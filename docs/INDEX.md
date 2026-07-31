@@ -27,7 +27,6 @@ purpose — an identifier is earned by being cited.
 
 | id | state | title | notes |
 |---|---|---|---|
-| `W-007` | planned | Re-pin the Zed grammar | `W-006` has landed, so this is unblocked. `extension.toml` pins `rev = d6997b1`, which predates the pest-side `type` grammar; run `./editors/zed/install.sh`. |
 | `Q-002` | open | Which archetype after `pie` and `packet`? | The Archmagos said "pie, packet, ce genre de chose" — the list is open. Candidates parked as `I-005`. |
 | `X-002` | mitigated | The two grammars can drift apart | `W-008` cross-checks them on every `cargo test` — but only when the `tree-sitter` CLI is on PATH; without it the test says SKIPPED and passes. |
 | `X-006` | open | Edge labels avoid lines, not each other's readability | `W-010` scores candidate positions and picks the least-obstructed. Two labels on the same crossing still both move; nothing guarantees the result is the *best* arrangement. |
@@ -69,6 +68,7 @@ not copies.
 | `W-004` | 2026-07-31 | `bgraph-lsp`: diagnostics, completion, hover, go-to-definition, outline | `1b53ec3` |
 | `W-005` | 2026-07-31 | Tree-sitter grammar and Zed extension | `1b53ec3`, regenerated `d6997b1` |
 | `W-006` | 2026-07-31 | `type` archetypes (`pie`, `packet`), quiet completion, explicit surface, generated reference manual | `4b4c548` |
+| `W-007` | 2026-07-31 | Re-pin the Zed grammar — `extension.toml` now points at `288f785`, which carries the `type` parser; `bgraph-lsp` reinstalled | this commit |
 | `W-008` | 2026-07-31 | Cross-check the two grammars over a shared corpus (`tests/grammar/`) | `4b4c548` |
 | `W-009` | 2026-07-31 | Draw self-loops — a sampled arc over the node's top edge | `4b4c548` |
 | `W-010` | 2026-07-31 | Place edge labels clear of the lines they would cross | `4b4c548` |

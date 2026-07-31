@@ -8,10 +8,10 @@ repository = "https://github.com/bunchy/bgraph"
 
 # The grammar lives in this same repository, under tree-sitter-bgraph/.
 # `rev` must be a real commit that contains the generated parser — run
-# ./editors/zed/sync-grammar.sh to point it at the current HEAD.
+# ./editors/zed/install.sh to point it at the current HEAD.
 [grammars.bgraph]
 repository = "file:///home/bunchy/Desktop/prj/p12"
-rev = "d6997b163974c416717a892bc34d26a7526f4224"
+rev = "288f7851aeba293ccb7e41561df39c7b83c0f5dd"
 path = "tree-sitter-bgraph"
 
 [language_servers.bgraph-lsp]
