@@ -900,6 +900,10 @@
               },
               {
                 "type": "SYMBOL",
+                "name": "member"
+              },
+              {
+                "type": "SYMBOL",
                 "name": "_newline"
               }
             ]
@@ -910,6 +914,31 @@
           "value": "}"
         }
       ]
+    },
+    "member": {
+      "type": "TOKEN",
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "- "
+              },
+              {
+                "type": "STRING",
+                "value": "+ "
+              }
+            ]
+          },
+          {
+            "type": "PATTERN",
+            "value": "[^\\n]*"
+          }
+        ]
+      }
     },
     "property": {
       "type": "SEQ",

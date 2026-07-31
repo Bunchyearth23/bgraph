@@ -270,6 +270,18 @@ slice <id> ["label"] <value>
 | `labels` | `labels: <percent\|value\|both\|none>` | What to write on each slice. Slices too thin to read are skipped. |
 | `legend` | `legend: <on\|off>` | Swatch-and-name list beside the chart. On by default — identity must never rest on color alone. |
 
+### `type class`
+
+Boxes with a name and a list of members, placed by anchors like `free`. A bare string in the block is a member.
+
+```
+class <id> ["label"]
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+
 ### `type state`
 
 A state machine. States are placed by anchors, exactly as in `free` — the archetype supplies the vocabulary and the shapes, not a layout engine. Nest them with `group`.

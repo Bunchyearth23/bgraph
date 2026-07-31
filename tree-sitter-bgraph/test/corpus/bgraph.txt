@@ -357,3 +357,30 @@ group outer "Outer" .frame at (0, 0) {
         from: (identifier)
         operator: (arrow)
         to: (identifier)))))
+
+================================================================================
+Members and properties share a block
+================================================================================
+
+class user "User" { fill: #111111 radius: 4
+  - id: Uuid
+  + save() : void
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (item_declaration
+    keyword: (item_keyword
+      (identifier))
+    name: (identifier)
+    label: (string)
+    body: (block
+      (property
+        name: (property_name)
+        value: (color))
+      (property
+        name: (property_name)
+        value: (number))
+      (member)
+      (member))))

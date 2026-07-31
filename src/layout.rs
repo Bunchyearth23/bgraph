@@ -241,6 +241,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
 
     let item = crate::check::archetype_of(diagram);
     let machine = item.name == "state";
+    let compartments = item.name == "class";
     // A base that leaves `shape` unset, so a declared one is distinguishable
     // from the default and a state can fall back to a rounded box.
     let node_base = if machine {
@@ -302,7 +303,32 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                 .collect()
         };
 
-        sizes.push(natural_size(&lines, &style));
+        // A class is sized by its widest line and the number of members, not
+        // by its name alone.
+        let size = if compartments {
+            let font = style.font_size.unwrap_or(14.0);
+            let pad = style.padding.unwrap_or(14.0);
+            let widest = lines
+                .iter()
+                .cloned()
+                .chain(node.members.iter().map(|m| m.value.clone()))
+                .collect::<Vec<_>>();
+            let rows = lines.len().max(1) + node.members.len();
+            (
+                style
+                    .width
+                    .unwrap_or((text_width(&widest, font) + pad * 2.0).max(96.0)),
+                style.height.unwrap_or(
+                    rows as f64 * font * 1.45
+                        + pad * 2.0
+                        + if node.members.is_empty() { 0.0 } else { 8.0 },
+                ),
+            )
+        } else {
+            natural_size(&lines, &style)
+        };
+
+        sizes.push(size);
         styles.push(style);
         labels.push(lines);
     }
@@ -314,7 +340,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     let solved = place_all(diagram, &index, &sizes, &opts)?;
     let placed = solved.nodes;
 
-    let nodes: Vec<PlacedNode> = diagram
+    let mut nodes: Vec<PlacedNode> = diagram
         .nodes
         .iter()
         .enumerate()
@@ -394,15 +420,86 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         })
         .collect::<Result<Vec<_>>>()?;
 
+    // A class's members are drawn as their own lines, under a rule that
+    // separates them from the name.
+    let guides = Vec::new();
+    let mut annotations = Vec::new();
+    let mut rules: Vec<PlacedNode> = Vec::new();
+    if compartments {
+        for (node, placed) in diagram.nodes.iter().zip(nodes.iter_mut()) {
+            let s = placed.style.clone();
+            let font = s.font_size.unwrap_or(14.0);
+            let pad = s.padding.unwrap_or(14.0);
+            let title_rows = placed.lines.len().max(1) as f64;
+            let head = placed.rect.y + pad + title_rows * font * 1.45;
+
+            // The name heads the box; taking it out of `lines` stops the
+            // renderer centring it over the members.
+            for (i, line) in std::mem::take(&mut placed.lines).into_iter().enumerate() {
+                annotations.push(Annotation {
+                    text: line,
+                    x: placed.rect.cx(),
+                    y: placed.rect.y + pad + (i as f64 + 0.5) * font * 1.45,
+                    anchor: Anchor::Middle,
+                    size: font,
+                    color: s.font_color.clone().unwrap_or_else(|| "#111827".into()),
+                    weight: s.font_weight.clone().unwrap_or_else(|| "600".into()),
+                    family: s.font_family.clone().unwrap_or_default(),
+                });
+            }
+
+            if node.members.is_empty() {
+                continue;
+            }
+
+            // A thin filled rect, not a `Guide`: guides are drawn beneath the
+            // boxes, so the rule would vanish under the class's own fill.
+            let thickness = s.stroke_width.unwrap_or(1.5);
+            rules.push(PlacedNode {
+                lines: Vec::new(),
+                rect: Rect {
+                    x: placed.rect.x,
+                    y: head - thickness / 2.0,
+                    w: placed.rect.w,
+                    h: thickness,
+                },
+                style: Style {
+                    fill: s.stroke.clone(),
+                    stroke: Some("none".into()),
+                    stroke_width: Some(0.0),
+                    radius: Some(0.0),
+                    shape: Some(Shape::Rect),
+                    ..Style::default()
+                },
+            });
+
+            for (i, member) in node.members.iter().enumerate() {
+                annotations.push(Annotation {
+                    text: member.value.clone(),
+                    x: placed.rect.x + pad,
+                    y: head + 8.0 + (i as f64 + 0.5) * font * 1.45,
+                    anchor: Anchor::Start,
+                    size: font * 0.92,
+                    color: s.font_color.clone().unwrap_or_else(|| "#111827".into()),
+                    weight: "400".into(),
+                    family: s.font_family.clone().unwrap_or_default(),
+                });
+            }
+        }
+    }
+
+    // After the boxes, so the compartment rules land on top of them.
+    nodes.extend(rules);
+
     Ok(Layout {
-        guides: Vec::new(),
+        guides,
         polylines: Vec::new(),
         groups,
         nodes,
         edges,
         opts,
         chart: Chart::Free,
-        annotations: Vec::new(),
+        annotations,
     })
 }
 

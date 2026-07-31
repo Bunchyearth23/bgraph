@@ -29,8 +29,8 @@ Ordered by what each unblocks, not by number. `W-011`, `W-012`, `W-015` and
 `W-029` have landed, so nesting, the plot frame, edge data and per-archetype
 vocabulary are available to everything below. `W-013` and `W-014` are the
 remaining foundations; each archetype names the one
-it waits for. One now waits for nothing — `W-025`, which unblocks nothing in
-turn and is largely a stylesheet over `free` plus groups.
+it waits for. `W-014` (dates) is the last foundation, and it unblocks `W-026`.
+`W-025` and `W-031` wait for nothing but unblock nothing in turn.
 
 **DSL impact, measured rather than assumed.** The grammar already accepts
 string lists (`data: "a" "b" "c"`), number lists (`points: 1 2 3`),
@@ -42,9 +42,8 @@ change the language: `W-011`, `W-013`, `W-014`.
 | id | state | title | notes |
 |---|---|---|---|
 | `W-011` | planned | **Containers / nesting** — `group` with children | **DSL change.** The one structural gap that keeps recurring: sequence `loop`/`alt` blocks, nested states, class packages, architecture groups, swimlanes, kanban columns, treemap nesting all need it. Promotes `I-006`. Blocks `W-020`, `W-021`, `W-022`. |
-| `W-013` | planned | **Node member lists** — a body of items, not properties | **DSL change.** A class needs fields and methods, a table needs columns; a label with `\n` is a workaround, not a model. Blocks `W-023`. |
 | `W-014` | planned | **Date and duration literals** | **DSL change.** `2026-07-31`, `3d`, `2w`. Blocks `W-026`. |
-| `W-023` | planned | `type class` and `type er` | Dev / data. Needs `W-013` for members, plus cardinality on arrows (`\|\|--o{`) — either new arrow tokens or `from-card:` / `to-card:` properties. |
+| `W-031` | planned | `type er` — entities and cardinality | Data. Members and the box are `W-023`'s; what remains is cardinality at each end of a relation — crow's-foot markers, or `from-card:` / `to-card:` read as text. |
 | `W-025` | planned | `type block` — architecture and C4-style component views | Dev. Boxes inside boxes with typed relations; `W-011` has landed. Closest of all of them to `free`, which is why it is worth doing as an archetype rather than by hand. |
 | `W-026` | planned | `type gantt` and `type timeline` | Project. Needs `W-014`. |
 | `W-027` | planned | **A stable embeddable API** | The long-term aim (`D-014`). `render_source` exists, but embedding needs a typed builder (construct a diagram without going through text), a documented public surface, no panics on hostile input, and semver. See `Q-003`. |
@@ -97,6 +96,8 @@ not copies.
 | `W-004` | 2026-07-31 | `bgraph-lsp`: diagnostics, completion, hover, go-to-definition, outline | `1b53ec3` |
 | `W-005` | 2026-07-31 | Tree-sitter grammar and Zed extension | `1b53ec3`, regenerated `d6997b1` |
 | `W-006` | 2026-07-31 | `type` archetypes (`pie`, `packet`), quiet completion, explicit surface, generated reference manual | `4b4c548` |
+| `W-013` | 2026-07-31 | Member lists — a `- ` or `+ ` line in a block, kept with its marker | this commit |
+| `W-023` | 2026-07-31 | `type class` — a name, a rule, and its members; placement stays declared | this commit |
 | `W-022` | 2026-07-31 | `type state` — declared placement kept, pseudo-states as marks, guards in brackets, nesting via groups | this commit |
 | `W-021` | 2026-07-31 | `type sequence` — participants, lifelines, ordered messages, self-messages, frames spanning message rows | this commit |
 | `W-030` | 2026-07-31 | Pan and zoom in the watch preview, kept across the reload a save triggers | this commit |

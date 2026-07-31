@@ -57,9 +57,9 @@ disagree.
 - `cargo run --bin bgraph -- watch diagram.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check diagram.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (176 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (183 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
-- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (24 corpus cases)
+- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (25 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
 - `./editors/zed/install.sh` — installs the server, regenerates + pins the grammar
 
@@ -302,6 +302,14 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   `tree_sitter_lock()` first. The CLI rebuilds the parser library into a
   shared path, and cargo's parallel test runner had two of them catching it
   mid-write — the corpus guard failed spuriously twice before this.
+
+- [2026-07-31] A member line opens with `- ` or `+ `, **space included**. That
+  space is what keeps `-40` a number, and the marker is what lets properties
+  keep sharing a line — the first attempt used a bare string and needed a
+  separator rule, which broke `{ fill: #111 stroke: #222 }`.
+- [2026-07-31] `Guide`s are drawn beneath the boxes. Anything that must appear
+  **over** a node — a class's compartment rule — is a thin `PlacedNode` pushed
+  after it, not a guide.
 
 ### Workarounds
 

@@ -80,7 +80,11 @@ align      = { "align" ~ align_kw }
 align_kw   = { "left" | "right" | "center" | "middle" | "top" | "bottom" }
 point      = { "(" ~ number ~ "," ~ number ~ ")" }
 
-block = { "{" ~ sep ~ (prop ~ sep)* ~ "}" }
+// A line opening with `- ` or `+ ` is a member — a class's field, a table's
+// column — and runs to the end of the line. The space is what keeps `-4` a
+// number, and the marker is what lets properties still share a line.
+block  = { "{" ~ sep ~ ((prop | member) ~ sep)* ~ "}" }
+member = @{ ("-" | "+") ~ " " ~ (!nl ~ ANY)* }
 // The lookahead stops a value list at the next `name:`, so several properties
 // can share a line without needing a separator.
 prop  = { ident ~ ":" ~ (!(ident ~ ":") ~ value)+ }

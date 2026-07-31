@@ -126,7 +126,8 @@ is a single item with two stray values rather than two items.
 | `sankey` | `node` | — the value is an **edge** slot: `a -> b 40` ✔ |
 | `state` | `state` | — ✔ |
 | `sequence` | `participant` | — ✔ |
-| `class` / `er` (`W-023`) | `class` / `entity` | — (members are `W-013`) |
+| `class` | `class` | — members are `- ` / `+ ` lines ✔ |
+| `er` (`W-031`) | `entity` | — members, plus cardinality on the arrows |
 | `treemap` | `box` | `value` — one number ✔ |
 | `gantt` / `timeline` (`W-026`) | `task` / `event` | start and duration (`W-014`) |
 | `block` (`W-025`) | `block` | — |

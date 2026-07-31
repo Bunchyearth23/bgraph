@@ -471,7 +471,9 @@ fn an_unknown_archetype_is_reported() {
     let e = err("type flowchart\nnode a");
     assert!(e.contains("unknown archetype `flowchart`"), "{e}");
     assert!(
-        e.contains("free, pie, state, sequence, xy, bar, sankey, wave, quadrant, treemap, packet"),
+        e.contains(
+            "free, pie, class, state, sequence, xy, bar, sankey, wave, quadrant, treemap, packet"
+        ),
         "{e}"
     );
 }
@@ -2454,4 +2456,94 @@ fn a_label_prefers_clipping_a_node_to_leaving_its_edge() {
         (y + 10.0 - (20.0 + translation)).abs() < 14.0,
         "label at y={y}"
     );
+}
+
+// ---------------------------------------------------------------- members
+
+#[test]
+fn a_member_line_opens_with_a_marker() {
+    let l = build(
+        r#"
+        type class
+        class user "User" {
+          fill: #123456
+          - id: Uuid
+          + save() : void
+        }
+    "#,
+    );
+
+    // The marker is kept: `-` and `+` are the visibility UML readers expect.
+    let text: Vec<&str> = l.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert!(text.contains(&"- id: Uuid"), "{text:?}");
+    assert!(text.contains(&"+ save() : void"), "{text:?}");
+    assert!(text.contains(&"User"), "the name heads the box");
+    // Properties in the same block still work.
+    assert_eq!(l.nodes[0].style.fill.as_deref(), Some("#123456"));
+}
+
+#[test]
+fn properties_may_still_share_a_line() {
+    // The marker exists precisely so members need no separator rule, which
+    // would have broken this — a documented shape with its own corpus case.
+    let l = build("node a { fill: #111111 stroke: #222222 2 dashed }");
+    assert_eq!(l.nodes[0].style.fill.as_deref(), Some("#111111"));
+    assert_eq!(l.nodes[0].style.stroke.as_deref(), Some("#222222"));
+    assert_eq!(l.nodes[0].style.stroke_width, Some(2.0));
+}
+
+#[test]
+fn a_negative_number_is_not_a_member() {
+    // The space after the marker is what keeps `-40` a coordinate.
+    let l = build("node a at (-40, -20) { size: 10 10 }");
+    assert_eq!((l.nodes[0].rect.x, l.nodes[0].rect.y), (-40.0, -20.0));
+}
+
+#[test]
+fn a_class_is_sized_by_its_widest_member() {
+    let narrow = build("type class\nclass a \"A\" {\n - x: u8\n}");
+    let wide = build("type class\nclass a \"A\" {\n - a_very_long_field_name_indeed: SomeType\n}");
+    assert!(wide.nodes[0].rect.w > narrow.nodes[0].rect.w);
+
+    let one = build("type class\nclass a \"A\" {\n - x: u8\n}");
+    let three = build("type class\nclass a \"A\" {\n - x: u8\n - y: u8\n - z: u8\n}");
+    assert!(three.nodes[0].rect.h > one.nodes[0].rect.h);
+}
+
+#[test]
+fn a_compartment_rule_is_drawn_over_the_box() {
+    // A `Guide` would have been drawn beneath the boxes and vanished under
+    // the class's own fill.
+    let l = build("type class\nclass a \"A\" {\n - x: u8\n}");
+    assert!(l.guides.is_empty());
+    assert_eq!(l.nodes.len(), 2, "the box, then the rule");
+    let rule = &l.nodes[1];
+    assert!(rule.rect.h < 4.0 && rule.rect.w == l.nodes[0].rect.w);
+
+    let svg = render_svg::render(&l);
+    let box_at = svg.find(r#"rx="8""#).or_else(|| svg.find("<rect")).unwrap();
+    let rule_at = svg.rfind("<rect").unwrap();
+    assert!(box_at < rule_at, "the rule must come after the box");
+}
+
+#[test]
+fn members_outside_a_class_are_reported() {
+    let d = diags("node a \"A\" {\n - x: u8\n}");
+    assert!(
+        d.iter()
+            .any(|x| x.message.contains("only drawn by `type class`")),
+        "{d:?}"
+    );
+    let d = diags("type class\nclass a \"A\"");
+    assert!(
+        d.iter().any(|x| x.message.contains("has no members")),
+        "{d:?}"
+    );
+}
+
+#[test]
+fn a_diagnostic_spells_its_plurals() {
+    // `classs` in a message about class diagrams undermines the rest of it.
+    let e = err("type pie\nclass a \"A\" 1");
+    assert!(e.contains("declares slices, not classes"), "{e}");
 }

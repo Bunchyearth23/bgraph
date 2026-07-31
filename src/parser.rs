@@ -237,6 +237,7 @@ fn parse_item(pair: Pair<Rule>) -> Result<NodeDecl> {
     let mut classes = Vec::new();
     let mut placement = None;
     let mut props = Vec::new();
+    let mut members = Vec::new();
 
     for part in pair.into_inner() {
         let part_span = span_of(&part);
@@ -249,7 +250,7 @@ fn parse_item(pair: Pair<Rule>) -> Result<NodeDecl> {
             Rule::string if label.is_none() => label = Some(unescape(part)),
             Rule::class_ref => classes.push(class_name(part)),
             Rule::abs_pos | Rule::rel_pos => placement = Some(parse_placement(part)?),
-            Rule::block => props = parse_block(part)?,
+            Rule::block => (props, members) = parse_body(part)?,
             Rule::ident | Rule::string | Rule::number | Rule::color => {
                 let start = positional_span.map_or(part_span.start, |s: Span| s.start);
                 positional_span = Some(Span {
@@ -271,6 +272,7 @@ fn parse_item(pair: Pair<Rule>) -> Result<NodeDecl> {
         classes,
         placement,
         props,
+        members,
         span,
     })
 }
@@ -378,11 +380,28 @@ fn parse_placement(pair: Pair<Rule>) -> Result<Placement> {
 }
 
 fn parse_block(pair: Pair<Rule>) -> Result<Vec<Prop>> {
+    Ok(parse_body(pair)?.0)
+}
+
+/// A block holds properties and, for archetypes that read them, members.
+fn parse_body(pair: Pair<Rule>) -> Result<(Vec<Prop>, Vec<Spanned<String>>)> {
     let mut props = Vec::new();
-    for prop in pair.into_inner() {
-        props.extend(parse_prop(prop)?);
+    let mut members = Vec::new();
+
+    for entry in pair.into_inner() {
+        match entry.as_rule() {
+            Rule::member => {
+                // The marker is kept: `-` and `+` are the visibility a reader
+                // of UML expects to see.
+                let span = span_of(&entry);
+                let text = entry.as_str().trim_end().to_string();
+                members.push(Spanned { value: text, span });
+            }
+            _ => props.extend(parse_prop(entry)?),
+        }
     }
-    Ok(props)
+
+    Ok((props, members))
 }
 
 fn parse_prop(prop: Pair<Rule>) -> Result<Vec<Prop>> {

@@ -45,6 +45,10 @@
       "required": false,
       "types": [
         {
+          "type": "member",
+          "named": true
+        },
+        {
           "type": "property",
           "named": true
         }
@@ -691,6 +695,10 @@
   {
     "type": "left-of",
     "named": false
+  },
+  {
+    "type": "member",
+    "named": true
   },
   {
     "type": "middle",

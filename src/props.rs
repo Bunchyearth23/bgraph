@@ -457,6 +457,15 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         edge_slots: &[],
     },
     ArchetypeDef {
+        name: "class",
+        item: "class",
+        doc: "Boxes with a name and a list of members, placed by anchors like \
+              `free`. A bare string in the block is a member.",
+        props: CLASS_PROPS,
+        slots: &[],
+        edge_slots: &[],
+    },
+    ArchetypeDef {
         name: "state",
         item: "state",
         doc: "A state machine. States are placed by anchors, exactly as in \
@@ -623,6 +632,15 @@ pub const PIE_PROPS: &[PropDef] = &[
               must never rest on color alone.",
     },
 ];
+
+pub const CLASS_PROPS: &[PropDef] = &[PropDef {
+    name: "title",
+    alias: false,
+    ctx: Ctx::Both,
+    words: &[],
+    syntax: "title: <text>",
+    doc: "Heading drawn above the diagram.",
+}];
 
 pub const STATE_KINDS: &[&str] = &["state", "initial", "final", "choice"];
 

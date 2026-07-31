@@ -60,6 +60,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "quadrant" => check_quadrant(diagram, &mut out),
         "wave" => check_wave(diagram, &mut out),
         "sequence" => check_sequence(diagram, &mut out),
+        "class" => check_class(diagram, &mut out),
         "state" => {
             check_cycles(diagram, &nodes, &mut out);
             check_state(diagram, &mut out);
@@ -369,10 +370,27 @@ fn check_keyword(node: &NodeDecl, def: &'static props::ArchetypeDef, out: &mut V
     out.push(Diag::error(
         node.keyword.span,
         format!(
-            "`type {}` declares {}s, not {written}s{hint}",
-            def.name, def.item
+            "`type {}` declares {}, not {}{hint}",
+            def.name,
+            plural(def.item),
+            plural(written)
         ),
     ));
+}
+
+/// Enough English to keep a diagnostic from reading like a bug: `classs` in a
+/// message about class diagrams undermines everything else it says.
+fn plural(word: &str) -> String {
+    let suffix = if word.ends_with('s')
+        || word.ends_with('x')
+        || word.ends_with("ch")
+        || word.ends_with("sh")
+    {
+        "es"
+    } else {
+        "s"
+    };
+    format!("{word}{suffix}")
 }
 
 /// Positional values fill the archetype's slots in order.
@@ -887,6 +905,32 @@ fn first_cycle(count: usize, edges: &[(usize, usize)]) -> Option<Vec<usize>> {
     Some((0..count).filter(|i| degree[*i] > 0).collect())
 }
 
+fn check_class(diagram: &Diagram, out: &mut Vec<Diag>) {
+    check_cycles_free(diagram, out);
+    for node in &diagram.nodes {
+        if node.members.is_empty() {
+            out.push(Diag::warn(
+                node.id.span,
+                format!(
+                    "`{}` has no members; a class with none is a plain box",
+                    node.id.as_str()
+                ),
+            ));
+        }
+    }
+}
+
+/// Archetypes that keep the free solver still need its cycle check.
+fn check_cycles_free(diagram: &Diagram, out: &mut Vec<Diag>) {
+    let index: HashMap<&str, usize> = diagram
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.id.as_str(), i))
+        .collect();
+    check_cycles(diagram, &index, out);
+}
+
 fn check_state(diagram: &Diagram, out: &mut Vec<Diag>) {
     use crate::style::StateKind;
 
@@ -1212,6 +1256,12 @@ fn check_treemap(diagram: &Diagram, out: &mut Vec<Diag>) {
 /// `value` and `bits` are data for an archetype that is not in play.
 fn check_unused_data(diagram: &Diagram, out: &mut Vec<Diag>) {
     for node in &diagram.nodes {
+        if let Some(member) = node.members.first() {
+            out.push(Diag::warn(
+                member.span,
+                "members are only drawn by `type class`".to_string(),
+            ));
+        }
         for prop in &node.props {
             let owner = match prop.name.as_str() {
                 "value" => "pie` or `type treemap",

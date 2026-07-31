@@ -85,6 +85,9 @@ pub struct NodeDecl {
     pub classes: Vec<Spanned<String>>,
     pub placement: Option<Placement>,
     pub props: Vec<Prop>,
+    /// Bare strings written in the block: a class's fields, a table's columns.
+    /// Distinct from `GroupDecl::members`, which names other declarations.
+    pub members: Vec<Spanned<String>>,
     pub span: Span,
 }
 

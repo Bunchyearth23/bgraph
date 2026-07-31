@@ -172,7 +172,12 @@ module.exports = grammar({
 
     // ---------------------------------------------------------- blocks
 
-    block: ($) => seq('{', repeat(choice($.property, $._newline)), '}'),
+    // A line opening with `- ` or `+ ` is a member — a class's field, a
+    // table's column — and runs to the end of the line. The space is what
+    // keeps `-4` a number.
+    block: ($) => seq('{', repeat(choice($.property, $.member, $._newline)), '}'),
+
+    member: (_) => token(seq(choice('- ', '+ '), /[^\n]*/)),
 
     property: ($) => seq(field('name', $.property_name), field('value', repeat1($._value))),
 
