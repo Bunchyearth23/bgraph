@@ -9,3 +9,6 @@
 /editors/zed/grammars/
 /tree-sitter-bgraph/*.so
 /tree-sitter-bgraph/*.dylib
+
+# your scratch file — yours, not the repo's
+/test.bd
