@@ -12,19 +12,34 @@ module.exports = grammar({
   // Horizontal space and comments only: newlines are significant.
   extras: ($) => [/[ \t]/, $.comment],
 
+  // Keyword extraction: `type`, `node`, … are lexed as identifiers first and
+  // reclassified, so a node may still be named after one where the parser
+  // expects an identifier — matching the pest grammar's backtracking.
+  word: ($) => $.identifier,
+
   conflicts: ($) => [],
 
   rules: {
     source_file: ($) => repeat(choice($._statement, $._newline)),
 
     _statement: ($) =>
-      choice($.graph_declaration, $.style_declaration, $.node_declaration, $.edge_declaration),
+      choice(
+        $.type_declaration,
+        $.graph_declaration,
+        $.style_declaration,
+        $.node_declaration,
+        $.edge_declaration,
+      ),
 
     _newline: (_) => choice('\n', '\r\n', ';', ','),
 
     comment: (_) => token(seq('//', /[^\n]*/)),
 
     // ---------------------------------------------------------- statements
+
+    // The archetype: `type pie { … }`. Absent means `free`.
+    type_declaration: ($) =>
+      seq('type', field('name', $.identifier), optional(field('body', $.block))),
 
     graph_declaration: ($) => seq('graph', field('body', $.block)),
 

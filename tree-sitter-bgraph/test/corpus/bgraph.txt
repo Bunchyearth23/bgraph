@@ -169,3 +169,39 @@ node b "a { brace } and a \" quote"
 (source_file
   (node_declaration name: (identifier) label: (string))
   (node_declaration name: (identifier) label: (string)))
+
+================================================================================
+Archetype declaration
+================================================================================
+
+type pie {
+  title: "Traffic"
+  donut: 0.55
+}
+
+node organic "Organic" { value: 4820 }
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (type_declaration
+    name: (identifier)
+    body: (block
+      (property name: (property_name) value: (string))
+      (property name: (property_name) value: (number))))
+  (node_declaration
+    name: (identifier)
+    label: (string)
+    body: (block
+      (property name: (property_name) value: (number)))))
+
+================================================================================
+Bare archetype
+================================================================================
+
+type free
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (type_declaration name: (identifier)))

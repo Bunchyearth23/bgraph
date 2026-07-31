@@ -357,6 +357,10 @@
         {
           "type": "style_declaration",
           "named": true
+        },
+        {
+          "type": "type_declaration",
+          "named": true
         }
       ]
     }
@@ -388,6 +392,32 @@
       "parent": {
         "multiple": false,
         "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "type_declaration",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
         "types": [
           {
             "type": "identifier",
@@ -520,6 +550,10 @@
   },
   {
     "type": "top",
+    "named": false
+  },
+  {
+    "type": "type",
     "named": false
   },
   {
