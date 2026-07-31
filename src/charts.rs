@@ -1950,6 +1950,7 @@ fn draw_frame(
 
 /// Swatch, name, one per series — always present past a single series, so
 /// identity never rests on colour alone.
+#[allow(clippy::too_many_arguments)]
 fn draw_legend(
     names: &[String],
     colours: &[String],
