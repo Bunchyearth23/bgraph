@@ -60,7 +60,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "quadrant" => check_quadrant(diagram, &mut out),
         "wave" => check_wave(diagram, &mut out),
         "sankey" => check_sankey(diagram, &mut out),
-        "bar" => check_bar(diagram, &mut out),
+        "bar" | "xy" => check_bar(diagram, &mut out),
         _ => {
             check_cycles(diagram, &nodes, &mut out);
             check_unused_data(diagram, &mut out);
@@ -668,8 +668,11 @@ fn check_packet(diagram: &Diagram, out: &mut Vec<Diag>) {
     }
 }
 
+/// `bar` and `xy` read the same data: named categories and one number per
+/// category, per series.
 fn check_bar(diagram: &Diagram, out: &mut Vec<Diag>) {
-    warn_ignored(diagram, "bar", out);
+    let archetype = archetype_of(diagram).name;
+    warn_ignored(diagram, archetype, out);
 
     let cfg = &diagram.archetype_props;
     let categories = cfg
@@ -677,7 +680,7 @@ fn check_bar(diagram: &Diagram, out: &mut Vec<Diag>) {
         .find(|p| p.name == "categories")
         .map_or(0, |p| p.values.len());
 
-    let styles = resolved_nodes(diagram, base_style("bar"));
+    let styles = resolved_nodes(diagram, base_style(archetype));
     for (i, node) in diagram.nodes.iter().enumerate() {
         let points = styles.get(i).and_then(|s| s.points.as_ref());
         let Some(points) = points.filter(|p| !p.is_empty()) else {
@@ -718,13 +721,15 @@ fn check_bar(diagram: &Diagram, out: &mut Vec<Diag>) {
         ));
     }
 
-    if let Some(prop) = cfg.iter().find(|p| p.name == "y-axis")
-        && prop.values.len() != 2
-    {
-        out.push(Diag::error(
-            prop.values_span,
-            "`y-axis` takes a minimum and a maximum".to_string(),
-        ));
+    for key in ["y-axis", "x-axis"] {
+        if let Some(prop) = cfg.iter().find(|p| p.name == key)
+            && prop.values.len() != 2
+        {
+            out.push(Diag::error(
+                prop.values_span,
+                format!("`{key}` takes a minimum and a maximum"),
+            ));
+        }
     }
 
     let drawn = diagram

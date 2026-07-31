@@ -1,0 +1,2 @@
+type xy { categories: "a" "b" mark: area }
+series s "S" 1 2

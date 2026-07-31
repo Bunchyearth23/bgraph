@@ -111,6 +111,8 @@ pub enum Chart {
     Sankey,
     /// Bars on a value axis. `guides` carries the frame.
     Bar,
+    /// Lines, areas or dots on two axes.
+    Xy,
     /// Slices, which need arcs the node renderer cannot make.
     Pie(Pie),
 }
@@ -214,6 +216,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         "wave" => return crate::charts::wave(diagram, opts, &registry),
         "sankey" => return crate::charts::sankey(diagram, opts, &registry),
         "bar" => return crate::charts::bar(diagram, opts, &registry),
+        "xy" => return crate::charts::xy(diagram, opts, &registry),
         _ => {}
     }
 

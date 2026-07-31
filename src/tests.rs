@@ -471,7 +471,7 @@ fn an_unknown_archetype_is_reported() {
     let e = err("type flowchart\nnode a");
     assert!(e.contains("unknown archetype `flowchart`"), "{e}");
     assert!(
-        e.contains("free, pie, bar, sankey, wave, quadrant, treemap, packet"),
+        e.contains("free, pie, xy, bar, sankey, wave, quadrant, treemap, packet"),
         "{e}"
     );
 }
@@ -2071,5 +2071,109 @@ fn the_axis_can_be_forced() {
     assert!(
         err("type bar { categories: \"a\" y-axis: 5 }\nseries s 1")
             .contains("takes a minimum and a maximum")
+    );
+}
+
+// -------------------------------------------------------------------- xy
+
+#[test]
+fn a_line_reaches_both_edges_of_the_plot() {
+    let l = build(
+        r#"
+        type xy { size: 400 200 categories: "a" "b" "c" legend: off }
+        series s "S" 0 50 100
+    "#,
+    );
+
+    assert!(matches!(l.chart, crate::layout::Chart::Xy));
+    let line = l.polylines.iter().find(|p| !p.closed).expect("a line");
+    assert_eq!(line.points.len(), 3);
+
+    // Points sit on the plot's edges, not in slot centres: a line that stops
+    // short of the axis reads as clipped.
+    let gutter = line.points[0].0;
+    assert!(
+        (line.points[2].0 - gutter - 400.0).abs() < 0.01,
+        "{:?}",
+        line.points
+    );
+    // And the values map onto the axis.
+    assert!(line.points[0].1 > line.points[2].1);
+}
+
+#[test]
+fn an_area_closes_on_the_baseline() {
+    let l = build(
+        r#"
+        type xy { size: 400 200 categories: "a" "b" mark: area legend: off }
+        series s "S" 40 80
+    "#,
+    );
+
+    let band = l.polylines.iter().find(|p| p.closed).expect("an area");
+    // Two points on the curve, two dropped to the baseline.
+    assert_eq!(band.points.len(), 4);
+    assert_eq!(band.points[2].1, band.points[3].1, "the base is level");
+    assert!(
+        band.fill.as_deref().is_some_and(|f| f.ends_with("40")),
+        "translucent"
+    );
+    // The line is still drawn over it.
+    assert!(l.polylines.iter().any(|p| !p.closed));
+}
+
+#[test]
+fn dots_are_large_enough_to_aim_at() {
+    let l = build(
+        r#"
+        type xy { size: 400 200 categories: "a" "b" mark: dot legend: off }
+        series s "S" 40 80
+    "#,
+    );
+
+    assert!(l.polylines.is_empty(), "a dot plot draws no line");
+    assert_eq!(l.nodes.len(), 2);
+    assert!(l.nodes[0].rect.w >= 8.0, "markers are at least 8px across");
+}
+
+#[test]
+fn a_numeric_x_axis_replaces_the_categories() {
+    let l = build(
+        r#"
+        type xy { size: 400 200 x-axis: 0 100 legend: off }
+        series s "S" 1 2 3
+    "#,
+    );
+
+    // Ticks come from the axis, not from category names.
+    let labels: Vec<&str> = l.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert!(
+        labels.contains(&"0") && labels.contains(&"100"),
+        "{labels:?}"
+    );
+
+    assert!(err("type xy { x-axis: 5 }\nseries s 1").contains("takes a minimum and a maximum"));
+}
+
+#[test]
+fn a_single_point_is_still_drawn() {
+    let l = build(
+        r#"
+        type xy { size: 400 200 categories: "only" legend: off }
+        series s "S" 42
+    "#,
+    );
+    // No line to draw, so the point is marked instead of vanishing.
+    assert_eq!(l.nodes.len(), 1);
+}
+
+#[test]
+fn xy_and_bar_share_their_diagnostics() {
+    assert!(err("type xy { categories: \"a\" }\nseries s \"S\"").contains("has no numbers"));
+    let d = diags("type xy { categories: \"a\" \"b\" }\nseries s \"S\" 1");
+    assert!(
+        d.iter()
+            .any(|x| x.message.contains("1 number for 2 categories")),
+        "{d:?}"
     );
 }

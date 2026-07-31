@@ -439,6 +439,18 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         edge_slots: &[],
     },
     ArchetypeDef {
+        name: "xy",
+        item: "series",
+        doc: "Lines, areas or dots over a shared x axis. One series per \
+              statement, its numbers evenly spaced across the plot.",
+        props: XY_PROPS,
+        slots: &[Slot {
+            prop: "points",
+            arity: VARIADIC,
+        }],
+        edge_slots: &[],
+    },
+    ArchetypeDef {
         name: "bar",
         item: "series",
         doc: "Bars grouped or stacked across named categories. One series per \
@@ -572,6 +584,70 @@ pub const PIE_PROPS: &[PropDef] = &[
         syntax: "legend: <on|off>",
         doc: "Swatch-and-name list beside the chart. On by default — identity \
               must never rest on color alone.",
+    },
+];
+
+pub const XY_MARKS: &[&str] = &["line", "area", "dot"];
+
+pub const XY_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the chart.",
+    },
+    PropDef {
+        name: "size",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "size: <width> <height>",
+        doc: "The plot area, before axis labels and legend. 560 by 320 by default.",
+    },
+    PropDef {
+        name: "categories",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "categories: \"<first>\" \"<second>\" …",
+        doc: "Labels for the x positions. One per point, in order.",
+    },
+    PropDef {
+        name: "x-axis",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "x-axis: <min> <max>",
+        doc: "A numeric x span instead of named categories; the points are \
+              spread evenly across it.",
+    },
+    PropDef {
+        name: "y-axis",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "y-axis: <min> <max>",
+        doc: "Force the value axis. Otherwise it is rounded outward from the \
+              data to human numbers.",
+    },
+    PropDef {
+        name: "mark",
+        alias: false,
+        ctx: Ctx::Both,
+        words: XY_MARKS,
+        syntax: "mark: <line|area|dot>",
+        doc: "How a series is drawn. `line` by default; `area` fills beneath \
+              it, `dot` plots the points alone.",
+    },
+    PropDef {
+        name: "legend",
+        alias: false,
+        ctx: Ctx::Both,
+        words: TOGGLE,
+        syntax: "legend: <on|off>",
+        doc: "Swatch-and-name list. Shown from two series up.",
     },
 ];
 

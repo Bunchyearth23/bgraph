@@ -1,0 +1,12 @@
+type xy {
+  title: "Requests per second, by week"
+  size: 520 260
+  categories: "W1" "W2" "W3" "W4" "W5" "W6" "W7" "W8"
+  mark: line
+}
+graph { background: #0b1120 padding: 32 }
+style series { font: 12 #e2e8f0 }
+
+series edge   "Edge"    120 168 155 210 265 240 310 355
+series origin "Origin"   90 102 118 130 126 148 160 172
+series cache  "Cache"    30  66  37  80 139  92 150 183

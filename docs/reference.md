@@ -263,6 +263,24 @@ slice <id> ["label"] <value>
 | `labels` | `labels: <percent\|value\|both\|none>` | What to write on each slice. Slices too thin to read are skipped. |
 | `legend` | `legend: <on\|off>` | Swatch-and-name list beside the chart. On by default — identity must never rest on color alone. |
 
+### `type xy`
+
+Lines, areas or dots over a shared x axis. One series per statement, its numbers evenly spaced across the plot.
+
+```
+series <id> ["label"] <points> …
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the chart. |
+| `size` | `size: <width> <height>` | The plot area, before axis labels and legend. 560 by 320 by default. |
+| `categories` | `categories: "<first>" "<second>" …` | Labels for the x positions. One per point, in order. |
+| `x-axis` | `x-axis: <min> <max>` | A numeric x span instead of named categories; the points are spread evenly across it. |
+| `y-axis` | `y-axis: <min> <max>` | Force the value axis. Otherwise it is rounded outward from the data to human numbers. |
+| `mark` | `mark: <line\|area\|dot>` | How a series is drawn. `line` by default; `area` fills beneath it, `dot` plots the points alone. |
+| `legend` | `legend: <on\|off>` | Swatch-and-name list. Shown from two series up. |
+
 ### `type bar`
 
 Bars grouped or stacked across named categories. One series per statement, its numbers in category order.

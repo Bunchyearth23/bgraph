@@ -1892,7 +1892,9 @@ pub fn nice_scale(min: f64, max: f64, want: usize) -> Scale {
 fn draw_frame(
     plot: Rect,
     scale: &Scale,
-    categories: &[String],
+    // `x_labels` places each label across the plot, 0 at the left edge and 1
+    // at the right — slot centres for bars, tick positions for a numeric axis.
+    x_labels: &[(f64, String)],
     theme: &Theme,
     base: &Style,
     guides: &mut Vec<Guide>,
@@ -1930,14 +1932,10 @@ fn draw_frame(
         dash: None,
     });
 
-    if categories.is_empty() {
-        return;
-    }
-    let slot = plot.w / categories.len() as f64;
-    for (i, name) in categories.iter().enumerate() {
+    for (fraction, name) in x_labels {
         annotations.push(Annotation {
             text: name.clone(),
-            x: plot.x + slot * (i as f64 + 0.5),
+            x: plot.x + fraction * plot.w,
             y: plot.bottom() + 16.0,
             anchor: Anchor::Middle,
             size: 11.0,
@@ -2110,10 +2108,16 @@ pub fn bar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
         });
     }
 
+    let slots_for_labels = categories.len().max(1) as f64;
+    let x_labels: Vec<(f64, String)> = categories
+        .iter()
+        .enumerate()
+        .map(|(i, name)| ((i as f64 + 0.5) / slots_for_labels, name.clone()))
+        .collect();
     draw_frame(
         plot,
         &scale,
-        &categories,
+        &x_labels,
         &theme,
         &base,
         &mut guides,
@@ -2218,6 +2222,243 @@ pub fn bar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
         edges: Vec::new(),
         opts,
         chart: Chart::Bar,
+        annotations,
+    })
+}
+
+// -------------------------------------------------------------------- xy
+
+pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
+    let cfg = &diagram.archetype_props;
+    let theme = Theme::of(&opts);
+    let def = crate::check::archetype_of(diagram);
+    let palette = theme.palette();
+
+    let width = setting(cfg, "size")
+        .and_then(|v| v.first())
+        .and_then(|v| v.as_num())
+        .unwrap_or(560.0)
+        .max(120.0);
+    let height = setting(cfg, "size")
+        .and_then(|v| v.get(1))
+        .and_then(|v| v.as_num())
+        .unwrap_or(320.0)
+        .max(80.0);
+    let mark = word(cfg, "mark", "line");
+    let title = text(cfg, "title");
+    let categories: Vec<String> = setting(cfg, "categories")
+        .map(|v| {
+            v.iter()
+                .filter_map(|x| x.as_text())
+                .map(String::from)
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
+
+    let mut series = Vec::new();
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        let style = registry.resolve(
+            chart_defaults(),
+            def.item,
+            &node.classes,
+            &node.effective_props(def.slots),
+        )?;
+        let Some(points) = style.points.clone().filter(|p| !p.is_empty()) else {
+            continue;
+        };
+        let colour = style
+            .fill
+            .clone()
+            .or_else(|| style.stroke.clone())
+            .unwrap_or_else(|| palette[i.min(palette.len() - 1)].to_string());
+        let name = node.label.clone().unwrap_or_else(|| node.id.value.clone());
+        series.push((name, points, colour, style));
+    }
+
+    let count = series.iter().map(|(_, p, _, _)| p.len()).max().unwrap_or(0);
+
+    let (mut lo, mut hi) = (f64::MAX, f64::MIN);
+    for (_, points, _, _) in &series {
+        for v in points {
+            lo = lo.min(*v);
+            hi = hi.max(*v);
+        }
+    }
+    if series.is_empty() {
+        (lo, hi) = (0.0, 1.0);
+    }
+    // An area is read against the baseline, so the axis has to include it.
+    if mark == "area" {
+        lo = lo.min(0.0);
+    }
+    let scale = match setting(cfg, "y-axis") {
+        Some(v) if v.len() == 2 => {
+            nice_scale(v[0].as_num().unwrap_or(lo), v[1].as_num().unwrap_or(hi), 5)
+        }
+        _ => nice_scale(lo, hi, 5),
+    };
+
+    let title_h = if title.is_some() {
+        TITLE_SIZE * 2.0
+    } else {
+        0.0
+    };
+    let gutter = scale
+        .ticks
+        .iter()
+        .map(|t| text_width(&[trim_number(*t)], 11.0))
+        .fold(0.0_f64, f64::max)
+        + 14.0;
+    let plot = Rect {
+        x: gutter,
+        y: title_h,
+        w: width,
+        h: height,
+    };
+
+    // Points sit on the plot's edges, not in slot centres: a line has to
+    // reach the axis at both ends or it reads as clipped.
+    let at = |i: usize| -> f64 {
+        if count <= 1 {
+            0.5
+        } else {
+            i as f64 / (count - 1) as f64
+        }
+    };
+
+    let x_labels: Vec<(f64, String)> = match setting(cfg, "x-axis") {
+        Some(v) if v.len() == 2 => {
+            let x = nice_scale(
+                v[0].as_num().unwrap_or(0.0),
+                v[1].as_num().unwrap_or(count as f64),
+                5,
+            );
+            x.ticks
+                .iter()
+                .map(|t| (x.fraction(*t), trim_number(*t)))
+                .collect()
+        }
+        _ => categories
+            .iter()
+            .enumerate()
+            .map(|(i, name)| (at(i), name.clone()))
+            .collect(),
+    };
+
+    let mut guides = Vec::new();
+    let mut polylines = Vec::new();
+    let mut nodes = Vec::new();
+    let mut annotations = Vec::new();
+
+    if let Some(title) = title {
+        annotations.push(Annotation {
+            text: title,
+            x: 0.0,
+            y: TITLE_SIZE,
+            anchor: Anchor::Start,
+            size: TITLE_SIZE,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    draw_frame(
+        plot,
+        &scale,
+        &x_labels,
+        &theme,
+        &base,
+        &mut guides,
+        &mut annotations,
+    );
+
+    for (_, points, colour, style) in &series {
+        let path: Vec<(f64, f64)> = points
+            .iter()
+            .enumerate()
+            .map(|(i, v)| {
+                (
+                    plot.x + at(i) * plot.w,
+                    plot.bottom() - scale.fraction(*v) * plot.h,
+                )
+            })
+            .collect();
+
+        if mark == "area" && path.len() >= 2 {
+            let base_y = plot.bottom() - scale.fraction(scale.min.max(0.0)) * plot.h;
+            let mut band = path.clone();
+            band.push((path[path.len() - 1].0, base_y));
+            band.push((path[0].0, base_y));
+            let (opaque, _) = crate::render_svg::split_alpha(colour);
+            polylines.push(Polyline {
+                points: band,
+                closed: true,
+                fill: Some(format!("{opaque}40")),
+                stroke: None,
+                width: 0.0,
+            });
+        }
+
+        if mark != "dot" && path.len() >= 2 {
+            polylines.push(Polyline {
+                points: path.clone(),
+                closed: false,
+                fill: None,
+                stroke: Some(colour.clone()),
+                width: style.stroke_width.unwrap_or(2.0),
+            });
+        }
+
+        // Markers are at least 8px across, or they are not targets.
+        if mark == "dot" || path.len() == 1 {
+            for (x, y) in path {
+                nodes.push(PlacedNode {
+                    lines: Vec::new(),
+                    rect: Rect {
+                        x: x - 4.5,
+                        y: y - 4.5,
+                        w: 9.0,
+                        h: 9.0,
+                    },
+                    style: Style {
+                        fill: Some(colour.clone()),
+                        stroke: Some(theme.surface.clone()),
+                        stroke_width: Some(1.5),
+                        shape: Some(Shape::Ellipse),
+                        ..style.clone()
+                    },
+                });
+            }
+        }
+    }
+
+    let wants_legend = toggle(cfg, "legend", series.len() > 1);
+    if wants_legend && !series.is_empty() {
+        let names: Vec<String> = series.iter().map(|(n, _, _, _)| n.clone()).collect();
+        let colours: Vec<String> = series.iter().map(|(_, _, c, _)| c.clone()).collect();
+        draw_legend(
+            &names,
+            &colours,
+            plot.right() + LEGEND_MARGIN,
+            plot.y,
+            &theme,
+            &base,
+            &mut nodes,
+            &mut annotations,
+        );
+    }
+
+    Ok(Layout {
+        guides,
+        polylines,
+        groups: Vec::new(),
+        nodes,
+        edges: Vec::new(),
+        opts,
+        chart: Chart::Xy,
         annotations,
     })
 }
