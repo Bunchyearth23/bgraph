@@ -272,6 +272,14 @@ pub const PROPS: &[PropDef] = &[
         doc: "Magnitude of a slice. Required by `type pie`, ignored elsewhere.",
     },
     PropDef {
+        name: "points",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "points: <n> <n> …",
+        doc: "One number per category, in order. Required by `type bar`.",
+    },
+    PropDef {
         name: "wave",
         alias: false,
         ctx: Ctx::Node,
@@ -401,9 +409,12 @@ pub struct ArchetypeDef {
 
 pub struct Slot {
     pub prop: &'static str,
-    /// How many values this slot takes.
+    /// How many values this slot takes. `VARIADIC` takes everything left.
     pub arity: usize,
 }
+
+/// A slot that swallows the rest of the line — a series of numbers.
+pub const VARIADIC: usize = usize::MAX;
 
 pub const ARCHETYPES: &[ArchetypeDef] = &[
     ArchetypeDef {
@@ -424,6 +435,18 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         slots: &[Slot {
             prop: "value",
             arity: 1,
+        }],
+        edge_slots: &[],
+    },
+    ArchetypeDef {
+        name: "bar",
+        item: "series",
+        doc: "Bars grouped or stacked across named categories. One series per \
+              statement, its numbers in category order.",
+        props: BAR_PROPS,
+        slots: &[Slot {
+            prop: "points",
+            arity: VARIADIC,
         }],
         edge_slots: &[],
     },
@@ -549,6 +572,60 @@ pub const PIE_PROPS: &[PropDef] = &[
         syntax: "legend: <on|off>",
         doc: "Swatch-and-name list beside the chart. On by default — identity \
               must never rest on color alone.",
+    },
+];
+
+pub const BAR_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the chart.",
+    },
+    PropDef {
+        name: "size",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "size: <width> <height>",
+        doc: "The plot area, before axis labels and legend. 560 by 320 by default.",
+    },
+    PropDef {
+        name: "categories",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "categories: \"<first>\" \"<second>\" …",
+        doc: "What the bars stand along. Each series gives one number per \
+              category, in this order.",
+    },
+    PropDef {
+        name: "stack",
+        alias: false,
+        ctx: Ctx::Both,
+        words: TOGGLE,
+        syntax: "stack: <on|off>",
+        doc: "Stack the series instead of standing them side by side.",
+    },
+    PropDef {
+        name: "y-axis",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "y-axis: <min> <max>",
+        doc: "Force the value axis. Otherwise it is rounded outward from the \
+              data to human numbers.",
+    },
+    PropDef {
+        name: "legend",
+        alias: false,
+        ctx: Ctx::Both,
+        words: TOGGLE,
+        syntax: "legend: <on|off>",
+        doc: "Swatch-and-name list. Shown from two series up; identity must \
+              never rest on colour alone.",
     },
 ];
 

@@ -103,18 +103,22 @@ fn archetypes(m: &mut String) {
     for def in props::ARCHETYPES {
         let _ = write!(m, "\n### `type {}`\n\n{}\n", def.name, squash(def.doc));
 
-        let shape: Vec<String> = def
-            .slots
-            .iter()
-            .flat_map(|s| std::iter::repeat_n(format!("<{}>", s.prop), s.arity))
-            .collect();
+        let shape = slot_shape(def.slots);
         let _ = write!(
             m,
             "\n```\n{} <id> [\"label\"]{}{}\n```\n",
             def.item,
             if shape.is_empty() { "" } else { " " },
-            shape.join(" ")
+            shape
         );
+
+        if !def.edge_slots.is_empty() {
+            let _ = write!(
+                m,
+                "\n```\n<from> -> <to> [\"label\"] {}\n```\n",
+                slot_shape(def.edge_slots)
+            );
+        }
 
         if def.props.is_empty() {
             m.push_str("\nIt takes no settings.\n");
@@ -128,6 +132,24 @@ fn archetypes(m: &mut String) {
     }
 
     m.push_str(ARCHETYPE_NOTES);
+}
+
+/// How a slot list is written: one placeholder per value, or `…` when the
+/// slot takes the rest of the line.
+fn slot_shape(slots: &[props::Slot]) -> String {
+    slots
+        .iter()
+        .map(|s| {
+            if s.arity == props::VARIADIC {
+                format!("<{}> …", s.prop)
+            } else {
+                std::iter::repeat_n(format!("<{}>", s.prop), s.arity)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn word_list(m: &mut String, title: &str, words: &[&str], note: &str) {

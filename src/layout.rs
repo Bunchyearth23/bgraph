@@ -109,6 +109,8 @@ pub enum Chart {
     Wave,
     /// Flows between stages. `polylines` carries the ribbons.
     Sankey,
+    /// Bars on a value axis. `guides` carries the frame.
+    Bar,
     /// Slices, which need arcs the node renderer cannot make.
     Pie(Pie),
 }
@@ -211,6 +213,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         "quadrant" => return crate::charts::quadrant(diagram, opts, &registry),
         "wave" => return crate::charts::wave(diagram, opts, &registry),
         "sankey" => return crate::charts::sankey(diagram, opts, &registry),
+        "bar" => return crate::charts::bar(diagram, opts, &registry),
         _ => {}
     }
 

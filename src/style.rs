@@ -75,6 +75,8 @@ pub struct Style {
     /// Timing data.
     pub wave: Option<String>,
     pub data: Option<Vec<String>>,
+    /// A series, one number per category.
+    pub points: Option<Vec<f64>>,
 }
 
 macro_rules! overlay {
@@ -111,6 +113,7 @@ impl Style {
             y,
             wave,
             data,
+            points,
         );
     }
 
@@ -259,6 +262,7 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
             });
         }
         "value" => style.value = first.and_then(|x| x.as_num()),
+        "points" => style.points = Some(v.iter().filter_map(|x| x.as_num()).collect()),
         "wave" => style.wave = first.and_then(|v| v.as_text()).map(String::from),
         "data" => {
             style.data = Some(

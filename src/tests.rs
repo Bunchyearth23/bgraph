@@ -471,7 +471,7 @@ fn an_unknown_archetype_is_reported() {
     let e = err("type flowchart\nnode a");
     assert!(e.contains("unknown archetype `flowchart`"), "{e}");
     assert!(
-        e.contains("free, pie, sankey, wave, quadrant, treemap, packet"),
+        e.contains("free, pie, bar, sankey, wave, quadrant, treemap, packet"),
         "{e}"
     );
 }
@@ -1928,5 +1928,148 @@ fn a_node_with_no_flows_is_reported() {
         d.iter()
             .any(|x| x.message.contains("`lonely` has no flows")),
         "{d:?}"
+    );
+}
+
+// ------------------------------------------------------------------- bar
+
+#[test]
+fn a_value_axis_rounds_outward_to_human_numbers() {
+    use crate::charts::nice_scale;
+
+    let s = nice_scale(0.0, 310.0, 5);
+    assert_eq!(s.min, 0.0);
+    assert_eq!(s.max, 400.0);
+    assert_eq!(s.ticks, vec![0.0, 100.0, 200.0, 300.0, 400.0]);
+
+    // Negative data pulls the axis below zero rather than clipping.
+    let s = nice_scale(-30.0, 90.0, 4);
+    assert!(s.min <= -30.0 && s.max >= 90.0);
+    assert!(
+        s.ticks.contains(&0.0),
+        "zero is always a tick: {:?}",
+        s.ticks
+    );
+
+    // A flat series still produces a usable axis.
+    let s = nice_scale(5.0, 5.0, 5);
+    assert!(s.max > s.min);
+}
+
+#[test]
+fn bars_stand_on_zero_and_scale_together() {
+    let l = build(
+        r#"
+        type bar { size: 400 200 categories: "a" "b" legend: off }
+        series only "Only" 50 100
+    "#,
+    );
+
+    assert!(matches!(l.chart, crate::layout::Chart::Bar));
+    let bars: Vec<&crate::layout::PlacedNode> = l.nodes.iter().collect();
+    assert_eq!(bars.len(), 2);
+    // Both sit on the baseline, and twice the value is twice the height.
+    assert!((bars[0].rect.bottom() - bars[1].rect.bottom()).abs() < 0.01);
+    assert!((bars[1].rect.h / bars[0].rect.h - 2.0).abs() < 0.01);
+}
+
+#[test]
+fn series_stand_side_by_side_or_stack() {
+    let grouped = build(
+        r#"
+        type bar { size: 400 200 categories: "a" legend: off }
+        series one "One" 10
+        series two "Two" 20
+    "#,
+    );
+    let g: Vec<f64> = grouped.nodes.iter().map(|n| n.rect.x).collect();
+    assert_ne!(g[0], g[1], "grouped bars stand beside each other");
+
+    let stacked = build(
+        r#"
+        type bar { size: 400 200 categories: "a" stack: on legend: off }
+        series one "One" 10
+        series two "Two" 20
+    "#,
+    );
+    let s: Vec<&crate::layout::Rect> = stacked.nodes.iter().map(|n| &n.rect).collect();
+    assert_eq!(s[0].x, s[1].x, "stacked bars share a column");
+    assert!(s[1].bottom() < s[0].y, "and never overlap");
+    // A 2px surface gap between fills, stacked segments included.
+    assert!((s[0].y - s[1].bottom() - 2.0).abs() < 0.01, "{s:?}");
+}
+
+#[test]
+fn a_stacked_axis_covers_the_totals() {
+    let l = build(
+        r#"
+        type bar { size: 400 200 categories: "a" stack: on legend: off }
+        series one "One" 60
+        series two "Two" 60
+    "#,
+    );
+    // 120 stacked, so the axis must reach past it, not past 60.
+    let top = l.nodes.iter().map(|n| n.rect.y).fold(f64::MAX, f64::min);
+    assert!(top > 0.0, "the stack must fit inside the plot");
+}
+
+#[test]
+fn a_legend_appears_from_two_series_up() {
+    let one = build(
+        r#"
+        type bar { categories: "a" }
+        series only "Only" 1
+    "#,
+    );
+    let two = build(
+        r#"
+        type bar { categories: "a" }
+        series one "One" 1
+        series two "Two" 2
+    "#,
+    );
+
+    // Legend swatches are extra nodes beyond the bars themselves.
+    assert_eq!(one.nodes.len(), 1, "one series names itself in the title");
+    assert_eq!(two.nodes.len(), 4, "two bars plus two swatches");
+    assert!(two.annotations.iter().any(|a| a.text == "One"));
+}
+
+#[test]
+fn a_series_needs_numbers_and_matching_categories() {
+    assert!(err("type bar { categories: \"a\" }\nseries s \"S\"").contains("has no numbers"));
+
+    let d = diags("type bar { categories: \"a\" \"b\" \"c\" }\nseries s \"S\" 1 2");
+    assert!(
+        d.iter()
+            .any(|x| x.message.contains("2 numbers for 3 categories")),
+        "{d:?}"
+    );
+
+    let d = diags("type bar\nseries s \"S\" 1 2");
+    assert!(
+        d.iter()
+            .any(|x| x.message.contains("stand along nothing named"))
+    );
+}
+
+#[test]
+fn the_axis_can_be_forced() {
+    let l = build(
+        r#"
+        type bar { size: 400 200 categories: "a" y-axis: 0 1000 legend: off }
+        series s "S" 100
+    "#,
+    );
+    // A tenth of the axis, not the whole plot.
+    assert!(
+        (l.nodes[0].rect.h / 200.0 - 0.1).abs() < 0.01,
+        "{:?}",
+        l.nodes[0].rect
+    );
+
+    assert!(
+        err("type bar { categories: \"a\" y-axis: 5 }\nseries s 1")
+            .contains("takes a minimum and a maximum")
     );
 }

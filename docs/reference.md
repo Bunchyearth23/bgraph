@@ -207,6 +207,7 @@ Aliases are marked. They behave identically to the property they alias; the edit
 | `router` | edge | `router: <straight\|ortho>` | `straight` draws a direct line; `ortho` draws a right-angled elbow. |
 | `route` *(alias)* | edge | `route: <straight\|ortho>` | Alias of `router`. |
 | `value` | both | `value: <number>` | Magnitude of a slice. Required by `type pie`, ignored elsewhere. |
+| `points` | node | `points: <n> <n> …` | One number per category, in order. Required by `type bar`. |
 | `wave` | node | `wave: "<characters>"` | One character per period: `0` `1` `l` `h` levels, `p` `n` clocks, `x` unknown, `z` high-impedance, `=` and `2`–`9` data, `.` repeats the previous, `\|` a gap. Required by `type wave`. |
 | `data` | node | `data: "<first>" "<second>" …` | Names for the data segments of a wave, in order. |
 | `x` | node | `x: <number>` | Horizontal position. Required by `type quadrant`, ignored elsewhere. |
@@ -262,12 +263,33 @@ slice <id> ["label"] <value>
 | `labels` | `labels: <percent\|value\|both\|none>` | What to write on each slice. Slices too thin to read are skipped. |
 | `legend` | `legend: <on\|off>` | Swatch-and-name list beside the chart. On by default — identity must never rest on color alone. |
 
+### `type bar`
+
+Bars grouped or stacked across named categories. One series per statement, its numbers in category order.
+
+```
+series <id> ["label"] <points> …
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the chart. |
+| `size` | `size: <width> <height>` | The plot area, before axis labels and legend. 560 by 320 by default. |
+| `categories` | `categories: "<first>" "<second>" …` | What the bars stand along. Each series gives one number per category, in this order. |
+| `stack` | `stack: <on\|off>` | Stack the series instead of standing them side by side. |
+| `y-axis` | `y-axis: <min> <max>` | Force the value axis. Otherwise it is rounded outward from the data to human numbers. |
+| `legend` | `legend: <on\|off>` | Swatch-and-name list. Shown from two series up; identity must never rest on colour alone. |
+
 ### `type sankey`
 
 Flows between stages, sized by magnitude. The value rides on the link, not on what it joins: a node's height is whatever passes through it.
 
 ```
 node <id> ["label"]
+```
+
+```
+<from> -> <to> ["label"] <value>
 ```
 
 | Setting | Syntax | Meaning |

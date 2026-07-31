@@ -1,0 +1,2 @@
+type bar { categories: "a" "b" }
+series s "S" 1 2

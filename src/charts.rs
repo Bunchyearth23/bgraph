@@ -1825,3 +1825,398 @@ fn ribbon(x0: f64, y0: f64, x1: f64, y1: f64, thickness: f64) -> Vec<(f64, f64)>
     );
     points
 }
+
+// ------------------------------------------------------- the plot frame
+
+/// A value axis: the span it covers and the round numbers it is marked at.
+pub struct Scale {
+    pub min: f64,
+    pub max: f64,
+    pub ticks: Vec<f64>,
+}
+
+impl Scale {
+    /// Where a value falls along the axis, 0 at `min` and 1 at `max`.
+    pub fn fraction(&self, v: f64) -> f64 {
+        let span = self.max - self.min;
+        if span.abs() < f64::EPSILON {
+            0.0
+        } else {
+            (v - self.min) / span
+        }
+    }
+}
+
+/// Rounds the span outward to human numbers — 1, 2, 2.5 or 5 times a power of
+/// ten — so the axis reads in figures a person would have chosen.
+pub fn nice_scale(min: f64, max: f64, want: usize) -> Scale {
+    let want = want.max(2);
+    let (min, max) = if (max - min).abs() < f64::EPSILON {
+        (min.min(0.0), max.max(min + 1.0))
+    } else {
+        (min, max)
+    };
+
+    let raw = (max - min) / want as f64;
+    let magnitude = 10f64.powf(raw.abs().max(f64::MIN_POSITIVE).log10().floor());
+    let step = magnitude
+        * match raw / magnitude {
+            r if r <= 1.0 => 1.0,
+            r if r <= 2.0 => 2.0,
+            r if r <= 2.5 => 2.5,
+            r if r <= 5.0 => 5.0,
+            _ => 10.0,
+        };
+
+    let lo = (min / step).floor() * step;
+    let hi = (max / step).ceil() * step;
+
+    let mut ticks = Vec::new();
+    let mut t = lo;
+    // Guard on count, not on floating-point arithmetic reaching `hi` exactly.
+    for _ in 0..=(((hi - lo) / step).round() as usize).min(64) {
+        ticks.push(t);
+        t += step;
+    }
+
+    Scale {
+        min: lo,
+        max: hi,
+        ticks,
+    }
+}
+
+/// Axis lines, gridlines and their labels. Recessive by design: the marks are
+/// the subject, and a grid that competes with them is a grid in the way.
+#[allow(clippy::too_many_arguments)]
+fn draw_frame(
+    plot: Rect,
+    scale: &Scale,
+    categories: &[String],
+    theme: &Theme,
+    base: &Style,
+    guides: &mut Vec<Guide>,
+    annotations: &mut Vec<Annotation>,
+) {
+    let rule = if theme.dark { "#1e293b" } else { "#e4e4e7" };
+    let axis = if theme.dark { "#334155" } else { "#d4d4d8" };
+
+    for value in &scale.ticks {
+        let y = plot.bottom() - scale.fraction(*value) * plot.h;
+        guides.push(Guide {
+            from: (plot.x, y),
+            to: (plot.right(), y),
+            color: if *value == 0.0 { axis } else { rule }.into(),
+            width: 1.0,
+            dash: None,
+        });
+        annotations.push(Annotation {
+            text: trim_number(*value),
+            x: plot.x - 8.0,
+            y,
+            anchor: Anchor::End,
+            size: 11.0,
+            color: theme.muted.clone(),
+            weight: "400".into(),
+            family: family(base),
+        });
+    }
+
+    guides.push(Guide {
+        from: (plot.x, plot.y),
+        to: (plot.x, plot.bottom()),
+        color: axis.into(),
+        width: 1.0,
+        dash: None,
+    });
+
+    if categories.is_empty() {
+        return;
+    }
+    let slot = plot.w / categories.len() as f64;
+    for (i, name) in categories.iter().enumerate() {
+        annotations.push(Annotation {
+            text: name.clone(),
+            x: plot.x + slot * (i as f64 + 0.5),
+            y: plot.bottom() + 16.0,
+            anchor: Anchor::Middle,
+            size: 11.0,
+            color: theme.muted.clone(),
+            weight: "500".into(),
+            family: family(base),
+        });
+    }
+}
+
+/// Swatch, name, one per series — always present past a single series, so
+/// identity never rests on colour alone.
+fn draw_legend(
+    names: &[String],
+    colours: &[String],
+    x: f64,
+    y: f64,
+    theme: &Theme,
+    base: &Style,
+    nodes: &mut Vec<PlacedNode>,
+    annotations: &mut Vec<Annotation>,
+) {
+    for (i, (name, colour)) in names.iter().zip(colours).enumerate() {
+        let row = y + i as f64 * LEGEND_STEP;
+        nodes.push(PlacedNode {
+            lines: Vec::new(),
+            rect: Rect {
+                x,
+                y: row,
+                w: SWATCH,
+                h: SWATCH,
+            },
+            style: Style {
+                fill: Some(colour.clone()),
+                stroke: Some("none".into()),
+                stroke_width: Some(0.0),
+                radius: Some(3.0),
+                shape: Some(Shape::Rect),
+                ..Style::default()
+            },
+        });
+        annotations.push(Annotation {
+            text: name.clone(),
+            x: x + SWATCH + 9.0,
+            y: row + SWATCH / 2.0,
+            anchor: Anchor::Start,
+            size: 12.0,
+            color: theme.ink.clone(),
+            weight: "400".into(),
+            family: family(base),
+        });
+    }
+}
+
+// ------------------------------------------------------------------- bar
+
+pub fn bar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
+    let cfg = &diagram.archetype_props;
+    let theme = Theme::of(&opts);
+    let def = crate::check::archetype_of(diagram);
+    let palette = theme.palette();
+
+    let width = setting(cfg, "size")
+        .and_then(|v| v.first())
+        .and_then(|v| v.as_num())
+        .unwrap_or(560.0)
+        .max(120.0);
+    let height = setting(cfg, "size")
+        .and_then(|v| v.get(1))
+        .and_then(|v| v.as_num())
+        .unwrap_or(320.0)
+        .max(80.0);
+    let stacked = toggle(cfg, "stack", false);
+    let title = text(cfg, "title");
+    let categories: Vec<String> = setting(cfg, "categories")
+        .map(|v| {
+            v.iter()
+                .filter_map(|x| x.as_text())
+                .map(String::from)
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
+
+    let mut series = Vec::new();
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        let style = registry.resolve(
+            chart_defaults(),
+            def.item,
+            &node.classes,
+            &node.effective_props(def.slots),
+        )?;
+        let Some(points) = style.points.clone().filter(|p| !p.is_empty()) else {
+            continue;
+        };
+        let colour = style
+            .fill
+            .clone()
+            .unwrap_or_else(|| palette[i.min(palette.len() - 1)].to_string());
+        let name = node.label.clone().unwrap_or_else(|| node.id.value.clone());
+        series.push((name, points, colour, style));
+    }
+
+    let slots = categories.len().max(
+        series
+            .iter()
+            .map(|(_, points, _, _)| points.len())
+            .max()
+            .unwrap_or(0),
+    );
+
+    // The axis covers what the data reaches — stacked totals, not the tallest
+    // single bar — and always includes zero, or the bars would float.
+    let (mut lo, mut hi) = (0.0_f64, 0.0_f64);
+    for slot in 0..slots {
+        let column: Vec<f64> = series
+            .iter()
+            .map(|(_, points, _, _)| points.get(slot).copied().unwrap_or(0.0))
+            .collect();
+        if stacked {
+            hi = hi.max(column.iter().filter(|v| **v > 0.0).sum());
+            lo = lo.min(column.iter().filter(|v| **v < 0.0).sum());
+        } else {
+            hi = hi.max(column.iter().copied().fold(f64::MIN, f64::max));
+            lo = lo.min(column.iter().copied().fold(f64::MAX, f64::min));
+        }
+    }
+    let scale = match setting(cfg, "y-axis") {
+        Some(v) if v.len() == 2 => {
+            let (a, b) = (v[0].as_num().unwrap_or(lo), v[1].as_num().unwrap_or(hi));
+            nice_scale(a, b, 5)
+        }
+        _ => nice_scale(lo, hi, 5),
+    };
+
+    let title_h = if title.is_some() {
+        TITLE_SIZE * 2.0
+    } else {
+        0.0
+    };
+    let gutter = scale
+        .ticks
+        .iter()
+        .map(|t| text_width(&[trim_number(*t)], 11.0))
+        .fold(0.0_f64, f64::max)
+        + 14.0;
+    let plot = Rect {
+        x: gutter,
+        y: title_h,
+        w: width,
+        h: height,
+    };
+
+    let mut guides = Vec::new();
+    let mut nodes = Vec::new();
+    let mut annotations = Vec::new();
+
+    if let Some(title) = title {
+        annotations.push(Annotation {
+            text: title,
+            x: 0.0,
+            y: TITLE_SIZE,
+            anchor: Anchor::Start,
+            size: TITLE_SIZE,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    draw_frame(
+        plot,
+        &scale,
+        &categories,
+        &theme,
+        &base,
+        &mut guides,
+        &mut annotations,
+    );
+
+    let zero = plot.bottom() - scale.fraction(0.0) * plot.h;
+    let slot_w = if slots > 0 {
+        plot.w / slots as f64
+    } else {
+        plot.w
+    };
+    // A 2px surface gap between fills, and room either side of a group.
+    let group_w = slot_w * 0.72;
+    let bar_w = if stacked || series.is_empty() {
+        group_w
+    } else {
+        (group_w - 2.0 * (series.len() - 1) as f64) / series.len() as f64
+    };
+
+    let mut stack_up = vec![0.0; slots];
+    let mut stack_down = vec![0.0; slots];
+
+    for (s, (_, points, colour, style)) in series.iter().enumerate() {
+        for slot in 0..slots {
+            let value = points.get(slot).copied().unwrap_or(0.0);
+            if value == 0.0 {
+                continue;
+            }
+
+            let left = plot.x + slot_w * slot as f64 + (slot_w - group_w) / 2.0;
+            let x = if stacked {
+                left
+            } else {
+                left + s as f64 * (bar_w + 2.0)
+            };
+
+            let (base_value, top_value) = if stacked {
+                let run = if value > 0.0 {
+                    &mut stack_up[slot]
+                } else {
+                    &mut stack_down[slot]
+                };
+                let from = *run;
+                *run += value;
+                (from, *run)
+            } else {
+                (0.0, value)
+            };
+
+            let y0 = plot.bottom() - scale.fraction(base_value) * plot.h;
+            let y1 = plot.bottom() - scale.fraction(top_value) * plot.h;
+
+            // Adjacent fills must never touch, stacked segments included.
+            let inset = if stacked { 1.0 } else { 0.0 };
+            nodes.push(PlacedNode {
+                lines: Vec::new(),
+                rect: Rect {
+                    x,
+                    y: y0.min(y1) + inset,
+                    w: bar_w.max(1.0),
+                    h: ((y1 - y0).abs() - inset * 2.0).max(1.0),
+                },
+                style: Style {
+                    fill: Some(colour.clone()),
+                    stroke: Some("none".into()),
+                    stroke_width: Some(0.0),
+                    // Rounded on the data end only would need two shapes; a
+                    // small radius reads as intentional on both.
+                    radius: Some(3.0),
+                    shape: Some(Shape::Rect),
+                    ..style.clone()
+                },
+            });
+        }
+    }
+
+    let _ = zero;
+
+    // A legend is not optional past one series: colour alone is not identity.
+    let wants_legend = toggle(cfg, "legend", series.len() > 1);
+    if wants_legend && !series.is_empty() {
+        let names: Vec<String> = series.iter().map(|(n, _, _, _)| n.clone()).collect();
+        let colours: Vec<String> = series.iter().map(|(_, _, c, _)| c.clone()).collect();
+        draw_legend(
+            &names,
+            &colours,
+            plot.right() + LEGEND_MARGIN,
+            plot.y,
+            &theme,
+            &base,
+            &mut nodes,
+            &mut annotations,
+        );
+    }
+
+    Ok(Layout {
+        guides,
+        polylines: Vec::new(),
+        groups: Vec::new(),
+        nodes,
+        edges: Vec::new(),
+        opts,
+        chart: Chart::Bar,
+        annotations,
+    })
+}

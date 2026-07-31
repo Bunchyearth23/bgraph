@@ -60,6 +60,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "quadrant" => check_quadrant(diagram, &mut out),
         "wave" => check_wave(diagram, &mut out),
         "sankey" => check_sankey(diagram, &mut out),
+        "bar" => check_bar(diagram, &mut out),
         _ => {
             check_cycles(diagram, &nodes, &mut out);
             check_unused_data(diagram, &mut out);
@@ -667,6 +668,87 @@ fn check_packet(diagram: &Diagram, out: &mut Vec<Diag>) {
     }
 }
 
+fn check_bar(diagram: &Diagram, out: &mut Vec<Diag>) {
+    warn_ignored(diagram, "bar", out);
+
+    let cfg = &diagram.archetype_props;
+    let categories = cfg
+        .iter()
+        .find(|p| p.name == "categories")
+        .map_or(0, |p| p.values.len());
+
+    let styles = resolved_nodes(diagram, base_style("bar"));
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        let points = styles.get(i).and_then(|s| s.points.as_ref());
+        let Some(points) = points.filter(|p| !p.is_empty()) else {
+            out.push(Diag::error(
+                node.id.span,
+                format!(
+                    "`{}` has no numbers — `series {} [\"label\"] <n> <n> …`",
+                    node.id.as_str(),
+                    node.id.as_str()
+                ),
+            ));
+            continue;
+        };
+
+        if categories > 0 && points.len() != categories {
+            out.push(Diag::warn(
+                node.id.span,
+                format!(
+                    "`{}` has {} number{} for {categories} categor{} — the \
+                     shorter of the two wins",
+                    node.id.as_str(),
+                    points.len(),
+                    if points.len() == 1 { "" } else { "s" },
+                    if categories == 1 { "y" } else { "ies" }
+                ),
+            ));
+        }
+    }
+
+    if categories == 0 {
+        out.push(Diag::warn(
+            diagram
+                .archetype
+                .as_ref()
+                .map(|a| a.span)
+                .unwrap_or_default(),
+            "no `categories`, so the bars stand along nothing named".to_string(),
+        ));
+    }
+
+    if let Some(prop) = cfg.iter().find(|p| p.name == "y-axis")
+        && prop.values.len() != 2
+    {
+        out.push(Diag::error(
+            prop.values_span,
+            "`y-axis` takes a minimum and a maximum".to_string(),
+        ));
+    }
+
+    let drawn = diagram
+        .nodes
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| styles.get(*i).and_then(|s| s.points.as_ref()).is_some())
+        .count();
+    if drawn > crate::props::PALETTE_LIGHT.len() {
+        out.push(Diag::warn(
+            diagram
+                .archetype
+                .as_ref()
+                .map(|a| a.span)
+                .unwrap_or_default(),
+            format!(
+                "{drawn} series exhaust the categorical palette ({} hues) — fold \
+                 the tail into an `Other` series rather than repeating a colour",
+                crate::props::PALETTE_LIGHT.len()
+            ),
+        ));
+    }
+}
+
 fn check_sankey(diagram: &Diagram, out: &mut Vec<Diag>) {
     for node in &diagram.nodes {
         if node.placement.is_some() {
@@ -1006,6 +1088,7 @@ fn check_unused_data(diagram: &Diagram, out: &mut Vec<Diag>) {
                 "bits" => "packet",
                 "x" | "y" => "quadrant",
                 "wave" | "data" => "wave",
+                "points" => "bar",
                 _ => continue,
             };
             out.push(Diag::warn(

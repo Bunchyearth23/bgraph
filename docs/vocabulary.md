@@ -120,7 +120,8 @@ is a single item with two stray values rather than two items.
 | `pie` | `slice` | `value` — one number ✔ |
 | `packet` | `field` | `bits` — two numbers ✔ |
 | `wave` | `signal` | `wave` — one string ✔ |
-| `bar` / `xy` (`W-016`, `W-017`) | `series` | `points` — a number list |
+| `bar` | `series` | `points` — a number list ✔ |
+| `xy` (`W-017`) | `series` | `points` — a number list |
 | `quadrant` | `point` | `x`, `y` — two numbers ✔ |
 | `sankey` | `node` | — the value is an **edge** slot: `a -> b 40` ✔ |
 | `state` (`W-022`) | `state` | — |

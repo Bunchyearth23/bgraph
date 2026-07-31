@@ -57,9 +57,9 @@ disagree.
 - `cargo run --bin bgraph -- watch diagram.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check diagram.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (144 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (151 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
-- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (20 corpus cases)
+- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (21 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
 - `./editors/zed/install.sh` — installs the server, regenerates + pins the grammar
 
@@ -262,6 +262,11 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
 - [2026-07-31] A waveform transition straddles the period boundary: pull the
   previous point back by half a slew rather than appending one behind it, or
   the polyline doubles back and renders as a spike.
+
+- [2026-07-31] `props::VARIADIC` is `usize::MAX`, and `docgen` used to render a
+  slot by repeating its name `arity` times — which allocated a vector of
+  `usize::MAX` strings and aborted. A variadic slot is *written* `<points> …`,
+  never repeated.
 
 ### Workarounds
 
