@@ -49,7 +49,6 @@ change the language: `W-011`, `W-013`, `W-014`.
 | `W-023` | planned | `type class` and `type er` | Dev / data. Needs `W-013` for members, plus cardinality on arrows (`\|\|--o{`) — either new arrow tokens or `from-card:` / `to-card:` properties. |
 | `W-025` | planned | `type block` — architecture and C4-style component views | Dev. Boxes inside boxes with typed relations; `W-011` has landed. Closest of all of them to `free`, which is why it is worth doing as an archetype rather than by hand. |
 | `W-026` | planned | `type gantt` and `type timeline` | Project. Needs `W-014`. |
-| `W-030` | planned | Pan and zoom in the watch preview | The live page shows the SVG at its natural size on a checkerboard; a large diagram cannot be inspected. Wheel-zoom, drag-to-pan, and a reset. Self-contained, no dependency — the page is hand-written. |
 | `W-027` | planned | **A stable embeddable API** | The long-term aim (`D-014`). `render_source` exists, but embedding needs a typed builder (construct a diagram without going through text), a documented public surface, no panics on hostile input, and semver. See `Q-003`. |
 | `W-028` | planned | Cargo features per archetype | So a program embedding `bgraph` for one chart does not compile all of them. Matters most for the embedded audience. |
 | `Q-003` | open | What shape should the embeddable API take? | Text-in/SVG-out only, or also a typed builder (`Diagram::new().node(…)`)? The second is far more useful for generating documents on the fly and far more surface to keep stable. Needed before `W-027`. |
@@ -101,6 +100,7 @@ not copies.
 | `W-004` | 2026-07-31 | `bgraph-lsp`: diagnostics, completion, hover, go-to-definition, outline | `1b53ec3` |
 | `W-005` | 2026-07-31 | Tree-sitter grammar and Zed extension | `1b53ec3`, regenerated `d6997b1` |
 | `W-006` | 2026-07-31 | `type` archetypes (`pie`, `packet`), quiet completion, explicit surface, generated reference manual | `4b4c548` |
+| `W-030` | 2026-07-31 | Pan and zoom in the watch preview, kept across the reload a save triggers | this commit |
 | `W-017` | 2026-07-31 | `type xy` — line, area and dot marks over a shared axis, categorical or numeric | this commit |
 | `W-012` | 2026-07-31 | Plot frame — `nice_scale`, axis lines, gridlines, tick and category labels, legend | this commit |
 | `W-016` | 2026-07-31 | `type bar` — grouped or stacked series across named categories | this commit |

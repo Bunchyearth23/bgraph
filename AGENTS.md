@@ -57,7 +57,7 @@ disagree.
 - `cargo run --bin bgraph -- watch diagram.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check diagram.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (157 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (163 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
 - `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (22 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
@@ -79,7 +79,7 @@ disagree.
 | `src/style.rs` | Style cascade, `extends` flattening, `GraphOpts` |
 | `src/layout.rs` | Anchor solver → absolute `Rect`s |
 | `src/render_svg.rs` | Shapes, edge routing, markers, text |
-| `src/watch.rs` | Dependency-free HTTP live preview |
+| `src/watch.rs` | Dependency-free HTTP live preview, with pan and zoom |
 | `src/lsp.rs` | Language server + `LineIndex` (byte ↔ UTF-16 position) |
 | `tree-sitter-bgraph/` | Tree-sitter grammar, corpus tests, generated parser |
 | `editors/zed/` | Zed extension: manifest, wasm shim, `.scm` queries |
@@ -267,6 +267,15 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   slot by repeating its name `arity` times — which allocated a vector of
   `usize::MAX` strings and aborted. A variadic slot is *written* `<points> …`,
   never repeated.
+
+- [2026-07-31] The watch page is one `format!` template, so **every CSS and JS
+  brace in it is doubled**. A missed pair reaches the browser as `{{`, which is
+  a syntax error in both languages — and the page still serves, so nothing
+  else notices. `the_template_leaves_no_doubled_braces_behind` checks it.
+- [2026-07-31] Pan and zoom transform a wrapper `<div>`, never the SVG: what
+  is on screen stays exactly what the file exports. The view is persisted in
+  `sessionStorage` because the page reloads on every save, and a view that
+  resets each time makes zooming useless while editing.
 
 ### Workarounds
 

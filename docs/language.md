@@ -277,7 +277,9 @@ bgraph docs -o docs/reference.md    # regenerate the reference manual
 ```
 
 The watch page shows parse and layout errors in place, so a broken file
-doesn't cost you the preview.
+doesn't cost you the preview. Scroll to zoom, drag to pan, `f` to fit the
+diagram, `0` for actual size; the view is kept across the reload that a save
+triggers.
 
 `check` prints `file:line:col: severity: message` and exits non-zero if any
 error was found — the form editors and CI already understand:
