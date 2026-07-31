@@ -1212,3 +1212,63 @@ fn a_statement_runs_to_its_separator() {
         );
     }
 }
+
+#[test]
+fn the_editor_queries_match_the_grammar() {
+    // A query naming a node type the grammar no longer has does not degrade
+    // gracefully: Zed fails to load the language and stops recognising the
+    // file type at all. Renaming `node_declaration` to `item_declaration` in
+    // W-029 broke exactly this way, and shipped.
+    let queries = std::path::Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/editors/zed/languages/bgraph"
+    ));
+    let sample = concat!(env!("CARGO_MANIFEST_DIR"), "/examples/packet.bd");
+
+    let mut files: Vec<_> = std::fs::read_dir(queries)
+        .expect("the extension ships queries")
+        .filter_map(|e| e.ok().map(|e| e.path()))
+        .filter(|p| p.extension().is_some_and(|x| x == "scm"))
+        .collect();
+    files.sort();
+    assert!(!files.is_empty(), "no .scm files in {}", queries.display());
+
+    let run = |path: &std::path::Path| -> Option<std::process::Output> {
+        std::process::Command::new("tree-sitter")
+            .arg("query")
+            .arg(path)
+            .arg(sample)
+            .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/tree-sitter-bgraph"))
+            .output()
+            .ok()
+    };
+
+    if run(&files[0]).is_none() {
+        println!(
+            "SKIPPED: `tree-sitter` is not on PATH, so the editor queries were \
+             not checked against the grammar."
+        );
+        return;
+    }
+
+    let mut broken = Vec::new();
+    for path in &files {
+        let out = run(path).expect("the CLI was found a moment ago");
+        if !out.status.success() {
+            broken.push(format!(
+                "{}: {}",
+                path.file_name().unwrap_or_default().to_string_lossy(),
+                String::from_utf8_lossy(&out.stderr)
+                    .lines()
+                    .last()
+                    .unwrap_or("failed")
+            ));
+        }
+    }
+
+    assert!(
+        broken.is_empty(),
+        "editor queries no longer compile against the grammar:\n  {}",
+        broken.join("\n  ")
+    );
+}

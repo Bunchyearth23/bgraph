@@ -2,8 +2,8 @@
   "style" @context
   name: (identifier) @name) @item
 
-(node_declaration
-  "node" @context
+(item_declaration
+  keyword: (item_keyword) @context
   name: (identifier) @name
   label: (string)? @context) @item
 

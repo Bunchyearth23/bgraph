@@ -57,7 +57,7 @@ disagree.
 - `cargo run --bin bgraph -- watch diagram.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check diagram.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (103 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (104 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
 - `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (15 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
@@ -106,6 +106,9 @@ disagree.
   `tree-sitter-bgraph/grammar.js`, add a case to `tests/grammar/accept` or
   `tests/grammar/reject`, and let `the_tree_sitter_grammar_agrees_with_pest`
   prove they still accept the same language
+- ALWAYS: when a tree-sitter node type is renamed, update
+  `editors/zed/languages/bgraph/*.scm` in the same breath — the queries are
+  part of the grammar's public surface, not decoration
 - ALWAYS: keep completion quiet. It must not fire inside strings or comments,
   must not offer aliases, and must not offer a property the current archetype
   does not read. A suggestion that appears while you type prose is worse than
@@ -123,6 +126,12 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-07-31] A `.scm` query naming a node type the grammar no longer has does
+  **not** degrade gracefully: Zed fails to load the language and stops
+  recognising `.bd` files entirely — no highlighting, no LSP, nothing. Renaming
+  `node_declaration` to `item_declaration` in `W-029` broke it exactly this
+  way and shipped. `the_editor_queries_match_the_grammar` now compiles every
+  query against the generated parser on each `cargo test`.
 - [2026-07-31] Zed pins a tree-sitter grammar to a **git revision**, even for a
   `file://` repository. The generated parser must therefore be committed, and
   `extension.toml`'s `rev` must move after every `grammar.js` change or Zed
