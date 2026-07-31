@@ -24,6 +24,12 @@ engine. Here **layout is declared** (relative anchors between nodes) and
 **style is a real cascade**. See `docs/language.md` for the syntax and
 `diagram.bd` for a worked example.
 
+**Where this is going** (`D-014`): archetypes covering four audiences —
+statistics, software, embedded and data — and, at the end of it, an
+**embeddable Rust library** other programs call to generate documents on the
+fly. `docs/INDEX.md` carries the surveyed archetype list and what each one
+needs from the language.
+
 Pipeline: `source → parser → AST → check → layout → render_svg`.
 The language server reuses the same front half, so editor and CLI can never
 disagree.
