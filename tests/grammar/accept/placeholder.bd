@@ -1,0 +1,2 @@
+type pie { title: "{{t}}" }
+slice a "A" {{v}}

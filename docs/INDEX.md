@@ -46,9 +46,9 @@ change the language: `W-011`, `W-013`, `W-014`.
 | `W-031` | planned | `type er` — entities and cardinality | Data. Members and the box are `W-023`'s; what remains is cardinality at each end of a relation — crow's-foot markers, or `from-card:` / `to-card:` read as text. |
 | `W-025` | planned | `type block` — architecture and C4-style component views | Dev. Boxes inside boxes with typed relations; `W-011` has landed. Closest of all of them to `free`, which is why it is worth doing as an archetype rather than by hand. |
 | `W-032` | planned | `type timeline` — events on a date line | Project. `W-014` gives it the dates and `W-026` the axis; what remains is the marks and the label stagger. |
-| `W-027` | planned | **A stable embeddable API** | The long-term aim (`D-014`). `render_source` exists, but embedding needs a typed builder (construct a diagram without going through text), a documented public surface, no panics on hostile input, and semver. See `Q-003`. |
+| `W-027` | planned | **A stable embeddable API** | The long-term aim (`D-014`). Templating (`D-017`) is the shape it takes; what remains is the promise around it — a documented public surface, no panics on hostile input, semver, and a crates.io release. |
+| `Q-004` | open | Does a template need repetition? | A pie with a variable *number* of slices cannot be templated by substitution alone. Either the calling program builds the source string itself — the honest answer for that case — or the language grows a `for` construct, which is a template language and a much larger promise. |
 | `W-028` | planned | Cargo features per archetype | So a program embedding `bgraph` for one chart does not compile all of them. Matters most for the embedded audience. |
-| `Q-003` | open | What shape should the embeddable API take? | Text-in/SVG-out only, or also a typed builder (`Diagram::new().node(…)`)? The second is far more useful for generating documents on the fly and far more surface to keep stable. Needed before `W-027`. |
 | `Q-002` | open | Which archetype after `pie` and `packet`? | Answered in part by the survey above; what remains is the *order*. `W-019`, `W-024`, `W-018` and `W-016` are the ones with no prerequisite. |
 | `X-009` | mitigated | Editor queries can name node types the grammar has dropped | It broke once — `W-029` renamed `node_declaration` and Zed stopped recognising `.bd` entirely. `the_editor_queries_match_the_grammar` compiles every `.scm` against the generated parser, but only when the `tree-sitter` CLI is on PATH. |
 | `X-002` | mitigated | The two grammars can drift apart | `W-008` cross-checks them on every `cargo test` — but only when the `tree-sitter` CLI is on PATH; without it the test says SKIPPED and passes. |
@@ -79,6 +79,7 @@ change the language: `W-011`, `W-013`, `W-014`.
 | `D-011` | active | 2026-07-31 | Completion is **quiet by answer, not by refusal**: space still triggers, but the server returns nothing where a suggestion would be in the way | |
 | `D-012` | active | 2026-07-31 | The git remote uses **SSH**; the HTTPS URL had no stored credentials | |
 | `D-013` | active | 2026-07-31 | The four statement keywords (`type`, `graph`, `style`, `node`) are **reserved** and cannot name a node — found by `W-008`, which caught pest accepting `style -> a` where tree-sitter could not | |
+| `D-017` | active | 2026-07-31 | The library is embedded by **templating**: a `.bd` file holds the diagram's shape and the calling program binds `{{holes}}`. Not a typed builder — a program that needs to build a diagram from nothing can already write the source text, and holes earn their keep exactly where the shape is fixed and only values vary | |
 | `D-016` | active | 2026-07-31 | **Alpha rides on the color**, as its fourth channel, defaulting to `ff`. The `opacity` property is removed: transparency belongs to the paint, which is what lets a shape keep an opaque border over a translucent fill. Emitted as a separate SVG attribute, since several SVG-to-PDF paths drop inline eight-digit hex | |
 | `D-015` | active | 2026-07-31 | Each archetype gets its **own keyword and positional data** — `slice organic "Organic search" 4820` — over one shared statement form, so the grammars, the validator and the editor stay written once. Seven rules and the reasoning in [`vocabulary.md`](vocabulary.md) | |
 | `D-014` | active | 2026-07-31 | The target is **four audiences — stats, dev, embedded and data** — and, at the end of it, an **embeddable Rust library** that other programs call to generate documents on the fly. The archetype survey in *Open* is scoped to that, and `W-027` is the library itself | |
@@ -96,6 +97,7 @@ not copies.
 | `W-004` | 2026-07-31 | `bgraph-lsp`: diagnostics, completion, hover, go-to-definition, outline | `1b53ec3` |
 | `W-005` | 2026-07-31 | Tree-sitter grammar and Zed extension | `1b53ec3`, regenerated `d6997b1` |
 | `W-006` | 2026-07-31 | `type` archetypes (`pie`, `packet`), quiet completion, explicit surface, generated reference manual | `4b4c548` |
+| `W-033` | 2026-07-31 | Templating: `{{holes}}` that parse, typed bindings, context-aware escaping, `--set` on the CLI | this commit |
 | `W-014` | 2026-07-31 | Date and duration literals — `2026-08-01`, `12d`, `2w`, `6h`, with civil-calendar arithmetic | this commit |
 | `W-026` | 2026-07-31 | `type gantt` — bars on a calendar, sections from groups, a today line | this commit |
 | `W-013` | 2026-07-31 | Member lists — a `- ` or `+ ` line in a block, kept with its marker | this commit |
@@ -125,6 +127,7 @@ Nothing is marked `landed` without a commit to point at.
 | id | date | title | became | was |
 |---|---|---|---|---|
 | `Q-001` | 2026-07-31 | What does `type` select — a placement strategy or a diagram genre? | `D-007` | |
+| `Q-003` | 2026-07-31 | What shape should the embeddable API take? | `D-017` | |
 
 ### Risks retired
 

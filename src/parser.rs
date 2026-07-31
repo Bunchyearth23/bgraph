@@ -256,7 +256,8 @@ fn parse_item(pair: Pair<Rule>) -> Result<NodeDecl> {
             | Rule::number
             | Rule::color
             | Rule::date
-            | Rule::duration => {
+            | Rule::duration
+            | Rule::placeholder => {
                 let start = positional_span.map_or(part_span.start, |s: Span| s.start);
                 positional_span = Some(Span {
                     start,
@@ -307,7 +308,8 @@ fn parse_edge(pair: Pair<Rule>) -> Result<EdgeDecl> {
             | Rule::number
             | Rule::color
             | Rule::date
-            | Rule::duration => {
+            | Rule::duration
+            | Rule::placeholder => {
                 let start = positional_span.map_or(part_span.start, |s: Span| s.start);
                 positional_span = Some(Span {
                     start,
@@ -474,6 +476,10 @@ fn parse_value(pair: Pair<Rule>) -> Result<Value> {
                 _ => amount,
             };
             Value::Duration(days)
+        }
+        Rule::placeholder => {
+            let raw = pair.as_str();
+            Value::Placeholder(raw[2..raw.len() - 2].trim().to_string())
         }
         Rule::number => Value::Num(number(pair)?),
         Rule::color => Value::Color(pair.as_str().to_string()),

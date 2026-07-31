@@ -124,6 +124,10 @@
             "named": true
           },
           {
+            "type": "placeholder",
+            "named": true
+          },
+          {
             "type": "string",
             "named": true
           }
@@ -351,6 +355,10 @@
             "named": true
           },
           {
+            "type": "placeholder",
+            "named": true
+          },
+          {
             "type": "string",
             "named": true
           }
@@ -479,6 +487,10 @@
           },
           {
             "type": "number",
+            "named": true
+          },
+          {
+            "type": "placeholder",
             "named": true
           },
           {
@@ -738,6 +750,10 @@
   },
   {
     "type": "number",
+    "named": true
+  },
+  {
+    "type": "placeholder",
     "named": true
   },
   {

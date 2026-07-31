@@ -1,0 +1,10 @@
+type pie {
+  title: "Revenue by region, {{year}}"
+  donut: 0.55
+}
+graph { background: #0b1120 padding: 30 }
+style slice { font-color: #e2e8f0 }
+
+slice emea "EMEA" {{emea}}
+slice amer "{{amer_label}}" {{amer}}
+slice apac "APAC" {{apac}}

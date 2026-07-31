@@ -529,6 +529,14 @@ fn check_cycles(diagram: &Diagram, nodes: &HashMap<&str, usize>, out: &mut Vec<D
 
 /// Resolves each node's style the way the layout will, so a `value` or `bits`
 /// inherited from a class counts as declared.
+/// True when a node names the property but leaves it to a `{{hole}}` — the
+/// datum is declared, just not bound yet, so "it is missing" would be a lie.
+fn awaits_binding(node: &NodeDecl, def: &'static props::ArchetypeDef, name: &str) -> bool {
+    node.effective_props(def.slots)
+        .iter()
+        .any(|p| p.name == name && p.values.iter().any(|v| v.is_hole()))
+}
+
 /// The base each archetype resolves its items on. `free` and `packet` draw
 /// boxes; the chart archetypes draw marks and take no box defaults.
 pub fn base_style(archetype: &str) -> crate::style::Style {
@@ -595,13 +603,14 @@ fn check_pie(diagram: &Diagram, out: &mut Vec<Diag>) {
 
     for (i, node) in diagram.nodes.iter().enumerate() {
         match styles.get(i).and_then(|s| s.value) {
-            None => out.push(Diag::error(
+            None if !awaits_binding(node, archetype_of(diagram), "value") => out.push(Diag::error(
                 node.id.span,
                 format!(
                     "`{}` has no `value` — every slice of a pie needs one",
                     node.id.as_str()
                 ),
             )),
+            None => {}
             Some(v) if v < 0.0 => out.push(Diag::error(
                 node.id.span,
                 format!(
@@ -654,13 +663,14 @@ fn check_packet(diagram: &Diagram, out: &mut Vec<Diag>) {
 
     for (i, node) in diagram.nodes.iter().enumerate() {
         match styles.get(i).and_then(|s| s.bits) {
-            None => out.push(Diag::error(
+            None if !awaits_binding(node, archetype_of(diagram), "bits") => out.push(Diag::error(
                 node.id.span,
                 format!(
                     "`{}` has no `bits` — every field of a packet needs a range",
                     node.id.as_str()
                 ),
             )),
+            None => {}
             Some((start, end)) => fields.push((start, end, node.id.as_str(), node.id.span)),
         }
     }
@@ -710,6 +720,9 @@ fn check_bar(diagram: &Diagram, out: &mut Vec<Diag>) {
     for (i, node) in diagram.nodes.iter().enumerate() {
         let points = styles.get(i).and_then(|s| s.points.as_ref());
         let Some(points) = points.filter(|p| !p.is_empty()) else {
+            if awaits_binding(node, archetype_of(diagram), "points") {
+                continue;
+            }
             out.push(Diag::error(
                 node.id.span,
                 format!(
@@ -912,6 +925,9 @@ fn check_gantt(diagram: &Diagram, out: &mut Vec<Diag>) {
     let styles = resolved_nodes(diagram, base_style("gantt"));
     for (i, node) in diagram.nodes.iter().enumerate() {
         let style = styles.get(i);
+        if awaits_binding(node, archetype_of(diagram), "start") {
+            continue;
+        }
         match (style.and_then(|s| s.start), style.and_then(|s| s.length)) {
             (None, _) => out.push(Diag::error(
                 node.id.span,
@@ -1098,6 +1114,9 @@ fn check_wave(diagram: &Diagram, out: &mut Vec<Diag>) {
     for (i, node) in diagram.nodes.iter().enumerate() {
         let style = styles.get(i);
         let Some(spec) = style.and_then(|s| s.wave.as_deref()) else {
+            if awaits_binding(node, archetype_of(diagram), "wave") {
+                continue;
+            }
             out.push(Diag::error(
                 node.id.span,
                 format!(
@@ -1190,6 +1209,8 @@ fn check_quadrant(diagram: &Diagram, out: &mut Vec<Diag>) {
                     }
                 }
             }
+            _ if awaits_binding(node, archetype_of(diagram), "x")
+                || awaits_binding(node, archetype_of(diagram), "y") => {}
             _ => out.push(Diag::error(
                 node.id.span,
                 format!(
@@ -1233,13 +1254,14 @@ fn check_treemap(diagram: &Diagram, out: &mut Vec<Diag>) {
 
     for (i, node) in diagram.nodes.iter().enumerate() {
         match styles.get(i).and_then(|s| s.value) {
-            None => out.push(Diag::error(
+            None if !awaits_binding(node, archetype_of(diagram), "value") => out.push(Diag::error(
                 node.id.span,
                 format!(
                     "`{}` has no value — every tile of a treemap needs an area",
                     node.id.as_str()
                 ),
             )),
+            None => {}
             Some(v) if v < 0.0 => out.push(Diag::error(
                 node.id.span,
                 format!(
@@ -1426,6 +1448,12 @@ fn check_props(
                 prop.name_span,
                 format!("`{}` needs a value — {}", prop.name, def.syntax),
             ));
+            continue;
+        }
+
+        // A hole is bound at render time; validating what is not there yet
+        // would report every template as broken.
+        if prop.values.iter().any(|v| v.is_hole()) {
             continue;
         }
 

@@ -215,8 +215,9 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
                     }
                     Value::Word(w) => style.stroke = Some(w.clone()),
                     Value::Str(s) => style.dash = Some(s.clone()),
-                    // A date or a duration says nothing about a stroke.
-                    Value::Date { .. } | Value::Duration(_) => {}
+                    // A date, a duration or an unbound hole says nothing
+                    // about a stroke.
+                    Value::Date { .. } | Value::Duration(_) | Value::Placeholder(_) => {}
                 }
             }
         }
@@ -255,7 +256,7 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
                     Value::Str(s) => style.font_family = Some(s.clone()),
                     Value::Color(c) => style.font_color = Some(c.clone()),
                     Value::Word(w) => style.font_weight = Some(w.clone()),
-                    Value::Date { .. } | Value::Duration(_) => {}
+                    Value::Date { .. } | Value::Duration(_) | Value::Placeholder(_) => {}
                 }
             }
         }

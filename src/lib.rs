@@ -14,12 +14,15 @@ pub mod parser;
 pub mod props;
 pub mod render_svg;
 pub mod style;
+pub mod template;
 pub mod watch;
 
 #[cfg(test)]
 mod tests;
 
 use anyhow::Result;
+
+pub use template::{Bindings, Template};
 
 /// Source text to SVG, the whole rite in one call.
 pub fn render_source(source: &str) -> Result<String> {

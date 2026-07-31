@@ -190,14 +190,20 @@ module.exports = grammar({
 
     // `date` and `duration` come before `number`, or `2026-07-31` would lex
     // as three numbers and `12d` as a number followed by an identifier.
-    _value: ($) => choice($.string, $.color, $.date, $.duration, $.number, $.identifier),
+    // `{{name}}` is a hole the library fills at render time. It parses so a
+    // template stays editable — the editor would otherwise light up every line.
+    _value: ($) =>
+      choice($.string, $.color, $.date, $.duration, $.number, $.placeholder, $.identifier),
+
+    placeholder: (_) => token(seq('{{', /[^}]*/, '}}')),
 
     date: (_) => token(seq(/\d{4}/, '-', /\d{2}/, '-', /\d{2}/)),
 
     duration: (_) =>
       token(seq(/\d+/, optional(seq('.', /\d+/)), choice('mo', 'w', 'd', 'h'))),
 
-    _bare_value: ($) => choice($.color, $.date, $.duration, $.number, $.identifier),
+    _bare_value: ($) =>
+      choice($.color, $.date, $.duration, $.number, $.placeholder, $.identifier),
 
     // ---------------------------------------------------------- tokens
 

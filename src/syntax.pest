@@ -90,6 +90,9 @@ member = @{ ("-" | "+") ~ " " ~ (!nl ~ ANY)* }
 prop  = { ident ~ ":" ~ (!(ident ~ ":") ~ value)+ }
 // `date` and `duration` come before `number`, or `2026-07-31` would lex as
 // three numbers and `12d` as a number followed by an identifier.
-value    = _{ string | color | date | duration | number | ident }
+// `{{name}}` is a hole the library fills at render time. It parses so a
+// template stays editable — the editor would otherwise light up every line.
+value       = _{ string | color | date | duration | number | placeholder | ident }
+placeholder = @{ "{{" ~ (!"}}" ~ ANY)* ~ "}}" }
 date     = @{ ASCII_DIGIT{4} ~ "-" ~ ASCII_DIGIT{2} ~ "-" ~ ASCII_DIGIT{2} }
 duration = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ ("mo" | "w" | "d" | "h") ~ !(ASCII_ALPHANUMERIC | "_") }

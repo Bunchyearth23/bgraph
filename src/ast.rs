@@ -178,6 +178,10 @@ pub enum Value {
     },
     /// A length of time, in days. `6h` is a quarter of one.
     Duration(f64),
+    /// `{{name}}` — bound by the library at render time. It reaches `check`
+    /// so a template can be edited, and suppresses the checks that depend on
+    /// a value nobody has supplied yet.
+    Placeholder(String),
 }
 
 /// Days since 1970-01-01, by Howard Hinnant's civil-calendar algorithm. Fewer
@@ -235,6 +239,11 @@ impl Value {
             Value::Duration(days) => Some(*days),
             _ => None,
         }
+    }
+
+    /// True of a value nobody has bound yet.
+    pub fn is_hole(&self) -> bool {
+        matches!(self, Value::Placeholder(_))
     }
 
     pub fn as_word(&self) -> Option<&str> {

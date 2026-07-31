@@ -57,9 +57,9 @@ disagree.
 - `cargo run --bin bgraph -- watch diagram.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check diagram.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (191 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (201 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
-- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (26 corpus cases)
+- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (27 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
 - `./editors/zed/install.sh` — installs the server, regenerates + pins the grammar
 
@@ -79,6 +79,7 @@ disagree.
 | `src/style.rs` | Style cascade, `extends` flattening, `GraphOpts` |
 | `src/layout.rs` | Anchor solver → absolute `Rect`s |
 | `src/render_svg.rs` | Shapes, edge routing, markers, text |
+| `src/template.rs` | `{{holes}}` and the values a calling program binds |
 | `src/watch.rs` | Dependency-free HTTP live preview, with pan and zoom |
 | `src/lsp.rs` | Language server + `LineIndex` (byte ↔ UTF-16 position) |
 | `tree-sitter-bgraph/` | Tree-sitter grammar, corpus tests, generated parser |
@@ -318,6 +319,17 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
 - [2026-07-31] Every archetype clamps its `size`. A test asking for less than
   the floor silently gets the floor — which cost an hour of reading the wrong
   end of a division.
+
+- [2026-07-31] A `{{hole}}` **parses**: it is a `Value::Placeholder`, not a
+  pre-parse text hack. Otherwise every line of a template lights up in the
+  editor. `check` skips the validation that depends on an unbound value, via
+  `awaits_binding`.
+- [2026-07-31] Substitution is context-aware. Text landing inside a string
+  literal is escaped for one; text landing in a value position is quoted.
+  Blind replacement lets a stray quote turn a label into different statements.
+- [2026-07-31] `Template::parse` probes with **two** plausible bindings (`0`
+  and an identifier), because no single one fits both a value position and an
+  identifier position.
 
 ### Workarounds
 

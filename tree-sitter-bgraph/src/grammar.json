@@ -1009,9 +1009,33 @@
         },
         {
           "type": "SYMBOL",
+          "name": "placeholder"
+        },
+        {
+          "type": "SYMBOL",
           "name": "identifier"
         }
       ]
+    },
+    "placeholder": {
+      "type": "TOKEN",
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "{{"
+          },
+          {
+            "type": "PATTERN",
+            "value": "[^}]*"
+          },
+          {
+            "type": "STRING",
+            "value": "}}"
+          }
+        ]
+      }
     },
     "date": {
       "type": "TOKEN",
@@ -1113,6 +1137,10 @@
         {
           "type": "SYMBOL",
           "name": "number"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "placeholder"
         },
         {
           "type": "SYMBOL",

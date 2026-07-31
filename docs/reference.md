@@ -533,6 +533,54 @@ validator serves both, so the editor can never disagree with the build.
 - `type packet` — bits left unassigned between two fields
 - an edge or a placement in an archetype that ignores it
 
+## Templates
+
+A `.bd` file may leave holes for a program to fill:
+
+```
+type pie { title: "Revenue by region, {{year}}" }
+
+slice emea "EMEA" {{emea}}
+slice amer "{{amer_label}}" {{amer}}
+```
+
+`{{name}}` parses, so a template stays editable — the editor would otherwise
+light up every line of it — and `check` skips the validation that depends on a
+value nobody has bound yet.
+
+From the shell:
+
+```
+bgraph revenue.bd -o revenue.svg --set year=2026 --set emea=4820
+bgraph revenue.bd --emit --set …          # print the filled source instead
+```
+
+From Rust:
+
+```rust
+use bgraph::{Bindings, Template};
+
+let template = Template::parse(&source)?;
+let svg = template.render(
+    &Bindings::new()
+        .set("year", 2026i64)
+        .set("emea", 4820i64)
+        .set("amer_label", "Americas"),
+)?;
+```
+
+A bound value is escaped for **where it lands**: inside a string literal it is
+escaped for one, in a value position text is quoted. Blind replacement would
+let a stray quote turn a label into a syntax error, or into different
+statements. A list spreads space-separated, which is how every list in this
+language reads — so `{{points}}` bound to `[10, 20, 30]` fills a whole series.
+
+An unbound hole is an error naming it. Rendering a blank would put a wrong
+figure in a document, which is worse than failing.
+
+`Value::Raw` inserts verbatim, and is the only way to fill an identifier or a
+colour — both of which would otherwise be quoted as text.
+
 ## Editor support
 
 `bgraph-lsp` speaks LSP over stdin/stdout with no arguments, so any client can

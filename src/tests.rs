@@ -2675,3 +2675,124 @@ fn a_task_needs_both_ends() {
         err("type gantt\ntask a \"A\" 2026-08-10 2026-08-01").contains("ends before it starts")
     );
 }
+
+// -------------------------------------------------------------- templates
+
+use crate::template::{Bindings, Template, Value as Bound};
+
+#[test]
+fn a_hole_parses_so_a_template_stays_editable() {
+    // Without this, every line of a template lights up in the editor.
+    let source = "type pie\nslice a \"North\" {{north}}";
+    assert!(parse_diagram(source).is_ok());
+    let diagram = parse_diagram(source).unwrap();
+    assert!(crate::check::first_error(&diagram).is_none());
+    assert!(diagram.nodes[0].positional[0].is_hole());
+}
+
+#[test]
+fn an_unbound_hole_does_not_read_as_a_missing_value() {
+    // `slice a {{v}}` declares the datum; it is simply not bound yet.
+    let d = diags("type pie\nslice a \"A\" {{v}}\nslice b \"B\" {{w}}");
+    assert!(
+        !d.iter().any(|x| x.message.contains("has no `value`")),
+        "{d:?}"
+    );
+
+    // The same node with nothing at all is still an error.
+    assert!(err("type pie\nslice a \"A\"").contains("has no `value`"));
+}
+
+#[test]
+fn holes_are_listed_in_order_without_repeats() {
+    let t = Template::parse("node {{a}} \"{{b}}\" { fill: {{a}} }").expect("parses");
+    assert_eq!(t.holes(), ["a", "b"]);
+}
+
+#[test]
+fn a_bound_value_is_escaped_for_where_it_lands() {
+    let t = Template::parse("node a \"{{label}}\" { fill: {{colour}} }").expect("parses");
+    let filled = t
+        .fill(
+            &Bindings::new()
+                .set("label", "Americas (\"north\")")
+                .set("colour", Bound::Raw("#38bdf8".into())),
+        )
+        .expect("fills");
+
+    // Inside a string it is escaped, not quoted again.
+    assert!(filled.contains(r#""Americas (\"north\")""#), "{filled}");
+    assert!(filled.contains("fill: #38bdf8"), "{filled}");
+    // And the result still parses, which is the whole point of the escaping.
+    assert!(parse_diagram(&filled).is_ok(), "{filled}");
+}
+
+#[test]
+fn text_in_a_value_position_is_quoted() {
+    // A bare word there would have to be an identifier, and a two-word value
+    // would silently become two values.
+    let t = Template::parse("type pie\nslice a {{name}} 1").expect("parses");
+    let filled = t
+        .fill(&Bindings::new().set("name", "North America"))
+        .unwrap();
+    assert!(filled.contains(r#"slice a "North America" 1"#), "{filled}");
+    assert!(parse_diagram(&filled).is_ok());
+}
+
+#[test]
+fn a_number_is_written_bare_and_a_list_is_spread() {
+    let t =
+        Template::parse("type bar { categories: {{names}} }\nseries s {{points}}").expect("parses");
+    let filled = t
+        .fill(
+            &Bindings::new()
+                .set("names", vec!["Q1", "Q2"])
+                .set("points", vec![10i64, 20, 30]),
+        )
+        .unwrap();
+
+    assert!(filled.contains(r#"categories: "Q1" "Q2""#), "{filled}");
+    assert!(filled.contains("series s 10 20 30"), "{filled}");
+    let l = build(&filled);
+    assert_eq!(l.nodes.len(), 3, "three bars");
+}
+
+#[test]
+fn an_unbound_hole_is_refused_by_name() {
+    let t = Template::parse("node a { fill: {{one}} }\nnode b { fill: {{two}} }").unwrap();
+    let e = t
+        .render(&Bindings::new().set("one", Bound::Raw("#fff".into())))
+        .expect_err("should refuse");
+    let text = format!("{e:#}");
+    assert!(text.contains("nothing bound to `two`"), "{text}");
+    assert!(!text.contains("`one`"), "{text}");
+}
+
+#[test]
+fn a_template_that_cannot_parse_is_refused_up_front() {
+    // Catching it at `parse` beats catching it at the first render, in
+    // production, with a customer's data in hand.
+    let e = Template::parse("node a { fill: }} }").expect_err("should refuse");
+    assert!(format!("{e:#}").contains("does not parse"), "{e:#}");
+}
+
+#[test]
+fn a_template_renders_to_svg() {
+    let svg = crate::template::render(
+        "type pie\nslice a \"North\" {{north}}\nslice b \"South\" {{south}}\nslice c \"East\" {{east}}",
+        &Bindings::new().set("north", 50i64).set("south", 30i64).set("east", 20i64),
+    )
+    .expect("renders");
+    assert!(svg.starts_with("<svg"));
+    assert!(svg.contains("50%"), "the first slice is half the circle");
+}
+
+#[test]
+fn a_hole_inside_a_comment_is_still_a_hole() {
+    // Substitution is textual, so it reaches comments too — which is what
+    // makes `// generated for {{year}}` work as a reader expects.
+    let t = Template::parse("// for {{year}}\nnode a").expect("parses");
+    assert_eq!(t.holes(), ["year"]);
+    let filled = t.fill(&Bindings::new().set("year", 2026i64)).unwrap();
+    assert!(filled.starts_with("// for 2026"), "{filled}");
+}

@@ -22,6 +22,14 @@ struct Cli {
     /// Output SVG file
     #[arg(short, long, default_value = "out.svg")]
     output: PathBuf,
+
+    /// Bind a template hole: `--set year=2026 --set north=4820`
+    #[arg(long = "set", value_name = "NAME=VALUE")]
+    set: Vec<String>,
+
+    /// Print the filled source instead of rendering it
+    #[arg(long)]
+    emit: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -87,6 +95,40 @@ fn run() -> Result<i32> {
 
     let source =
         fs::read_to_string(&input).with_context(|| format!("cannot read {}", input.display()))?;
+
+    // A file with holes is a template; one without renders exactly as before.
+    let template = bgraph::Template::parse(&source)?;
+    if !template.holes().is_empty() || !cli.set.is_empty() {
+        let mut values = bgraph::Bindings::new();
+        for pair in &cli.set {
+            let Some((name, raw)) = pair.split_once('=') else {
+                bail!("`--set {pair}` needs a `name=value`");
+            };
+            values.insert(
+                name,
+                match raw.parse::<f64>() {
+                    Ok(n) => bgraph::template::Value::Number(n),
+                    Err(_) => bgraph::template::Value::Text(raw.to_string()),
+                },
+            );
+        }
+
+        if cli.emit {
+            print!("{}", template.fill(&values)?);
+            return Ok(0);
+        }
+
+        let svg = template.render(&values)?;
+        fs::write(&cli.output, svg)
+            .with_context(|| format!("cannot write {}", cli.output.display()))?;
+        println!(
+            "{} holes filled → {}",
+            template.holes().len(),
+            cli.output.display()
+        );
+        return Ok(0);
+    }
+
     let diagram = parser::parse_diagram(&source)?;
     let layout = layout::solve(&diagram)?;
     let svg = render_svg::render(&layout);
