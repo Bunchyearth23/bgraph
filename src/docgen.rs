@@ -134,9 +134,14 @@ fn archetypes(m: &mut String) {
         // another archetype's completion, so this is the only place they are
         // written down.
         if !def.item_props.is_empty() {
+            let article = if def.item.starts_with(['a', 'e', 'i', 'o', 'u']) {
+                "an"
+            } else {
+                "a"
+            };
             let _ = write!(
                 m,
-                "\nOn a `{}` — these are its own, and are not offered elsewhere:\n",
+                "\nOn {article} `{}` — these are its own, and are not offered elsewhere:\n",
                 def.item
             );
             m.push_str("\n| Property | Where | Syntax | Meaning |\n|---|---|---|---|\n");

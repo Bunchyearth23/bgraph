@@ -2868,6 +2868,20 @@ fn hostile_corpus() -> Vec<(&'static str, String)> {
         ("year zero", "type gantt\ntask a \"A\" 0000-01-01 1d".into()),
         ("packet zero bits", "type packet\nfield a \"A\" 0 0".into()),
         ("er with no relations", "type er\nentity a \"A\"".into()),
+        ("timeline with no events", "type timeline".into()),
+        ("timeline of one day", "type timeline\nevent a \"A\" 2026-03-01".into()),
+        (
+            "timeline of the same day",
+            "type timeline\nevent a \"A\" 2026-03-01\nevent b \"B\" 2026-03-01".into(),
+        ),
+        (
+            "timeline across two millennia",
+            "type timeline\nevent a \"A\" 0001-01-01\nevent b \"B\" 2026-03-01".into(),
+        ),
+        (
+            "timeline with a zero width",
+            "type timeline { size: 0 0 }\nevent a \"A\" 2026-03-01".into(),
+        ),
         (
             "er cardinality on a self relation",
             "type er\nentity a \"A\"\na -> a \"loops\" many many".into(),
@@ -3278,4 +3292,135 @@ fn a_non_rectangular_block_is_given_the_room_its_shape_takes() {
 
     assert!(hex.nodes[0].rect.w > rect.nodes[0].rect.w, "the hexagon's slanted sides eat width");
     assert!(cyl.nodes[0].rect.h > rect.nodes[0].rect.h, "the cylinder's caps eat height");
+}
+
+// ---------------------------------------------------------------------------
+// `timeline` — events on a date line.
+// ---------------------------------------------------------------------------
+
+/// Every event label, paired with the y its name sits at.
+fn timeline_labels(source: &str) -> Vec<(String, f64)> {
+    build(source)
+        .annotations
+        .iter()
+        .filter(|a| a.weight == "600" && a.size < 16.0)
+        .map(|a| (a.text.clone(), a.y))
+        .collect()
+}
+
+#[test]
+fn events_are_drawn_in_date_order_whatever_order_they_are_written() {
+    let l = build(
+        "type timeline\nevent c \"C\" 2026-03-09\nevent a \"A\" 2026-03-01\nevent b \"B\" 2026-03-05",
+    );
+    let xs: Vec<f64> = l.nodes.iter().map(|n| n.rect.cx()).collect();
+    assert!(xs[0] < xs[1] && xs[1] < xs[2], "{xs:?}");
+}
+
+#[test]
+fn neighbouring_labels_land_on_opposite_sides_of_the_line() {
+    // The stagger is the point: dates cluster, and one side at one height is
+    // unreadable exactly where a timeline matters most.
+    let labels = timeline_labels(
+        "type timeline\nevent a \"A\" 2026-03-01\nevent b \"B\" 2026-03-02\nevent c \"C\" 2026-03-03",
+    );
+    assert!(labels[0].1 < labels[1].1, "A is above, B below");
+    assert!(labels[2].1 < labels[1].1, "C is back above");
+}
+
+#[test]
+fn a_crowd_on_one_side_is_pushed_to_a_further_row() {
+    // Four events one day apart: two per side, and on each side the second
+    // cannot fit beside the first.
+    let tight = timeline_labels(
+        "type timeline { size: 200 30 }\n\
+         event a \"A long enough label\" 2026-03-01\n\
+         event b \"B long enough label\" 2026-03-02\n\
+         event c \"C long enough label\" 2026-03-03\n\
+         event d \"D long enough label\" 2026-03-04",
+    );
+    // `a` and `c` share the upper side and must not share a row.
+    assert_ne!(tight[0].1, tight[2].1, "{tight:?}");
+}
+
+#[test]
+fn a_roomy_line_keeps_every_label_on_one_row_per_side() {
+    let roomy = timeline_labels(
+        "type timeline { size: 900 30 }\n\
+         event a \"A\" 2026-01-01\n\
+         event b \"B\" 2026-04-01\n\
+         event c \"C\" 2026-07-01\n\
+         event d \"D\" 2026-10-01",
+    );
+    assert_eq!(roomy[0].1, roomy[2].1, "both upper labels fit one row");
+    assert_eq!(roomy[1].1, roomy[3].1, "both lower labels fit one row");
+}
+
+#[test]
+fn an_event_without_a_date_is_refused() {
+    let e = err("type timeline\nevent a \"A\"");
+    assert!(e.contains("no date"), "{e}");
+}
+
+#[test]
+fn the_axis_step_coarsens_until_the_labels_fit() {
+    // Ten years at a quarterly step is forty labels in 800px — a smear. The
+    // step is chosen against the page, not against the calendar alone.
+    let decade = build(
+        "type timeline { size: 800 30 }\nevent a \"A\" 2015-01-01\nevent b \"B\" 2025-01-01",
+    );
+    let axis: Vec<&str> = decade
+        .annotations
+        .iter()
+        .filter(|a| a.size <= 10.0)
+        .map(|a| a.text.as_str())
+        .collect();
+    assert!(axis.len() <= 14, "{} labels: {axis:?}", axis.len());
+    assert!(axis.iter().all(|t| t.len() == 4), "years, not days: {axis:?}");
+
+    let week = build(
+        "type timeline { size: 800 30 }\nevent a \"A\" 2026-03-01\nevent b \"B\" 2026-03-08",
+    );
+    assert!(
+        week.annotations
+            .iter()
+            .filter(|a| a.size <= 10.0)
+            .any(|a| a.text.contains("03-0")),
+        "a week is labelled by day"
+    );
+}
+
+#[test]
+fn a_stem_stops_at_the_edge_of_its_label_rather_than_through_it() {
+    let l = build("type timeline\nevent a \"A\" 2026-03-01");
+    let name = l
+        .annotations
+        .iter()
+        .find(|a| a.text == "A")
+        .expect("the name is drawn");
+    let date = l
+        .annotations
+        .iter()
+        .find(|a| a.text == "2026-03-01")
+        .expect("the date is drawn");
+    // Gridlines are vertical too; the stem is the one that starts on the axis.
+    let axis_y = l
+        .guides
+        .iter()
+        .find(|g| (g.from.1 - g.to.1).abs() < 0.01)
+        .expect("the date line is drawn")
+        .from
+        .1;
+    let stem = l
+        .guides
+        .iter()
+        .find(|g| (g.from.0 - g.to.0).abs() < 0.01 && (g.from.1 - axis_y).abs() < 0.01)
+        .expect("a stem is drawn");
+    let top = stem.from.1.min(stem.to.1);
+    assert!(
+        top > date.y,
+        "the stem ends below the date line: stem {top}, date {}",
+        date.y
+    );
+    assert!(name.y < date.y, "the name leads");
 }

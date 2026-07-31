@@ -553,6 +553,20 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         edge_slots: &[],
     },
     ArchetypeDef {
+        name: "timeline",
+        item: "event",
+        doc: "Events on a date line. Each event needs a date; they are drawn \
+              in date order with their labels staggered above and below, so a \
+              cluster of dates stays readable without hand-placing anything.",
+        props: TIMELINE_PROPS,
+        item_props: TIMELINE_ITEM_PROPS,
+        slots: &[Slot {
+            prop: "date",
+            arity: 1,
+        }],
+        edge_slots: &[],
+    },
+    ArchetypeDef {
         name: "block",
         item: "block",
         doc: "Architecture and C4-style component views: typed elements with a \
@@ -823,6 +837,49 @@ pub const BLOCK_KINDS: &[&str] = &[
     "queue",
     "external",
 ];
+
+pub const TIMELINE_TICKS: &[&str] = &["day", "week", "month", "year"];
+
+pub const TIMELINE_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the diagram.",
+    },
+    PropDef {
+        name: "size",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "size: <width> <row-height>",
+        doc: "How wide the date line runs, and how much room one row of \
+              staggered labels takes.",
+    },
+    PropDef {
+        name: "ticks",
+        alias: false,
+        ctx: Ctx::Both,
+        words: TIMELINE_TICKS,
+        syntax: "ticks: <day|week|month|year>",
+        doc: "How often the axis is labelled. Chosen from the span when it is \
+              not declared.",
+    },
+];
+
+pub const TIMELINE_ITEM_PROPS: &[PropDef] = &[PropDef {
+    name: "date",
+    alias: false,
+    ctx: Ctx::Node,
+    words: &[],
+    syntax: "date: <date>",
+    doc: "When the event happened. Usually written positionally — \
+          `event launch \"Launch\" 2026-03-15`. Events are drawn in date \
+          order, and their labels staggered above and below the line so a \
+          cluster stays readable.",
+}];
 
 pub const BLOCK_PROPS: &[PropDef] = &[PropDef {
     name: "title",

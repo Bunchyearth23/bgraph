@@ -79,6 +79,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "er" => check_er(diagram, &mut out),
         "block" => check_block(diagram, &mut out),
         "gantt" => check_gantt(diagram, &mut out),
+        "timeline" => check_timeline(diagram, &mut out),
         "state" => {
             check_cycles(diagram, &nodes, &mut out);
             check_state(diagram, &mut out);
@@ -955,6 +956,27 @@ fn first_cycle(count: usize, edges: &[(usize, usize)]) -> Option<Vec<usize>> {
         return None;
     }
     Some((0..count).filter(|i| degree[*i] > 0).collect())
+}
+
+fn check_timeline(diagram: &Diagram, out: &mut Vec<Diag>) {
+    warn_ignored(diagram, "timeline", out);
+
+    let styles = resolved_nodes(diagram, base_style("timeline"));
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        if awaits_binding(node, archetype_of(diagram), "date") {
+            continue;
+        }
+        if styles.get(i).and_then(|s| s.start).is_none() {
+            out.push(Diag::error(
+                node.id.span,
+                format!(
+                    "`{}` has no date — `event {} [\"label\"] <date>`",
+                    node.id.as_str(),
+                    node.id.as_str()
+                ),
+            ));
+        }
+    }
 }
 
 fn check_gantt(diagram: &Diagram, out: &mut Vec<Diag>) {

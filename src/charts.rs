@@ -2830,7 +2830,7 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
     }
 
     let rule = if theme.dark { "#1e293b" } else { "#e4e4e7" };
-    let step = pick_tick(span);
+    let step = pick_tick(span, (width / 52.0) as usize);
     let mut d = first;
     while d <= last {
         let x = x_of(d);
@@ -2970,11 +2970,250 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
 }
 
 /// Marks the calendar often enough to read and rarely enough to breathe.
-fn pick_tick(span_days: f64) -> i64 {
-    match span_days {
-        s if s <= 21.0 => 1,
-        s if s <= 120.0 => 7,
-        s if s <= 400.0 => 28,
-        _ => 91,
+/// A calendar step coarse enough that the labels fit.
+///
+/// Span alone is not enough: ten years at a quarterly step is forty labels,
+/// and forty labels in 800px is a smear. `most` is how many the axis has room
+/// for, so the step is chosen against the page rather than against the
+/// calendar alone.
+fn pick_tick(span_days: f64, most: usize) -> i64 {
+    const STEPS: [i64; 8] = [1, 7, 28, 91, 364, 728, 1820, 3640];
+    let most = most.max(2) as f64;
+    for step in STEPS {
+        if span_days / step as f64 <= most {
+            return step;
+        }
     }
+    STEPS[STEPS.len() - 1]
+}
+
+// ---------------------------------------------------------------------------
+// timeline — events on a date line
+// ---------------------------------------------------------------------------
+
+/// Events on a horizontal date line, labels staggered above and below.
+///
+/// The stagger is the whole point. Dates cluster — three things happen in one
+/// week and nothing for two months — so a timeline that puts every label on
+/// one side at one height is unreadable exactly where it matters most.
+pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
+    use crate::ast::civil_from_days;
+
+    let cfg = &diagram.archetype_props;
+    let theme = Theme::of(&opts);
+    let def = crate::check::archetype_of(diagram);
+
+    let width = setting(cfg, "size")
+        .and_then(|v| v.first())
+        .and_then(|v| v.as_num())
+        .unwrap_or(720.0)
+        .max(160.0);
+    let row_h = setting(cfg, "size")
+        .and_then(|v| v.get(1))
+        .and_then(|v| v.as_num())
+        .unwrap_or(34.0)
+        .max(14.0);
+    let title = text(cfg, "title");
+
+    let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
+    let accent = theme.palette()[0];
+    let font = base.font_size.unwrap_or(13.0);
+
+    let mut events = Vec::new();
+    for node in &diagram.nodes {
+        let style = registry.resolve(
+            chart_defaults(),
+            def.item,
+            &node.classes,
+            &node.effective_props(def.slots),
+        )?;
+        let Some(day) = style.start else { continue };
+        let name = node.label.clone().unwrap_or_else(|| node.id.value.clone());
+        events.push((name, day, style));
+    }
+    // Date order, and source order for two things on the same day — which is
+    // the only tie-break a reader can predict.
+    events.sort_by_key(|e| e.1);
+
+    let (first, last) = events
+        .iter()
+        .fold((i64::MAX, i64::MIN), |(lo, hi), e| (lo.min(e.1), hi.max(e.1)));
+    let (first, last) = if events.is_empty() {
+        (0, 1)
+    } else {
+        (first, last.max(first + 1))
+    };
+    let span = (last - first) as f64;
+
+    // Room at each end so the first and last labels are not half off the page.
+    let margin = width * 0.08;
+    let plot = width - margin * 2.0;
+    let x_of = |d: i64| margin + (d - first) as f64 * plot / span;
+
+    // Pack labels into rows, per side, so two never overlap: an event takes
+    // the shallowest row on its side whose last label ended before this one
+    // starts.
+    let label_w = |name: &str| text_width(std::slice::from_ref(&name.to_string()), font) + 14.0;
+    let mut ends: [Vec<f64>; 2] = [Vec::new(), Vec::new()];
+    let mut placed: Vec<(usize, usize)> = Vec::new(); // (side, row)
+    for (i, (name, day, _)) in events.iter().enumerate() {
+        let side = i % 2;
+        let half = label_w(name) / 2.0;
+        let (left, right) = (x_of(*day) - half, x_of(*day) + half);
+        let row = match ends[side].iter().position(|end| *end + 10.0 < left) {
+            Some(row) => row,
+            None => {
+                ends[side].push(0.0);
+                ends[side].len() - 1
+            }
+        };
+        ends[side][row] = right;
+        placed.push((side, row));
+    }
+
+    let title_h = if title.is_some() { TITLE_SIZE * 2.0 } else { 0.0 };
+    const STEM: f64 = 14.0;
+    const AXIS_H: f64 = 22.0;
+    // A label is two lines — the name, then the date under it — so the space
+    // it needs is not one row. Forgetting the second line is what ran the stem
+    // through the date and put the axis strip on top of the deepest row.
+    let cap = font * 0.8;
+    let tail = font * 1.6;
+    let above = ends[0].len() as f64 * row_h + cap;
+    let axis_y = title_h + above + STEM;
+    let below = ends[1].len() as f64 * row_h + tail + cap;
+    let height = axis_y + STEM + below + AXIS_H;
+
+    let mut guides = Vec::new();
+    let mut nodes = Vec::new();
+    let mut annotations = Vec::new();
+
+    if let Some(title) = title {
+        annotations.push(Annotation {
+            text: title,
+            x: 0.0,
+            y: TITLE_SIZE,
+            anchor: Anchor::Start,
+            size: TITLE_SIZE,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    // Gridlines carry the axis labels down to the strip at the foot, so a date
+    // is read off the same vertical the event sits on.
+    let rule = if theme.dark { "#1e293b" } else { "#e4e4e7" };
+    let step = match text(cfg, "ticks").as_deref() {
+        Some("day") => 1,
+        Some("week") => 7,
+        Some("month") => 28,
+        Some("year") => 364,
+        // A centred `2015-05` is about 52px wide; leave it a gap.
+        _ => pick_tick(span, (plot / 66.0) as usize),
+    };
+    let mut d = first;
+    while d <= last {
+        let x = x_of(d);
+        guides.push(Guide {
+            from: (x, title_h),
+            to: (x, height - AXIS_H),
+            color: rule.into(),
+            width: 1.0,
+            dash: None,
+        });
+        let (y, m, dd) = civil_from_days(d);
+        annotations.push(Annotation {
+            text: match step {
+                s if s >= 364 => format!("{y}"),
+                s if s >= 28 => format!("{y}-{m:02}"),
+                _ => format!("{m:02}-{dd:02}"),
+            },
+            x,
+            y: height - AXIS_H / 2.0,
+            anchor: Anchor::Middle,
+            size: 10.0,
+            color: theme.muted.clone(),
+            weight: "400".into(),
+            family: family(&base),
+        });
+        d += step;
+    }
+
+    // The date line itself, over the gridlines.
+    guides.push(Guide {
+        from: (0.0, axis_y),
+        to: (width, axis_y),
+        color: ink(&base, &theme),
+        width: 1.4,
+        dash: None,
+    });
+
+    for ((name, day, style), (side, row)) in events.iter().zip(&placed) {
+        let x = x_of(*day);
+        let up = *side == 0;
+        let depth = STEM + (*row as f64 + 1.0) * row_h;
+        let tip = if up { axis_y - depth } else { axis_y + depth };
+
+        // Stops at the edge of the label block, not inside it.
+        guides.push(Guide {
+            from: (x, axis_y),
+            to: (x, if up { tip + tail } else { tip - cap }),
+            color: style.stroke.clone().unwrap_or_else(|| accent.into()),
+            width: 1.2,
+            dash: None,
+        });
+
+        // A mark, not a box: it carries no label of its own.
+        let r = 5.0;
+        nodes.push(PlacedNode {
+            lines: Vec::new(),
+            rect: Rect {
+                x: x - r,
+                y: axis_y - r,
+                w: r * 2.0,
+                h: r * 2.0,
+            },
+            style: Style {
+                fill: Some(style.fill.clone().unwrap_or_else(|| accent.into())),
+                stroke: Some(theme.surface.clone()),
+                stroke_width: Some(2.0),
+                shape: Some(Shape::Ellipse),
+                ..Style::default()
+            },
+        });
+
+        annotations.push(Annotation {
+            text: name.clone(),
+            x,
+            y: tip,
+            anchor: Anchor::Middle,
+            size: font,
+            color: ink(style, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+        let (y, m, dd) = civil_from_days(*day);
+        annotations.push(Annotation {
+            text: format!("{y}-{m:02}-{dd:02}"),
+            x,
+            y: tip + font * 1.15,
+            anchor: Anchor::Middle,
+            size: font * 0.8,
+            color: theme.muted.clone(),
+            weight: "400".into(),
+            family: family(&base),
+        });
+    }
+
+    Ok(Layout {
+        guides,
+        polylines: Vec::new(),
+        groups: Vec::new(),
+        nodes,
+        edges: Vec::new(),
+        opts,
+        chart: Chart::Timeline,
+        annotations,
+    })
 }

@@ -37,6 +37,7 @@ type gantt      // task a "A" 2026-01-01 5d
 type class      // class a "A", then `- id: Uuid` on its own line
 type er         // entity a "A", then a -> b "places" one many
 type block      // block api "API" container { tech: "Rust" }
+type timeline   // event launch "Launch" 2026-03-15
 type state      // state a "A"
 type sequence   // participant a "A"
 ```

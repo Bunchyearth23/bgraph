@@ -385,6 +385,9 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
             style.description = first.and_then(|x| x.as_text()).map(String::from)
         }
         "guard" => style.guard = first.and_then(|x| x.as_text()).map(String::from),
+        // A timeline event is a point, so it needs only the day — but the day
+        // it sits on is the same field a gantt bar starts from.
+        "date" => style.start = first.and_then(|x| x.as_date()),
         // `start: 2026-08-01 12d` or `start: 2026-08-01 2026-08-12` — read by
         // value kind, so either way of saying "how long" works.
         "start" => {

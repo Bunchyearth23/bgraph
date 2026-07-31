@@ -29,7 +29,7 @@ Ordered by what each unblocks, not by number. **Every foundation has landed** �
 nesting (`W-011`), the plot frame (`W-012`), edge data (`W-015`), per-archetype
 vocabulary (`W-029`), members (`W-013`) and dates (`W-014`) — so nothing below
 waits on anything but itself. What is left either unblocks
-nothing — `W-032` — or belongs to the library track, where
+nothing, or belongs to the library track, where
 the engineering is done and the two open items are decisions for a human:
 `Q-005` (release) and `Q-004` (repetition in templates).
 
@@ -42,7 +42,6 @@ changed the language: `W-011`, `W-013`, `W-014` — all three have landed.
 
 | id | state | title | notes |
 |---|---|---|---|
-| `W-032` | planned | `type timeline` — events on a date line | Project. `W-014` gives it the dates and `W-026` the axis; what remains is the marks and the label stagger. |
 | `Q-005` | open | Publish to crates.io, and under which licence? | **The Archmagos's call, and only his.** A version on crates.io cannot be withdrawn, only yanked, and the name is spent the moment it lands. `Cargo.toml` carries `publish = false` and deliberately omits `license` and `authors`, so `cargo publish` refuses rather than merely being discouraged. The name `bgraph` was free on 2026-07-31. Blocks `W-034`. |
 | `W-034` | blocked | Release to crates.io | Blocked by `Q-005`. Needs a licence choice, `LICENSE` files, `authors`, `publish = true`, and a `cargo publish --dry-run`. Nothing else: `W-027` did the engineering. |
 | `Q-004` | open | Does a template need repetition? | A pie with a variable *number* of slices cannot be templated by substitution alone. Either the calling program builds the source string itself — the honest answer for that case — or the language grows a `for` construct, which is a template language and a much larger promise. |
@@ -97,6 +96,7 @@ not copies.
 | `W-005` | 2026-07-31 | Tree-sitter grammar and Zed extension | `1b53ec3`, regenerated `d6997b1` |
 | `W-006` | 2026-07-31 | `type` archetypes (`pie`, `packet`), quiet completion, explicit surface, generated reference manual | `4b4c548` |
 | `W-033` | 2026-07-31 | Templating: `{{holes}}` that parse, typed bindings, context-aware escaping, `--set` on the CLI | 6d166eb |
+| `W-032` | 2026-07-31 | `type timeline` — events on a date line, labels packed into staggered rows either side | this commit |
 | `W-025` | 2026-07-31 | `type block` — C4 architecture views: typed elements, a technology line, a wrapped description, relations that carry a protocol | this commit |
 | `W-031` | 2026-07-31 | `type er` — entities, columns and crow's-foot cardinality at each end of a relation | this commit |
 | `W-027` | 2026-07-31 | **The embedding promise**: hostile input cannot bring down the host, and the public surface says what semver covers | this commit |

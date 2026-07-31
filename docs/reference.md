@@ -301,6 +301,26 @@ class <id> ["label"]
 |---|---|---|
 | `title` | `title: <text>` | Heading drawn above the diagram. |
 
+### `type timeline`
+
+Events on a date line. Each event needs a date; they are drawn in date order with their labels staggered above and below, so a cluster of dates stays readable without hand-placing anything.
+
+```
+event <id> ["label"] <date>
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+| `size` | `size: <width> <row-height>` | How wide the date line runs, and how much room one row of staggered labels takes. |
+| `ticks` | `ticks: <day\|week\|month\|year>` | How often the axis is labelled. Chosen from the span when it is not declared. |
+
+On an `event` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `date` | node | `date: <date>` | When the event happened. Usually written positionally — `event launch "Launch" 2026-03-15`. Events are drawn in date order, and their labels staggered above and below the line so a cluster stays readable. |
+
 ### `type block`
 
 Architecture and C4-style component views: typed elements with a technology and a description, nested with `group`, joined by relations that carry a protocol. Placed by anchors exactly as in `free` — the archetype supplies the vocabulary and the shapes.

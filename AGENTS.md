@@ -178,6 +178,10 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   silently reuses the cached grammar. `editors/zed/install.sh` does both.
 
 ### Gotchas
+- [2026-07-31] `pick_tick` chose a calendar step from the **span alone**, so a
+  ten-year timeline asked for forty quarterly labels in 800px and drew a
+  smear. A tick step is a function of the span *and the room on the page*; it
+  now takes how many labels fit. `gantt` had the same latent bug.
 - [2026-07-31] Box sizing existed in three places — `natural_size`, the class
   compartment path, and `block`. The shape allowance (a cylinder's caps, a
   hexagon's slanted sides) lived only in the first, so a `block` cylinder drew

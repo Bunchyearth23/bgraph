@@ -120,6 +120,8 @@ pub enum Chart {
     Sequence,
     /// Bars on a calendar.
     Gantt,
+    /// Events on a date line, labels staggered either side of it.
+    Timeline,
     /// Slices, which need arcs the node renderer cannot make.
     Pie(Pie),
 }
@@ -342,6 +344,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         "xy" => return crate::charts::xy(diagram, opts, &registry),
         "sequence" => return crate::charts::sequence(diagram, opts, &registry),
         "gantt" => return crate::charts::gantt(diagram, opts, &registry),
+        "timeline" => return crate::charts::timeline(diagram, opts, &registry),
         _ => {}
     }
 
