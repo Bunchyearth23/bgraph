@@ -2,7 +2,7 @@ type wave {
   title: "SPI transfer"
   period: 34
   lane: 26 16
-  every: 4
+  every: 1
 }
 graph { background: #0b1120 padding: 30 }
 style signal { font: 12 #e2e8f0 stroke: #7dd3fc }
