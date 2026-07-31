@@ -1,0 +1,22 @@
+{
+  "name": "tree-sitter-bgraph",
+  "version": "0.1.0",
+  "description": "Tree-sitter grammar for the bgraph diagram DSL",
+  "main": "bindings/node",
+  "keywords": ["parser", "tree-sitter", "bgraph", "diagram"],
+  "license": "MIT",
+  "devDependencies": {
+    "tree-sitter-cli": "^0.25.0"
+  },
+  "scripts": {
+    "build": "tree-sitter generate",
+    "test": "tree-sitter test"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.bgraph",
+      "file-types": ["bd"],
+      "injection-regex": "^bgraph$"
+    }
+  ]
+}

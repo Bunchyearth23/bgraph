@@ -1,0 +1,46 @@
+// bgraph DSL grammar
+//
+// Newlines are significant (they separate statements), so WHITESPACE covers
+// only horizontal space and every rule spanning several lines consumes `sep`.
+
+WHITESPACE = _{ " " | "\t" }
+// `//`, not `#` — `#` is reserved for hex colors.
+COMMENT    = _{ "//" ~ (!nl ~ ANY)* }
+
+nl  = _{ "\r\n" | "\n" }
+sep = _{ (nl | ";" | ",")* }
+
+// A trailing hyphen is disallowed so `a->b` splits into `a` `->` `b`
+// while keywords like `right-of` still read as one token.
+ident  = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_" | ("-" ~ (ASCII_ALPHANUMERIC | "_")))* }
+string = ${ "\"" ~ str_inner ~ "\"" }
+str_inner = @{ (!("\"" | "\\") ~ ANY | "\\" ~ ANY)* }
+number = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ ("px" | "%")? }
+color  = @{ "#" ~ ASCII_HEX_DIGIT{3, 8} }
+
+file = { SOI ~ sep ~ (stmt ~ sep)* ~ EOI }
+
+stmt = _{ graph_decl | style_decl | node_decl | edge_decl }
+
+graph_decl = { "graph" ~ block }
+style_decl = { "style" ~ ident ~ ("extends" ~ ident)? ~ block }
+node_decl  = { "node" ~ ident ~ string? ~ class_ref* ~ placement? ~ block? }
+edge_decl  = { ident ~ arrow ~ ident ~ string? ~ class_ref* ~ block? }
+
+class_ref = { "." ~ ident }
+arrow     = @{ "<->" | "<-" | "-->" | "..>" | "--" | "->" | ".." }
+
+placement = _{ abs_pos | rel_pos }
+abs_pos   = { "at" ~ point }
+rel_pos   = { rel_dir ~ ident ~ gap? ~ align? }
+rel_dir    = { "right-of" | "left-of" | "below" | "above" }
+gap        = { "gap" ~ number }
+align      = { "align" ~ align_kw }
+align_kw   = { "left" | "right" | "center" | "middle" | "top" | "bottom" }
+point      = { "(" ~ number ~ "," ~ number ~ ")" }
+
+block = { "{" ~ sep ~ (prop ~ sep)* ~ "}" }
+// The lookahead stops a value list at the next `name:`, so several properties
+// can share a line without needing a separator.
+prop  = { ident ~ ":" ~ (!(ident ~ ":") ~ value)+ }
+value = _{ string | color | number | ident }

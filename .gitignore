@@ -1,0 +1,6 @@
+/target
+/editors/zed/target
+/tree-sitter-bgraph/node_modules
+/tree-sitter-bgraph/package-lock.json
+# The generated parser IS committed: Zed fetches the grammar from a git
+# revision, so tree-sitter-bgraph/src must be in the tree.

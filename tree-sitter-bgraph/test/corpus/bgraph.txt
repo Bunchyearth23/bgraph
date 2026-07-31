@@ -1,0 +1,171 @@
+================================================================================
+Graph settings
+================================================================================
+
+graph {
+  background: #0b1120
+  padding: 40
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (graph_declaration
+    body: (block
+      (property name: (property_name) value: (color))
+      (property name: (property_name) value: (number)))))
+
+================================================================================
+Hex colors are not comments
+================================================================================
+
+// a comment
+node a "A" { fill: #0b1120 }  // trailing
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (comment)
+  (node_declaration
+    name: (identifier)
+    label: (string)
+    body: (block
+      (property name: (property_name) value: (color))))
+  (comment))
+
+================================================================================
+Several properties on one line
+================================================================================
+
+node a { fill: #111111 stroke: #222222 2 dashed }
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (node_declaration
+    name: (identifier)
+    body: (block
+      (property name: (property_name) value: (color))
+      (property
+        name: (property_name)
+        value: (color)
+        value: (number)
+        value: (identifier)))))
+
+================================================================================
+Styles and inheritance
+================================================================================
+
+style base { radius: 4 }
+style leaf extends base {
+  shape: cylinder
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (style_declaration
+    name: (identifier)
+    body: (block
+      (property name: (property_name) value: (number))))
+  (style_declaration
+    name: (identifier)
+    parent: (identifier)
+    body: (block
+      (property name: (property_name) value: (identifier)))))
+
+================================================================================
+Absolute and relative placement
+================================================================================
+
+node a "A" at (0, 0)
+node b "B" .service right-of a gap 90 align top
+node c above b
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (node_declaration
+    name: (identifier)
+    label: (string)
+    placement: (absolute_position
+      point: (point x: (number) y: (number))))
+  (node_declaration
+    name: (identifier)
+    label: (string)
+    class: (class_reference (identifier))
+    placement: (relative_position
+      direction: (direction)
+      anchor: (identifier)
+      (gap_clause amount: (number))
+      (align_clause alignment: (alignment))))
+  (node_declaration
+    name: (identifier)
+    placement: (relative_position
+      direction: (direction)
+      anchor: (identifier))))
+
+================================================================================
+Every arrow form
+================================================================================
+
+a -> b
+a <- b
+a <-> b
+a -- b
+a --> b
+a ..> b
+a .. b
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (edge_declaration from: (identifier) operator: (arrow) to: (identifier))
+  (edge_declaration from: (identifier) operator: (arrow) to: (identifier))
+  (edge_declaration from: (identifier) operator: (arrow) to: (identifier))
+  (edge_declaration from: (identifier) operator: (arrow) to: (identifier))
+  (edge_declaration from: (identifier) operator: (arrow) to: (identifier))
+  (edge_declaration from: (identifier) operator: (arrow) to: (identifier))
+  (edge_declaration from: (identifier) operator: (arrow) to: (identifier)))
+
+================================================================================
+Arrows without surrounding space
+================================================================================
+
+alpha->beta
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (edge_declaration from: (identifier) operator: (arrow) to: (identifier)))
+
+================================================================================
+Edge with label, class and inline block
+================================================================================
+
+orders -> billing "charge" .hot { router: ortho }
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (edge_declaration
+    from: (identifier)
+    operator: (arrow)
+    to: (identifier)
+    label: (string)
+    class: (class_reference (identifier))
+    body: (block
+      (property name: (property_name) value: (identifier)))))
+
+================================================================================
+Escapes and braces inside labels
+================================================================================
+
+node a "Order\nService"
+node b "a { brace } and a \" quote"
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (node_declaration name: (identifier) label: (string))
+  (node_declaration name: (identifier) label: (string)))

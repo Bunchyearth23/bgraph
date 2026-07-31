@@ -1,0 +1,17 @@
+{
+  "grammars": [
+    {
+      "name": "bgraph",
+      "camelcase": "Bgraph",
+      "scope": "source.bgraph",
+      "path": ".",
+      "file-types": ["bd"],
+      "injection-regex": "^bgraph$"
+    }
+  ],
+  "metadata": {
+    "version": "0.1.0",
+    "license": "MIT",
+    "description": "Tree-sitter grammar for the bgraph diagram DSL"
+  }
+}
