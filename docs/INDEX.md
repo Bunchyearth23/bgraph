@@ -28,8 +28,7 @@ purpose — an identifier is earned by being cited.
 Ordered by what each unblocks, not by number. `W-011` and `W-029` have landed,
 so nesting and per-archetype vocabulary are available to everything below.
 `W-012` … `W-015` are the remaining foundations; each archetype names the one
-it waits for. Four now wait for nothing — `W-019`, `W-024`, `W-018` and
-`W-025`.
+it waits for. Three now wait for nothing — `W-024`, `W-018` and `W-025`.
 
 **DSL impact, measured rather than assumed.** The grammar already accepts
 string lists (`data: "a" "b" "c"`), number lists (`points: 1 2 3`),
@@ -41,14 +40,13 @@ change the language: `W-011`, `W-013`, `W-014`.
 | id | state | title | notes |
 |---|---|---|---|
 | `W-011` | planned | **Containers / nesting** — `group` with children | **DSL change.** The one structural gap that keeps recurring: sequence `loop`/`alt` blocks, nested states, class packages, architecture groups, swimlanes, kanban columns, treemap nesting all need it. Promotes `I-006`. Blocks `W-020`, `W-021`, `W-022`. |
-| `W-012` | planned | **Plot frame** — axes, scales, ticks, gridlines, legend | Shared substrate for every numeric chart. No DSL change; it is layout and rendering. Blocks `W-016`, `W-017`. |
+| `W-012` | planned | **Plot frame** — axes, scales, ticks, gridlines, legend | Shared substrate for every numeric chart. No DSL change; it is layout and rendering. `W-019` added the `Guide` primitive it will draw with. Blocks `W-016`, `W-017`. |
 | `W-013` | planned | **Node member lists** — a body of items, not properties | **DSL change.** A class needs fields and methods, a table needs columns; a label with `\n` is a workaround, not a model. Blocks `W-023`. |
 | `W-014` | planned | **Date and duration literals** | **DSL change.** `2026-07-31`, `3d`, `2w`. Blocks `W-026`. |
 | `W-015` | planned | **`value` on edges** | Not a grammar change — `value` moves from `Ctx::Node` to `Ctx::Both`. Blocks `W-018`. |
 | `W-016` | planned | `type bar` — bar, column, stacked, grouped | Data / stats. Reuses `value`, which already exists. Needs `W-012`. |
 | `W-017` | planned | `type xy` — line, scatter, area, multi-series | Data / stats. A series is a node carrying a number list; categories are a string list on the `type` block. Needs `W-012`. |
 | `W-018` | planned | `type sankey` — flows sized by magnitude | Data. Needs `W-015`; nothing else. |
-| `W-019` | planned | `type quadrant` — incl. a Wardley-map flavour | Stats / strategy. **Reuses `at (x, y)` verbatim** — the cheapest archetype on this list, and the closest to what the tool already is. |
 | `W-021` | planned | `type sequence` — participants, ordered messages, activations | Dev. Repeated edges between the same pair already survive in source order; `loop`/`alt`/`opt` have `W-011`. |
 | `W-022` | planned | `type state` — state machines | Dev / embedded. Nested states have `W-011`; entry/exit pseudo-states are nodes with a shape. |
 | `W-023` | planned | `type class` and `type er` | Dev / data. Needs `W-013` for members, plus cardinality on arrows (`\|\|--o{`) — either new arrow tokens or `from-card:` / `to-card:` properties. |
@@ -106,6 +104,7 @@ not copies.
 | `W-004` | 2026-07-31 | `bgraph-lsp`: diagnostics, completion, hover, go-to-definition, outline | `1b53ec3` |
 | `W-005` | 2026-07-31 | Tree-sitter grammar and Zed extension | `1b53ec3`, regenerated `d6997b1` |
 | `W-006` | 2026-07-31 | `type` archetypes (`pie`, `packet`), quiet completion, explicit surface, generated reference manual | `4b4c548` |
+| `W-019` | 2026-07-31 | `type quadrant` — points on two axes, four named regions; a Wardley map is the same archetype with other axis names | this commit |
 | `W-020` | 2026-07-31 | `type treemap` — squarified tiles, hierarchy from group nesting, one hue per top-level branch | this commit |
 | `W-011` | 2026-07-31 | Containers: `group` with nested statements, sized by its members, anchorable, translating its subtree when placed | this commit |
 | `W-029` | 2026-07-31 | Per-archetype vocabulary: `slice a "A" 4820`, `field b "B" 0 15` — one statement form, keyword and slots declared in `props.rs` | this commit |

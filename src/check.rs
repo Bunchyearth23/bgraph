@@ -57,6 +57,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "pie" => check_pie(diagram, &mut out),
         "packet" => check_packet(diagram, &mut out),
         "treemap" => check_treemap(diagram, &mut out),
+        "quadrant" => check_quadrant(diagram, &mut out),
         _ => {
             check_cycles(diagram, &nodes, &mut out);
             check_unused_data(diagram, &mut out);
@@ -499,6 +500,15 @@ fn check_cycles(diagram: &Diagram, nodes: &HashMap<&str, usize>, out: &mut Vec<D
 
 /// Resolves each node's style the way the layout will, so a `value` or `bits`
 /// inherited from a class counts as declared.
+/// The base each archetype resolves its items on. `free` and `packet` draw
+/// boxes; the chart archetypes draw marks and take no box defaults.
+pub fn base_style(archetype: &str) -> crate::style::Style {
+    match archetype {
+        "free" | "packet" => crate::style::Style::node_defaults(),
+        _ => crate::charts::chart_defaults(),
+    }
+}
+
 fn resolved_nodes(diagram: &Diagram, base: crate::style::Style) -> Vec<crate::style::Style> {
     let Ok(registry) = crate::style::Registry::build(&diagram.styles) else {
         return Vec::new();
@@ -551,7 +561,7 @@ fn warn_ignored(diagram: &Diagram, archetype: &str, out: &mut Vec<Diag>) {
 fn check_pie(diagram: &Diagram, out: &mut Vec<Diag>) {
     warn_ignored(diagram, "pie", out);
 
-    let styles = resolved_nodes(diagram, crate::charts::chart_defaults());
+    let styles = resolved_nodes(diagram, base_style("pie"));
     let mut drawn = 0;
 
     for (i, node) in diagram.nodes.iter().enumerate() {
@@ -655,10 +665,72 @@ fn check_packet(diagram: &Diagram, out: &mut Vec<Diag>) {
     }
 }
 
+fn check_quadrant(diagram: &Diagram, out: &mut Vec<Diag>) {
+    warn_ignored(diagram, "quadrant", out);
+
+    let cfg = &diagram.archetype_props;
+    let bound = |k: &str, i: usize, fallback: f64| {
+        cfg.iter()
+            .find(|p| p.name == k)
+            .and_then(|p| p.values.get(i))
+            .and_then(|v| v.as_num())
+            .unwrap_or(fallback)
+    };
+    let (lo, hi) = (bound("range", 0, 0.0), bound("range", 1, 1.0));
+
+    let styles = resolved_nodes(diagram, base_style("quadrant"));
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        let style = styles.get(i);
+        match (style.and_then(|s| s.x), style.and_then(|s| s.y)) {
+            (Some(x), Some(y)) => {
+                for (axis, v) in [("x", x), ("y", y)] {
+                    if v < lo.min(hi) || v > lo.max(hi) {
+                        out.push(Diag::warn(
+                            node.id.span,
+                            format!(
+                                "`{}` has {axis} = {v}, outside the range {lo}–{hi}; \
+                                 it will be pinned to the edge",
+                                node.id.as_str()
+                            ),
+                        ));
+                    }
+                }
+            }
+            _ => out.push(Diag::error(
+                node.id.span,
+                format!(
+                    "`{}` needs two coordinates — `point {} [\"label\"] <x> <y>`",
+                    node.id.as_str(),
+                    node.id.as_str()
+                ),
+            )),
+        }
+    }
+
+    for key in ["x-axis", "y-axis"] {
+        if let Some(prop) = cfg.iter().find(|p| p.name == key)
+            && prop.values.len() != 2
+        {
+            out.push(Diag::error(
+                prop.values_span,
+                format!("`{key}` names both ends, so it takes exactly two labels"),
+            ));
+        }
+    }
+    if let Some(prop) = cfg.iter().find(|p| p.name == "quadrants")
+        && prop.values.len() != 4
+    {
+        out.push(Diag::error(
+            prop.values_span,
+            "`quadrants` takes four names, anticlockwise from the top right".to_string(),
+        ));
+    }
+}
+
 fn check_treemap(diagram: &Diagram, out: &mut Vec<Diag>) {
     warn_ignored(diagram, "treemap", out);
 
-    let styles = resolved_nodes(diagram, crate::charts::chart_defaults());
+    let styles = resolved_nodes(diagram, base_style("treemap"));
     let owned: HashSet<&str> = diagram
         .groups
         .iter()
@@ -736,6 +808,7 @@ fn check_unused_data(diagram: &Diagram, out: &mut Vec<Diag>) {
             let owner = match prop.name.as_str() {
                 "value" => "pie` or `type treemap",
                 "bits" => "packet",
+                "x" | "y" => "quadrant",
                 _ => continue,
             };
             out.push(Diag::warn(
@@ -753,21 +826,25 @@ fn check_contrast(diagram: &Diagram, archetype: &str, out: &mut Vec<Diag>) {
         .map(|o| o.background.unwrap_or_else(|| "#ffffff".into()))
         .unwrap_or_else(|_| "#ffffff".into());
 
-    // Mirror the base each archetype actually resolves on, so a color the
+    // A treemap's tiles are painted from the palette, not from any style the
+    // author wrote, and the renderer already guarantees white reads on all of
+    // them. There is nothing here to compare.
+    if archetype == "treemap" {
+        return;
+    }
+
+    // Mirror the base each archetype actually resolves on, so a colour the
     // renderer never uses is never reported.
-    let base = match archetype {
-        "pie" => crate::charts::chart_defaults(),
-        _ => crate::style::Style::node_defaults(),
-    };
+    let base = base_style(archetype);
 
     for (node, style) in diagram.nodes.iter().zip(resolved_nodes(diagram, base)) {
         // Unset means the archetype picks a readable ink itself.
         let Some(ink) = style.font_color.as_deref() else {
             continue;
         };
-        // A pie's legend sits on the canvas; a box's label sits on its fill.
+        // Chart text sits on the canvas; a box's label sits on its own fill.
         let nominal = match archetype {
-            "pie" => surface.as_str(),
+            "pie" | "quadrant" => surface.as_str(),
             _ => style.fill.as_deref().unwrap_or(surface.as_str()),
         };
 

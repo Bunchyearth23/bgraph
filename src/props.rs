@@ -272,6 +272,22 @@ pub const PROPS: &[PropDef] = &[
         doc: "Magnitude of a slice. Required by `type pie`, ignored elsewhere.",
     },
     PropDef {
+        name: "x",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "x: <number>",
+        doc: "Horizontal position. Required by `type quadrant`, ignored elsewhere.",
+    },
+    PropDef {
+        name: "y",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "y: <number>",
+        doc: "Vertical position. Required by `type quadrant`, ignored elsewhere.",
+    },
+    PropDef {
         name: "bits",
         alias: false,
         ctx: Ctx::Node,
@@ -389,6 +405,23 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         }],
     },
     ArchetypeDef {
+        name: "quadrant",
+        item: "point",
+        doc: "Points on two axes, divided into four named regions. A Wardley \
+              map is this archetype with its own axis names.",
+        props: QUADRANT_PROPS,
+        slots: &[
+            Slot {
+                prop: "x",
+                arity: 1,
+            },
+            Slot {
+                prop: "y",
+                arity: 1,
+            },
+        ],
+    },
+    ArchetypeDef {
         name: "treemap",
         item: "box",
         doc: "Nested rectangles whose area is proportional to a value. The \
@@ -465,6 +498,65 @@ pub const PIE_PROPS: &[PropDef] = &[
         syntax: "legend: <on|off>",
         doc: "Swatch-and-name list beside the chart. On by default — identity \
               must never rest on color alone.",
+    },
+];
+
+pub const QUADRANT_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the chart.",
+    },
+    PropDef {
+        name: "size",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "size: <width> <height>",
+        doc: "The plot area. 460 square by default.",
+    },
+    PropDef {
+        name: "range",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "range: <min> <max>",
+        doc: "The span both axes cover. `0 1` by default.",
+    },
+    PropDef {
+        name: "x-axis",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "x-axis: \"<left>\" \"<right>\"",
+        doc: "What the horizontal axis means at each end.",
+    },
+    PropDef {
+        name: "y-axis",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "y-axis: \"<bottom>\" \"<top>\"",
+        doc: "What the vertical axis means at each end.",
+    },
+    PropDef {
+        name: "quadrants",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "quadrants: \"<top-right>\" \"<top-left>\" \"<bottom-left>\" \"<bottom-right>\"",
+        doc: "Names for the four regions, anticlockwise from the top right.",
+    },
+    PropDef {
+        name: "labels",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &["name", "none"],
+        syntax: "labels: <name|none>",
+        doc: "Whether each point carries its name.",
     },
 ];
 

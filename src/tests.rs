@@ -470,7 +470,7 @@ fn a_file_without_type_is_free() {
 fn an_unknown_archetype_is_reported() {
     let e = err("type flowchart\nnode a");
     assert!(e.contains("unknown archetype `flowchart`"), "{e}");
-    assert!(e.contains("free, pie, treemap, packet"), "{e}");
+    assert!(e.contains("free, pie, quadrant, treemap, packet"), "{e}");
 }
 
 #[test]
@@ -1578,4 +1578,113 @@ fn a_label_that_does_not_fit_degrades_rather_than_lying() {
         vec!["a-very-long-tile-name"],
         "the value should be dropped before the name"
     );
+}
+
+// -------------------------------------------------------------- quadrant
+
+#[test]
+fn a_quadrant_maps_data_space_onto_the_plot() {
+    let l = build(
+        r#"
+        type quadrant { size: 400 400 }
+        point a "A" 0 0
+        point b "B" 1 1
+        point c "C" 0.5 0.5
+    "#,
+    );
+
+    assert!(matches!(l.chart, crate::layout::Chart::Quadrant));
+
+    let centre = |i: usize| {
+        let r = l.nodes[i].rect;
+        (r.cx(), r.cy())
+    };
+    // y grows upward on the page: (0,0) is bottom-left, (1,1) top-right.
+    assert_eq!(centre(0), (0.0, 400.0));
+    assert_eq!(centre(1), (400.0, 0.0));
+    assert_eq!(centre(2), (200.0, 200.0));
+}
+
+#[test]
+fn a_quadrant_honours_its_range() {
+    let l = build(
+        r#"
+        type quadrant { size: 100 100 range: 0 10 }
+        point a "A" 5 10
+    "#,
+    );
+    let r = l.nodes[0].rect;
+    assert_eq!((r.cx(), r.cy()), (50.0, 0.0));
+}
+
+#[test]
+fn a_point_outside_the_range_is_pinned_and_reported() {
+    let d = diags("type quadrant\npoint a \"A\" 1.4 0.5");
+    assert!(
+        d.iter().any(|x| x.message.contains("outside the range")),
+        "{d:?}"
+    );
+
+    let l = build("type quadrant { size: 100 100 }\npoint a \"A\" 1.4 0.5");
+    assert_eq!(
+        l.nodes[0].rect.cx(),
+        100.0,
+        "clamped to the edge, not off it"
+    );
+}
+
+#[test]
+fn a_point_needs_both_coordinates() {
+    let e = err("type quadrant\npoint a \"A\" 0.5");
+    assert!(e.contains("needs two coordinates"), "{e}");
+}
+
+#[test]
+fn the_frame_and_cross_are_drawn_as_guides() {
+    let l = build("type quadrant { size: 100 100 }\npoint a \"A\" 0.5 0.5");
+    // Four sides plus two dividers.
+    assert_eq!(l.guides.len(), 6);
+    assert_eq!(l.guides.iter().filter(|g| g.dash.is_some()).count(), 2);
+
+    let svg = render_svg::render(&l);
+    assert_eq!(svg.matches("<line").count(), 6);
+    // Guides go under the marks.
+    assert!(svg.find("<line").unwrap() < svg.find("<ellipse").unwrap());
+}
+
+#[test]
+fn axis_and_region_names_are_counted() {
+    assert!(
+        err("type quadrant { x-axis: \"only one\" }\npoint a 0.5 0.5")
+            .contains("takes exactly two labels")
+    );
+    assert!(
+        err("type quadrant { quadrants: \"a\" \"b\" }\npoint a 0.5 0.5")
+            .contains("takes four names")
+    );
+}
+
+#[test]
+fn a_point_label_turns_inward_near_the_right_edge() {
+    let l = build(
+        r#"
+        type quadrant { size: 200 200 }
+        point left "L" 0.1 0.5
+        point right "R" 0.9 0.5
+    "#,
+    );
+
+    let by_text = |t: &str| l.annotations.iter().find(|a| a.text == t).unwrap();
+    assert_eq!(by_text("L").anchor, crate::layout::Anchor::Start);
+    assert_eq!(by_text("R").anchor, crate::layout::Anchor::End);
+}
+
+#[test]
+fn contrast_is_measured_against_what_each_archetype_actually_paints() {
+    // A quadrant's labels sit on the canvas, not on a box fill. Comparing
+    // them against `node_defaults`' white fill reported every one of them.
+    let d = diags(
+        "type quadrant\ngraph { background: #0b1120 }\nstyle point { font-color: #e2e8f0 }\npoint a \"A\" 0.5 0.5",
+    );
+    assert!(!d.iter().any(|x| x.message.contains("readable")), "{d:?}");
 }

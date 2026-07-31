@@ -57,9 +57,9 @@ disagree.
 - `cargo run --bin bgraph -- watch diagram.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check diagram.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (121 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (129 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
-- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (17 corpus cases)
+- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (18 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
 - `./editors/zed/install.sh` — installs the server, regenerates + pins the grammar
 
@@ -239,6 +239,15 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
 - [2026-07-31] Treemap colour identifies the **top-level branch only**; depth
   darkens the same hue rather than inventing one, because a new hue would
   claim to be a new category. Slots are taken in order and never cycled.
+
+- [2026-07-31] `check::base_style(archetype)` exists because contrast checks
+  kept comparing text against a fill the renderer never paints. `free` and
+  `packet` draw boxes and take `node_defaults`; every chart archetype takes
+  `chart_defaults`. Adding an archetype means adding it there too, or its
+  labels will all be reported as unreadable.
+- [2026-07-31] `Guide` is a plain line in `Layout`, drawn under everything.
+  Introduced for the quadrant's frame and cross, but it is the primitive
+  `W-012` will draw axes and gridlines with — not a quadrant-only device.
 
 ### Workarounds
 

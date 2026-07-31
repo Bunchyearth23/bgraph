@@ -207,6 +207,8 @@ Aliases are marked. They behave identically to the property they alias; the edit
 | `router` | edge | `router: <straight\|ortho>` | `straight` draws a direct line; `ortho` draws a right-angled elbow. |
 | `route` *(alias)* | edge | `route: <straight\|ortho>` | Alias of `router`. |
 | `value` | node | `value: <number>` | Magnitude of a slice. Required by `type pie`, ignored elsewhere. |
+| `x` | node | `x: <number>` | Horizontal position. Required by `type quadrant`, ignored elsewhere. |
+| `y` | node | `y: <number>` | Vertical position. Required by `type quadrant`, ignored elsewhere. |
 | `bits` | node | `bits: <first> <last>` | Inclusive bit range of a field. Required by `type packet`, ignored elsewhere; `bits: 8` is shorthand for a single bit. |
 | `shadow` | node | `shadow: <on\|off>` | Soft drop shadow under the shape. |
 
@@ -257,6 +259,24 @@ slice <id> ["label"] <value>
 | `start` | `start: <degrees>` | Angle the first slice starts at. `0` is twelve o'clock. |
 | `labels` | `labels: <percent\|value\|both\|none>` | What to write on each slice. Slices too thin to read are skipped. |
 | `legend` | `legend: <on\|off>` | Swatch-and-name list beside the chart. On by default — identity must never rest on color alone. |
+
+### `type quadrant`
+
+Points on two axes, divided into four named regions. A Wardley map is this archetype with its own axis names.
+
+```
+point <id> ["label"] <x> <y>
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the chart. |
+| `size` | `size: <width> <height>` | The plot area. 460 square by default. |
+| `range` | `range: <min> <max>` | The span both axes cover. `0 1` by default. |
+| `x-axis` | `x-axis: "<left>" "<right>"` | What the horizontal axis means at each end. |
+| `y-axis` | `y-axis: "<bottom>" "<top>"` | What the vertical axis means at each end. |
+| `quadrants` | `quadrants: "<top-right>" "<top-left>" "<bottom-left>" "<bottom-right>"` | Names for the four regions, anticlockwise from the top right. |
+| `labels` | `labels: <name\|none>` | Whether each point carries its name. |
 
 ### `type treemap`
 

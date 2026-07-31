@@ -10,7 +10,7 @@ use anyhow::Result;
 
 use crate::ast::{Diagram, Prop, Value};
 use crate::layout::{
-    Anchor, Annotation, Chart, Layout, Pie, PlacedGroup, PlacedNode, Rect, Slice, text_width,
+    Anchor, Annotation, Chart, Guide, Layout, Pie, PlacedGroup, PlacedNode, Rect, Slice, text_width,
 };
 use crate::props;
 use crate::style::{GraphOpts, Registry, Shape, Style};
@@ -336,6 +336,7 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
     }
 
     Ok(Layout {
+        guides: Vec::new(),
         groups: Vec::new(),
         nodes,
         edges: Vec::new(),
@@ -502,6 +503,7 @@ pub fn packet(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
     }
 
     Ok(Layout {
+        guides: Vec::new(),
         groups: Vec::new(),
         nodes,
         edges: Vec::new(),
@@ -609,6 +611,7 @@ pub fn treemap(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
     );
 
     Ok(Layout {
+        guides: Vec::new(),
         groups,
         nodes,
         edges: Vec::new(),
@@ -926,4 +929,231 @@ fn worst_ratio(areas: &[f64], sum: f64, short: f64) -> f64 {
     let s2 = sum * sum;
     let w2 = short * short;
     (w2 * max / s2).max(s2 / (w2 * min))
+}
+
+// -------------------------------------------------------------- quadrant
+
+pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
+    let cfg = &diagram.archetype_props;
+    let theme = Theme::of(&opts);
+    let def = crate::check::archetype_of(diagram);
+    let palette = theme.palette();
+
+    let width = setting(cfg, "size")
+        .and_then(|v| v.first())
+        .and_then(|v| v.as_num())
+        .unwrap_or(460.0)
+        .max(80.0);
+    let height = setting(cfg, "size")
+        .and_then(|v| v.get(1))
+        .and_then(|v| v.as_num())
+        .unwrap_or(460.0)
+        .max(80.0);
+    let (lo, hi) = (
+        setting(cfg, "range")
+            .and_then(|v| v.first())
+            .and_then(|v| v.as_num())
+            .unwrap_or(0.0),
+        setting(cfg, "range")
+            .and_then(|v| v.get(1))
+            .and_then(|v| v.as_num())
+            .unwrap_or(1.0),
+    );
+    let span = (hi - lo).abs().max(f64::EPSILON);
+    let named = |key: &str| -> Vec<String> {
+        setting(cfg, key)
+            .map(|v| {
+                v.iter()
+                    .filter_map(|x| x.as_text())
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default()
+    };
+    let x_axis = named("x-axis");
+    let y_axis = named("y-axis");
+    let regions = named("quadrants");
+    let show_names = word(cfg, "labels", "name") != "none";
+    let title = text(cfg, "title");
+
+    let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
+    let title_h = if title.is_some() {
+        TITLE_SIZE * 2.0
+    } else {
+        0.0
+    };
+    let plot = Rect {
+        x: 0.0,
+        y: title_h,
+        w: width,
+        h: height,
+    };
+
+    let mut guides = Vec::new();
+    let mut nodes = Vec::new();
+    let mut annotations = Vec::new();
+
+    if let Some(title) = title {
+        annotations.push(Annotation {
+            text: title,
+            x: 0.0,
+            y: TITLE_SIZE,
+            anchor: Anchor::Start,
+            size: TITLE_SIZE,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    // The frame, then the cross. Both recede: the data is the subject.
+    let frame = if theme.dark { "#334155" } else { "#d4d4d8" };
+    for (from, to) in [
+        ((plot.x, plot.y), (plot.right(), plot.y)),
+        ((plot.right(), plot.y), (plot.right(), plot.bottom())),
+        ((plot.right(), plot.bottom()), (plot.x, plot.bottom())),
+        ((plot.x, plot.bottom()), (plot.x, plot.y)),
+    ] {
+        guides.push(Guide {
+            from,
+            to,
+            color: frame.into(),
+            width: 1.0,
+            dash: None,
+        });
+    }
+    for (from, to) in [
+        ((plot.cx(), plot.y), (plot.cx(), plot.bottom())),
+        ((plot.x, plot.cy()), (plot.right(), plot.cy())),
+    ] {
+        guides.push(Guide {
+            from,
+            to,
+            color: frame.into(),
+            width: 1.0,
+            dash: Some("6 5".into()),
+        });
+    }
+
+    // Region names sit in their corners, quiet enough to stay background.
+    let inset = 12.0;
+    let corners: [(f64, f64, Anchor); 4] = [
+        (plot.right() - inset, plot.y + inset + 4.0, Anchor::End),
+        (plot.x + inset, plot.y + inset + 4.0, Anchor::Start),
+        (plot.x + inset, plot.bottom() - inset, Anchor::Start),
+        (plot.right() - inset, plot.bottom() - inset, Anchor::End),
+    ];
+    for (name, (x, y, anchor)) in regions.iter().zip(corners) {
+        annotations.push(Annotation {
+            text: name.clone(),
+            x,
+            y,
+            anchor,
+            size: 12.0,
+            color: theme.muted.clone(),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    // Axis ends, outside the frame. Each pair reads low-end first.
+    type Spot = (f64, f64, Anchor);
+    let axis_pairs: [(&[String], [Spot; 2]); 2] = [
+        (
+            &x_axis,
+            [
+                (plot.x, plot.bottom() + 18.0, Anchor::Start),
+                (plot.right(), plot.bottom() + 18.0, Anchor::End),
+            ],
+        ),
+        (
+            &y_axis,
+            [
+                (plot.x - 8.0, plot.bottom(), Anchor::End),
+                (plot.x - 8.0, plot.y, Anchor::End),
+            ],
+        ),
+    ];
+    for (labels, spots) in axis_pairs {
+        for (text, (x, y, anchor)) in labels.iter().zip(spots) {
+            annotations.push(Annotation {
+                text: text.clone(),
+                x,
+                y,
+                anchor,
+                size: 12.0,
+                color: theme.muted.clone(),
+                weight: "500".into(),
+                family: family(&base),
+            });
+        }
+    }
+
+    const DOT: f64 = 11.0;
+    for (slot, node) in diagram.nodes.iter().enumerate() {
+        let style = registry.resolve(
+            chart_defaults(),
+            def.item,
+            &node.classes,
+            &node.effective_props(def.slots),
+        )?;
+        let (Some(x), Some(y)) = (style.x, style.y) else {
+            continue;
+        };
+
+        // Data space to plot space; y grows upward on the page.
+        let px = plot.x + ((x - lo) / span).clamp(0.0, 1.0) * plot.w;
+        let py = plot.bottom() - ((y - lo) / span).clamp(0.0, 1.0) * plot.h;
+        let fill = style
+            .fill
+            .clone()
+            .unwrap_or_else(|| palette[slot.min(palette.len() - 1)].to_string());
+
+        nodes.push(PlacedNode {
+            lines: Vec::new(),
+            rect: Rect {
+                x: px - DOT / 2.0,
+                y: py - DOT / 2.0,
+                w: DOT,
+                h: DOT,
+            },
+            style: Style {
+                fill: Some(fill),
+                stroke: Some(theme.surface.clone()),
+                stroke_width: Some(2.0),
+                shape: Some(Shape::Ellipse),
+                ..style.clone()
+            },
+        });
+
+        if show_names {
+            let label = node.label.clone().unwrap_or_else(|| node.id.value.clone());
+            // Points near the right edge label leftwards, so nothing spills.
+            let right_half = px > plot.cx();
+            annotations.push(Annotation {
+                text: label,
+                x: if right_half { px - DOT } else { px + DOT },
+                y: py,
+                anchor: if right_half {
+                    Anchor::End
+                } else {
+                    Anchor::Start
+                },
+                size: style.font_size.unwrap_or(12.0),
+                color: ink(&style, &theme),
+                weight: style.font_weight.clone().unwrap_or_else(|| "500".into()),
+                family: family(&style),
+            });
+        }
+    }
+
+    Ok(Layout {
+        guides,
+        groups: Vec::new(),
+        nodes,
+        edges: Vec::new(),
+        opts,
+        chart: Chart::Quadrant,
+        annotations,
+    })
 }

@@ -119,7 +119,7 @@ is a single item with two stray values rather than two items.
 | `packet` | `field` | `bits` — two numbers ✔ |
 | `wave` (`W-024`) | `signal` | `wave` — one string |
 | `bar` / `xy` (`W-016`, `W-017`) | `series` | `points` — a number list |
-| `quadrant` (`W-019`) | `point` | `x`, `y` — two numbers |
+| `quadrant` | `point` | `x`, `y` — two numbers ✔ |
 | `sankey` (`W-018`) | `node` | — (the value is on the edge) |
 | `state` (`W-022`) | `state` | — |
 | `sequence` (`W-021`) | `participant` | — |

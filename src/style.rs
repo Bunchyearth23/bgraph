@@ -69,6 +69,9 @@ pub struct Style {
     /// can supply it: `value` feeds `type pie`, `bits` feeds `type packet`.
     pub value: Option<f64>,
     pub bits: Option<(u32, u32)>,
+    /// Quadrant coordinates, in the archetype's own range.
+    pub x: Option<f64>,
+    pub y: Option<f64>,
 }
 
 macro_rules! overlay {
@@ -101,6 +104,8 @@ impl Style {
             shadow,
             value,
             bits,
+            x,
+            y,
         );
     }
 
@@ -249,6 +254,8 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
             });
         }
         "value" => style.value = first.and_then(|x| x.as_num()),
+        "x" => style.x = first.and_then(|v| v.as_num()),
+        "y" => style.y = first.and_then(|v| v.as_num()),
         "bits" => {
             let start = first.and_then(|x| x.as_num()).unwrap_or(0.0).max(0.0) as u32;
             let end = v

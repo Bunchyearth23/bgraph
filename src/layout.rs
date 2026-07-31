@@ -57,8 +57,20 @@ pub struct PlacedGroup {
     pub style: Style,
 }
 
+/// A plain line: an axis, a gridline, a divider. Drawn beneath everything —
+/// the substrate `W-012` will need too, not a quadrant-only device.
+pub struct Guide {
+    pub from: (f64, f64),
+    pub to: (f64, f64),
+    pub color: String,
+    pub width: f64,
+    pub dash: Option<String>,
+}
+
 pub struct Layout {
-    /// Drawn first, behind everything they enclose.
+    /// Drawn first, under everything.
+    pub guides: Vec<Guide>,
+    /// Drawn next, behind everything they enclose.
     pub groups: Vec<PlacedGroup>,
     pub nodes: Vec<PlacedNode>,
     pub edges: Vec<PlacedEdge>,
@@ -79,6 +91,8 @@ pub enum Chart {
     /// Nested tiles. Like `Packet`, the geometry is already in `nodes` and
     /// `groups`; the variant exists so the intent is legible.
     Treemap,
+    /// Points on two axes. `guides` carries the frame and the cross.
+    Quadrant,
     /// Slices, which need arcs the node renderer cannot make.
     Pie(Pie),
 }
@@ -178,6 +192,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         "pie" => return crate::charts::pie(diagram, opts, &registry),
         "packet" => return crate::charts::packet(diagram, opts, &registry),
         "treemap" => return crate::charts::treemap(diagram, opts, &registry),
+        "quadrant" => return crate::charts::quadrant(diagram, opts, &registry),
         _ => {}
     }
 
@@ -297,6 +312,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         .collect::<Result<Vec<_>>>()?;
 
     Ok(Layout {
+        guides: Vec::new(),
         groups,
         nodes,
         edges,

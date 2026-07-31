@@ -6,7 +6,7 @@ use std::fmt::Write;
 
 use crate::charts::annotation_bounds;
 use crate::layout::{
-    Anchor, Annotation, Chart, Layout, Pie, PlacedGroup, PlacedNode, Rect, text_width,
+    Anchor, Annotation, Chart, Guide, Layout, Pie, PlacedGroup, PlacedNode, Rect, text_width,
 };
 use crate::style::{Head, Router, Shape, Style};
 
@@ -33,7 +33,10 @@ pub fn render(layout: &Layout) -> String {
     let mut markers = BTreeMap::new();
     let mut needs_shadow = false;
 
-    // Frames go down first: everything they enclose is drawn over them.
+    // Guides sit under everything, frames under what they enclose.
+    for guide in &layout.guides {
+        body.push_str(&guide_line(guide));
+    }
     for group in &layout.groups {
         body.push_str(&group_frame(group));
     }
@@ -324,6 +327,16 @@ fn bounds(layout: &Layout, routed: &[Routed]) -> (f64, f64, f64, f64) {
 
     let mut boxes: Vec<Rect> = layout.nodes.iter().map(|n| n.rect).collect();
     boxes.extend(layout.groups.iter().map(|g| g.rect));
+    for g in &layout.guides {
+        for (x, y) in [g.from, g.to] {
+            boxes.push(Rect {
+                x,
+                y,
+                w: 0.0,
+                h: 0.0,
+            });
+        }
+    }
     boxes.extend(layout.annotations.iter().map(annotation_bounds));
     boxes.extend(routed.iter().filter_map(|r| r.label.as_ref().map(|l| l.1)));
 
@@ -359,6 +372,23 @@ fn bounds(layout: &Layout, routed: &[Routed]) -> (f64, f64, f64, f64) {
         max_y = max_y.max(r.bottom());
     }
     (min_x, min_y, max_x, max_y)
+}
+
+fn guide_line(g: &Guide) -> String {
+    let dash = g
+        .dash
+        .as_deref()
+        .map(|d| format!(r#" stroke-dasharray="{}""#, esc(d)))
+        .unwrap_or_default();
+    format!(
+        r#"<line x1="{}" y1="{}" x2="{}" y2="{}"{} stroke-width="{}" stroke-linecap="round"{dash}/>"#,
+        n(g.from.0),
+        n(g.from.1),
+        n(g.to.0),
+        n(g.to.1),
+        paint("stroke", &g.color),
+        n(g.width)
+    )
 }
 
 /// A frame and its name, set into the top-left of the border.
