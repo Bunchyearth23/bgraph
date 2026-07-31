@@ -45,6 +45,48 @@
 //! cannot become a statement. An unbound hole is an error naming it, never a
 //! blank — a document with a missing figure is worse than one that failed.
 //!
+//! When the *number* of items is not known either, a line holding a
+//! `{{row.field}}` hole is written once per row:
+//!
+//! ```
+//! use bgraph::{Bindings, Template};
+//!
+//! let template = Template::parse(
+//!     "type pie\nslice {{region.id}} \"{{region.name}}\" {{region.revenue}}",
+//! )?;
+//!
+//! let svg = template.render(&Bindings::new().rows(
+//!     "region",
+//!     vec![
+//!         Bindings::new()
+//!             .set("id", bgraph::Value::Raw("emea".into()))
+//!             .set("name", "EMEA")
+//!             .set("revenue", 4_820i64),
+//!         Bindings::new()
+//!             .set("id", bgraph::Value::Raw("amer".into()))
+//!             .set("name", "Americas")
+//!             .set("revenue", 6_310i64),
+//!     ],
+//! ))?;
+//! # Ok::<(), anyhow::Error>(())
+//! ```
+//!
+//! That is deliberately the whole of the repetition on offer: one line, one
+//! list, no nesting and no conditions. Anything past that is a template
+//! language, and a much larger promise than this makes.
+//!
+//! # Building only what you use
+//!
+//! Every archetype is a cargo feature, so a program that needs one chart does
+//! not compile the other fourteen:
+//!
+//! ```toml
+//! bgraph = { version = "0.1", default-features = false, features = ["pie"] }
+//! ```
+//!
+//! An archetype that is not compiled in is *unknown*, not broken: `check` says
+//! so and lists what is available.
+//!
 //! # What this promises
 //!
 //! **No input can bring down the host.** Rendering any text at all returns
@@ -96,6 +138,11 @@ pub mod lsp;
 #[allow(missing_docs)]
 #[doc(hidden)]
 pub mod watch;
+
+// The suite covers every archetype, so a reduced build cannot run it. Saying
+// so at compile time beats a hundred failures that all mean the same thing.
+#[cfg(all(test, not(feature = "all-archetypes")))]
+compile_error!("the test suite covers every archetype — run it with default features");
 
 #[cfg(test)]
 mod tests;

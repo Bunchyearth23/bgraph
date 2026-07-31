@@ -25,28 +25,14 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-Ordered by what each unblocks, not by number. **Every foundation has landed** —
-nesting (`W-011`), the plot frame (`W-012`), edge data (`W-015`), per-archetype
-vocabulary (`W-029`), members (`W-013`) and dates (`W-014`) — so nothing below
-waits on anything but itself. What is left either unblocks
-nothing, or belongs to the library track, where
-the engineering is done and the two open items are decisions for a human:
-`Q-005` (release) and `Q-004` (repetition in templates).
-
-**DSL impact, measured rather than assumed.** The grammar already accepts
-string lists (`data: "a" "b" "c"`), number lists (`points: 1 2 3`),
-fractional coordinates (`at (0.82, 0.15)`) and repeated edges between the
-same pair in source order. So most archetypes below need *no grammar change
-at all* — only new properties and a renderer. Exactly three foundations
-changed the language: `W-011`, `W-013`, `W-014` — all three have landed.
+**Nothing is planned and nothing is blocked.** Sixteen archetypes ship, the
+library is embeddable, and the two questions that needed a human are answered
+(`D-020`, `D-021`). What remains are three open **risks** — known ways the
+renderer is imperfect, each with no work item because none has been worth the
+cost yet.
 
 | id | state | title | notes |
 |---|---|---|---|
-| `Q-005` | open | Publish to crates.io, and under which licence? | **The Archmagos's call, and only his.** A version on crates.io cannot be withdrawn, only yanked, and the name is spent the moment it lands. `Cargo.toml` carries `publish = false` and deliberately omits `license` and `authors`, so `cargo publish` refuses rather than merely being discouraged. The name `bgraph` was free on 2026-07-31. Blocks `W-034`. |
-| `W-034` | blocked | Release to crates.io | Blocked by `Q-005`. Needs a licence choice, `LICENSE` files, `authors`, `publish = true`, and a `cargo publish --dry-run`. Nothing else: `W-027` did the engineering. |
-| `Q-004` | open | Does a template need repetition? | A pie with a variable *number* of slices cannot be templated by substitution alone. Either the calling program builds the source string itself — the honest answer for that case — or the language grows a `for` construct, which is a template language and a much larger promise. |
-| `W-028` | planned | Cargo features per archetype | So a program embedding `bgraph` for one chart does not compile all of them. Matters most for the embedded audience. |
-| `Q-002` | open | Which archetype after `pie` and `packet`? | Answered in part by the survey above; what remains is the *order*. `W-019`, `W-024`, `W-018` and `W-016` are the ones with no prerequisite. |
 | `X-009` | mitigated | Editor queries can name node types the grammar has dropped | It broke once — `W-029` renamed `node_declaration` and Zed stopped recognising `.bd` entirely. `the_editor_queries_match_the_grammar` compiles every `.scm` against the generated parser, but only when the `tree-sitter` CLI is on PATH. |
 | `X-002` | mitigated | The two grammars can drift apart | `W-008` cross-checks them on every `cargo test` — but only when the `tree-sitter` CLI is on PATH; without it the test says SKIPPED and passes. |
 | `X-010` | mitigated | `tree-sitter test`'s summary line counts parses, not expectation matches | It read "failed parses: 0" while seven corpus expectations were stale across the `W-029` rename. `the_grammar_corpus_expectations_still_hold` now asserts the **exit code** on each `cargo test`, but only when the CLI is on PATH. |
@@ -62,6 +48,8 @@ changed the language: `W-011`, `W-013`, `W-014` — all three have landed.
 ### Decisions
 | id | state | date | title | was |
 |---|---|---|---|---|
+| `D-020` | active | 2026-07-31 | **Proprietary, all rights reserved, and not published.** `LICENSE` grants nothing; `Cargo.toml` carries `license-file` and `publish = false`, so `cargo publish` refuses on that line rather than on a comment. The Archmagos chose AGPL and then changed it to proprietary the same day | |
+| `D-021` | active | 2026-07-31 | **Repetition in templates is one line, one list.** A line holding `{{row.field}}` is written once per row — the line is the unit because a statement already ends at a newline, so it needs no block syntax and cannot nest wrongly. No conditions, no expressions, no nesting: that would be a template language, and a much larger promise. A line naming two lists is refused when the template is read | |
 | `D-019` | active | 2026-07-31 | **An archetype may refine a shared property.** `ArchetypeDef::item_props` is consulted before the global table, so `kind` carries `state`'s words in a machine and `block`'s in an architecture view, and `tech` exists in neither anywhere else. Without it the two word lists would have to be merged, and completion would offer `initial` while writing a C4 diagram — the exact noise `W-007` was asked to remove | |
 | `D-018` | active | 2026-07-31 | **The embedding surface is narrow on purpose.** Semver covers `render_source`, `template`, `parser` and `check` — nothing else. `ast`, `layout`, `style`, `charts`, `render_svg` and `props` stay public to be inspected but are not a promise; pinning them would mean the diagrams could never be improved. The vocabulary's stable form is `docs/reference.md`, generated from those tables | |
 | `D-001` | active | 2026-07-31 | Placement is declared with **relative anchors plus absolute** — `at`, `right-of`, `gap`, `align` — not auto-layout | |
@@ -96,6 +84,8 @@ not copies.
 | `W-005` | 2026-07-31 | Tree-sitter grammar and Zed extension | `1b53ec3`, regenerated `d6997b1` |
 | `W-006` | 2026-07-31 | `type` archetypes (`pie`, `packet`), quiet completion, explicit surface, generated reference manual | `4b4c548` |
 | `W-033` | 2026-07-31 | Templating: `{{holes}}` that parse, typed bindings, context-aware escaping, `--set` on the CLI | 6d166eb |
+| `W-028` | 2026-07-31 | One cargo feature per archetype; an archetype not compiled in is *unknown*, not broken. `rlib` 3439 KB → 2566 KB with none | this commit |
+| `W-035` | 2026-07-31 | Templating: repetition. A line holding a `{{row.field}}` hole is written once per row | this commit |
 | `W-032` | 2026-07-31 | `type timeline` — events on a date line, labels packed into staggered rows either side | this commit |
 | `W-025` | 2026-07-31 | `type block` — C4 architecture views: typed elements, a technology line, a wrapped description, relations that carry a protocol | this commit |
 | `W-031` | 2026-07-31 | `type er` — entities, columns and crow's-foot cardinality at each end of a relation | this commit |

@@ -3424,3 +3424,222 @@ fn a_stem_stops_at_the_edge_of_its_label_rather_than_through_it() {
     );
     assert!(name.y < date.y, "the name leads");
 }
+
+#[test]
+fn every_archetype_has_a_feature_and_every_feature_an_archetype() {
+    // Two tables that must agree, in two files, in two languages. Adding an
+    // archetype and forgetting its feature would ship one that cannot be
+    // switched off; the reverse would ship a feature that gates nothing.
+    let manifest = include_str!("../Cargo.toml");
+    let features: Vec<&str> = manifest
+        .lines()
+        .skip_while(|l| l.trim() != "[features]")
+        .skip(1)
+        .take_while(|l| !l.starts_with('['))
+        .filter_map(|l| l.split_once(" = []"))
+        .map(|(name, _)| name.trim())
+        .collect();
+
+    let mut archetypes: Vec<&str> = crate::props::ARCHETYPES
+        .iter()
+        .map(|a| a.name)
+        .filter(|name| *name != "free")
+        .collect();
+    let mut features = features;
+    archetypes.sort_unstable();
+    features.sort_unstable();
+    assert_eq!(
+        archetypes, features,
+        "`free` is the language itself and has no feature; every other \
+         archetype has exactly one"
+    );
+
+    // And the umbrella turns them all on, or `default` would ship a partial
+    // build to everyone who never thought about features.
+    let umbrella: Vec<&str> = manifest
+        .lines()
+        .skip_while(|l| !l.starts_with("all-archetypes = ["))
+        .skip(1)
+        .take_while(|l| !l.starts_with(']'))
+        .map(|l| l.trim().trim_matches(|c| c == '"' || c == ','))
+        .collect();
+    let mut umbrella = umbrella;
+    umbrella.sort_unstable();
+    assert_eq!(umbrella, archetypes);
+}
+
+// ---------------------------------------------------------------------------
+// Templating: repetition. A chart whose *number* of items is not known when
+// the template is written.
+// ---------------------------------------------------------------------------
+
+fn region(id: &str, name: &str, revenue: i64) -> Bindings {
+    Bindings::new()
+        .set("id", Bound::Raw(id.into()))
+        .set("name", name)
+        .set("revenue", revenue)
+}
+
+#[test]
+fn a_line_with_a_row_hole_is_written_once_per_row() {
+    let t = Template::parse("type pie\nslice {{r.id}} \"{{r.name}}\" {{r.value}}")
+        .expect("parses");
+    let filled = t
+        .fill(&Bindings::new().rows(
+            "r",
+            vec![
+                Bindings::new()
+                    .set("id", Bound::Raw("a".into()))
+                    .set("name", "A")
+                    .set("value", 1i64),
+                Bindings::new()
+                    .set("id", Bound::Raw("b".into()))
+                    .set("name", "B")
+                    .set("value", 2i64),
+            ],
+        ))
+        .expect("fills");
+    assert_eq!(
+        filled,
+        "type pie\nslice a \"A\" 1\nslice b \"B\" 2",
+        "{filled}"
+    );
+}
+
+#[test]
+fn a_variable_number_of_slices_renders() {
+    // The case `Q-004` was opened for: substitution alone cannot do this.
+    for count in [2usize, 5, 8] {
+        let rows: Vec<Bindings> = (0..count)
+            .map(|i| region(&format!("r{i}"), &format!("Region {i}"), 100 + i as i64))
+            .collect();
+        let svg = crate::template::render(
+            "type pie { title: \"Revenue\" }\nslice {{region.id}} \"{{region.name}}\" {{region.revenue}}",
+            &Bindings::new().rows("region", rows),
+        )
+        .unwrap_or_else(|e| panic!("{count} slices: {e:#}"));
+        assert_eq!(
+            svg.matches("<path").count(),
+            count,
+            "{count} slices should draw {count} arcs"
+        );
+    }
+}
+
+#[test]
+fn no_rows_means_no_line() {
+    // A chart of nothing draws nothing, which beats a line full of holes.
+    let t = Template::parse("type pie\nslice a \"A\" 1\nslice {{r.id}} \"x\" {{r.v}}")
+        .expect("parses");
+    let filled = t.fill(&Bindings::new().rows("r", Vec::new())).expect("fills");
+    assert_eq!(filled, "type pie\nslice a \"A\" 1\n", "{filled}");
+}
+
+#[test]
+fn a_row_hole_and_an_ordinary_hole_share_a_line() {
+    let t = Template::parse("type bar { categories: {{cats}} }\nseries {{s.id}} {{s.points}}")
+        .expect("parses");
+    let filled = t
+        .fill(
+            &Bindings::new()
+                .set("cats", vec!["q1", "q2"])
+                .rows(
+                    "s",
+                    vec![
+                        Bindings::new()
+                            .set("id", Bound::Raw("north".into()))
+                            .set("points", vec![1i64, 2]),
+                    ],
+                ),
+        )
+        .expect("fills");
+    assert_eq!(
+        filled,
+        "type bar { categories: \"q1\" \"q2\" }\nseries north 1 2",
+        "{filled}"
+    );
+}
+
+#[test]
+fn one_line_cannot_repeat_over_two_lists() {
+    // How many times would it be written? There is no answer a reader could
+    // predict. And the ambiguity is in the *template*, not in the binding, so
+    // it is caught when the template is read rather than at the first render.
+    let e = Template::parse("type pie\nslice {{a.id}} \"{{b.name}}\" 1")
+        .expect_err("should refuse");
+    assert!(format!("{e:#}").contains("one list"), "{e:#}");
+}
+
+#[test]
+fn rows_written_as_a_value_are_reported_by_name() {
+    let t = Template::parse("type pie\nslice a \"A\" {{r}}").expect("parses");
+    let e = t
+        .render(&Bindings::new().rows("r", vec![Bindings::new().set("v", 1i64)]))
+        .expect_err("should refuse");
+    assert!(format!("{e:#}").contains("`r`"), "{e:#}");
+    assert!(format!("{e:#}").contains(".field"), "{e:#}");
+}
+
+#[test]
+fn an_unbound_row_is_reported_like_any_other_hole() {
+    let t = Template::parse("type pie\nslice {{r.id}} \"A\" 1").expect("parses");
+    let e = t.render(&Bindings::new()).expect_err("should refuse");
+    assert!(format!("{e:#}").contains("r.id"), "{e:#}");
+}
+
+#[test]
+fn a_row_value_is_escaped_for_where_it_lands() {
+    // The same guarantee substitution already gave, now per row.
+    let t = Template::parse("type pie\nslice {{r.id}} \"{{r.name}}\" 1").expect("parses");
+    let filled = t
+        .fill(&Bindings::new().rows(
+            "r",
+            vec![
+                Bindings::new()
+                    .set("id", Bound::Raw("a".into()))
+                    .set("name", "\" } node injected \""),
+            ],
+        ))
+        .expect("fills");
+    let d = parse_diagram(&filled).unwrap_or_else(|e| panic!("{e}\n{filled}"));
+    assert_eq!(d.nodes.len(), 1, "{filled}");
+}
+
+#[test]
+fn every_example_still_works() {
+    // The suite used to name two example files by hand, so the ones added
+    // since were covered by nothing at all. A directory sweep cannot forget.
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/examples");
+    let mut seen = 0;
+
+    for entry in std::fs::read_dir(dir).unwrap_or_else(|e| panic!("cannot read {dir}: {e}")) {
+        let path = entry.expect("readable entry").path();
+        if path.extension().is_none_or(|e| e != "bd") {
+            continue;
+        }
+        seen += 1;
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        let source = std::fs::read_to_string(&path).expect("readable");
+
+        // A template is checked as a template: its holes are not bound here,
+        // so rendering it is not the question — whether it is well-formed is.
+        let template = Template::parse(&source)
+            .unwrap_or_else(|e| panic!("{name} is not a well-formed template: {e:#}"));
+        if !template.holes().is_empty() {
+            continue;
+        }
+
+        let diagram = parse_diagram(&source).unwrap_or_else(|e| panic!("{name}: {e:#}"));
+        let errors: Vec<String> = crate::check::check(&diagram)
+            .into_iter()
+            .filter(|d| d.severity == crate::check::Severity::Error)
+            .map(|d| d.message)
+            .collect();
+        assert!(errors.is_empty(), "{name}: {errors:?}");
+
+        let svg = crate::render_source(&source).unwrap_or_else(|e| panic!("{name}: {e:#}"));
+        assert!(svg.starts_with("<svg") && svg.trim_end().ends_with("</svg>"), "{name}");
+    }
+
+    assert!(seen >= 16, "only {seen} examples found — the sweep is not finding them");
+}

@@ -334,16 +334,27 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         .map(|a| a.as_str())
         .unwrap_or("free")
     {
+        #[cfg(feature = "pie")]
         "pie" => return crate::charts::pie(diagram, opts, &registry),
+        #[cfg(feature = "packet")]
         "packet" => return crate::charts::packet(diagram, opts, &registry),
+        #[cfg(feature = "treemap")]
         "treemap" => return crate::charts::treemap(diagram, opts, &registry),
+        #[cfg(feature = "quadrant")]
         "quadrant" => return crate::charts::quadrant(diagram, opts, &registry),
+        #[cfg(feature = "wave")]
         "wave" => return crate::charts::wave(diagram, opts, &registry),
+        #[cfg(feature = "sankey")]
         "sankey" => return crate::charts::sankey(diagram, opts, &registry),
+        #[cfg(feature = "bar")]
         "bar" => return crate::charts::bar(diagram, opts, &registry),
+        #[cfg(feature = "xy")]
         "xy" => return crate::charts::xy(diagram, opts, &registry),
+        #[cfg(feature = "sequence")]
         "sequence" => return crate::charts::sequence(diagram, opts, &registry),
+        #[cfg(feature = "gantt")]
         "gantt" => return crate::charts::gantt(diagram, opts, &registry),
+        #[cfg(feature = "timeline")]
         "timeline" => return crate::charts::timeline(diagram, opts, &registry),
         _ => {}
     }

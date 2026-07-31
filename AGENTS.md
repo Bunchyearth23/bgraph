@@ -127,6 +127,10 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-07-31] **The example files were covered by nothing.** The suite named
+  `pie.bd` and `packet.bd` by hand, so the fifteen added since could have been
+  broken for weeks. `every_example_still_works` sweeps the directory — a list
+  written by hand is a list that stops being true.
 - [2026-07-31] **`check_props` validated enumerated words only for a hard-coded
   allow-list of property names.** Anything not on it — `kind`, `ticks`, `mark`,
   `numbered`, `stack`, `grid` — accepted any word silently, against `D-005`.
@@ -178,6 +182,12 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   silently reuses the cached grammar. `editors/zed/install.sh` does both.
 
 ### Gotchas
+- [2026-07-31] `template::scan` is textual on purpose, so `{{…}}` written
+  inside a **comment** is still a hole. Writing about the syntax in a `.bd`
+  comment therefore invents holes; say `row.field` without the braces.
+- [2026-07-31] The last line of a file carries no newline, so repeated copies
+  of it run together into one statement. Any line-repeating transform has to
+  put the separator back.
 - [2026-07-31] `pick_tick` chose a calendar step from the **span alone**, so a
   ten-year timeline asked for forty quarterly labels in 800px and drew a
   smear. A tick step is a function of the span *and the room on the page*; it

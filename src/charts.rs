@@ -4,6 +4,12 @@
 //! the style cascade — a slice or a bitfield is styled exactly like a box.
 //! `packet` needs no renderer support at all: it emits ordinary rects.
 
+// The chart helpers — the theme, the axis scale, the frame, the legend — are
+// shared by several archetypes. Cfg-ing each against the set of features that
+// might use it would be a maintenance trap for no gain: they are small, and
+// what a reduced build actually saves is the chart bodies themselves.
+#![cfg_attr(not(feature = "all-archetypes"), allow(dead_code, unused_imports))]
+
 use std::collections::HashMap;
 
 use anyhow::Result;
@@ -183,6 +189,7 @@ const SWATCH: f64 = 13.0;
 const LEGEND_STEP: f64 = 24.0;
 const LEGEND_MARGIN: f64 = 28.0;
 
+#[cfg(feature = "pie")]
 pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
     let cfg = &diagram.archetype_props;
     let theme = Theme::of(&opts);
@@ -365,6 +372,7 @@ fn trim_number(v: f64) -> String {
 
 // ---------------------------------------------------------------- packet
 
+#[cfg(feature = "packet")]
 pub fn packet(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
     let cfg = &diagram.archetype_props;
     let theme = Theme::of(&opts);
@@ -545,6 +553,7 @@ struct Tile {
     is_group: bool,
 }
 
+#[cfg(feature = "treemap")]
 pub fn treemap(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
     let cfg = &diagram.archetype_props;
     let theme = Theme::of(&opts);
@@ -937,6 +946,7 @@ fn worst_ratio(areas: &[f64], sum: f64, short: f64) -> f64 {
 
 // -------------------------------------------------------------- quadrant
 
+#[cfg(feature = "quadrant")]
 pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
     let cfg = &diagram.archetype_props;
     let theme = Theme::of(&opts);
@@ -1193,6 +1203,7 @@ fn level_of(c: char) -> Option<Level> {
     })
 }
 
+#[cfg(feature = "wave")]
 pub fn wave(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
     let cfg = &diagram.archetype_props;
     let theme = Theme::of(&opts);
@@ -1556,6 +1567,7 @@ fn draw_lane(
 
 // ---------------------------------------------------------------- sankey
 
+#[cfg(feature = "sankey")]
 pub fn sankey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
     let cfg = &diagram.archetype_props;
     let theme = Theme::of(&opts);
@@ -2001,6 +2013,7 @@ fn draw_legend(
 
 // ------------------------------------------------------------------- bar
 
+#[cfg(feature = "bar")]
 pub fn bar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
     let cfg = &diagram.archetype_props;
     let theme = Theme::of(&opts);
@@ -2236,6 +2249,7 @@ pub fn bar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
 
 // -------------------------------------------------------------------- xy
 
+#[cfg(feature = "xy")]
 pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
     let cfg = &diagram.archetype_props;
     let theme = Theme::of(&opts);
@@ -2477,6 +2491,7 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
 
 // -------------------------------------------------------------- sequence
 
+#[cfg(feature = "sequence")]
 pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
     let cfg = &diagram.archetype_props;
     let theme = Theme::of(&opts);
@@ -2709,6 +2724,7 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
 
 // ----------------------------------------------------------------- gantt
 
+#[cfg(feature = "gantt")]
 pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
     use crate::ast::civil_from_days;
 
@@ -2996,6 +3012,7 @@ fn pick_tick(span_days: f64, most: usize) -> i64 {
 /// The stagger is the whole point. Dates cluster — three things happen in one
 /// week and nothing for two months — so a timeline that puts every label on
 /// one side at one height is unreadable exactly where it matters most.
+#[cfg(feature = "timeline")]
 pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
     use crate::ast::civil_from_days;
 

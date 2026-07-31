@@ -641,6 +641,52 @@ figure in a document, which is worse than failing.
 `Value::Raw` inserts verbatim, and is the only way to fill an identifier or a
 colour — both of which would otherwise be quoted as text.
 
+### Repetition
+
+Substitution cannot give a chart a number of items that is not known when the
+template is written — a pie with a variable number of slices. So a line that
+holds a `{{row.field}}` hole is written **once per row**:
+
+```
+type pie
+slice {{region.id}} "{{region.name}}" {{region.revenue}}
+```
+
+```rust
+template.render(&Bindings::new().rows("region", vec![
+    Bindings::new().set("id", Value::Raw("emea".into()))
+                   .set("name", "EMEA").set("revenue", 4_820i64),
+    Bindings::new().set("id", Value::Raw("amer".into()))
+                   .set("name", "Americas").set("revenue", 6_310i64),
+]))?;
+```
+
+The line is the unit because it is the unit the language already uses: a
+statement ends at a newline. So "repeat this" needs no block syntax, and there
+is no way to get the nesting wrong.
+
+That is deliberately the whole of it — **one line, one list, no nesting and no
+conditions**. A line naming two lists is refused when the template is read,
+because there is no number of repetitions a reader could predict. No rows
+means the line is not written at all: a chart of nothing draws nothing.
+
+Rows come from the library, not the CLI. `--set` binds scalars; a list of rows
+is what a document generator has and a shell argument is not.
+
+## Building only what you use
+
+Every archetype is a cargo feature, so a program that needs one chart does not
+compile the other fourteen:
+
+```toml
+bgraph = { version = "0.1", default-features = false, features = ["pie"] }
+```
+
+`free` is not a feature — it is the language itself, and a file that declares
+no `type` is a free graph. An archetype that is **not** compiled in is
+*unknown*, not broken: `check` reports it and lists what is available, rather
+than accepting the file and failing to draw it.
+
 ## Editor support
 
 `bgraph-lsp` speaks LSP over stdin/stdout with no arguments, so any client can

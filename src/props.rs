@@ -516,6 +516,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         slots: &[],
         edge_slots: &[],
     },
+    #[cfg(feature = "pie")]
     ArchetypeDef {
         name: "pie",
         item: "slice",
@@ -529,6 +530,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         }],
         edge_slots: &[],
     },
+    #[cfg(feature = "gantt")]
     ArchetypeDef {
         name: "gantt",
         item: "task",
@@ -542,6 +544,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         }],
         edge_slots: &[],
     },
+    #[cfg(feature = "class")]
     ArchetypeDef {
         name: "class",
         item: "class",
@@ -552,6 +555,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         slots: &[],
         edge_slots: &[],
     },
+    #[cfg(feature = "timeline")]
     ArchetypeDef {
         name: "timeline",
         item: "event",
@@ -566,6 +570,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         }],
         edge_slots: &[],
     },
+    #[cfg(feature = "block")]
     ArchetypeDef {
         name: "block",
         item: "block",
@@ -581,6 +586,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         }],
         edge_slots: &[],
     },
+    #[cfg(feature = "er")]
     ArchetypeDef {
         name: "er",
         item: "entity",
@@ -603,6 +609,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             },
         ],
     },
+    #[cfg(feature = "state")]
     ArchetypeDef {
         name: "state",
         item: "state",
@@ -614,6 +621,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         slots: &[],
         edge_slots: &[],
     },
+    #[cfg(feature = "sequence")]
     ArchetypeDef {
         name: "sequence",
         item: "participant",
@@ -624,6 +632,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         slots: &[],
         edge_slots: &[],
     },
+    #[cfg(feature = "xy")]
     ArchetypeDef {
         name: "xy",
         item: "series",
@@ -637,6 +646,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         }],
         edge_slots: &[],
     },
+    #[cfg(feature = "bar")]
     ArchetypeDef {
         name: "bar",
         item: "series",
@@ -650,6 +660,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         }],
         edge_slots: &[],
     },
+    #[cfg(feature = "sankey")]
     ArchetypeDef {
         name: "sankey",
         item: "node",
@@ -664,6 +675,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             arity: 1,
         }],
     },
+    #[cfg(feature = "wave")]
     ArchetypeDef {
         name: "wave",
         item: "signal",
@@ -677,6 +689,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         }],
         edge_slots: &[],
     },
+    #[cfg(feature = "quadrant")]
     ArchetypeDef {
         name: "quadrant",
         item: "point",
@@ -696,6 +709,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         ],
         edge_slots: &[],
     },
+    #[cfg(feature = "treemap")]
     ArchetypeDef {
         name: "treemap",
         item: "box",
@@ -710,6 +724,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         }],
         edge_slots: &[],
     },
+    #[cfg(feature = "packet")]
     ArchetypeDef {
         name: "packet",
         item: "field",

@@ -1,3 +1,4 @@
+#![cfg_attr(not(feature = "all-archetypes"), allow(dead_code))]
 //! Semantic validation, with spans.
 //!
 //! This is the single source of truth: `layout::solve` runs it and reports the
@@ -69,22 +70,36 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
 
     // Anchors only mean something where placement means something.
     match archetype {
+        #[cfg(feature = "pie")]
         "pie" => check_pie(diagram, &mut out),
+        #[cfg(feature = "packet")]
         "packet" => check_packet(diagram, &mut out),
+        #[cfg(feature = "treemap")]
         "treemap" => check_treemap(diagram, &mut out),
+        #[cfg(feature = "quadrant")]
         "quadrant" => check_quadrant(diagram, &mut out),
+        #[cfg(feature = "wave")]
         "wave" => check_wave(diagram, &mut out),
+        #[cfg(feature = "sequence")]
         "sequence" => check_sequence(diagram, &mut out),
+        #[cfg(feature = "class")]
         "class" => check_class(diagram, "class", &mut out),
+        #[cfg(feature = "er")]
         "er" => check_er(diagram, &mut out),
+        #[cfg(feature = "block")]
         "block" => check_block(diagram, &mut out),
+        #[cfg(feature = "gantt")]
         "gantt" => check_gantt(diagram, &mut out),
+        #[cfg(feature = "timeline")]
         "timeline" => check_timeline(diagram, &mut out),
+        #[cfg(feature = "state")]
         "state" => {
             check_cycles(diagram, &nodes, &mut out);
             check_state(diagram, &mut out);
         }
+        #[cfg(feature = "sankey")]
         "sankey" => check_sankey(diagram, &mut out),
+        #[cfg(any(feature = "bar", feature = "xy"))]
         "bar" | "xy" => check_bar(diagram, &mut out),
         _ => {
             check_cycles(diagram, &nodes, &mut out);

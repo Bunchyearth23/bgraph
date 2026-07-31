@@ -1,10 +1,23 @@
-type pie {
-  title: "Revenue by region, {{year}}"
-  donut: 0.55
-}
-graph { background: #0b1120 padding: 30 }
-style slice { font-color: #e2e8f0 }
+// A template: the diagram's *shape* is written here, and a program supplies
+// what varies. Scalars can be bound from the shell —
+//
+//   bgraph examples/template.bd --set year=2026 --emit
+//
+// A line holding a `row.field` hole is written once per row, so the number of
+// slices is not fixed here. Rows come from the library, not the CLI: they are
+// what a document generator has and a shell argument is not.
+//
+//   Template::parse(source)?.render(
+//       &Bindings::new()
+//           .set("year", 2026i64)
+//           .rows("region", vec![
+//               Bindings::new().set("id", Value::Raw("emea".into()))
+//                              .set("name", "EMEA").set("revenue", 4_820i64),
+//               Bindings::new().set("id", Value::Raw("amer".into()))
+//                              .set("name", "Americas").set("revenue", 6_310i64),
+//           ]),
+//   )?
+type pie { title: "Revenue by region, {{year}}" }
+graph { background: #ffffff padding: 28 }
 
-slice emea "EMEA" {{emea}}
-slice amer "{{amer_label}}" {{amer}}
-slice apac "APAC" {{apac}}
+slice {{region.id}} "{{region.name}}" {{region.revenue}}
