@@ -89,32 +89,43 @@ impl NodeDecl {
     /// Inline properties, with the positional values folded in first — so an
     /// explicit `{ value: … }` still wins, and `check` warns about the clash.
     pub fn effective_props(&self, slots: &[crate::props::Slot]) -> Vec<Prop> {
-        if self.positional.is_empty() {
-            return self.props.clone();
-        }
-
-        let mut out = Vec::with_capacity(slots.len() + self.props.len());
-        let mut rest = self.positional.as_slice();
-
-        for slot in slots {
-            let take = slot.arity.min(rest.len());
-            if take == 0 {
-                break;
-            }
-            let (values, tail) = rest.split_at(take);
-            rest = tail;
-            out.push(Prop {
-                name: slot.prop.to_string(),
-                name_span: self.positional_span,
-                values: values.to_vec(),
-                values_span: self.positional_span,
-                span: self.positional_span,
-            });
-        }
-
-        out.extend(self.props.iter().cloned());
-        out
+        fold_positional(&self.positional, self.positional_span, slots, &self.props)
     }
+}
+
+/// Positional values fill the archetype's slots in order and are placed
+/// before the inline block, so an explicit property still wins.
+fn fold_positional(
+    positional: &[Value],
+    span: Span,
+    slots: &[crate::props::Slot],
+    inline: &[Prop],
+) -> Vec<Prop> {
+    if positional.is_empty() {
+        return inline.to_vec();
+    }
+
+    let mut out = Vec::with_capacity(slots.len() + inline.len());
+    let mut rest = positional;
+
+    for slot in slots {
+        let take = slot.arity.min(rest.len());
+        if take == 0 {
+            break;
+        }
+        let (values, tail) = rest.split_at(take);
+        rest = tail;
+        out.push(Prop {
+            name: slot.prop.to_string(),
+            name_span: span,
+            values: values.to_vec(),
+            values_span: span,
+            span,
+        });
+    }
+
+    out.extend(inline.iter().cloned());
+    out
 }
 
 #[derive(Debug)]
@@ -123,9 +134,18 @@ pub struct EdgeDecl {
     pub to: Spanned<String>,
     pub arrow: Arrow,
     pub label: Option<String>,
+    /// Values after the label, for archetypes that give edges slots.
+    pub positional: Vec<Value>,
+    pub positional_span: Span,
     pub classes: Vec<Spanned<String>>,
     pub props: Vec<Prop>,
     pub span: Span,
+}
+
+impl EdgeDecl {
+    pub fn effective_props(&self, slots: &[crate::props::Slot]) -> Vec<Prop> {
+        fold_positional(&self.positional, self.positional_span, slots, &self.props)
+    }
 }
 
 #[derive(Debug, Clone)]

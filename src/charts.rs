@@ -1547,3 +1547,281 @@ fn draw_lane(
 
     flush_line(&mut line, polylines);
 }
+
+// ---------------------------------------------------------------- sankey
+
+pub fn sankey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
+    let cfg = &diagram.archetype_props;
+    let theme = Theme::of(&opts);
+    let def = crate::check::archetype_of(diagram);
+    let palette = theme.palette();
+
+    let width = setting(cfg, "size")
+        .and_then(|v| v.first())
+        .and_then(|v| v.as_num())
+        .unwrap_or(680.0)
+        .max(120.0);
+    let height = setting(cfg, "size")
+        .and_then(|v| v.get(1))
+        .and_then(|v| v.as_num())
+        .unwrap_or(400.0)
+        .max(80.0);
+    let gap = number(cfg, "gap", 14.0).max(2.0);
+    let bar = number(cfg, "width", 16.0).max(2.0);
+    let labels = word(cfg, "labels", "name");
+    let title = text(cfg, "title");
+
+    let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
+
+    let index: HashMap<&str, usize> = diagram
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.id.as_str(), i))
+        .collect();
+
+    // Links first: a node's size is whatever passes through it.
+    let mut links = Vec::new();
+    for edge in &diagram.edges {
+        // A bare base, so a declared colour is distinguishable from a
+        // default one — `edge_defaults` always sets `stroke`, which would
+        // make every ribbon the same grey.
+        let style = registry.resolve(
+            chart_defaults(),
+            "edge",
+            &edge.classes,
+            &edge.effective_props(def.edge_slots),
+        )?;
+        let (Some(&from), Some(&to)) = (index.get(edge.from.as_str()), index.get(edge.to.as_str()))
+        else {
+            continue;
+        };
+        let Some(value) = style.value.filter(|v| *v > 0.0) else {
+            continue;
+        };
+        links.push((from, to, value, style));
+    }
+
+    let layers = layer_nodes(diagram.nodes.len(), &links);
+    let depth = layers.iter().copied().max().unwrap_or(0);
+
+    // A node is as tall as the larger of what enters and what leaves it.
+    let mut incoming = vec![0.0; diagram.nodes.len()];
+    let mut outgoing = vec![0.0; diagram.nodes.len()];
+    for (from, to, value, _) in &links {
+        outgoing[*from] += value;
+        incoming[*to] += value;
+    }
+    let weight: Vec<f64> = incoming
+        .iter()
+        .zip(&outgoing)
+        .map(|(a, b)| a.max(*b))
+        .collect();
+
+    // Scale so the busiest column just fills the height.
+    let mut column_total = vec![0.0; depth + 1];
+    let mut column_count = vec![0usize; depth + 1];
+    for (i, layer) in layers.iter().enumerate() {
+        if weight[i] > 0.0 {
+            column_total[*layer] += weight[i];
+            column_count[*layer] += 1;
+        }
+    }
+    let scale = column_total
+        .iter()
+        .zip(&column_count)
+        .map(|(total, count)| {
+            let free = height - gap * count.saturating_sub(1) as f64;
+            if *total > 0.0 { free / total } else { 0.0 }
+        })
+        .fold(f64::MAX, f64::min)
+        .max(0.0);
+
+    let title_h = if title.is_some() {
+        TITLE_SIZE * 2.0
+    } else {
+        0.0
+    };
+    let step = if depth > 0 {
+        (width - bar) / depth as f64
+    } else {
+        0.0
+    };
+
+    let mut nodes = Vec::new();
+    let mut polylines = Vec::new();
+    let mut annotations = Vec::new();
+    let mut rect_of = vec![
+        Rect {
+            x: 0.0,
+            y: 0.0,
+            w: 0.0,
+            h: 0.0
+        };
+        diagram.nodes.len()
+    ];
+
+    if let Some(title) = title {
+        annotations.push(Annotation {
+            text: title,
+            x: 0.0,
+            y: TITLE_SIZE,
+            anchor: Anchor::Start,
+            size: TITLE_SIZE,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    // Stack each column in declaration order — predictable beats clever.
+    let mut cursor = vec![0.0; depth + 1];
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        if weight[i] <= 0.0 {
+            continue;
+        }
+        let layer = layers[i];
+        let h = (weight[i] * scale).max(2.0);
+        let rect = Rect {
+            x: layer as f64 * step,
+            y: title_h + cursor[layer],
+            w: bar,
+            h,
+        };
+        cursor[layer] += h + gap;
+        rect_of[i] = rect;
+
+        let style = registry.resolve(
+            chart_defaults(),
+            def.item,
+            &node.classes,
+            &node.effective_props(def.slots),
+        )?;
+        let fill = style
+            .fill
+            .clone()
+            .unwrap_or_else(|| palette[i.min(palette.len() - 1)].to_string());
+
+        nodes.push(PlacedNode {
+            lines: Vec::new(),
+            rect,
+            style: Style {
+                fill: Some(fill.clone()),
+                stroke: Some("none".into()),
+                stroke_width: Some(0.0),
+                radius: Some(2.0),
+                shape: Some(Shape::Rect),
+                ..style.clone()
+            },
+        });
+
+        let name = node.label.clone().unwrap_or_else(|| node.id.value.clone());
+        let text = match labels.as_str() {
+            "none" => None,
+            "value" => Some(trim_number(weight[i])),
+            "both" => Some(format!("{name}  {}", trim_number(weight[i]))),
+            _ => Some(name),
+        };
+        if let Some(text) = text {
+            // The last column labels leftward so nothing spills off the plot.
+            let last = layer == depth;
+            annotations.push(Annotation {
+                text,
+                x: if last {
+                    rect.x - 8.0
+                } else {
+                    rect.right() + 8.0
+                },
+                y: rect.cy(),
+                anchor: if last { Anchor::End } else { Anchor::Start },
+                size: style.font_size.unwrap_or(12.0),
+                color: ink(&style, &theme),
+                weight: style.font_weight.clone().unwrap_or_else(|| "500".into()),
+                family: family(&style),
+            });
+        }
+    }
+
+    // Ribbons, allocated down each node's face in declaration order.
+    let mut out_at = vec![0.0; diagram.nodes.len()];
+    let mut in_at = vec![0.0; diagram.nodes.len()];
+    for (from, to, value, style) in &links {
+        let thickness = value * scale;
+        let a = rect_of[*from];
+        let b = rect_of[*to];
+        let y0 = a.y + out_at[*from];
+        let y1 = b.y + in_at[*to];
+        out_at[*from] += thickness;
+        in_at[*to] += thickness;
+
+        // A ribbon takes its source's colour, at an alpha that lets crossings
+        // stay legible.
+        let hue = style
+            .stroke
+            .clone()
+            .unwrap_or_else(|| palette[(*from).min(palette.len() - 1)].to_string());
+        let (opaque, _) = crate::render_svg::split_alpha(&hue);
+
+        polylines.push(Polyline {
+            points: ribbon(a.right(), y0, b.x, y1, thickness),
+            closed: true,
+            fill: Some(format!("{opaque}66")),
+            stroke: None,
+            width: 0.0,
+        });
+    }
+
+    Ok(Layout {
+        guides: Vec::new(),
+        polylines,
+        groups: Vec::new(),
+        nodes,
+        edges: Vec::new(),
+        opts,
+        chart: Chart::Sankey,
+        annotations,
+    })
+}
+
+/// Longest path from a source, so a node sits to the right of everything that
+/// feeds it. A cycle leaves nodes unassigned; `check` reports it.
+fn layer_nodes(count: usize, links: &[(usize, usize, f64, Style)]) -> Vec<usize> {
+    let mut layer = vec![0usize; count];
+    // `count` relaxations settle any acyclic graph; a cycle stops improving.
+    for _ in 0..count {
+        let mut moved = false;
+        for (from, to, _, _) in links {
+            if layer[*to] < layer[*from] + 1 {
+                layer[*to] = layer[*from] + 1;
+                moved = true;
+            }
+        }
+        if !moved {
+            break;
+        }
+    }
+    layer
+}
+
+/// A flow band: two cubic curves sampled into a closed polygon, so the ribbon
+/// needs no primitive beyond the polyline everything else already uses.
+fn ribbon(x0: f64, y0: f64, x1: f64, y1: f64, thickness: f64) -> Vec<(f64, f64)> {
+    const STEPS: usize = 24;
+    let curve = |a: f64, b: f64| {
+        (0..=STEPS).map(move |i| {
+            let t = i as f64 / STEPS as f64;
+            // Horizontal control points: the band leaves and arrives flat.
+            let ease = t * t * (3.0 - 2.0 * t);
+            (x0 + (x1 - x0) * t, a + (b - a) * ease)
+        })
+    };
+
+    let mut points: Vec<(f64, f64)> = curve(y0, y1).collect();
+    points.extend(
+        curve(y0 + thickness, y1 + thickness)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev(),
+    );
+    points
+}

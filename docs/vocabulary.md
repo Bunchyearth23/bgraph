@@ -56,7 +56,9 @@ positional slots; nothing else learns about archetypes.
    `series`, `task`, `participant`, `state`, … declared per archetype.
 2. **Positional data is sugar for the named property.** `slice a 4820` and
    `slice a { value: 4820 }` produce the same thing. The property is the
-   model; the position is the shorthand.
+   model; the position is the shorthand. Edges take slots too, by the same
+   rule — `a -> b 40` in a sankey, where the datum rides on the link rather
+   than on what it joins.
 3. **`node` is a universal synonym**, and so is `edge`. Nothing that works
    today stops working. The genre keyword is idiomatic, not mandatory.
 4. **Identifier first, label second.** `slice organic "Organic search" 4820`.
@@ -120,7 +122,7 @@ is a single item with two stray values rather than two items.
 | `wave` | `signal` | `wave` — one string ✔ |
 | `bar` / `xy` (`W-016`, `W-017`) | `series` | `points` — a number list |
 | `quadrant` | `point` | `x`, `y` — two numbers ✔ |
-| `sankey` (`W-018`) | `node` | — (the value is on the edge) |
+| `sankey` | `node` | — the value is an **edge** slot: `a -> b 40` ✔ |
 | `state` (`W-022`) | `state` | — |
 | `sequence` (`W-021`) | `participant` | — |
 | `class` / `er` (`W-023`) | `class` / `entity` | — (members are `W-013`) |

@@ -57,9 +57,9 @@ disagree.
 - `cargo run --bin bgraph -- watch diagram.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check diagram.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (137 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (144 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
-- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (19 corpus cases)
+- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (20 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
 - `./editors/zed/install.sh` — installs the server, regenerates + pins the grammar
 
@@ -126,6 +126,13 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-07-31] **A `*_defaults()` base hides whether the author declared
+  anything.** `node_defaults` always sets `fill`, `edge_defaults` always sets
+  `stroke` — so `style.fill.unwrap_or(palette)` silently never reaches the
+  palette. This has now bitten three times: the pie's slice colours, the
+  quadrant's contrast check, the sankey's ribbons. Any archetype that wants to
+  distinguish *declared* from *default* must resolve on `chart_defaults()`,
+  which sets neither.
 - [2026-07-31] `tree-sitter test`'s summary line — "failed parses: 0" — counts
   **parses**, not expectation matches. It says nothing about whether the trees
   are what the corpus claims, and reading it let seven expectations go stale

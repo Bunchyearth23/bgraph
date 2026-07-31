@@ -206,7 +206,7 @@ Aliases are marked. They behave identically to the property they alias; the edit
 | `head` *(alias)* | edge | `head: <solid\|open\|dot\|none>` | Alias of `arrow`. |
 | `router` | edge | `router: <straight\|ortho>` | `straight` draws a direct line; `ortho` draws a right-angled elbow. |
 | `route` *(alias)* | edge | `route: <straight\|ortho>` | Alias of `router`. |
-| `value` | node | `value: <number>` | Magnitude of a slice. Required by `type pie`, ignored elsewhere. |
+| `value` | both | `value: <number>` | Magnitude of a slice. Required by `type pie`, ignored elsewhere. |
 | `wave` | node | `wave: "<characters>"` | One character per period: `0` `1` `l` `h` levels, `p` `n` clocks, `x` unknown, `z` high-impedance, `=` and `2`–`9` data, `.` repeats the previous, `\|` a gap. Required by `type wave`. |
 | `data` | node | `data: "<first>" "<second>" …` | Names for the data segments of a wave, in order. |
 | `x` | node | `x: <number>` | Horizontal position. Required by `type quadrant`, ignored elsewhere. |
@@ -261,6 +261,22 @@ slice <id> ["label"] <value>
 | `start` | `start: <degrees>` | Angle the first slice starts at. `0` is twelve o'clock. |
 | `labels` | `labels: <percent\|value\|both\|none>` | What to write on each slice. Slices too thin to read are skipped. |
 | `legend` | `legend: <on\|off>` | Swatch-and-name list beside the chart. On by default — identity must never rest on color alone. |
+
+### `type sankey`
+
+Flows between stages, sized by magnitude. The value rides on the link, not on what it joins: a node's height is whatever passes through it.
+
+```
+node <id> ["label"]
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+| `size` | `size: <width> <height>` | The area the flows fill. 680 by 400 by default. |
+| `gap` | `gap: <number>` | Space between stacked nodes in a column. |
+| `width` | `width: <number>` | Thickness of a node bar. |
+| `labels` | `labels: <name\|value\|both\|none>` | What to write beside each node. |
 
 ### `type wave`
 

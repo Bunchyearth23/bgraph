@@ -59,7 +59,7 @@ place_kw   = @{ ("at" | "right-of" | "left-of" | "below" | "above") ~ !(ASCII_AL
 // An edge may not start with a statement keyword. Without this, `style -> a`
 // parses here (pest backtracks out of `style_decl`) but not in tree-sitter,
 // whose lexer commits to the keyword. `check` reserves these names outright.
-edge_decl  = { !(keyword) ~ ident ~ arrow ~ ident ~ string? ~ class_ref* ~ block? }
+edge_decl  = { !(keyword) ~ ident ~ arrow ~ ident ~ string? ~ (pos_value | class_ref)* ~ block? }
 // Atomic: a non-atomic rule would let implicit whitespace slip between the
 // word and the boundary test, so `style -> a` would read the `-` as part
 // of an identifier and the guard would never fire.

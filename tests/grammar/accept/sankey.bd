@@ -1,0 +1,5 @@
+type sankey
+node a
+node b
+a -> b "most" 40
+a -> b 10

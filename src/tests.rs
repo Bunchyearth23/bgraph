@@ -471,7 +471,7 @@ fn an_unknown_archetype_is_reported() {
     let e = err("type flowchart\nnode a");
     assert!(e.contains("unknown archetype `flowchart`"), "{e}");
     assert!(
-        e.contains("free, pie, wave, quadrant, treemap, packet"),
+        e.contains("free, pie, sankey, wave, quadrant, treemap, packet"),
         "{e}"
     );
 }
@@ -1812,4 +1812,121 @@ fn a_gap_breaks_the_record() {
     // Two runs of line, plus the two strokes that mark the break.
     let open = l.polylines.iter().filter(|p| !p.closed).count();
     assert_eq!(open, 4, "a gap splits the line and marks the seam");
+}
+
+// ---------------------------------------------------------------- sankey
+
+#[test]
+fn a_node_is_as_tall_as_what_flows_through_it() {
+    let l = build(
+        r#"
+        type sankey { size: 300 200 gap: 0 width: 10 }
+        node a
+        node b
+        node c
+        a -> c 30
+        b -> c 70
+    "#,
+    );
+
+    assert!(matches!(l.chart, crate::layout::Chart::Sankey));
+    let h: Vec<f64> = l.nodes.iter().map(|n| n.rect.h).collect();
+    // a and b together are exactly c.
+    assert!((h[0] + h[1] - h[2]).abs() < 0.01, "{h:?}");
+    assert!((h[0] / h[1] - 30.0 / 70.0).abs() < 0.01, "{h:?}");
+    // `gap` has a floor of 2, so the busiest column plus its gaps fills the
+    // height rather than the tallest bar alone.
+    assert!((h[0] + h[1] + 2.0 - 200.0).abs() < 0.01, "{h:?}");
+}
+
+#[test]
+fn layers_read_left_to_right() {
+    let l = build(
+        r#"
+        type sankey { size: 300 100 }
+        node a
+        node b
+        node c
+        a -> b 10
+        b -> c 10
+    "#,
+    );
+
+    let x: Vec<f64> = l.nodes.iter().map(|n| n.rect.x).collect();
+    assert!(x[0] < x[1] && x[1] < x[2], "{x:?}");
+    // A node sits right of everything that feeds it, however it was declared.
+    let l = build(
+        r#"
+        type sankey { size: 300 100 }
+        node last
+        node first
+        first -> last 10
+    "#,
+    );
+    assert!(l.nodes[1].rect.x < l.nodes[0].rect.x);
+}
+
+#[test]
+fn a_flow_carries_its_value_in_position() {
+    let terse = build("type sankey\nnode a\nnode b\na -> b 40");
+    let verbose = build("type sankey\nnode a\nnode b\na -> b { value: 40 }");
+    assert_eq!(terse.nodes[0].rect.h, verbose.nodes[0].rect.h);
+
+    // The label still comes first when both are written.
+    let labelled = build("type sankey\nnode a\nnode b\na -> b \"most of it\" 40");
+    assert_eq!(labelled.nodes[0].rect.h, terse.nodes[0].rect.h);
+}
+
+#[test]
+fn a_ribbon_takes_its_sources_hue() {
+    // `edge_defaults` always sets `stroke`, so resolving on it made every
+    // ribbon the same grey — the third time that trap has been sprung.
+    let l = build(
+        r#"
+        type sankey { size: 300 100 }
+        node a
+        node b
+        node c
+        a -> c 10
+        b -> c 10
+    "#,
+    );
+
+    let fills: Vec<&str> = l
+        .polylines
+        .iter()
+        .filter_map(|p| p.fill.as_deref())
+        .collect();
+    assert_eq!(fills.len(), 2);
+    assert_ne!(fills[0], fills[1], "two sources, two hues");
+    assert!(
+        fills[0].starts_with(crate::props::PALETTE_LIGHT[0]),
+        "{fills:?}"
+    );
+}
+
+#[test]
+fn a_flow_needs_a_magnitude() {
+    assert!(err("type sankey\nnode a\nnode b\na -> b").contains("has no value"));
+    assert!(
+        err("type sankey\nnode a { value: 5 }\nnode b\na -> b 1")
+            .contains("cannot declare a value")
+    );
+}
+
+#[test]
+fn a_flow_cycle_is_refused() {
+    let e = err("type sankey\nnode a\nnode b\na -> b 1\nb -> a 1");
+    assert!(e.contains("form a cycle"), "{e}");
+    assert!(e.contains("reads left to right"), "{e}");
+}
+
+#[test]
+fn a_node_with_no_flows_is_reported() {
+    let d = diags("type sankey\nnode a\nnode b\nnode lonely\na -> b 1");
+    assert!(
+        d.iter()
+            .any(|x| x.message.contains("`lonely` has no flows")),
+        "{d:?}"
+    );
 }

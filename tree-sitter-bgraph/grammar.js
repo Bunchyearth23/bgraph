@@ -124,8 +124,15 @@ module.exports = grammar({
         field('from', $.identifier),
         field('operator', $.arrow),
         field('to', $.identifier),
-        optional(field('label', $.string)),
-        repeat(field('class', $.class_reference)),
+        // Same rule as an item: the first string is the label, and what
+        // follows is positional data for archetypes that declare edge slots.
+        choice(
+          seq(
+            field('label', $.string),
+            repeat(choice(field('data', $._value), field('class', $.class_reference))),
+          ),
+          repeat(choice(field('data', $._bare_value), field('class', $.class_reference))),
+        ),
         optional(field('body', $.block)),
       ),
 

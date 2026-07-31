@@ -275,16 +275,29 @@ fn parse_edge(pair: Pair<Rule>) -> Result<EdgeDecl> {
     let mut endpoints = Vec::new();
     let mut arrow = Arrow::parse("->");
     let mut label = None;
+    let mut positional = Vec::new();
+    let mut positional_span: Option<Span> = None;
     let mut classes = Vec::new();
     let mut props = Vec::new();
 
     for part in pair.into_inner() {
+        let part_span = span_of(&part);
         match part.as_rule() {
-            Rule::ident => endpoints.push(spanned(&part)),
+            // The first two identifiers are the endpoints; a third is a
+            // bare-word positional value.
+            Rule::ident if endpoints.len() < 2 => endpoints.push(spanned(&part)),
             Rule::arrow => arrow = Arrow::parse(part.as_str()),
-            Rule::string => label = Some(unescape(part)),
+            Rule::string if label.is_none() => label = Some(unescape(part)),
             Rule::class_ref => classes.push(class_name(part)),
             Rule::block => props = parse_block(part)?,
+            Rule::ident | Rule::string | Rule::number | Rule::color => {
+                let start = positional_span.map_or(part_span.start, |s: Span| s.start);
+                positional_span = Some(Span {
+                    start,
+                    end: part_span.end,
+                });
+                positional.push(parse_value(part)?);
+            }
             other => bail!("unexpected rule {other:?} in edge declaration"),
         }
     }
@@ -297,6 +310,8 @@ fn parse_edge(pair: Pair<Rule>) -> Result<EdgeDecl> {
         to,
         arrow,
         label,
+        positional,
+        positional_span: positional_span.unwrap_or(span),
         classes,
         props,
         span,

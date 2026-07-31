@@ -59,6 +59,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "treemap" => check_treemap(diagram, &mut out),
         "quadrant" => check_quadrant(diagram, &mut out),
         "wave" => check_wave(diagram, &mut out),
+        "sankey" => check_sankey(diagram, &mut out),
         _ => {
             check_cycles(diagram, &nodes, &mut out);
             check_unused_data(diagram, &mut out);
@@ -664,6 +665,132 @@ fn check_packet(diagram: &Diagram, out: &mut Vec<Diag>) {
             ));
         }
     }
+}
+
+fn check_sankey(diagram: &Diagram, out: &mut Vec<Diag>) {
+    for node in &diagram.nodes {
+        if node.placement.is_some() {
+            out.push(Diag::warn(
+                node.span,
+                "`type sankey` places its own nodes; the placement is ignored".to_string(),
+            ));
+        }
+        if let Some(prop) = node.props.iter().find(|p| p.name == "value") {
+            out.push(Diag::error(
+                prop.name_span,
+                format!(
+                    "`{}` cannot declare a value — a node is as tall as what \
+                     flows through it",
+                    node.id.as_str()
+                ),
+            ));
+        }
+    }
+
+    let def = archetype_of(diagram);
+    let Ok(registry) = crate::style::Registry::build(&diagram.styles) else {
+        return;
+    };
+
+    let index: HashMap<&str, usize> = diagram
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.id.as_str(), i))
+        .collect();
+    let mut touched = vec![false; diagram.nodes.len()];
+    let mut edges = Vec::new();
+
+    for edge in &diagram.edges {
+        let value = registry
+            .resolve(
+                crate::charts::chart_defaults(),
+                "edge",
+                &edge.classes,
+                &edge.effective_props(def.edge_slots),
+            )
+            .ok()
+            .and_then(|s| s.value);
+
+        match value {
+            None => out.push(Diag::error(
+                edge.span,
+                format!(
+                    "`{} -> {}` has no value — a flow needs a magnitude",
+                    edge.from.as_str(),
+                    edge.to.as_str()
+                ),
+            )),
+            Some(v) if v <= 0.0 => out.push(Diag::warn(
+                edge.span,
+                format!(
+                    "`{} -> {}` carries {v} and will not be drawn",
+                    edge.from.as_str(),
+                    edge.to.as_str()
+                ),
+            )),
+            Some(_) => {}
+        }
+
+        if let (Some(&from), Some(&to)) =
+            (index.get(edge.from.as_str()), index.get(edge.to.as_str()))
+        {
+            touched[from] = true;
+            touched[to] = true;
+            edges.push((from, to));
+        }
+    }
+
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        if !touched[i] {
+            out.push(Diag::warn(
+                node.id.span,
+                format!("`{}` has no flows and will not be drawn", node.id.as_str()),
+            ));
+        }
+    }
+
+    // Layering is a longest-path walk; a cycle has no left-to-right reading.
+    if let Some(cycle) = first_cycle(diagram.nodes.len(), &edges) {
+        let names: Vec<&str> = cycle
+            .iter()
+            .map(|i| diagram.nodes[*i].id.as_str())
+            .collect();
+        out.push(Diag::error(
+            diagram.nodes[cycle[0]].id.span,
+            format!(
+                "flows form a cycle ({}); a sankey reads left to right",
+                names.join(" → ")
+            ),
+        ));
+    }
+}
+
+/// Any cycle in the flow graph, as the nodes that make it up.
+fn first_cycle(count: usize, edges: &[(usize, usize)]) -> Option<Vec<usize>> {
+    let mut degree = vec![0usize; count];
+    for (_, to) in edges {
+        degree[*to] += 1;
+    }
+    let mut queue: Vec<usize> = (0..count).filter(|i| degree[*i] == 0).collect();
+    let mut removed = 0;
+
+    while let Some(node) = queue.pop() {
+        removed += 1;
+        for (from, to) in edges {
+            if *from == node {
+                degree[*to] -= 1;
+                if degree[*to] == 0 {
+                    queue.push(*to);
+                }
+            }
+        }
+    }
+
+    if removed == count {
+        return None;
+    }
+    Some((0..count).filter(|i| degree[*i] > 0).collect())
 }
 
 fn check_wave(diagram: &Diagram, out: &mut Vec<Diag>) {

@@ -28,7 +28,7 @@ purpose — an identifier is earned by being cited.
 Ordered by what each unblocks, not by number. `W-011` and `W-029` have landed,
 so nesting and per-archetype vocabulary are available to everything below.
 `W-012` … `W-015` are the remaining foundations; each archetype names the one
-it waits for. Two now wait for nothing — `W-018` and `W-025`.
+it waits for. One now waits for nothing — `W-025`.
 
 **DSL impact, measured rather than assumed.** The grammar already accepts
 string lists (`data: "a" "b" "c"`), number lists (`points: 1 2 3`),
@@ -43,10 +43,8 @@ change the language: `W-011`, `W-013`, `W-014`.
 | `W-012` | planned | **Plot frame** — axes, scales, ticks, gridlines, legend | Shared substrate for every numeric chart. No DSL change; it is layout and rendering. `W-019` added the `Guide` primitive it will draw with. Blocks `W-016`, `W-017`. |
 | `W-013` | planned | **Node member lists** — a body of items, not properties | **DSL change.** A class needs fields and methods, a table needs columns; a label with `\n` is a workaround, not a model. Blocks `W-023`. |
 | `W-014` | planned | **Date and duration literals** | **DSL change.** `2026-07-31`, `3d`, `2w`. Blocks `W-026`. |
-| `W-015` | planned | **`value` on edges** | Not a grammar change — `value` moves from `Ctx::Node` to `Ctx::Both`. Blocks `W-018`. |
 | `W-016` | planned | `type bar` — bar, column, stacked, grouped | Data / stats. Reuses `value`, which already exists. Needs `W-012`. |
 | `W-017` | planned | `type xy` — line, scatter, area, multi-series | Data / stats. A series is a node carrying a number list; categories are a string list on the `type` block. Needs `W-012`. |
-| `W-018` | planned | `type sankey` — flows sized by magnitude | Data. Needs `W-015`; nothing else. |
 | `W-021` | planned | `type sequence` — participants, ordered messages, activations | Dev. Repeated edges between the same pair already survive in source order; `loop`/`alt`/`opt` have `W-011`. |
 | `W-022` | planned | `type state` — state machines | Dev / embedded. Nested states have `W-011`; entry/exit pseudo-states are nodes with a shape. |
 | `W-023` | planned | `type class` and `type er` | Dev / data. Needs `W-013` for members, plus cardinality on arrows (`\|\|--o{`) — either new arrow tokens or `from-card:` / `to-card:` properties. |
@@ -104,6 +102,8 @@ not copies.
 | `W-004` | 2026-07-31 | `bgraph-lsp`: diagnostics, completion, hover, go-to-definition, outline | `1b53ec3` |
 | `W-005` | 2026-07-31 | Tree-sitter grammar and Zed extension | `1b53ec3`, regenerated `d6997b1` |
 | `W-006` | 2026-07-31 | `type` archetypes (`pie`, `packet`), quiet completion, explicit surface, generated reference manual | `4b4c548` |
+| `W-015` | 2026-07-31 | `value` on edges — and, past it, positional slots for edges: `a -> b 40` | this commit |
+| `W-018` | 2026-07-31 | `type sankey` — layered flows, ribbons sized by magnitude and coloured by source | this commit |
 | `W-024` | 2026-07-31 | `type wave` — timing lanes in the WaveDrom alphabet, clocks, buses with named segments, gaps | this commit |
 | `W-019` | 2026-07-31 | `type quadrant` — points on two axes, four named regions; a Wardley map is the same archetype with other axis names | this commit |
 | `W-020` | 2026-07-31 | `type treemap` — squarified tiles, hierarchy from group nesting, one hue per top-level branch | this commit |

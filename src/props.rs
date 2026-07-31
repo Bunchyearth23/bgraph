@@ -266,7 +266,7 @@ pub const PROPS: &[PropDef] = &[
     PropDef {
         name: "value",
         alias: false,
-        ctx: Ctx::Node,
+        ctx: Ctx::Both,
         words: &[],
         syntax: "value: <number>",
         doc: "Magnitude of a slice. Required by `type pie`, ignored elsewhere.",
@@ -394,6 +394,9 @@ pub struct ArchetypeDef {
     /// Values written after the label, in order, and the property each one
     /// fills. `slice a "A" 4820` is sugar for `slice a "A" { value: 4820 }`.
     pub slots: &'static [Slot],
+    /// The same, for edges: `a -> b 40` where the archetype's datum rides on
+    /// the link rather than on what it joins.
+    pub edge_slots: &'static [Slot],
 }
 
 pub struct Slot {
@@ -410,6 +413,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
               declares no `type`.",
         props: &[],
         slots: &[],
+        edge_slots: &[],
     },
     ArchetypeDef {
         name: "pie",
@@ -418,6 +422,20 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
               overrides the automatic palette.",
         props: PIE_PROPS,
         slots: &[Slot {
+            prop: "value",
+            arity: 1,
+        }],
+        edge_slots: &[],
+    },
+    ArchetypeDef {
+        name: "sankey",
+        item: "node",
+        doc: "Flows between stages, sized by magnitude. The value rides on the \
+              link, not on what it joins: a node's height is whatever passes \
+              through it.",
+        props: SANKEY_PROPS,
+        slots: &[],
+        edge_slots: &[Slot {
             prop: "value",
             arity: 1,
         }],
@@ -432,6 +450,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "wave",
             arity: 1,
         }],
+        edge_slots: &[],
     },
     ArchetypeDef {
         name: "quadrant",
@@ -449,6 +468,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
                 arity: 1,
             },
         ],
+        edge_slots: &[],
     },
     ArchetypeDef {
         name: "treemap",
@@ -461,6 +481,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "value",
             arity: 1,
         }],
+        edge_slots: &[],
     },
     ArchetypeDef {
         name: "packet",
@@ -472,6 +493,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "bits",
             arity: 2,
         }],
+        edge_slots: &[],
     },
 ];
 
@@ -527,6 +549,49 @@ pub const PIE_PROPS: &[PropDef] = &[
         syntax: "legend: <on|off>",
         doc: "Swatch-and-name list beside the chart. On by default — identity \
               must never rest on color alone.",
+    },
+];
+
+pub const SANKEY_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the diagram.",
+    },
+    PropDef {
+        name: "size",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "size: <width> <height>",
+        doc: "The area the flows fill. 680 by 400 by default.",
+    },
+    PropDef {
+        name: "gap",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "gap: <number>",
+        doc: "Space between stacked nodes in a column.",
+    },
+    PropDef {
+        name: "width",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "width: <number>",
+        doc: "Thickness of a node bar.",
+    },
+    PropDef {
+        name: "labels",
+        alias: false,
+        ctx: Ctx::Both,
+        words: TREEMAP_LABELS,
+        syntax: "labels: <name|value|both|none>",
+        doc: "What to write beside each node.",
     },
 ];
 

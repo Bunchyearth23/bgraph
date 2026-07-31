@@ -107,6 +107,8 @@ pub enum Chart {
     Quadrant,
     /// Timing lanes. `polylines` carries the waveforms.
     Wave,
+    /// Flows between stages. `polylines` carries the ribbons.
+    Sankey,
     /// Slices, which need arcs the node renderer cannot make.
     Pie(Pie),
 }
@@ -208,6 +210,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         "treemap" => return crate::charts::treemap(diagram, opts, &registry),
         "quadrant" => return crate::charts::quadrant(diagram, opts, &registry),
         "wave" => return crate::charts::wave(diagram, opts, &registry),
+        "sankey" => return crate::charts::sankey(diagram, opts, &registry),
         _ => {}
     }
 
