@@ -127,6 +127,13 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-07-31] **A hard-coded list of keywords in the LSP goes stale silently.**
+  `Context::at` matched a block's owner against five words, so all sixteen
+  archetype item keywords read as *edges* — wrong completions in every genre
+  but `free`, from `W-029` until it was looked at. Ask a structural question
+  (does the statement carry an arrow?) rather than enumerating names. The same
+  applies to `relevant_here`, now deleted: a filter listing what is special is
+  a filter that forgets.
 - [2026-07-31] **The example files were covered by nothing.** The suite named
   `pie.bd` and `packet.bd` by hand, so the fifteen added since could have been
   broken for weeks. `every_example_still_works` sweeps the directory — a list
