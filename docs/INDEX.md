@@ -68,10 +68,10 @@ not copies.
 | `W-003` | 2026-07-31 | `bgraph watch` — dependency-free live preview | `1b53ec3` |
 | `W-004` | 2026-07-31 | `bgraph-lsp`: diagnostics, completion, hover, go-to-definition, outline | `1b53ec3` |
 | `W-005` | 2026-07-31 | Tree-sitter grammar and Zed extension | `1b53ec3`, regenerated `d6997b1` |
-| `W-006` | 2026-07-31 | `type` archetypes (`pie`, `packet`), quiet completion, explicit surface, generated reference manual | `8f95499` |
-| `W-008` | 2026-07-31 | Cross-check the two grammars over a shared corpus (`tests/grammar/`) | `8f95499` |
-| `W-009` | 2026-07-31 | Draw self-loops — a sampled arc over the node's top edge | `8f95499` |
-| `W-010` | 2026-07-31 | Place edge labels clear of the lines they would cross | `8f95499` |
+| `W-006` | 2026-07-31 | `type` archetypes (`pie`, `packet`), quiet completion, explicit surface, generated reference manual | `4b4c548` |
+| `W-008` | 2026-07-31 | Cross-check the two grammars over a shared corpus (`tests/grammar/`) | `4b4c548` |
+| `W-009` | 2026-07-31 | Draw self-loops — a sampled arc over the node's top edge | `4b4c548` |
+| `W-010` | 2026-07-31 | Place edge labels clear of the lines they would cross | `4b4c548` |
 
 Nothing is marked `landed` without a commit to point at.
 
