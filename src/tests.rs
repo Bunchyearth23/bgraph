@@ -470,7 +470,10 @@ fn a_file_without_type_is_free() {
 fn an_unknown_archetype_is_reported() {
     let e = err("type flowchart\nnode a");
     assert!(e.contains("unknown archetype `flowchart`"), "{e}");
-    assert!(e.contains("free, pie, quadrant, treemap, packet"), "{e}");
+    assert!(
+        e.contains("free, pie, wave, quadrant, treemap, packet"),
+        "{e}"
+    );
 }
 
 #[test]
@@ -1687,4 +1690,126 @@ fn contrast_is_measured_against_what_each_archetype_actually_paints() {
         "type quadrant\ngraph { background: #0b1120 }\nstyle point { font-color: #e2e8f0 }\npoint a \"A\" 0.5 0.5",
     );
     assert!(!d.iter().any(|x| x.message.contains("readable")), "{d:?}");
+}
+
+// ------------------------------------------------------------------ wave
+
+fn wave_layout(source: &str) -> crate::layout::Layout {
+    let l = build(source);
+    assert!(matches!(l.chart, crate::layout::Chart::Wave));
+    l
+}
+
+#[test]
+fn a_restated_value_is_a_new_segment_but_a_dot_is_not() {
+    // `=.=.` is two values held two periods each; `=...` is one held four.
+    // Merging on equal levels alone silently joined them.
+    let two = wave_layout(
+        r#"
+        type wave { period: 10 }
+        signal bus "Bus" "=.=." { data: "a" "b" }
+    "#,
+    );
+    let one = wave_layout(
+        r#"
+        type wave { period: 10 }
+        signal bus "Bus" "=..." { data: "a" }
+    "#,
+    );
+
+    let hexes = |l: &crate::layout::Layout| l.polylines.iter().filter(|p| p.closed).count();
+    assert_eq!(hexes(&two), 2);
+    assert_eq!(hexes(&one), 1);
+
+    let labels: Vec<&str> = two.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert!(labels.contains(&"a") && labels.contains(&"b"), "{labels:?}");
+}
+
+#[test]
+fn a_clock_has_two_edges_per_period() {
+    let l = wave_layout(
+        r#"
+        type wave { period: 20 lane: 20 0 grid: off ruler: off }
+        signal clk "clk" "pp"
+    "#,
+    );
+
+    let line = l
+        .polylines
+        .iter()
+        .find(|p| !p.closed)
+        .expect("a clock line");
+    // Two periods, each rising then falling, plus the closing point.
+    let tops = line
+        .points
+        .iter()
+        .filter(|(_, y)| *y == line.points[0].1)
+        .count();
+    assert!(tops >= 2, "{:?}", line.points);
+    assert!(line.points.len() >= 8, "{:?}", line.points);
+}
+
+#[test]
+fn levels_hold_and_transitions_slope() {
+    let l = wave_layout(
+        r#"
+        type wave { period: 20 lane: 20 0 grid: off ruler: off }
+        signal s "s" "0011"
+    "#,
+    );
+
+    let line = l
+        .polylines
+        .iter()
+        .find(|p| !p.closed)
+        .expect("a level line");
+    let ys: Vec<f64> = line.points.iter().map(|(_, y)| *y).collect();
+    // Starts low, ends high, and the change is not a vertical jump.
+    assert_eq!(ys.first(), ys.get(1));
+    assert_ne!(ys.first(), ys.last());
+    let xs: Vec<f64> = line.points.iter().map(|(x, _)| *x).collect();
+    assert!(
+        xs.windows(2).all(|w| w[1] >= w[0]),
+        "x must advance: {xs:?}"
+    );
+}
+
+#[test]
+fn a_signal_needs_a_wave() {
+    assert!(err("type wave\nsignal s \"S\"").contains("has no wave"));
+}
+
+#[test]
+fn an_unknown_wave_character_names_the_alphabet() {
+    let e = err("type wave\nsignal s \"S\" \"01Q1\"");
+    assert!(e.contains("`Q` at position 2"), "{e}");
+    assert!(e.contains(crate::props::WAVE_ALPHABET), "{e}");
+}
+
+#[test]
+fn a_wave_cannot_open_with_a_repeat() {
+    assert!(err("type wave\nsignal s \"S\" \".01\"").contains("there is none"));
+}
+
+#[test]
+fn unnamed_data_segments_are_reported() {
+    let d = diags("type wave\nsignal s \"S\" \"=.=.=.\" { data: \"only\" }");
+    assert!(
+        d.iter()
+            .any(|x| x.message.contains("3 data segments but 1 name")),
+        "{d:?}"
+    );
+}
+
+#[test]
+fn a_gap_breaks_the_record() {
+    let l = wave_layout(
+        r#"
+        type wave { period: 20 lane: 20 0 grid: off ruler: off }
+        signal s "s" "11|11"
+    "#,
+    );
+    // Two runs of line, plus the two strokes that mark the break.
+    let open = l.polylines.iter().filter(|p| !p.closed).count();
+    assert_eq!(open, 4, "a gap splits the line and marks the seam");
 }

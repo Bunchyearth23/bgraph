@@ -1,0 +1,3 @@
+type wave
+signal clk "clk" "p..."
+signal d "d" "x.=x" { data: "v" }

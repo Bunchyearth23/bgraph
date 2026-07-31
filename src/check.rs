@@ -58,6 +58,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "packet" => check_packet(diagram, &mut out),
         "treemap" => check_treemap(diagram, &mut out),
         "quadrant" => check_quadrant(diagram, &mut out),
+        "wave" => check_wave(diagram, &mut out),
         _ => {
             check_cycles(diagram, &nodes, &mut out);
             check_unused_data(diagram, &mut out);
@@ -665,6 +666,74 @@ fn check_packet(diagram: &Diagram, out: &mut Vec<Diag>) {
     }
 }
 
+fn check_wave(diagram: &Diagram, out: &mut Vec<Diag>) {
+    warn_ignored(diagram, "wave", out);
+
+    let styles = resolved_nodes(diagram, base_style("wave"));
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        let style = styles.get(i);
+        let Some(spec) = style.and_then(|s| s.wave.as_deref()) else {
+            out.push(Diag::error(
+                node.id.span,
+                format!(
+                    "`{}` has no wave — `signal {} [\"label\"] \"<characters>\"`",
+                    node.id.as_str(),
+                    node.id.as_str()
+                ),
+            ));
+            continue;
+        };
+
+        for (column, c) in spec.chars().enumerate() {
+            if !props::WAVE_ALPHABET.contains(c) {
+                out.push(Diag::error(
+                    node.id.span,
+                    format!(
+                        "`{c}` at position {column} is not a wave character — the \
+                         alphabet is {}",
+                        props::WAVE_ALPHABET
+                    ),
+                ));
+            }
+        }
+
+        if spec.starts_with('.') {
+            out.push(Diag::error(
+                node.id.span,
+                format!(
+                    "`{}` starts with `.`, which repeats the previous character — \
+                     there is none",
+                    node.id.as_str()
+                ),
+            ));
+        }
+
+        // Every data segment wants a name; an unnamed bus says nothing.
+        let segments = data_segments(spec);
+        let named = style.and_then(|s| s.data.as_ref()).map_or(0, Vec::len);
+        if segments > named {
+            out.push(Diag::warn(
+                node.id.span,
+                format!(
+                    "`{}` has {segments} data segment{} but {named} name{} — the rest \
+                     will be blank",
+                    node.id.as_str(),
+                    if segments == 1 { "" } else { "s" },
+                    if named == 1 { "" } else { "s" }
+                ),
+            ));
+        }
+    }
+}
+
+/// How many distinct data runs a wave contains. Only an explicit data
+/// character opens one — `.` continues whatever it follows.
+fn data_segments(spec: &str) -> usize {
+    spec.chars()
+        .filter(|c| *c == '=' || matches!(c, '2'..='9'))
+        .count()
+}
+
 fn check_quadrant(diagram: &Diagram, out: &mut Vec<Diag>) {
     warn_ignored(diagram, "quadrant", out);
 
@@ -809,6 +878,7 @@ fn check_unused_data(diagram: &Diagram, out: &mut Vec<Diag>) {
                 "value" => "pie` or `type treemap",
                 "bits" => "packet",
                 "x" | "y" => "quadrant",
+                "wave" | "data" => "wave",
                 _ => continue,
             };
             out.push(Diag::warn(

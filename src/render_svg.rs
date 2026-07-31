@@ -6,7 +6,8 @@ use std::fmt::Write;
 
 use crate::charts::annotation_bounds;
 use crate::layout::{
-    Anchor, Annotation, Chart, Guide, Layout, Pie, PlacedGroup, PlacedNode, Rect, text_width,
+    Anchor, Annotation, Chart, Guide, Layout, Pie, PlacedGroup, PlacedNode, Polyline, Rect,
+    text_width,
 };
 use crate::style::{Head, Router, Shape, Style};
 
@@ -36,6 +37,9 @@ pub fn render(layout: &Layout) -> String {
     // Guides sit under everything, frames under what they enclose.
     for guide in &layout.guides {
         body.push_str(&guide_line(guide));
+    }
+    for shape in &layout.polylines {
+        body.push_str(&free_polyline(shape));
     }
     for group in &layout.groups {
         body.push_str(&group_frame(group));
@@ -327,6 +331,16 @@ fn bounds(layout: &Layout, routed: &[Routed]) -> (f64, f64, f64, f64) {
 
     let mut boxes: Vec<Rect> = layout.nodes.iter().map(|n| n.rect).collect();
     boxes.extend(layout.groups.iter().map(|g| g.rect));
+    for p in &layout.polylines {
+        for &(x, y) in &p.points {
+            boxes.push(Rect {
+                x,
+                y,
+                w: 0.0,
+                h: 0.0,
+            });
+        }
+    }
     for g in &layout.guides {
         for (x, y) in [g.from, g.to] {
             boxes.push(Rect {
@@ -388,6 +402,22 @@ fn guide_line(g: &Guide) -> String {
         n(g.to.1),
         paint("stroke", &g.color),
         n(g.width)
+    )
+}
+
+fn free_polyline(p: &Polyline) -> String {
+    let points: Vec<String> = p
+        .points
+        .iter()
+        .map(|(x, y)| format!("{},{}", n(*x), n(*y)))
+        .collect();
+    format!(
+        r#"<{} points="{}"{}{} stroke-width="{}" stroke-linejoin="round" stroke-linecap="round"/>"#,
+        if p.closed { "polygon" } else { "polyline" },
+        points.join(" "),
+        paint("fill", p.fill.as_deref().unwrap_or("none")),
+        paint("stroke", p.stroke.as_deref().unwrap_or("none")),
+        n(p.width)
     )
 }
 

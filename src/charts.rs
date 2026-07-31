@@ -10,7 +10,8 @@ use anyhow::Result;
 
 use crate::ast::{Diagram, Prop, Value};
 use crate::layout::{
-    Anchor, Annotation, Chart, Guide, Layout, Pie, PlacedGroup, PlacedNode, Rect, Slice, text_width,
+    Anchor, Annotation, Chart, Guide, Layout, Pie, PlacedGroup, PlacedNode, Polyline, Rect, Slice,
+    text_width,
 };
 use crate::props;
 use crate::style::{GraphOpts, Registry, Shape, Style};
@@ -337,6 +338,7 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
 
     Ok(Layout {
         guides: Vec::new(),
+        polylines: Vec::new(),
         groups: Vec::new(),
         nodes,
         edges: Vec::new(),
@@ -504,6 +506,7 @@ pub fn packet(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
 
     Ok(Layout {
         guides: Vec::new(),
+        polylines: Vec::new(),
         groups: Vec::new(),
         nodes,
         edges: Vec::new(),
@@ -612,6 +615,7 @@ pub fn treemap(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
 
     Ok(Layout {
         guides: Vec::new(),
+        polylines: Vec::new(),
         groups,
         nodes,
         edges: Vec::new(),
@@ -1149,6 +1153,7 @@ pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
 
     Ok(Layout {
         guides,
+        polylines: Vec::new(),
         groups: Vec::new(),
         nodes,
         edges: Vec::new(),
@@ -1156,4 +1161,389 @@ pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         chart: Chart::Quadrant,
         annotations,
     })
+}
+
+// ------------------------------------------------------------------ wave
+
+/// What one wave character means. `.` never reaches here — it is resolved
+/// into a repeat of whatever came before.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Level {
+    Low,
+    High,
+    Clock { positive: bool },
+    Unknown,
+    HighImpedance,
+    Data(u8),
+    Gap,
+}
+
+fn level_of(c: char) -> Option<Level> {
+    Some(match c {
+        '0' | 'l' => Level::Low,
+        '1' | 'h' => Level::High,
+        'p' | 'P' => Level::Clock { positive: true },
+        'n' | 'N' => Level::Clock { positive: false },
+        'x' => Level::Unknown,
+        'z' => Level::HighImpedance,
+        '=' => Level::Data(0),
+        d @ '2'..='9' => Level::Data(d as u8 - b'1'),
+        '|' => Level::Gap,
+        _ => return None,
+    })
+}
+
+pub fn wave(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
+    let cfg = &diagram.archetype_props;
+    let theme = Theme::of(&opts);
+    let def = crate::check::archetype_of(diagram);
+    let palette = theme.palette();
+
+    let period = number(cfg, "period", 40.0).max(8.0);
+    let lane_h = setting(cfg, "lane")
+        .and_then(|v| v.first())
+        .and_then(|v| v.as_num())
+        .unwrap_or(28.0)
+        .max(10.0);
+    let lane_gap = setting(cfg, "lane")
+        .and_then(|v| v.get(1))
+        .and_then(|v| v.as_num())
+        .unwrap_or(14.0)
+        .max(0.0);
+    let ruler = toggle(cfg, "ruler", true);
+    let grid = toggle(cfg, "grid", true);
+    let every = number(cfg, "every", 4.0).max(1.0) as usize;
+    let title = text(cfg, "title");
+
+    let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
+
+    // Resolve every signal first: the name column and the canvas both need
+    // to know the widest name and the longest wave before anything is drawn.
+    let mut signals = Vec::new();
+    for node in &diagram.nodes {
+        let style = registry.resolve(
+            chart_defaults(),
+            def.item,
+            &node.classes,
+            &node.effective_props(def.slots),
+        )?;
+        let Some(spec) = style.wave.clone() else {
+            continue;
+        };
+        let name = node.label.clone().unwrap_or_else(|| node.id.value.clone());
+        signals.push((name, spec, style));
+    }
+
+    let name_size = base.font_size.unwrap_or(13.0);
+    let names_w = signals
+        .iter()
+        .map(|(name, _, _)| text_width(std::slice::from_ref(name), name_size))
+        .fold(0.0_f64, f64::max)
+        + 14.0;
+    let periods = signals
+        .iter()
+        .map(|(_, spec, _)| spec.chars().count())
+        .max()
+        .unwrap_or(0);
+
+    let title_h = if title.is_some() {
+        TITLE_SIZE * 2.0
+    } else {
+        0.0
+    };
+    let ruler_h = if ruler { 16.0 } else { 0.0 };
+    let top = title_h + ruler_h;
+    let plot_w = periods as f64 * period;
+
+    let mut guides = Vec::new();
+    let mut polylines = Vec::new();
+    let mut annotations = Vec::new();
+
+    if let Some(title) = title {
+        annotations.push(Annotation {
+            text: title,
+            x: 0.0,
+            y: TITLE_SIZE,
+            anchor: Anchor::Start,
+            size: TITLE_SIZE,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    let lanes_h = signals.len() as f64 * (lane_h + lane_gap);
+    let rule = if theme.dark { "#1e293b" } else { "#e4e4e7" };
+
+    if grid {
+        for p in 0..=periods {
+            let x = names_w + p as f64 * period;
+            guides.push(Guide {
+                from: (x, top),
+                to: (x, top + lanes_h - lane_gap),
+                color: rule.into(),
+                width: 1.0,
+                dash: None,
+            });
+        }
+    }
+
+    if ruler {
+        for p in (0..periods).step_by(every) {
+            annotations.push(Annotation {
+                text: format!("{p}"),
+                x: names_w + p as f64 * period + 3.0,
+                y: title_h + ruler_h / 2.0,
+                anchor: Anchor::Start,
+                size: 10.0,
+                color: theme.muted.clone(),
+                weight: "400".into(),
+                family: family(&base),
+            });
+        }
+    }
+
+    for (row, (name, spec, style)) in signals.iter().enumerate() {
+        let y = top + row as f64 * (lane_h + lane_gap);
+        let stroke = style
+            .stroke
+            .clone()
+            .unwrap_or_else(|| if theme.dark { "#7dd3fc" } else { "#0369a1" }.into());
+
+        annotations.push(Annotation {
+            text: name.clone(),
+            x: names_w - 12.0,
+            y: y + lane_h / 2.0,
+            anchor: Anchor::End,
+            size: name_size,
+            color: ink(style, &theme),
+            weight: style.font_weight.clone().unwrap_or_else(|| "500".into()),
+            family: family(style),
+        });
+
+        draw_lane(
+            spec,
+            style.data.as_deref().unwrap_or(&[]),
+            names_w,
+            y,
+            period,
+            lane_h,
+            &stroke,
+            &theme,
+            palette,
+            style,
+            &mut polylines,
+            &mut annotations,
+        );
+    }
+
+    let _ = plot_w;
+
+    Ok(Layout {
+        guides,
+        polylines,
+        groups: Vec::new(),
+        nodes: Vec::new(),
+        edges: Vec::new(),
+        opts,
+        chart: Chart::Wave,
+        annotations,
+    })
+}
+
+#[allow(clippy::too_many_arguments)]
+fn draw_lane(
+    spec: &str,
+    data: &[String],
+    x0: f64,
+    y: f64,
+    period: f64,
+    lane_h: f64,
+    stroke: &str,
+    theme: &Theme,
+    palette: &'static [&'static str],
+    style: &Style,
+    polylines: &mut Vec<Polyline>,
+    annotations: &mut Vec<Annotation>,
+) {
+    let (top, bottom, mid) = (y, y + lane_h, y + lane_h / 2.0);
+    // A transition is drawn as a slope, not a vertical jump: it reads as an
+    // edge rather than as a seam between two unrelated segments.
+    let slew = (period * 0.12).min(6.0);
+
+    // Expand `.` into a repeat, keeping the fact that it *was* a repeat: two
+    // explicit `=` are two data segments, while `=.` is one held for two
+    // periods. Merging on equal levels alone would silently join them.
+    let mut chars: Vec<(Level, bool)> = Vec::new();
+    for c in spec.chars() {
+        match c {
+            '.' => {
+                if let Some((previous, _)) = chars.last().copied() {
+                    chars.push((previous, true));
+                }
+            }
+            other => {
+                if let Some(level) = level_of(other) {
+                    chars.push((level, false));
+                }
+            }
+        }
+    }
+
+    let height_of = |l: Level| match l {
+        Level::Low => bottom,
+        Level::High => top,
+        Level::HighImpedance => mid,
+        _ => mid,
+    };
+
+    let mut line: Vec<(f64, f64)> = Vec::new();
+    let mut data_index = 0usize;
+
+    // A transition straddles the period boundary: pull the previous point
+    // back by half a slew rather than adding one behind it, or the line
+    // doubles back on itself.
+    fn open_at(line: &mut Vec<(f64, f64)>, x: f64, height: f64, slew: f64) {
+        match line.last_mut() {
+            None => line.push((x, height)),
+            Some(last) => {
+                last.0 -= slew / 2.0;
+                line.push((x + slew / 2.0, height));
+            }
+        }
+    }
+
+    let flush_line = |line: &mut Vec<(f64, f64)>, polylines: &mut Vec<Polyline>| {
+        if line.len() >= 2 {
+            polylines.push(Polyline {
+                points: std::mem::take(line),
+                closed: false,
+                fill: None,
+                stroke: Some(stroke.to_string()),
+                width: 1.6,
+            });
+        } else {
+            line.clear();
+        }
+    };
+
+    let mut i = 0;
+    while i < chars.len() {
+        let (level, _) = chars[i];
+        let x = x0 + i as f64 * period;
+
+        match level {
+            Level::Clock { positive } => {
+                let (a, b) = if positive {
+                    (top, bottom)
+                } else {
+                    (bottom, top)
+                };
+                open_at(&mut line, x, a, slew);
+                line.push((x + period / 2.0 - slew / 2.0, a));
+                line.push((x + period / 2.0 + slew / 2.0, b));
+                line.push((x + period, b));
+                i += 1;
+            }
+            Level::Low | Level::High | Level::HighImpedance => {
+                // A held level looks the same whether it was repeated or
+                // restated, so either extends the run.
+                let mut end = i;
+                while end + 1 < chars.len() && chars[end + 1].0 == level {
+                    end += 1;
+                }
+                let h = height_of(level);
+                let stop = x0 + (end + 1) as f64 * period;
+                open_at(&mut line, x, h, slew);
+                line.push((stop, h));
+                i = end + 1;
+            }
+            Level::Unknown | Level::Data(_) => {
+                // Only a `.` continues a segment: a restated `=` is a new
+                // value, and drawing it as one run would lose a transition.
+                let mut end = i;
+                while end + 1 < chars.len() && chars[end + 1] == (level, true) {
+                    end += 1;
+                }
+                let stop = x0 + (end + 1) as f64 * period;
+                flush_line(&mut line, polylines);
+
+                let fill = match level {
+                    Level::Data(0) => {
+                        if theme.dark {
+                            "#334155".to_string()
+                        } else {
+                            "#e4e4e7".to_string()
+                        }
+                    }
+                    Level::Data(k) => palette[(k as usize).min(palette.len() - 1)].to_string(),
+                    _ => {
+                        if theme.dark {
+                            "#475569".to_string()
+                        } else {
+                            "#a1a1aa".to_string()
+                        }
+                    }
+                };
+
+                // A bus segment is a stretched hexagon: it opens and closes on
+                // a slope, so two adjacent values read as two values.
+                polylines.push(Polyline {
+                    points: vec![
+                        (x, mid),
+                        (x + slew, top),
+                        (stop - slew, top),
+                        (stop, mid),
+                        (stop - slew, bottom),
+                        (x + slew, bottom),
+                    ],
+                    closed: true,
+                    fill: Some(fill),
+                    stroke: Some(stroke.to_string()),
+                    width: 1.6,
+                });
+
+                if let Level::Data(_) = level {
+                    let label = data.get(data_index).cloned();
+                    data_index += 1;
+                    if let Some(label) = label {
+                        let room = stop - x - slew * 2.0;
+                        if room >= text_width(std::slice::from_ref(&label), 11.0) + 6.0 {
+                            annotations.push(Annotation {
+                                text: label,
+                                x: (x + stop) / 2.0,
+                                y: mid,
+                                anchor: Anchor::Middle,
+                                size: 11.0,
+                                color: ink(style, theme),
+                                weight: "500".into(),
+                                family: family(style),
+                            });
+                        }
+                    }
+                }
+
+                i = end + 1;
+            }
+            Level::Gap => {
+                // A break in the record: stop the line and mark the seam.
+                flush_line(&mut line, polylines);
+                for offset in [-3.0, 3.0] {
+                    polylines.push(Polyline {
+                        points: vec![
+                            (x + period / 2.0 + offset - 4.0, bottom + 4.0),
+                            (x + period / 2.0 + offset + 4.0, top - 4.0),
+                        ],
+                        closed: false,
+                        fill: None,
+                        stroke: Some(theme.muted.clone()),
+                        width: 1.2,
+                    });
+                }
+                i += 1;
+            }
+        }
+    }
+
+    flush_line(&mut line, polylines);
 }

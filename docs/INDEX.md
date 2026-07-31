@@ -28,7 +28,7 @@ purpose — an identifier is earned by being cited.
 Ordered by what each unblocks, not by number. `W-011` and `W-029` have landed,
 so nesting and per-archetype vocabulary are available to everything below.
 `W-012` … `W-015` are the remaining foundations; each archetype names the one
-it waits for. Three now wait for nothing — `W-024`, `W-018` and `W-025`.
+it waits for. Two now wait for nothing — `W-018` and `W-025`.
 
 **DSL impact, measured rather than assumed.** The grammar already accepts
 string lists (`data: "a" "b" "c"`), number lists (`points: 1 2 3`),
@@ -50,7 +50,6 @@ change the language: `W-011`, `W-013`, `W-014`.
 | `W-021` | planned | `type sequence` — participants, ordered messages, activations | Dev. Repeated edges between the same pair already survive in source order; `loop`/`alt`/`opt` have `W-011`. |
 | `W-022` | planned | `type state` — state machines | Dev / embedded. Nested states have `W-011`; entry/exit pseudo-states are nodes with a shape. |
 | `W-023` | planned | `type class` and `type er` | Dev / data. Needs `W-013` for members, plus cardinality on arrows (`\|\|--o{`) — either new arrow tokens or `from-card:` / `to-card:` properties. |
-| `W-024` | planned | `type wave` — WaveDrom-style timing diagrams | **Embedded.** No DSL change: a signal is `node clk { wave: "p....." }`, a bus is `{ wave: "x.=.=x" data: "head" "body" }` — both already parse. The most distinctive archetype available for the embedded audience. |
 | `W-025` | planned | `type block` — architecture and C4-style component views | Dev. Boxes inside boxes with typed relations; `W-011` has landed. Closest of all of them to `free`, which is why it is worth doing as an archetype rather than by hand. |
 | `W-026` | planned | `type gantt` and `type timeline` | Project. Needs `W-014`. |
 | `W-030` | planned | Pan and zoom in the watch preview | The live page shows the SVG at its natural size on a checkerboard; a large diagram cannot be inspected. Wheel-zoom, drag-to-pan, and a reset. Self-contained, no dependency — the page is hand-written. |
@@ -61,6 +60,7 @@ change the language: `W-011`, `W-013`, `W-014`.
 | `X-009` | mitigated | Editor queries can name node types the grammar has dropped | It broke once — `W-029` renamed `node_declaration` and Zed stopped recognising `.bd` entirely. `the_editor_queries_match_the_grammar` compiles every `.scm` against the generated parser, but only when the `tree-sitter` CLI is on PATH. |
 | `X-002` | mitigated | The two grammars can drift apart | `W-008` cross-checks them on every `cargo test` — but only when the `tree-sitter` CLI is on PATH; without it the test says SKIPPED and passes. |
 | `X-010` | mitigated | `tree-sitter test`'s summary line counts parses, not expectation matches | It read "failed parses: 0" while seven corpus expectations were stale across the `W-029` rename. `the_grammar_corpus_expectations_still_hold` now asserts the **exit code** on each `cargo test`, but only when the CLI is on PATH. |
+| `X-011` | open | Two tests shell out to `tree-sitter` and cargo runs them in parallel | `the_grammar_corpus_expectations_still_hold` failed once, spuriously, while another test had the CLI rebuilding the parser library. Rare, and a re-run passes — but a flaky guard erodes trust in the guard. |
 | `X-006` | open | Edge labels avoid lines, not each other's readability | `W-010` scores candidate positions and picks the least-obstructed. Two labels on the same crossing still both move; nothing guarantees the result is the *best* arrangement. |
 | `X-004` | open | Orthogonal routing ignores obstacles | An `ortho` edge can pass straight through a node. No diagnostic. |
 | `X-008` | open | `D-016` removed `opacity`, which is a breaking change | Any file using `opacity: 0.5` now fails with `unknown property`. The repo's own files carried none, and the message names the fix — but nothing migrates it automatically. |
@@ -104,6 +104,7 @@ not copies.
 | `W-004` | 2026-07-31 | `bgraph-lsp`: diagnostics, completion, hover, go-to-definition, outline | `1b53ec3` |
 | `W-005` | 2026-07-31 | Tree-sitter grammar and Zed extension | `1b53ec3`, regenerated `d6997b1` |
 | `W-006` | 2026-07-31 | `type` archetypes (`pie`, `packet`), quiet completion, explicit surface, generated reference manual | `4b4c548` |
+| `W-024` | 2026-07-31 | `type wave` — timing lanes in the WaveDrom alphabet, clocks, buses with named segments, gaps | this commit |
 | `W-019` | 2026-07-31 | `type quadrant` — points on two axes, four named regions; a Wardley map is the same archetype with other axis names | this commit |
 | `W-020` | 2026-07-31 | `type treemap` — squarified tiles, hierarchy from group nesting, one hue per top-level branch | this commit |
 | `W-011` | 2026-07-31 | Containers: `group` with nested statements, sized by its members, anchorable, translating its subtree when placed | this commit |

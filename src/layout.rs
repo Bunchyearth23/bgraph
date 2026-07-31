@@ -67,9 +67,21 @@ pub struct Guide {
     pub dash: Option<String>,
 }
 
+/// Free geometry: open for a line, closed for a filled shape. Enough for a
+/// waveform without letting SVG path syntax leak into the layout.
+pub struct Polyline {
+    pub points: Vec<(f64, f64)>,
+    pub closed: bool,
+    pub fill: Option<String>,
+    pub stroke: Option<String>,
+    pub width: f64,
+}
+
 pub struct Layout {
     /// Drawn first, under everything.
     pub guides: Vec<Guide>,
+    /// Drawn over the guides, under the boxes.
+    pub polylines: Vec<Polyline>,
     /// Drawn next, behind everything they enclose.
     pub groups: Vec<PlacedGroup>,
     pub nodes: Vec<PlacedNode>,
@@ -93,6 +105,8 @@ pub enum Chart {
     Treemap,
     /// Points on two axes. `guides` carries the frame and the cross.
     Quadrant,
+    /// Timing lanes. `polylines` carries the waveforms.
+    Wave,
     /// Slices, which need arcs the node renderer cannot make.
     Pie(Pie),
 }
@@ -193,6 +207,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         "packet" => return crate::charts::packet(diagram, opts, &registry),
         "treemap" => return crate::charts::treemap(diagram, opts, &registry),
         "quadrant" => return crate::charts::quadrant(diagram, opts, &registry),
+        "wave" => return crate::charts::wave(diagram, opts, &registry),
         _ => {}
     }
 
@@ -313,6 +328,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
 
     Ok(Layout {
         guides: Vec::new(),
+        polylines: Vec::new(),
         groups,
         nodes,
         edges,

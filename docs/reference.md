@@ -207,6 +207,8 @@ Aliases are marked. They behave identically to the property they alias; the edit
 | `router` | edge | `router: <straight\|ortho>` | `straight` draws a direct line; `ortho` draws a right-angled elbow. |
 | `route` *(alias)* | edge | `route: <straight\|ortho>` | Alias of `router`. |
 | `value` | node | `value: <number>` | Magnitude of a slice. Required by `type pie`, ignored elsewhere. |
+| `wave` | node | `wave: "<characters>"` | One character per period: `0` `1` `l` `h` levels, `p` `n` clocks, `x` unknown, `z` high-impedance, `=` and `2`–`9` data, `.` repeats the previous, `\|` a gap. Required by `type wave`. |
+| `data` | node | `data: "<first>" "<second>" …` | Names for the data segments of a wave, in order. |
 | `x` | node | `x: <number>` | Horizontal position. Required by `type quadrant`, ignored elsewhere. |
 | `y` | node | `y: <number>` | Vertical position. Required by `type quadrant`, ignored elsewhere. |
 | `bits` | node | `bits: <first> <last>` | Inclusive bit range of a field. Required by `type packet`, ignored elsewhere; `bits: 8` is shorthand for a single bit. |
@@ -259,6 +261,23 @@ slice <id> ["label"] <value>
 | `start` | `start: <degrees>` | Angle the first slice starts at. `0` is twelve o'clock. |
 | `labels` | `labels: <percent\|value\|both\|none>` | What to write on each slice. Slices too thin to read are skipped. |
 | `legend` | `legend: <on\|off>` | Swatch-and-name list beside the chart. On by default — identity must never rest on color alone. |
+
+### `type wave`
+
+A timing diagram. Each signal carries a wave string, one character per period, in the WaveDrom alphabet.
+
+```
+signal <id> ["label"] <wave>
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the lanes. |
+| `period` | `period: <number>` | Width of one wave character. 40 by default. |
+| `lane` | `lane: <height> <gap>` | Height of a signal lane and the space beneath it. |
+| `ruler` | `ruler: <on\|off>` | Period numbers above the lanes. On by default. |
+| `every` | `every: <number>` | Label a ruler tick every N periods. 4 by default. |
+| `grid` | `grid: <on\|off>` | Vertical lines on the period boundaries. On by default. |
 
 ### `type quadrant`
 

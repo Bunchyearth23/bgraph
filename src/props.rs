@@ -272,6 +272,24 @@ pub const PROPS: &[PropDef] = &[
         doc: "Magnitude of a slice. Required by `type pie`, ignored elsewhere.",
     },
     PropDef {
+        name: "wave",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "wave: \"<characters>\"",
+        doc: "One character per period: `0` `1` `l` `h` levels, `p` `n` clocks, \
+              `x` unknown, `z` high-impedance, `=` and `2`–`9` data, `.` repeats \
+              the previous, `|` a gap. Required by `type wave`.",
+    },
+    PropDef {
+        name: "data",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "data: \"<first>\" \"<second>\" …",
+        doc: "Names for the data segments of a wave, in order.",
+    },
+    PropDef {
         name: "x",
         alias: false,
         ctx: Ctx::Node,
@@ -405,6 +423,17 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         }],
     },
     ArchetypeDef {
+        name: "wave",
+        item: "signal",
+        doc: "A timing diagram. Each signal carries a wave string, one \
+              character per period, in the WaveDrom alphabet.",
+        props: WAVE_PROPS,
+        slots: &[Slot {
+            prop: "wave",
+            arity: 1,
+        }],
+    },
+    ArchetypeDef {
         name: "quadrant",
         item: "point",
         doc: "Points on two axes, divided into four named regions. A Wardley \
@@ -498,6 +527,60 @@ pub const PIE_PROPS: &[PropDef] = &[
         syntax: "legend: <on|off>",
         doc: "Swatch-and-name list beside the chart. On by default — identity \
               must never rest on color alone.",
+    },
+];
+
+/// The WaveDrom wave alphabet, as supported here.
+pub const WAVE_ALPHABET: &str = "01lhpnPNxz=23456789.|";
+
+pub const WAVE_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the lanes.",
+    },
+    PropDef {
+        name: "period",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "period: <number>",
+        doc: "Width of one wave character. 40 by default.",
+    },
+    PropDef {
+        name: "lane",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "lane: <height> <gap>",
+        doc: "Height of a signal lane and the space beneath it.",
+    },
+    PropDef {
+        name: "ruler",
+        alias: false,
+        ctx: Ctx::Both,
+        words: TOGGLE,
+        syntax: "ruler: <on|off>",
+        doc: "Period numbers above the lanes. On by default.",
+    },
+    PropDef {
+        name: "every",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "every: <number>",
+        doc: "Label a ruler tick every N periods. 4 by default.",
+    },
+    PropDef {
+        name: "grid",
+        alias: false,
+        ctx: Ctx::Both,
+        words: TOGGLE,
+        syntax: "grid: <on|off>",
+        doc: "Vertical lines on the period boundaries. On by default.",
     },
 ];
 

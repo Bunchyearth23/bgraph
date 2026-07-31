@@ -72,6 +72,9 @@ pub struct Style {
     /// Quadrant coordinates, in the archetype's own range.
     pub x: Option<f64>,
     pub y: Option<f64>,
+    /// Timing data.
+    pub wave: Option<String>,
+    pub data: Option<Vec<String>>,
 }
 
 macro_rules! overlay {
@@ -106,6 +109,8 @@ impl Style {
             bits,
             x,
             y,
+            wave,
+            data,
         );
     }
 
@@ -254,6 +259,15 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
             });
         }
         "value" => style.value = first.and_then(|x| x.as_num()),
+        "wave" => style.wave = first.and_then(|v| v.as_text()).map(String::from),
+        "data" => {
+            style.data = Some(
+                v.iter()
+                    .filter_map(|x| x.as_text())
+                    .map(String::from)
+                    .collect(),
+            )
+        }
         "x" => style.x = first.and_then(|v| v.as_num()),
         "y" => style.y = first.and_then(|v| v.as_num()),
         "bits" => {

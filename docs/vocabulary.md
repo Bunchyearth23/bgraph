@@ -117,7 +117,7 @@ is a single item with two stray values rather than two items.
 | `free` | `node` | — (placement is separate) |
 | `pie` | `slice` | `value` — one number ✔ |
 | `packet` | `field` | `bits` — two numbers ✔ |
-| `wave` (`W-024`) | `signal` | `wave` — one string |
+| `wave` | `signal` | `wave` — one string ✔ |
 | `bar` / `xy` (`W-016`, `W-017`) | `series` | `points` — a number list |
 | `quadrant` | `point` | `x`, `y` — two numbers ✔ |
 | `sankey` (`W-018`) | `node` | — (the value is on the edge) |

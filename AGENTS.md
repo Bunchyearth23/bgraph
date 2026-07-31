@@ -57,9 +57,9 @@ disagree.
 - `cargo run --bin bgraph -- watch diagram.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check diagram.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (129 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (137 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
-- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (18 corpus cases)
+- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (19 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
 - `./editors/zed/install.sh` — installs the server, regenerates + pins the grammar
 
@@ -248,6 +248,13 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
 - [2026-07-31] `Guide` is a plain line in `Layout`, drawn under everything.
   Introduced for the quadrant's frame and cross, but it is the primitive
   `W-012` will draw axes and gridlines with — not a quadrant-only device.
+
+- [2026-07-31] In a wave string, `=.=` is **two** values and `=..` is one held
+  for two periods. Merging runs on equal levels alone silently joins them —
+  the expansion has to remember that a `.` *was* a repeat.
+- [2026-07-31] A waveform transition straddles the period boundary: pull the
+  previous point back by half a slew rather than appending one behind it, or
+  the polyline doubles back and renders as a spike.
 
 ### Workarounds
 
