@@ -15,9 +15,11 @@ grep " open \| planned \| blocked " docs/INDEX.md
 and a Zed extension for it.
 
 `type` picks the archetype once per file: `free` (nodes and edges, the
-default), `pie`, `packet`. Every archetype reads the *same* statements — a
-`node` is a box, a slice or a bitfield depending on the genre — so the style
-cascade, the validator and the editor support are written once.
+default), `pie`, `packet`. Every archetype reads the same statement *form*, so
+the style cascade, the validator and the editor support are written once —
+but each gets its own *words*: `slice organic "Organic search" 4820` rather
+than `node organic { value: 4820 }`. Designed in `docs/vocabulary.md`
+(`D-015`, `W-029`); the keyword-less form still works as a synonym.
 
 The premise: mermaid-class tools auto-place everything and you fight the
 engine. Here **layout is declared** (relative anchors between nodes) and
