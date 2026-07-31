@@ -57,6 +57,9 @@ pub struct GroupDecl {
     pub props: Vec<Prop>,
     /// Items and groups declared directly inside, in source order.
     pub members: Vec<Spanned<String>>,
+    /// Edges declared directly inside, as indices into `Diagram::edges`.
+    /// A sequence diagram's `loop` frame spans messages, not participants.
+    pub edge_members: Vec<usize>,
     pub span: Span,
 }
 

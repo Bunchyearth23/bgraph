@@ -471,7 +471,7 @@ fn an_unknown_archetype_is_reported() {
     let e = err("type flowchart\nnode a");
     assert!(e.contains("unknown archetype `flowchart`"), "{e}");
     assert!(
-        e.contains("free, pie, xy, bar, sankey, wave, quadrant, treemap, packet"),
+        e.contains("free, pie, sequence, xy, bar, sankey, wave, quadrant, treemap, packet"),
         "{e}"
     );
 }
@@ -2176,4 +2176,140 @@ fn xy_and_bar_share_their_diagnostics() {
             .any(|x| x.message.contains("1 number for 2 categories")),
         "{d:?}"
     );
+}
+
+// -------------------------------------------------------------- sequence
+
+#[test]
+fn participants_head_their_own_lifelines() {
+    let l = build(
+        r#"
+        type sequence { column: 100 row: 40 }
+        participant a "A"
+        participant b "B"
+        a -> b "call"
+    "#,
+    );
+
+    assert!(matches!(l.chart, crate::layout::Chart::Sequence));
+    assert_eq!(l.nodes.len(), 2);
+    // One dashed lifeline per participant, under its box.
+    assert_eq!(l.guides.len(), 2);
+    assert!(l.guides.iter().all(|g| g.dash.is_some()));
+    for (node, guide) in l.nodes.iter().zip(&l.guides) {
+        assert!((guide.from.0 - node.rect.cx()).abs() < 0.01);
+        assert!(guide.from.1 >= node.rect.bottom() - 0.01);
+    }
+}
+
+#[test]
+fn messages_run_down_the_page_in_source_order() {
+    let l = build(
+        r#"
+        type sequence { column: 100 row: 40 }
+        participant a "A"
+        participant b "B"
+        a -> b "first"
+        b -> a "second"
+        a -> b "third"
+    "#,
+    );
+
+    let ys: Vec<f64> = l.polylines.iter().map(|p| p.points[0].1).collect();
+    assert_eq!(ys.len(), 3);
+    assert!(ys[0] < ys[1] && ys[1] < ys[2], "{ys:?}");
+    // The second message runs the other way.
+    assert!(l.polylines[0].points[0].0 < l.polylines[0].points[1].0);
+    assert!(l.polylines[1].points[0].0 > l.polylines[1].points[1].0);
+    // Every message carries an arrow.
+    assert!(l.polylines.iter().all(|p| p.head.is_some()));
+}
+
+#[test]
+fn a_message_to_oneself_loops_out_and_back() {
+    let l = build(
+        r#"
+        type sequence { column: 100 row: 40 }
+        participant a "A"
+        a -> a "retry"
+    "#,
+    );
+
+    let loop_ = &l.polylines[0];
+    assert!(
+        loop_.points.len() > 2,
+        "a self-message is not a straight line"
+    );
+    // It leaves and returns to the same lifeline.
+    let x = l.nodes[0].rect.cx();
+    assert!((loop_.points[0].0 - x).abs() < 0.01);
+    assert!(
+        loop_.points.iter().any(|(px, _)| *px > x + 10.0),
+        "it reaches out"
+    );
+    assert!(
+        (loop_.points.last().unwrap().0 - x).abs() < 2.0,
+        "and comes back"
+    );
+}
+
+#[test]
+fn a_group_frames_the_messages_it_holds() {
+    let l = build(
+        r#"
+        type sequence { column: 100 row: 40 }
+        participant a "A"
+        participant b "B"
+        a -> b "before"
+        group retry "retry" {
+          a -> b "inside"
+          b -> a "also inside"
+        }
+        a -> b "after"
+    "#,
+    );
+
+    assert_eq!(l.groups.len(), 1);
+    let frame = l.groups[0].rect;
+    let ys: Vec<f64> = l.polylines.iter().map(|p| p.points[0].1).collect();
+
+    // It spans the two messages inside and neither of the ones outside.
+    assert!(
+        frame.y < ys[1] && frame.bottom() > ys[2],
+        "{frame:?} {ys:?}"
+    );
+    assert!(frame.y > ys[0], "the message before must stay clear");
+    assert!(frame.bottom() < ys[3], "and so must the one after");
+    assert_eq!(l.groups[0].lines, vec!["retry"]);
+}
+
+#[test]
+fn a_group_of_messages_is_not_empty() {
+    // `members` holds items; a sequence frame holds edges, and counting only
+    // the former called every `loop` block empty.
+    let d = diags("type sequence\nparticipant a\nparticipant b\ngroup g {\n a -> b\n}");
+    assert!(!d.iter().any(|x| x.message.contains("is empty")), "{d:?}");
+
+    let d =
+        diags("type sequence\nparticipant a\nparticipant b\na -> b\ngroup g {\n participant c\n}");
+    assert!(
+        d.iter().any(|x| x.message.contains("holds no messages")),
+        "{d:?}"
+    );
+}
+
+#[test]
+fn messages_can_be_numbered() {
+    let plain = build("type sequence\nparticipant a\nparticipant b\na -> b \"go\"");
+    let numbered =
+        build("type sequence { numbered: on }\nparticipant a\nparticipant b\na -> b \"go\"");
+
+    assert!(plain.annotations.iter().any(|x| x.text == "go"));
+    assert!(numbered.annotations.iter().any(|x| x.text == "1. go"));
+}
+
+#[test]
+fn a_sequence_without_messages_says_so() {
+    let d = diags("type sequence\nparticipant a \"A\"");
+    assert!(d.iter().any(|x| x.message.contains("no messages")), "{d:?}");
 }

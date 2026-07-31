@@ -44,7 +44,6 @@ change the language: `W-011`, `W-013`, `W-014`.
 | `W-011` | planned | **Containers / nesting** — `group` with children | **DSL change.** The one structural gap that keeps recurring: sequence `loop`/`alt` blocks, nested states, class packages, architecture groups, swimlanes, kanban columns, treemap nesting all need it. Promotes `I-006`. Blocks `W-020`, `W-021`, `W-022`. |
 | `W-013` | planned | **Node member lists** — a body of items, not properties | **DSL change.** A class needs fields and methods, a table needs columns; a label with `\n` is a workaround, not a model. Blocks `W-023`. |
 | `W-014` | planned | **Date and duration literals** | **DSL change.** `2026-07-31`, `3d`, `2w`. Blocks `W-026`. |
-| `W-021` | planned | `type sequence` — participants, ordered messages, activations | Dev. Repeated edges between the same pair already survive in source order; `loop`/`alt`/`opt` have `W-011`. |
 | `W-022` | planned | `type state` — state machines | Dev / embedded. Nested states have `W-011`; entry/exit pseudo-states are nodes with a shape. |
 | `W-023` | planned | `type class` and `type er` | Dev / data. Needs `W-013` for members, plus cardinality on arrows (`\|\|--o{`) — either new arrow tokens or `from-card:` / `to-card:` properties. |
 | `W-025` | planned | `type block` — architecture and C4-style component views | Dev. Boxes inside boxes with typed relations; `W-011` has landed. Closest of all of them to `free`, which is why it is worth doing as an archetype rather than by hand. |
@@ -100,6 +99,7 @@ not copies.
 | `W-004` | 2026-07-31 | `bgraph-lsp`: diagnostics, completion, hover, go-to-definition, outline | `1b53ec3` |
 | `W-005` | 2026-07-31 | Tree-sitter grammar and Zed extension | `1b53ec3`, regenerated `d6997b1` |
 | `W-006` | 2026-07-31 | `type` archetypes (`pie`, `packet`), quiet completion, explicit surface, generated reference manual | `4b4c548` |
+| `W-021` | 2026-07-31 | `type sequence` — participants, lifelines, ordered messages, self-messages, frames spanning message rows | this commit |
 | `W-030` | 2026-07-31 | Pan and zoom in the watch preview, kept across the reload a save triggers | this commit |
 | `W-017` | 2026-07-31 | `type xy` — line, area and dot marks over a shared axis, categorical or numeric | this commit |
 | `W-012` | 2026-07-31 | Plot frame — `nice_scale`, axis lines, gridlines, tick and category labels, legend | this commit |
@@ -151,4 +151,5 @@ Nothing is marked `landed` without a commit to point at.
 | `I-013` | parked | Process and planning genres: kanban, user journey, BPMN, C4, requirement diagrams |
 | `I-014` | parked | `type gitgraph` — commits, branches and merges; expressible as nodes and edges, but the layout is its own problem |
 | `I-015` | parked | Raster and PDF export from the library (`W-027`), so an embedding program is not forced to ship an SVG renderer |
-| `I-016` | parked | True scatter for `type xy` — arbitrary `(x, y)` pairs rather than points spread evenly across the axis. Needs a second slot form, which is its own decision |
+| `I-016` | parked | Activation bars for `type sequence` — the box down a lifeline while a call is outstanding. Needs a way to say where one opens and closes |
+| `I-017` | parked | True scatter for `type xy` — arbitrary `(x, y)` pairs rather than points spread evenly across the axis. Needs a second slot form, which is its own decision |

@@ -57,9 +57,9 @@ disagree.
 - `cargo run --bin bgraph -- watch diagram.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check diagram.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (163 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (170 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
-- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (22 corpus cases)
+- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (23 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
 - `./editors/zed/install.sh` — installs the server, regenerates + pins the grammar
 
@@ -284,6 +284,10 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   is on screen stays exactly what the file exports. The view is persisted in
   `sessionStorage` because the page reloads on every save, and a view that
   resets each time makes zooming useless while editing.
+
+- [2026-07-31] A `group` records `members` (items) **and** `edge_members`
+  (indices into `Diagram::edges`). A sequence frame spans message rows, not
+  participants, so counting only `members` called every `loop` block empty.
 
 ### Workarounds
 

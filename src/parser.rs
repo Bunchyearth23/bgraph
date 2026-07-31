@@ -170,6 +170,7 @@ fn parse_group(pair: Pair<Rule>, diagram: &mut Diagram) -> Result<()> {
     let mut placement = None;
     let mut props = Vec::new();
     let mut members = Vec::new();
+    let mut edge_members = Vec::new();
 
     for part in pair.into_inner() {
         match part.as_rule() {
@@ -191,7 +192,10 @@ fn parse_group(pair: Pair<Rule>, diagram: &mut Diagram) -> Result<()> {
                             members.push(name);
                             parse_group(inner, diagram)?;
                         }
-                        Rule::edge_decl => diagram.edges.push(parse_edge(inner)?),
+                        Rule::edge_decl => {
+                            edge_members.push(diagram.edges.len());
+                            diagram.edges.push(parse_edge(inner)?);
+                        }
                         Rule::style_decl => diagram.styles.push(parse_style(inner)?),
                         other => bail!("`{other:?}` cannot be nested in a group"),
                     }
@@ -208,6 +212,7 @@ fn parse_group(pair: Pair<Rule>, diagram: &mut Diagram) -> Result<()> {
         placement,
         props,
         members,
+        edge_members,
         span,
     });
 

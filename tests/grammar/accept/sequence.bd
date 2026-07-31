@@ -1,0 +1,7 @@
+type sequence
+participant a
+participant b
+a -> b "call"
+group g "loop" {
+ b -> a "back"
+}

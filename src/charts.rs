@@ -14,7 +14,7 @@ use crate::layout::{
     text_width,
 };
 use crate::props;
-use crate::style::{GraphOpts, Registry, Shape, Style};
+use crate::style::{GraphOpts, Head, Registry, Shape, Style};
 
 /// Chart text inherits the theme without inheriting a box: no fill, no
 /// border, and crucially **no font color** — so a declared one is
@@ -1421,6 +1421,8 @@ fn draw_lane(
                 fill: None,
                 stroke: Some(stroke.to_string()),
                 width: 1.6,
+                head: None,
+                dash: None,
             });
         } else {
             line.clear();
@@ -1501,6 +1503,8 @@ fn draw_lane(
                     fill: Some(fill),
                     stroke: Some(stroke.to_string()),
                     width: 1.6,
+                    head: None,
+                    dash: None,
                 });
 
                 if let Level::Data(_) = level {
@@ -1538,6 +1542,8 @@ fn draw_lane(
                         fill: None,
                         stroke: Some(theme.muted.clone()),
                         width: 1.2,
+                        head: None,
+                        dash: None,
                     });
                 }
                 i += 1;
@@ -1768,6 +1774,8 @@ pub fn sankey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             fill: Some(format!("{opaque}66")),
             stroke: None,
             width: 0.0,
+            head: None,
+            dash: None,
         });
     }
 
@@ -2399,6 +2407,8 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
                 fill: Some(format!("{opaque}40")),
                 stroke: None,
                 width: 0.0,
+                head: None,
+                dash: None,
             });
         }
 
@@ -2409,6 +2419,8 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
                 fill: None,
                 stroke: Some(colour.clone()),
                 width: style.stroke_width.unwrap_or(2.0),
+                head: None,
+                dash: None,
             });
         }
 
@@ -2459,6 +2471,238 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
         edges: Vec::new(),
         opts,
         chart: Chart::Xy,
+        annotations,
+    })
+}
+
+// -------------------------------------------------------------- sequence
+
+pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
+    let cfg = &diagram.archetype_props;
+    let theme = Theme::of(&opts);
+    let def = crate::check::archetype_of(diagram);
+
+    let column = number(cfg, "column", 150.0).max(60.0);
+    let row = number(cfg, "row", 46.0).max(20.0);
+    let numbered = toggle(cfg, "numbered", false);
+    let title = text(cfg, "title");
+
+    let base = registry.resolve(Style::node_defaults(), def.item, &[], &[])?;
+    let title_h = if title.is_some() {
+        TITLE_SIZE * 2.0
+    } else {
+        0.0
+    };
+
+    let index: HashMap<&str, usize> = diagram
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.id.as_str(), i))
+        .collect();
+
+    let mut guides = Vec::new();
+    let mut polylines = Vec::new();
+    let mut nodes = Vec::new();
+    let mut groups = Vec::new();
+    let mut annotations = Vec::new();
+
+    if let Some(title) = title {
+        annotations.push(Annotation {
+            text: title,
+            x: 0.0,
+            y: TITLE_SIZE,
+            anchor: Anchor::Start,
+            size: TITLE_SIZE,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    // Participants across the top, each owning a column.
+    const HEAD_H: f64 = 42.0;
+    let head_y = title_h;
+    let lifeline_top = head_y + HEAD_H;
+    let first_row = lifeline_top + row * 0.9;
+    let rows = diagram.edges.len();
+    let bottom = first_row + rows as f64 * row + row * 0.4;
+
+    let centre = |i: usize| column * i as f64 + column / 2.0;
+
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        let style = registry.resolve(
+            Style::node_defaults(),
+            def.item,
+            &node.classes,
+            &node.effective_props(def.slots),
+        )?;
+        let label = node.label.clone().unwrap_or_else(|| node.id.value.clone());
+        let w = (text_width(
+            std::slice::from_ref(&label),
+            style.font_size.unwrap_or(13.0),
+        ) + style.padding.unwrap_or(14.0) * 2.0)
+            .min(column - 12.0)
+            .max(50.0);
+
+        nodes.push(PlacedNode {
+            lines: vec![label],
+            rect: Rect {
+                x: centre(i) - w / 2.0,
+                y: head_y,
+                w,
+                h: HEAD_H,
+            },
+            style,
+        });
+
+        // The lifeline: dashed, recessive, the whole height of the exchange.
+        guides.push(Guide {
+            from: (centre(i), lifeline_top),
+            to: (centre(i), bottom),
+            color: if theme.dark { "#334155" } else { "#d4d4d8" }.into(),
+            width: 1.0,
+            dash: Some("4 5".into()),
+        });
+    }
+
+    // A group frames the rows of the messages it holds.
+    for group in &diagram.groups {
+        let rows_inside: Vec<usize> = group.edge_members.clone();
+        let Some(&first) = rows_inside.first() else {
+            continue;
+        };
+        let last = *rows_inside.last().unwrap_or(&first);
+
+        let touched: Vec<usize> = rows_inside
+            .iter()
+            .filter_map(|e| {
+                let edge = &diagram.edges[*e];
+                index
+                    .get(edge.from.as_str())
+                    .into_iter()
+                    .chain(index.get(edge.to.as_str()))
+                    .copied()
+                    .min()
+            })
+            .collect();
+        let lo = touched.iter().copied().min().unwrap_or(0);
+        let hi = rows_inside
+            .iter()
+            .filter_map(|e| {
+                let edge = &diagram.edges[*e];
+                index
+                    .get(edge.from.as_str())
+                    .into_iter()
+                    .chain(index.get(edge.to.as_str()))
+                    .copied()
+                    .max()
+            })
+            .max()
+            .unwrap_or(diagram.nodes.len().saturating_sub(1));
+
+        let style = registry.resolve(
+            Style::group_defaults(),
+            "group",
+            &group.classes,
+            &group.props,
+        )?;
+        // The frame sits between the message before it and the one after,
+        // never a whole row above — that would swallow the previous message.
+        let above = row * 0.62;
+        let below = row * 0.42;
+
+        groups.push(PlacedGroup {
+            lines: group
+                .label
+                .clone()
+                .map(|l| vec![l])
+                .unwrap_or_else(|| vec![group.id.value.clone()]),
+            rect: Rect {
+                x: centre(lo) - column * 0.36,
+                y: first_row + first as f64 * row - above,
+                w: (centre(hi) - centre(lo)) + column * 0.72,
+                h: (last - first) as f64 * row + above + below,
+            },
+            style,
+        });
+    }
+
+    // Messages, one row each, in the order they were written.
+    for (r, edge) in diagram.edges.iter().enumerate() {
+        let (Some(&from), Some(&to)) = (index.get(edge.from.as_str()), index.get(edge.to.as_str()))
+        else {
+            continue;
+        };
+        let style = registry.resolve(
+            Style::edge_defaults(),
+            "edge",
+            &edge.classes,
+            &edge.effective_props(def.edge_slots),
+        )?;
+        let stroke = style.stroke.clone().unwrap_or_else(|| "#64748b".into());
+        let y = first_row + r as f64 * row;
+
+        let mut label = edge.label.clone().unwrap_or_default();
+        if numbered {
+            label = if label.is_empty() {
+                format!("{}", r + 1)
+            } else {
+                format!("{}. {label}", r + 1)
+            };
+        }
+
+        // A message to oneself has no horizontal run: it loops out and back.
+        let points = if from == to {
+            let x = centre(from);
+            let out = column * 0.28;
+            vec![
+                (x, y - row * 0.22),
+                (x + out, y - row * 0.22),
+                (x + out, y + row * 0.16),
+                (x + 1.0, y + row * 0.16),
+            ]
+        } else {
+            vec![(centre(from), y), (centre(to), y)]
+        };
+
+        polylines.push(Polyline {
+            points: points.clone(),
+            closed: false,
+            fill: None,
+            stroke: Some(stroke),
+            width: style.stroke_width.unwrap_or(1.5),
+            head: Some(style.head.unwrap_or(Head::Solid)),
+            dash: style.dash_array(),
+        });
+
+        if !label.is_empty() {
+            let (x, anchor, ly) = if from == to {
+                (centre(from) + column * 0.30, Anchor::Start, y - row * 0.05)
+            } else {
+                ((centre(from) + centre(to)) / 2.0, Anchor::Middle, y - 9.0)
+            };
+            annotations.push(Annotation {
+                text: label,
+                x,
+                y: ly,
+                anchor,
+                size: style.font_size.unwrap_or(12.0),
+                color: ink(&style, &theme),
+                weight: style.font_weight.clone().unwrap_or_else(|| "400".into()),
+                family: family(&style),
+            });
+        }
+    }
+
+    Ok(Layout {
+        guides,
+        polylines,
+        groups,
+        nodes,
+        edges: Vec::new(),
+        opts,
+        chart: Chart::Sequence,
         annotations,
     })
 }

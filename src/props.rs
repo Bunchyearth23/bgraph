@@ -439,6 +439,15 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         edge_slots: &[],
     },
     ArchetypeDef {
+        name: "sequence",
+        item: "participant",
+        doc: "Participants across the top, messages down the page in the order \
+              they are written. A `group` frames the messages inside it.",
+        props: SEQUENCE_PROPS,
+        slots: &[],
+        edge_slots: &[],
+    },
+    ArchetypeDef {
         name: "xy",
         item: "series",
         doc: "Lines, areas or dots over a shared x axis. One series per \
@@ -584,6 +593,41 @@ pub const PIE_PROPS: &[PropDef] = &[
         syntax: "legend: <on|off>",
         doc: "Swatch-and-name list beside the chart. On by default — identity \
               must never rest on color alone.",
+    },
+];
+
+pub const SEQUENCE_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the diagram.",
+    },
+    PropDef {
+        name: "column",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "column: <number>",
+        doc: "Width of a participant's column. 150 by default.",
+    },
+    PropDef {
+        name: "row",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "row: <number>",
+        doc: "Vertical space one message takes. 46 by default.",
+    },
+    PropDef {
+        name: "numbered",
+        alias: false,
+        ctx: Ctx::Both,
+        words: TOGGLE,
+        syntax: "numbered: <on|off>",
+        doc: "Number the messages in order.",
     },
 ];
 

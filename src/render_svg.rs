@@ -39,6 +39,14 @@ pub fn render(layout: &Layout) -> String {
         body.push_str(&guide_line(guide));
     }
     for shape in &layout.polylines {
+        if let Some(head) = shape.head
+            && head != Head::None
+        {
+            let colour = shape.stroke.as_deref().unwrap_or("#64748b");
+            markers
+                .entry(marker_id(head, colour))
+                .or_insert((head, colour.to_string()));
+        }
         body.push_str(&free_polyline(shape));
     }
     for group in &layout.groups {
@@ -411,8 +419,20 @@ fn free_polyline(p: &Polyline) -> String {
         .iter()
         .map(|(x, y)| format!("{},{}", n(*x), n(*y)))
         .collect();
+
+    let mut attrs = String::new();
+    if let Some(head) = p.head
+        && head != Head::None
+    {
+        let id = marker_id(head, p.stroke.as_deref().unwrap_or("#64748b"));
+        let _ = write!(attrs, r#" marker-end="url(#{id})""#);
+    }
+    if let Some(dash) = &p.dash {
+        let _ = write!(attrs, r#" stroke-dasharray="{}""#, esc(dash));
+    }
+
     format!(
-        r#"<{} points="{}"{}{} stroke-width="{}" stroke-linejoin="round" stroke-linecap="round"/>"#,
+        r#"<{} points="{}"{}{} stroke-width="{}" stroke-linejoin="round" stroke-linecap="round"{attrs}/>"#,
         if p.closed { "polygon" } else { "polyline" },
         points.join(" "),
         paint("fill", p.fill.as_deref().unwrap_or("none")),

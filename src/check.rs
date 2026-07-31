@@ -59,6 +59,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "treemap" => check_treemap(diagram, &mut out),
         "quadrant" => check_quadrant(diagram, &mut out),
         "wave" => check_wave(diagram, &mut out),
+        "sequence" => check_sequence(diagram, &mut out),
         "sankey" => check_sankey(diagram, &mut out),
         "bar" | "xy" => check_bar(diagram, &mut out),
         _ => {
@@ -306,7 +307,9 @@ fn check_groups(diagram: &Diagram, nodes: &HashMap<&str, usize>, out: &mut Vec<D
             ));
         }
 
-        if group.members.is_empty() {
+        // A group holding only edges is not empty — a sequence diagram's
+        // `loop` frame spans messages, never participants.
+        if group.members.is_empty() && group.edge_members.is_empty() {
             out.push(Diag::warn(
                 group.span,
                 format!(
@@ -878,6 +881,45 @@ fn first_cycle(count: usize, edges: &[(usize, usize)]) -> Option<Vec<usize>> {
         return None;
     }
     Some((0..count).filter(|i| degree[*i] > 0).collect())
+}
+
+fn check_sequence(diagram: &Diagram, out: &mut Vec<Diag>) {
+    for node in &diagram.nodes {
+        if node.placement.is_some() {
+            out.push(Diag::warn(
+                node.span,
+                "`type sequence` ranks its participants in declaration order; \
+                 the placement is ignored"
+                    .to_string(),
+            ));
+        }
+    }
+
+    if diagram.edges.is_empty() {
+        out.push(Diag::warn(
+            diagram
+                .archetype
+                .as_ref()
+                .map(|a| a.span)
+                .unwrap_or_default(),
+            "no messages, so the diagram is a row of participants".to_string(),
+        ));
+    }
+
+    // A frame is drawn around rows; one holding participants instead of
+    // messages would have nothing to span.
+    for group in &diagram.groups {
+        if group.edge_members.is_empty() {
+            out.push(Diag::warn(
+                group.span,
+                format!(
+                    "group `{}` holds no messages — in a sequence a frame spans \
+                     rows, not participants",
+                    group.id.as_str()
+                ),
+            ));
+        }
+    }
 }
 
 fn check_wave(diagram: &Diagram, out: &mut Vec<Diag>) {

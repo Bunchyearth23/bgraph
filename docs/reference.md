@@ -268,6 +268,21 @@ slice <id> ["label"] <value>
 | `labels` | `labels: <percent\|value\|both\|none>` | What to write on each slice. Slices too thin to read are skipped. |
 | `legend` | `legend: <on\|off>` | Swatch-and-name list beside the chart. On by default — identity must never rest on color alone. |
 
+### `type sequence`
+
+Participants across the top, messages down the page in the order they are written. A `group` frames the messages inside it.
+
+```
+participant <id> ["label"]
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+| `column` | `column: <number>` | Width of a participant's column. 150 by default. |
+| `row` | `row: <number>` | Vertical space one message takes. 46 by default. |
+| `numbered` | `numbered: <on\|off>` | Number the messages in order. |
+
 ### `type xy`
 
 Lines, areas or dots over a shared x axis. One series per statement, its numbers evenly spaced across the plot.

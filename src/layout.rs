@@ -75,6 +75,9 @@ pub struct Polyline {
     pub fill: Option<String>,
     pub stroke: Option<String>,
     pub width: f64,
+    /// An arrow at the far end, sharing the marker machinery edges use.
+    pub head: Option<crate::style::Head>,
+    pub dash: Option<String>,
 }
 
 pub struct Layout {
@@ -113,6 +116,8 @@ pub enum Chart {
     Bar,
     /// Lines, areas or dots on two axes.
     Xy,
+    /// Participants, lifelines and messages in source order.
+    Sequence,
     /// Slices, which need arcs the node renderer cannot make.
     Pie(Pie),
 }
@@ -217,6 +222,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         "sankey" => return crate::charts::sankey(diagram, opts, &registry),
         "bar" => return crate::charts::bar(diagram, opts, &registry),
         "xy" => return crate::charts::xy(diagram, opts, &registry),
+        "sequence" => return crate::charts::sequence(diagram, opts, &registry),
         _ => {}
     }
 

@@ -1,0 +1,29 @@
+type sequence {
+  title: "Checkout"
+  column: 160
+  row: 46
+  numbered: on
+}
+graph { background: #0b1120 padding: 30 }
+style participant { fill: #1e293b stroke: #334155 1.5 font: 13 #e2e8f0 radius: 8 }
+style edge  { stroke: #7dd3fc 1.5 font: 11 #cbd5e1 }
+style group { stroke: #f59e0b 1.2 font: 11 #f59e0b fill: #f59e0b10 }
+
+participant browser "Browser"
+participant api     "API"
+participant bank    "Bank"
+participant db      "Postgres"
+
+browser -> api  "POST /checkout"
+api     -> db   "reserve stock"
+db      --> api "ok"
+
+group retry "retry up to 3×" {
+  api  -> bank "authorise"
+  bank --> api "declined" { stroke: #f43f5e }
+}
+
+api  -> bank "authorise"
+bank --> api "approved"
+api  -> db   "commit"
+api  --> browser "201 Created"
