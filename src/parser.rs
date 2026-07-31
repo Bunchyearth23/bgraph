@@ -110,7 +110,7 @@ fn build(file: Pair<Rule>) -> Result<Diagram> {
                 diagram.graph.extend(parse_block(block)?);
             }
             Rule::style_decl => diagram.styles.push(parse_style(pair)?),
-            Rule::node_decl => diagram.nodes.push(parse_node(pair)?),
+            Rule::item_decl => diagram.nodes.push(parse_item(pair)?),
             Rule::edge_decl => diagram.edges.push(parse_edge(pair)?),
             Rule::EOI => {}
             other => bail!("unexpected rule {other:?}"),
@@ -159,28 +159,47 @@ fn parse_style(pair: Pair<Rule>) -> Result<StyleDecl> {
     })
 }
 
-fn parse_node(pair: Pair<Rule>) -> Result<NodeDecl> {
+fn parse_item(pair: Pair<Rule>) -> Result<NodeDecl> {
     let span = span_of(&pair);
+    let mut keyword = None;
     let mut id = None;
     let mut label = None;
+    let mut positional = Vec::new();
+    let mut positional_span: Option<Span> = None;
     let mut classes = Vec::new();
     let mut placement = None;
     let mut props = Vec::new();
 
     for part in pair.into_inner() {
+        let part_span = span_of(&part);
         match part.as_rule() {
-            Rule::ident => id = Some(spanned(&part)),
-            Rule::string => label = Some(unescape(part)),
+            // The first two identifiers are the keyword and the name; a third
+            // is a bare-word positional value.
+            Rule::ident if keyword.is_none() => keyword = Some(spanned(&part)),
+            Rule::ident if id.is_none() => id = Some(spanned(&part)),
+            // Likewise the first string is the label, by construction.
+            Rule::string if label.is_none() => label = Some(unescape(part)),
             Rule::class_ref => classes.push(class_name(part)),
             Rule::abs_pos | Rule::rel_pos => placement = Some(parse_placement(part)?),
             Rule::block => props = parse_block(part)?,
-            other => bail!("unexpected rule {other:?} in node declaration"),
+            Rule::ident | Rule::string | Rule::number | Rule::color => {
+                let start = positional_span.map_or(part_span.start, |s: Span| s.start);
+                positional_span = Some(Span {
+                    start,
+                    end: part_span.end,
+                });
+                positional.push(parse_value(part)?);
+            }
+            other => bail!("unexpected rule {other:?} in item declaration"),
         }
     }
 
     Ok(NodeDecl {
-        id: id.expect("a node declaration always names the node"),
+        keyword: keyword.expect("an item declaration always leads with a keyword"),
+        id: id.expect("an item declaration always names the item"),
         label,
+        positional,
+        positional_span: positional_span.unwrap_or(span),
         classes,
         placement,
         props,
@@ -300,13 +319,7 @@ fn parse_block(pair: Pair<Rule>) -> Result<Vec<Prop>> {
             }
             values_span.end = vspan.end;
 
-            values.push(match value.as_rule() {
-                Rule::number => Value::Num(number(value)?),
-                Rule::color => Value::Color(value.as_str().to_string()),
-                Rule::string => Value::Str(unescape(value)),
-                Rule::ident => Value::Word(value.as_str().to_string()),
-                other => bail!("unexpected rule {other:?} as property value"),
-            });
+            values.push(parse_value(value)?);
         }
 
         props.push(Prop {
@@ -319,6 +332,16 @@ fn parse_block(pair: Pair<Rule>) -> Result<Vec<Prop>> {
     }
 
     Ok(props)
+}
+
+fn parse_value(pair: Pair<Rule>) -> Result<Value> {
+    Ok(match pair.as_rule() {
+        Rule::number => Value::Num(number(pair)?),
+        Rule::color => Value::Color(pair.as_str().to_string()),
+        Rule::string => Value::Str(unescape(pair)),
+        Rule::ident => Value::Word(pair.as_str().to_string()),
+        other => bail!("unexpected rule {other:?} as a value"),
+    })
 }
 
 fn class_name(pair: Pair<Rule>) -> Spanned<String> {

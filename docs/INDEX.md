@@ -25,11 +25,11 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-Ordered by what each unblocks, not by number. `W-029` comes first: it gives
-every archetype its own vocabulary, and doing it before the archetypes is far
-cheaper than retrofitting it after. `W-011` … `W-015` are the five foundations
-the archetypes rest on; each archetype names the one it waits for. Four wait
-for nothing else — `W-019`, `W-024`, `W-018` and `W-016`.
+Ordered by what each unblocks, not by number. `W-029` has landed, so every
+archetype below now only has to declare its keyword and its positional slots.
+`W-011` … `W-015` are the five foundations the archetypes rest on; each names
+the one it waits for. Four wait for nothing else — `W-019`, `W-024`, `W-018`
+and `W-016`.
 
 **DSL impact, measured rather than assumed.** The grammar already accepts
 string lists (`data: "a" "b" "c"`), number lists (`points: 1 2 3`),
@@ -40,7 +40,6 @@ change the language: `W-011`, `W-013`, `W-014`.
 
 | id | state | title | notes |
 |---|---|---|---|
-| `W-029` | planned | **Per-archetype vocabulary** — `slice a 4820`, not `node a { value: 4820 }` | **DSL change**, designed in [`vocabulary.md`](vocabulary.md), decided as `D-015`. One statement form, one grammar rule; `props.rs` declares each archetype's keyword and positional slots. Every archetype below inherits its own words from this, so it comes first. Amends `D-008`. |
 | `W-011` | planned | **Containers / nesting** — `group` with children | **DSL change.** The one structural gap that keeps recurring: sequence `loop`/`alt` blocks, nested states, class packages, architecture groups, swimlanes, kanban columns, treemap nesting all need it. Promotes `I-006`. Blocks `W-020`, `W-021`, `W-022`. |
 | `W-012` | planned | **Plot frame** — axes, scales, ticks, gridlines, legend | Shared substrate for every numeric chart. No DSL change; it is layout and rendering. Blocks `W-016`, `W-017`. |
 | `W-013` | planned | **Node member lists** — a body of items, not properties | **DSL change.** A class needs fields and methods, a table needs columns; a label with `\n` is a workaround, not a model. Blocks `W-023`. |
@@ -65,7 +64,6 @@ change the language: `W-011`, `W-013`, `W-014`.
 | `X-006` | open | Edge labels avoid lines, not each other's readability | `W-010` scores candidate positions and picks the least-obstructed. Two labels on the same crossing still both move; nothing guarantees the result is the *best* arrangement. |
 | `X-004` | open | Orthogonal routing ignores obstacles | An `ortho` edge can pass straight through a node. No diagnostic. |
 | `X-008` | open | `D-016` removed `opacity`, which is a breaking change | Any file using `opacity: 0.5` now fails with `unknown property`. The repo's own files carried none, and the message names the fix — but nothing migrates it automatically. |
-| `X-007` | open | `W-029` moves some syntax errors to semantic ones | The item keyword is open in the grammar and closed in `check`, so `alpha beta` will parse and then be rejected by name. Better message, different category — `tests/grammar/reject/no-arrow.bd` moves to `accept/` when `W-029` lands. |
 | `X-005` | open | Text width is estimated, not measured | `0.56 × font-size` per character. Auto-sized boxes are slightly wrong for narrow or wide fonts, and edge-label plates with them. |
 
 ---
@@ -106,6 +104,7 @@ not copies.
 | `W-004` | 2026-07-31 | `bgraph-lsp`: diagnostics, completion, hover, go-to-definition, outline | `1b53ec3` |
 | `W-005` | 2026-07-31 | Tree-sitter grammar and Zed extension | `1b53ec3`, regenerated `d6997b1` |
 | `W-006` | 2026-07-31 | `type` archetypes (`pie`, `packet`), quiet completion, explicit surface, generated reference manual | `4b4c548` |
+| `W-029` | 2026-07-31 | Per-archetype vocabulary: `slice a "A" 4820`, `field b "B" 0 15` — one statement form, keyword and slots declared in `props.rs` | this commit |
 | `W-007` | 2026-07-31 | Re-pin the Zed grammar — `extension.toml` now points at `288f785`, which carries the `type` parser; `bgraph-lsp` reinstalled | this commit |
 | `W-008` | 2026-07-31 | Cross-check the two grammars over a shared corpus (`tests/grammar/`) | `4b4c548` |
 | `W-009` | 2026-07-31 | Draw self-loops — a sampled arc over the node's top edge | `4b4c548` |
@@ -124,6 +123,7 @@ Nothing is marked `landed` without a commit to point at.
 | id | date | title | how |
 |---|---|---|---|
 | `X-001` | 2026-07-31 | The Zed extension had never been exercised inside Zed | The Archmagos installed it and reported live completion and rendering behaviour, which drove `D-011` and the `font-color` fix |
+| `X-007` | 2026-07-31 | `W-029` was going to move some syntax errors to semantic ones | It did, exactly once: `alpha beta` is now an item with an unknown keyword. The message names the archetype's word, and `tests/grammar/accept/bare-words-parse-as-items.bd` pins the new category |
 | `X-003` | 2026-07-31 | Self-loops were declared but not drawn | `W-009` draws them; the stale "not drawn yet" warning is gone |
 
 ### Ideas

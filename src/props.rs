@@ -352,28 +352,52 @@ pub fn lookup(name: &str, table: &'static [PropDef]) -> Option<&'static PropDef>
 /// the editor support all carry over unchanged.
 pub struct ArchetypeDef {
     pub name: &'static str,
+    /// What this archetype calls its elements: `node`, `slice`, `field`.
+    /// `node` stays a universal synonym everywhere.
+    pub item: &'static str,
     pub doc: &'static str,
     pub props: &'static [PropDef],
+    /// Values written after the label, in order, and the property each one
+    /// fills. `slice a "A" 4820` is sugar for `slice a "A" { value: 4820 }`.
+    pub slots: &'static [Slot],
+}
+
+pub struct Slot {
+    pub prop: &'static str,
+    /// How many values this slot takes.
+    pub arity: usize,
 }
 
 pub const ARCHETYPES: &[ArchetypeDef] = &[
     ArchetypeDef {
         name: "free",
+        item: "node",
         doc: "Nodes and edges placed by anchors — the default when a file \
               declares no `type`.",
         props: &[],
+        slots: &[],
     },
     ArchetypeDef {
         name: "pie",
-        doc: "A pie or donut chart. Each node is a slice and needs a `value`; \
-              its `fill` overrides the automatic palette.",
+        item: "slice",
+        doc: "A pie or donut chart. Each slice needs a value; its `fill` \
+              overrides the automatic palette.",
         props: PIE_PROPS,
+        slots: &[Slot {
+            prop: "value",
+            arity: 1,
+        }],
     },
     ArchetypeDef {
         name: "packet",
-        doc: "A packet / bitfield diagram. Each node is a field and needs \
-              `bits`; a field crossing a row boundary is split across rows.",
+        item: "field",
+        doc: "A packet / bitfield diagram. Each field needs an inclusive bit \
+              range; one crossing a row boundary is split across rows.",
         props: PACKET_PROPS,
+        slots: &[Slot {
+            prop: "bits",
+            arity: 2,
+        }],
     },
 ];
 

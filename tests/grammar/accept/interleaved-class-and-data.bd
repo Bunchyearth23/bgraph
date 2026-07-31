@@ -1,0 +1,4 @@
+type packet
+field a "A" .cls 0 15
+field b "B" 16 31 .cls
+style cls { fill: #111 }

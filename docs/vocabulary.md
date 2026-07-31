@@ -1,8 +1,8 @@
 # Per-archetype vocabulary — design note
 
-Cited by `D-015` and `W-029` in [`INDEX.md`](INDEX.md). Not implemented yet;
-this records what was decided and why, so the work does not have to
-re-litigate it.
+Cited by `D-015` and `W-029` in [`INDEX.md`](INDEX.md). **Implemented.** This
+records what was decided and why; [`reference.md`](reference.md) describes what
+the binary does.
 
 ## The problem
 
@@ -80,8 +80,14 @@ rides on properties (`{ guard: … }`, `{ from-card: one to-card: many }`).
 **The keyword set is open in the grammar and closed in `check`.**
 
 ```pest
-item_decl = { ident ~ ident ~ string? ~ value* ~ class_ref* ~ placement? ~ block? }
+item_decl = { ident ~ ident ~ string? ~ (pos_value | class_ref)* ~ placement? ~ block? }
+pos_value = _{ !(place_kw) ~ value }
 ```
+
+(`pos_value` excludes the placement keywords, or `at` and `right-of` would be
+eaten as bare-word data before `placement?` ever looked. Data and `.class`
+interleave freely — the leading `.` keeps them apart, so there is no order to
+remember.)
 
 The parser accepts any `<word> <word>`; `check` rejects a keyword the current
 archetype does not declare, and suggests the right one. The alternative — an
@@ -90,20 +96,27 @@ regenerating the tree-sitter parser every time an archetype is added, which
 is exactly the cost this design exists to avoid.
 
 The price is that a line like `alpha beta` moves from a syntax error to a
-semantic one (`unknown item keyword 'alpha' — did you mean 'node'?`). The
+semantic one (`type free declares nodes, not alphas`). The
 message is better; the category is different. `tests/grammar/reject/no-arrow.bd`
-moves to `accept/` when this lands, and that is not a regression — but it is
-the kind of thing that should be noticed on purpose rather than discovered.
+moved to `accept/`, and that is not a regression — but it is the kind of thing
+that should be noticed on purpose rather than discovered.
 
-Recorded as `X-007`.
+Recorded as `X-007`, and it happened exactly once —
+`tests/grammar/accept/bare-words-parse-as-items.bd` pins the new category.
+
+One thing the design did not anticipate: **a statement has to run to its
+separator**. Without that rule `slice a b` is ambiguous — is `b` data or the
+next statement? — and tree-sitter refuses to generate a parser at all. Both
+grammars now require a separator, which also means `node a node b` on one line
+is a single item with two stray values rather than two items.
 
 ## Keywords, as currently planned
 
 | Archetype | Keyword | Positional slots |
 |---|---|---|
 | `free` | `node` | — (placement is separate) |
-| `pie` | `slice` | `value` — one number |
-| `packet` | `field` | `bits` — two numbers |
+| `pie` | `slice` | `value` — one number ✔ |
+| `packet` | `field` | `bits` — two numbers ✔ |
 | `wave` (`W-024`) | `signal` | `wave` — one string |
 | `bar` / `xy` (`W-016`, `W-017`) | `series` | `points` — a number list |
 | `quadrant` (`W-019`) | `point` | `x`, `y` — two numbers |
@@ -115,5 +128,6 @@ Recorded as `X-007`.
 | `gantt` / `timeline` (`W-026`) | `task` / `event` | start and duration (`W-014`) |
 | `block` (`W-025`) | `block` | — |
 
-Nothing here is settled beyond `slice` and `field`; the rest is the shape the
-survey suggests, to be confirmed as each archetype is built.
+✔ marks what is implemented. The rest is the shape the survey suggests, to be
+confirmed as each archetype is built — and each costs one `item` and one
+`slots` line, with neither grammar touched.

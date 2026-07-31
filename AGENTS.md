@@ -16,10 +16,17 @@ and a Zed extension for it.
 
 `type` picks the archetype once per file: `free` (nodes and edges, the
 default), `pie`, `packet`. Every archetype reads the same statement *form*, so
-the style cascade, the validator and the editor support are written once —
-but each gets its own *words*: `slice organic "Organic search" 4820` rather
-than `node organic { value: 4820 }`. Designed in `docs/vocabulary.md`
-(`D-015`, `W-029`); the keyword-less form still works as a synonym.
+the style cascade, the validator and the editor support are written once — but
+each has its own *word* and its own positional data:
+
+    slice organic "Organic search" 4820      // type pie
+    field sport   "Source port"    0 15      // type packet
+    node  a       "A"              at (0, 0) // type free
+
+Adding an archetype means adding `item` and `slots` to its `ArchetypeDef` —
+neither grammar changes. `node` stays a universal synonym and positional data
+is sugar for the named property, so the long form always works. See
+`docs/vocabulary.md` (`D-015`, `W-029`).
 
 The premise: mermaid-class tools auto-place everything and you fight the
 engine. Here **layout is declared** (relative anchors between nodes) and
@@ -50,9 +57,9 @@ disagree.
 - `cargo run --bin bgraph -- watch diagram.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check diagram.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (92 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (103 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
-- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (12 corpus cases)
+- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (15 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
 - `./editors/zed/install.sh` — installs the server, regenerates + pins the grammar
 
@@ -188,6 +195,18 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   Contrast checks must **composite** before measuring — a fill at alpha 20 is
   mostly its backdrop, and comparing against the nominal color reports text
   that is perfectly readable.
+
+- [2026-07-31] A statement runs to its separator, and that is load-bearing:
+  without it `slice a b` is ambiguous (data, or the next statement?) and
+  tree-sitter refuses to generate. `node a node b` on one line is therefore
+  one item with two stray values.
+- [2026-07-31] "The first string is the label" is encoded in the tree-sitter
+  grammar as a `choice`, not left to the reader — with a label, later strings
+  are data; without one, data cannot begin with a string. Exactly one parse
+  either way. pest gets it for free from PEG ordering.
+- [2026-07-31] `pos_value` excludes the placement keywords in pest, or `at`
+  and `right-of` would be eaten as bare-word positional data before
+  `placement?` ever gets to look.
 
 ### Workarounds
 

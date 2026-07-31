@@ -1078,3 +1078,137 @@ fn contrast_is_measured_on_what_the_eye_receives() {
         "{opaque:?}"
     );
 }
+
+// ------------------------------------------------- per-archetype vocabulary
+
+#[test]
+fn each_archetype_has_its_own_word_for_its_elements() {
+    let l = build(
+        r#"
+        type pie
+        slice organic "Organic search" 4820
+        slice direct  "Direct"         2410
+        slice referral 1180
+    "#,
+    );
+
+    let crate::layout::Chart::Pie(pie) = &l.chart else {
+        panic!("expected a pie");
+    };
+    assert_eq!(pie.slices.len(), 3);
+    // 4820 + 2410 + 1180 = 8410; the first slice is 4820/8410 of the circle.
+    assert!((pie.slices[0].end - 4820.0 / 8410.0 * 360.0).abs() < 0.01);
+
+    let l = build(
+        r#"
+        type packet { width: 32 cell: 10 40 }
+        field sport "Source port"      0 15
+        field dport "Destination port" 16 31
+    "#,
+    );
+    assert_eq!(l.nodes[0].rect.w, 160.0);
+    assert_eq!(l.nodes[1].rect.x, 160.0);
+}
+
+#[test]
+fn positional_data_is_sugar_for_the_property() {
+    let terse = build("type pie\nslice a \"A\" 30\nslice b \"B\" 70");
+    let verbose = build("type pie\nnode a \"A\" { value: 30 }\nnode b \"B\" { value: 70 }");
+
+    let (crate::layout::Chart::Pie(x), crate::layout::Chart::Pie(y)) =
+        (&terse.chart, &verbose.chart)
+    else {
+        panic!("expected pies");
+    };
+    assert_eq!(x.slices[0].end, y.slices[0].end);
+}
+
+#[test]
+fn node_stays_a_universal_synonym() {
+    // Mixed on purpose: nothing that worked before stops working.
+    let l = build("type pie\nslice a \"A\" 30\nnode b \"B\" { value: 70 }");
+    let crate::layout::Chart::Pie(pie) = &l.chart else {
+        panic!("expected a pie");
+    };
+    assert_eq!(pie.slices.len(), 2);
+}
+
+#[test]
+fn a_foreign_keyword_says_where_it_belongs() {
+    let e = err("type pie\nfield a \"A\" 0 15");
+    assert!(e.contains("declares slices, not fields"), "{e}");
+    assert!(e.contains("belongs to `type packet`"), "{e}");
+
+    let e = err("type pie\nwidget a \"A\" 1");
+    assert!(e.contains("declares slices, not widgets"), "{e}");
+
+    // A bare `alpha beta` is now an item declaration with an unknown keyword,
+    // not a syntax error — X-007 records that deliberate change.
+    let e = err("alpha beta");
+    assert!(e.contains("declares nodes, not alphas"), "{e}");
+}
+
+#[test]
+fn positional_arity_is_checked() {
+    let e = err("type pie\nslice a \"A\" 10 20");
+    assert!(e.contains("takes 1 value after the label"), "{e}");
+
+    let e = err("node a \"A\" 10");
+    assert!(e.contains("takes no data after the label"), "{e}");
+
+    let d = diags("type pie\nslice a \"A\" 10 { value: 99 }");
+    assert!(
+        d.iter().any(|x| x.message.contains("the block wins")),
+        "{d:?}"
+    );
+}
+
+#[test]
+fn the_first_string_is_always_the_label() {
+    let l = build("type pie\nslice a \"Organic\" 10\nslice b 20");
+    assert_eq!(l.nodes.len(), 2);
+
+    // Without a label the identifier is displayed; the number is still data.
+    let crate::layout::Chart::Pie(pie) = &l.chart else {
+        panic!("expected a pie");
+    };
+    assert_eq!(pie.slices.len(), 2);
+}
+
+#[test]
+fn the_implicit_theme_follows_the_keyword() {
+    // `style slice` is idiomatic in a pie; `style node` still reaches it.
+    let by_keyword = build("type pie\nstyle slice { font-color: #ff0000 }\nslice a \"A\" 1");
+    let by_node = build("type pie\nstyle node { font-color: #ff0000 }\nslice a \"A\" 1");
+    for l in [&by_keyword, &by_node] {
+        assert!(
+            l.annotations.iter().any(|a| a.color == "#ff0000"),
+            "the implicit theme did not reach the chart text"
+        );
+    }
+
+    // Declared together, the specific name wins.
+    let both = build(
+        "type pie\nstyle node { font-color: #00ff00 }\nstyle slice { font-color: #0000ff }\nslice a \"A\" 1",
+    );
+    assert!(both.annotations.iter().all(|a| a.color == "#0000ff"));
+}
+
+#[test]
+fn a_statement_runs_to_its_separator() {
+    // Requiring a separator is what makes `slice a b` unambiguous: everything
+    // up to the newline belongs to one statement. So `node a node b` is a
+    // single item whose positional values are `node` and `b` — which `free`
+    // takes none of, and says so.
+    let one = parse_diagram("node a node b").expect("parses as one statement");
+    assert_eq!(one.nodes.len(), 1, "two statements would need a separator");
+    assert!(err("node a node b").contains("takes no data after the label"));
+
+    for separated in ["node a\nnode b", "node a; node b", "node a, node b"] {
+        assert_eq!(
+            parse_diagram(separated).expect("parses").nodes.len(),
+            2,
+            "{separated:?}"
+        );
+    }
+}

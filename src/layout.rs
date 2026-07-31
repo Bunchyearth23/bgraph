@@ -179,9 +179,15 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     let mut styles = Vec::with_capacity(diagram.nodes.len());
     let mut labels = Vec::with_capacity(diagram.nodes.len());
 
+    let item = crate::check::archetype_of(diagram);
     for node in &diagram.nodes {
         let style = registry
-            .resolve(Style::node_defaults(), "node", &node.classes, &node.props)
+            .resolve(
+                Style::node_defaults(),
+                item.item,
+                &node.classes,
+                &node.effective_props(item.slots),
+            )
             .map_err(|e| e.context(format!("in node `{}`", node.id.as_str())))?;
 
         let lines: Vec<String> = node

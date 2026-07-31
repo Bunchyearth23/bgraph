@@ -20,15 +20,27 @@ module.exports = grammar({
   conflicts: ($) => [],
 
   rules: {
-    source_file: ($) => repeat(choice($._statement, $._newline)),
+    // Statements must be separated. Without it `slice a b` is ambiguous —
+    // is `b` a positional value or the start of the next statement?
+    source_file: ($) =>
+      seq(
+        repeat($._newline),
+        optional(
+          seq(
+            $._statement,
+            repeat(seq(repeat1($._newline), $._statement)),
+            repeat($._newline),
+          ),
+        ),
+      ),
 
     _statement: ($) =>
       choice(
         $.type_declaration,
         $.graph_declaration,
         $.style_declaration,
-        $.node_declaration,
         $.edge_declaration,
+        $.item_declaration,
       ),
 
     _newline: (_) => choice('\n', '\r\n', ';', ','),
@@ -51,15 +63,29 @@ module.exports = grammar({
         field('body', $.block),
       ),
 
-    node_declaration: ($) =>
+    // The leading identifier is the archetype's element keyword — `node`,
+    // `slice`, `field`. Open here, closed by `check`, so adding an archetype
+    // touches neither grammar.
+    item_declaration: ($) =>
       seq(
-        'node',
+        field('keyword', $.item_keyword),
         field('name', $.identifier),
-        optional(field('label', $.string)),
-        repeat(field('class', $.class_reference)),
+        // "The first string is always the label" is encoded here rather than
+        // left to the reader: with a label, later strings are data; without
+        // one, data cannot begin with a string. Exactly one parse either way.
+        choice(
+          seq(
+            field('label', $.string),
+            repeat(choice(field('data', $._value), field('class', $.class_reference))),
+          ),
+          // Data and `.class` may interleave: the leading `.` keeps them apart.
+          repeat(choice(field('data', $._bare_value), field('class', $.class_reference))),
+        ),
         optional(field('placement', $._placement)),
         optional(field('body', $.block)),
       ),
+
+    item_keyword: ($) => $.identifier,
 
     edge_declaration: ($) =>
       seq(
@@ -113,6 +139,8 @@ module.exports = grammar({
       token(seq(/[a-zA-Z_][a-zA-Z0-9_]*(-[a-zA-Z0-9_]+)*/, /[ \t]*/, ':')),
 
     _value: ($) => choice($.string, $.color, $.number, $.identifier),
+
+    _bare_value: ($) => choice($.color, $.number, $.identifier),
 
     // ---------------------------------------------------------- tokens
 

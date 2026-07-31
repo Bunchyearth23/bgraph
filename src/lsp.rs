@@ -254,7 +254,9 @@ impl Server {
         {
             return declared(text, "style")
                 .into_iter()
-                .map(|(name, _)| item(&name, 7, "style", &format!("Apply the `{name}` style.")))
+                .map(|(name, _)| {
+                    completion(&name, 7, "style", &format!("Apply the `{name}` style."))
+                })
                 .collect();
         }
 
@@ -280,7 +282,7 @@ impl Server {
                     .map(|def| {
                         def.words
                             .iter()
-                            .map(|w| item(w, 20, def.syntax, def.doc))
+                            .map(|w| completion(w, 20, def.syntax, def.doc))
                             .collect()
                     })
                     .unwrap_or_default();
@@ -299,7 +301,7 @@ impl Server {
                 .filter(|p| relevant_here(p.name, archetype))
                 .enumerate()
                 .map(|(i, p)| {
-                    let mut it = item(p.name, 10, p.syntax, p.doc);
+                    let mut it = completion(p.name, 10, p.syntax, p.doc);
                     it["insertText"] = json!(format!("{}: ", p.name));
                     // Table order is meaningful; keep it instead of alphabetical.
                     it["sortText"] = json!(format!("{i:03}"));
@@ -326,40 +328,45 @@ impl Server {
             ""
         };
 
+        let item = props::archetype(archetype).map_or("node", |a| a.item);
+
         if preceding == "type" {
             return props::ARCHETYPES
                 .iter()
-                .map(|a| item(a.name, 20, "archetype", a.doc))
+                .map(|a| completion(a.name, 20, "archetype", a.doc))
                 .collect();
         }
 
         if is_rel_dir(preceding) {
-            return declared(text, "node")
+            return declared_items(text, item)
                 .into_iter()
-                .map(|(name, label)| item(&name, 6, "node", &label))
+                .map(|(name, label)| completion(&name, 6, item, &label))
                 .collect();
         }
 
         if preceding == "align" {
             return props::ALIGNMENTS
                 .iter()
-                .map(|a| item(a, 20, "align", "Cross-axis alignment against the anchor."))
+                .map(|a| completion(a, 20, "align", "Cross-axis alignment against the anchor."))
                 .collect();
         }
 
         if preceding == "extends" {
             return declared(text, "style")
                 .into_iter()
-                .map(|(name, _)| item(&name, 7, "style", &format!("Inherit from `{name}`.")))
+                .map(|(name, _)| completion(&name, 7, "style", &format!("Inherit from `{name}`.")))
                 .collect();
         }
 
         // Placements only make sense where placement is honoured, and only
-        // once the node already has an identifier.
-        if trimmed.starts_with("node ") && words.len() >= 2 && archetype == "free" {
+        // once the item already has an identifier.
+        if words.first().is_some_and(|w| *w == item || *w == "node")
+            && words.len() >= 2
+            && archetype == "free"
+        {
             return props::PLACEMENTS
                 .iter()
-                .map(|(name, doc)| item(name, 14, "placement", doc))
+                .map(|(name, doc)| completion(name, 14, "placement", doc))
                 .collect();
         }
 
@@ -367,13 +374,26 @@ impl Server {
         if words.len() <= 1 && !ends_with_space {
             let mut out: Vec<Value> = props::KEYWORDS
                 .iter()
-                .map(|(name, doc)| item(name, 14, "keyword", doc))
+                .map(|(name, doc)| completion(name, 14, "keyword", doc))
                 .collect();
+
+            // The archetype's own word first; `node` stays available.
+            if item != "node" {
+                out.insert(
+                    0,
+                    completion(
+                        item,
+                        14,
+                        "keyword",
+                        &format!("Declare a {item} — what `type {archetype}` calls its elements."),
+                    ),
+                );
+            }
             if archetype == "free" && !current.is_empty() {
                 out.extend(
-                    declared(text, "node")
+                    declared_items(text, item)
                         .into_iter()
-                        .map(|(name, label)| item(&name, 6, "node", &label)),
+                        .map(|(name, label)| completion(&name, 6, item, &label)),
                 );
             }
             return out;
@@ -707,8 +727,17 @@ fn word_at(text: &str, offset: usize) -> Option<(String, Span)> {
     Some((text[start..end].to_string(), Span { start, end }))
 }
 
-/// Every `node <id>` / `style <id>` in the file, found by line scan so it
-/// survives a syntax error elsewhere.
+/// Items declared with either the archetype's keyword or the universal `node`.
+fn declared_items(text: &str, item: &str) -> Vec<(String, String)> {
+    let mut out = declared(text, item);
+    if item != "node" {
+        out.extend(declared(text, "node"));
+    }
+    out
+}
+
+/// Every `<keyword> <id>` in the file, found by line scan so it survives a
+/// syntax error elsewhere.
 fn declared(text: &str, keyword: &str) -> Vec<(String, String)> {
     let mut out = Vec::new();
 
@@ -782,7 +811,7 @@ fn uri_of(params: &Value) -> String {
         .to_string()
 }
 
-fn item(label: &str, kind: u8, detail: &str, doc: &str) -> Value {
+fn completion(label: &str, kind: u8, detail: &str, doc: &str) -> Value {
     json!({
         "label": label,
         "kind": kind,
@@ -1178,5 +1207,47 @@ mod tests {
         let hover = server.hover(&params);
         let value = hover["contents"]["value"].as_str().unwrap_or_default();
         assert!(value.contains("**type** `packet`"), "{value}");
+    }
+
+    #[test]
+    fn completion_offers_the_archetypes_own_keyword() {
+        let labels = labels_at("type pie\ns", "s");
+        assert_eq!(
+            labels.first().map(String::as_str),
+            Some("slice"),
+            "{labels:?}"
+        );
+        assert!(labels.contains(&"node".to_string()), "node stays available");
+
+        let labels = labels_at("type packet\nf", "f");
+        assert_eq!(labels.first().map(String::as_str), Some("field"));
+
+        // `free` has no second word to offer.
+        let labels = labels_at("n", "n");
+        assert_eq!(
+            labels.iter().filter(|l| *l == "node").count(),
+            1,
+            "{labels:?}"
+        );
+    }
+
+    #[test]
+    fn references_are_found_under_either_keyword() {
+        // In an archetype with its own word, both spellings declare items, so
+        // both must be offered as references.
+        let text = "type pie\nslice alpha \"A\" 1\nnode beta \"B\" { value: 2 }\n";
+        let found: Vec<String> = declared_items(text, "slice")
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect();
+        assert!(found.contains(&"alpha".to_string()), "{found:?}");
+        assert!(found.contains(&"beta".to_string()), "{found:?}");
+    }
+
+    #[test]
+    fn placements_follow_the_archetypes_keyword() {
+        assert!(labels_at("node a ", "node a ").contains(&"right-of".to_string()));
+        // A pie ignores placement, so it is not offered — with either word.
+        assert!(!labels_at("type pie\nslice a ", "slice a ").contains(&"right-of".to_string()));
     }
 }

@@ -7,8 +7,9 @@ type pie {
 
 graph { background: #0b1120 padding: 32 }
 
-node organic  "Organic search" { value: 4820 }
-node direct   "Direct"         { value: 2410 }
-node referral "Referral"       { value: 1180 }
-node social   "Social"         { value: 690 }
-node paid     "Paid"           { value: 410 }
+// `slice <id> ["label"] <value>` — the value rides in position.
+slice organic  "Organic search" 4820
+slice direct   "Direct"         2410
+slice referral "Referral"       1180
+slice social   "Social"          690
+slice paid     "Paid"            410

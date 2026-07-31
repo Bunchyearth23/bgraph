@@ -312,7 +312,11 @@ impl Registry {
         self.resolved.get(name)
     }
 
-    /// defaults ← implicit `node`/`edge` block ← listed classes ← inline props.
+    /// defaults ← implicit theme ← listed classes ← inline props.
+    ///
+    /// The implicit theme is the archetype's own word (`style slice { … }`),
+    /// with `node` staying a universal alias — applied first, so the specific
+    /// name wins where both are declared.
     pub fn resolve(
         &self,
         base: Style,
@@ -322,6 +326,11 @@ impl Registry {
     ) -> Result<Style> {
         let mut style = base;
 
+        if implicit != "node"
+            && let Some(found) = self.get("node")
+        {
+            style.overlay(found);
+        }
         if let Some(found) = self.get(implicit) {
             style.overlay(found);
         }

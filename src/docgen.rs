@@ -103,6 +103,19 @@ fn archetypes(m: &mut String) {
     for def in props::ARCHETYPES {
         let _ = write!(m, "\n### `type {}`\n\n{}\n", def.name, squash(def.doc));
 
+        let shape: Vec<String> = def
+            .slots
+            .iter()
+            .flat_map(|s| std::iter::repeat_n(format!("<{}>", s.prop), s.arity))
+            .collect();
+        let _ = write!(
+            m,
+            "\n```\n{} <id> [\"label\"]{}{}\n```\n",
+            def.item,
+            if shape.is_empty() { "" } else { " " },
+            shape.join(" ")
+        );
+
         if def.props.is_empty() {
             m.push_str("\nIt takes no settings.\n");
             continue;
@@ -229,9 +242,28 @@ bgraph-lsp                          # language server, LSP over stdin/stdout
 type <archetype> { … }      // the genre of diagram; optional, defaults to free
 graph { … }                 // diagram-wide settings
 style <name> [extends <name>] { … }
-node <id> ["<label>"] [.class …] [<placement>] { … }
+<keyword> <id> ["<label>"] <data…> [.class …] [<placement>] { … }
 <id> <arrow> <id> ["<label>"] [.class …] { … }
 ```
+
+The fourth is an **item**, and each archetype has its own word for it —
+`node` in `free`, `slice` in `pie`, `field` in `packet`. `node` stays a
+universal synonym everywhere, so nothing is ever forced.
+
+```
+type pie
+slice organic "Organic search" 4820
+slice referral 1180                    // no label: the id is displayed
+node b "Direct" { value: 2410 }        // the long form, still valid
+```
+
+Values after the label fill the archetype's slots in order, and are **sugar
+for the properties it declares** — `slice a 4820` and `slice a { value: 4820 }`
+build the same thing. The first string after the identifier is always the
+label, so an archetype whose data is a string obliges you to write one.
+
+A statement runs to its separator. `node a node b` on one line is therefore
+one item with two stray values, not two items, and `check` says so.
 
 Statements are separated by newlines; `;` and `,` also work. Comments start
 with `//` — `#` is reserved for hex colors and cannot also open a comment.
@@ -313,8 +345,9 @@ composited away first.
 built-in defaults  →  style node / style edge  →  .classes (in order)  →  inline { }
 ```
 
-`node` and `edge` are **implicit** style names: declaring them themes every
-node and every edge without being referenced. `extends` flattens a chain
+The implicit theme is the archetype's own word — `style slice { … }` in a
+pie — with `style node` and `style edge` remaining universal aliases, applied
+first so the specific name wins where both are declared. `extends` flattens a chain
 child-first. An unknown property or an unknown `.class` is an error.
 "##;
 

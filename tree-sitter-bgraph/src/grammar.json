@@ -4,20 +4,59 @@
   "word": "identifier",
   "rules": {
     "source_file": {
-      "type": "REPEAT",
-      "content": {
-        "type": "CHOICE",
-        "members": [
-          {
-            "type": "SYMBOL",
-            "name": "_statement"
-          },
-          {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "REPEAT",
+          "content": {
             "type": "SYMBOL",
             "name": "_newline"
           }
-        ]
-      }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_statement"
+                },
+                {
+                  "type": "REPEAT",
+                  "content": {
+                    "type": "SEQ",
+                    "members": [
+                      {
+                        "type": "REPEAT1",
+                        "content": {
+                          "type": "SYMBOL",
+                          "name": "_newline"
+                        }
+                      },
+                      {
+                        "type": "SYMBOL",
+                        "name": "_statement"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "type": "REPEAT",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "_newline"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
     },
     "_statement": {
       "type": "CHOICE",
@@ -36,11 +75,11 @@
         },
         {
           "type": "SYMBOL",
-          "name": "node_declaration"
+          "name": "edge_declaration"
         },
         {
           "type": "SYMBOL",
-          "name": "edge_declaration"
+          "name": "item_declaration"
         }
       ]
     },
@@ -181,12 +220,16 @@
         }
       ]
     },
-    "node_declaration": {
+    "item_declaration": {
       "type": "SEQ",
       "members": [
         {
-          "type": "STRING",
-          "value": "node"
+          "type": "FIELD",
+          "name": "keyword",
+          "content": {
+            "type": "SYMBOL",
+            "name": "item_keyword"
+          }
         },
         {
           "type": "FIELD",
@@ -200,28 +243,67 @@
           "type": "CHOICE",
           "members": [
             {
-              "type": "FIELD",
-              "name": "label",
-              "content": {
-                "type": "SYMBOL",
-                "name": "string"
-              }
+              "type": "SEQ",
+              "members": [
+                {
+                  "type": "FIELD",
+                  "name": "label",
+                  "content": {
+                    "type": "SYMBOL",
+                    "name": "string"
+                  }
+                },
+                {
+                  "type": "REPEAT",
+                  "content": {
+                    "type": "CHOICE",
+                    "members": [
+                      {
+                        "type": "FIELD",
+                        "name": "data",
+                        "content": {
+                          "type": "SYMBOL",
+                          "name": "_value"
+                        }
+                      },
+                      {
+                        "type": "FIELD",
+                        "name": "class",
+                        "content": {
+                          "type": "SYMBOL",
+                          "name": "class_reference"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
             },
             {
-              "type": "BLANK"
+              "type": "REPEAT",
+              "content": {
+                "type": "CHOICE",
+                "members": [
+                  {
+                    "type": "FIELD",
+                    "name": "data",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "_bare_value"
+                    }
+                  },
+                  {
+                    "type": "FIELD",
+                    "name": "class",
+                    "content": {
+                      "type": "SYMBOL",
+                      "name": "class_reference"
+                    }
+                  }
+                ]
+              }
             }
           ]
-        },
-        {
-          "type": "REPEAT",
-          "content": {
-            "type": "FIELD",
-            "name": "class",
-            "content": {
-              "type": "SYMBOL",
-              "name": "class_reference"
-            }
-          }
         },
         {
           "type": "CHOICE",
@@ -256,6 +338,10 @@
           ]
         }
       ]
+    },
+    "item_keyword": {
+      "type": "SYMBOL",
+      "name": "identifier"
     },
     "edge_declaration": {
       "type": "SEQ",
@@ -650,6 +736,23 @@
           "type": "SYMBOL",
           "name": "string"
         },
+        {
+          "type": "SYMBOL",
+          "name": "color"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "number"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "identifier"
+        }
+      ]
+    },
+    "_bare_value": {
+      "type": "CHOICE",
+      "members": [
         {
           "type": "SYMBOL",
           "name": "color"

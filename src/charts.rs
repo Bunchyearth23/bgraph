@@ -196,11 +196,17 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
     // the default one, and the palette only fills in what was left unsaid.
     // `style node { … }` is the only text hook a pie has, so it governs the
     // title too — an author who sets a font color means all of the chart.
-    let base = registry.resolve(chart_defaults(), "node", &[], &[])?;
+    let def = crate::check::archetype_of(diagram);
+    let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
 
     let mut entries = Vec::new();
     for node in &diagram.nodes {
-        let style = registry.resolve(chart_defaults(), "node", &node.classes, &node.props)?;
+        let style = registry.resolve(
+            chart_defaults(),
+            def.item,
+            &node.classes,
+            &node.effective_props(def.slots),
+        )?;
         let Some(value) = style.value.filter(|v| *v > 0.0) else {
             continue;
         };
@@ -371,9 +377,15 @@ pub fn packet(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
     let ruler = toggle(cfg, "ruler", true);
     let title = text(cfg, "title");
 
+    let def = crate::check::archetype_of(diagram);
     let mut fields = Vec::new();
     for node in &diagram.nodes {
-        let style = registry.resolve(Style::node_defaults(), "node", &node.classes, &node.props)?;
+        let style = registry.resolve(
+            Style::node_defaults(),
+            def.item,
+            &node.classes,
+            &node.effective_props(def.slots),
+        )?;
         let Some((first, last)) = style.bits else {
             continue;
         };
@@ -393,7 +405,8 @@ pub fn packet(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
     let mut nodes = Vec::new();
     let mut annotations = Vec::new();
     let mut rows_used: HashMap<u32, ()> = HashMap::new();
-    let base = registry.resolve(Style::node_defaults(), "node", &[], &[])?;
+    let def = crate::check::archetype_of(diagram);
+    let base = registry.resolve(Style::node_defaults(), def.item, &[], &[])?;
 
     if let Some(title) = title {
         annotations.push(Annotation {

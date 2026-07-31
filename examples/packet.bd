@@ -6,22 +6,23 @@ type packet {
 
 graph { background: #0b1120 }
 
-style node {
+style field {
   fill: #1e293b
   stroke: #334155 1
   radius: 3
   font: 12 #e2e8f0
 }
 
-style flag extends node { fill: #422006 stroke: #f59e0b 1 }
+style flag extends field { fill: #422006 stroke: #f59e0b 1 }
 
-node sport "Source port"       { bits: 0 15 }
-node dport "Destination port"  { bits: 16 31 }
-node seq   "Sequence number"   { bits: 32 63 }
-node ack   "Acknowledgment number" { bits: 64 95 }
-node off   "Offset"            { bits: 96 99 }
-node rsv   "Rsvd"              { bits: 100 102 }
-node flags "Flags" .flag       { bits: 103 111 }
-node win   "Window"            { bits: 112 127 }
-node sum   "Checksum"          { bits: 128 143 }
-node urg   "Urgent pointer"    { bits: 144 159 }
+// `field <id> ["label"] <bits> <bits>` — an inclusive range, in position.
+field sport "Source port"           0 15
+field dport "Destination port"     16 31
+field seq   "Sequence number"      32 63
+field ack   "Acknowledgment number" 64 95
+field off   "Offset"               96 99
+field rsv   "Rsvd"                100 102
+field flags "Flags" .flag         103 111
+field win   "Window"              112 127
+field sum   "Checksum"            128 143
+field urg   "Urgent pointer"      144 159

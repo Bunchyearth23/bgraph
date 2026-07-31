@@ -170,7 +170,7 @@
     }
   },
   {
-    "type": "node_declaration",
+    "type": "item_declaration",
     "named": true,
     "fields": {
       "body": {
@@ -189,6 +189,38 @@
         "types": [
           {
             "type": "class_reference",
+            "named": true
+          }
+        ]
+      },
+      "data": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "color",
+            "named": true
+          },
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "number",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
+      "keyword": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "item_keyword",
             "named": true
           }
         ]
@@ -227,6 +259,21 @@
           }
         ]
       }
+    }
+  },
+  {
+    "type": "item_keyword",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -351,7 +398,7 @@
           "named": true
         },
         {
-          "type": "node_declaration",
+          "type": "item_declaration",
           "named": true
         },
         {
@@ -518,10 +565,6 @@
   },
   {
     "type": "middle",
-    "named": false
-  },
-  {
-    "type": "node",
     "named": false
   },
   {

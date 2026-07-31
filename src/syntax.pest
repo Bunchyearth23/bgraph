@@ -21,16 +21,31 @@ number = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ ("px" | "%")? }
 // made one grammar reject `#1234567` and the other split it in two.
 color  = @{ "#" ~ ASCII_HEX_DIGIT+ }
 
-file = { SOI ~ sep ~ (stmt ~ sep)* ~ EOI }
+// Statements must be separated. Without it `slice a b` is ambiguous — is `b`
+// a positional value or the start of the next statement?
+file = { SOI ~ sep ~ (stmt ~ term)* ~ EOI }
+term = _{ (nl | ";" | ",")+ | &EOI }
 
 // `type_decl` precedes `edge_decl` so `type pie` is not read as the start of
 // an edge; PEG backtracking still lets a node actually named `type` have edges.
-stmt = _{ type_decl | graph_decl | style_decl | node_decl | edge_decl }
+// `edge_decl` precedes `item_decl` only for speed: `item_decl` would fail on
+// the arrow anyway and backtrack.
+stmt = _{ type_decl | graph_decl | style_decl | edge_decl | item_decl }
 
 type_decl  = { "type" ~ ident ~ block? }
 graph_decl = { "graph" ~ block }
 style_decl = { "style" ~ ident ~ ("extends" ~ ident)? ~ block }
-node_decl  = { "node" ~ ident ~ string? ~ class_ref* ~ placement? ~ block? }
+// The leading identifier is the archetype's element keyword — `node`, `slice`,
+// `field`. It is open here and closed by `check`, so adding an archetype never
+// touches either grammar. Positional values are sugar for the properties the
+// archetype declares.
+// Data and `.class` may interleave: the leading `.` keeps them apart, so
+// there is no reason to make the author remember an order.
+item_decl  = { ident ~ ident ~ string? ~ (pos_value | class_ref)* ~ placement? ~ block? }
+
+// A placement keyword would otherwise be eaten as a bare-word value.
+pos_value  = _{ !(place_kw) ~ value }
+place_kw   = @{ ("at" | "right-of" | "left-of" | "below" | "above") ~ !(ASCII_ALPHANUMERIC | "_" | "-") }
 
 // An edge may not start with a statement keyword. Without this, `style -> a`
 // parses here (pest backtracks out of `style_decl`) but not in tree-sitter,

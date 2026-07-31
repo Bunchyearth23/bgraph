@@ -42,9 +42,10 @@ impl Diag {
 pub fn check(diagram: &Diagram) -> Vec<Diag> {
     let mut out = Vec::new();
 
-    let archetype = check_archetype(diagram, &mut out);
+    let def = check_archetype(diagram, &mut out);
+    let archetype = def.name;
     check_styles(diagram, &mut out);
-    let nodes = check_nodes(diagram, &mut out);
+    let nodes = check_nodes(diagram, def, &mut out);
     check_edges(diagram, &nodes, &mut out);
     check_graph(diagram, &mut out);
 
@@ -67,7 +68,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
 /// The declared archetype, or `free`. Reports an unknown name and any
 /// redeclaration, then validates the `type { … }` block against that
 /// archetype's own settings.
-fn check_archetype(diagram: &Diagram, out: &mut Vec<Diag>) -> &'static str {
+fn check_archetype(diagram: &Diagram, out: &mut Vec<Diag>) -> &'static props::ArchetypeDef {
     let def = match &diagram.archetype {
         Some(name) => match props::archetype(name.as_str()) {
             Some(def) => def,
@@ -108,7 +109,7 @@ fn check_archetype(diagram: &Diagram, out: &mut Vec<Diag>) -> &'static str {
         check_props(&diagram.archetype_props, None, def.props, "setting", out);
     }
 
-    def.name
+    def
 }
 
 /// The first error, if any — what the CLI reports.
@@ -186,7 +187,11 @@ fn check_extends_cycles(diagram: &Diagram, out: &mut Vec<Diag>) {
     }
 }
 
-fn check_nodes<'a>(diagram: &'a Diagram, out: &mut Vec<Diag>) -> HashMap<&'a str, usize> {
+fn check_nodes<'a>(
+    diagram: &'a Diagram,
+    def: &'static props::ArchetypeDef,
+    out: &mut Vec<Diag>,
+) -> HashMap<&'a str, usize> {
     let known_styles = style_names(diagram);
     let mut index = HashMap::new();
 
@@ -219,6 +224,8 @@ fn check_nodes<'a>(diagram: &'a Diagram, out: &mut Vec<Diag>) -> HashMap<&'a str
             }
         }
 
+        check_keyword(node, def, out);
+        check_positional(node, def, out);
         check_props(&node.props, Some(Ctx::Node), props::PROPS, "property", out);
     }
 
@@ -242,6 +249,78 @@ fn check_nodes<'a>(diagram: &'a Diagram, out: &mut Vec<Diag>) -> HashMap<&'a str
     }
 
     index
+}
+
+/// `node` is a universal synonym; anything else must be the archetype's own
+/// word for its elements.
+fn check_keyword(node: &NodeDecl, def: &'static props::ArchetypeDef, out: &mut Vec<Diag>) {
+    let written = node.keyword.as_str();
+    if written == def.item || written == "node" {
+        return;
+    }
+
+    let elsewhere = props::ARCHETYPES.iter().find(|a| a.item == written);
+    let hint = match elsewhere {
+        Some(other) => format!(" — `{written}` belongs to `type {}`", other.name),
+        None => String::new(),
+    };
+
+    out.push(Diag::error(
+        node.keyword.span,
+        format!(
+            "`type {}` declares {}s, not {written}s{hint}",
+            def.name, def.item
+        ),
+    ));
+}
+
+/// Positional values fill the archetype's slots in order.
+fn check_positional(node: &NodeDecl, def: &'static props::ArchetypeDef, out: &mut Vec<Diag>) {
+    if node.positional.is_empty() {
+        return;
+    }
+
+    let wanted: usize = def.slots.iter().map(|s| s.arity).sum();
+    if wanted == 0 {
+        out.push(Diag::error(
+            node.positional_span,
+            format!("`type {}` takes no data after the label", def.name),
+        ));
+        return;
+    }
+
+    if node.positional.len() > wanted {
+        let shape: Vec<String> = def.slots.iter().map(|s| format!("<{}>", s.prop)).collect();
+        out.push(Diag::error(
+            node.positional_span,
+            format!(
+                "`{}` takes {wanted} value{} after the label — `{} <id> [\"label\"] {}`",
+                def.item,
+                if wanted == 1 { "" } else { "s" },
+                def.item,
+                shape.join(" ")
+            ),
+        ));
+        return;
+    }
+
+    // Written twice, once in each form: say which one wins.
+    let mut rest = node.positional.len();
+    for slot in def.slots {
+        if rest == 0 {
+            break;
+        }
+        rest = rest.saturating_sub(slot.arity);
+        if let Some(inline) = node.props.iter().find(|p| p.name == slot.prop) {
+            out.push(Diag::warn(
+                inline.name_span,
+                format!(
+                    "`{}` is given both after the label and in the block; the block wins",
+                    slot.prop
+                ),
+            ));
+        }
+    }
 }
 
 fn check_edges(diagram: &Diagram, nodes: &HashMap<&str, usize>, out: &mut Vec<Diag>) {
@@ -333,15 +412,32 @@ fn resolved_nodes(diagram: &Diagram, base: crate::style::Style) -> Vec<crate::st
     let Ok(registry) = crate::style::Registry::build(&diagram.styles) else {
         return Vec::new();
     };
+    let def = archetype_of(diagram);
     diagram
         .nodes
         .iter()
         .map(|node| {
             registry
-                .resolve(base.clone(), "node", &node.classes, &node.props)
+                .resolve(
+                    base.clone(),
+                    def.item,
+                    &node.classes,
+                    &node.effective_props(def.slots),
+                )
                 .unwrap_or_default()
         })
         .collect()
+}
+
+/// The declared archetype, or `free`. Unknown names are reported by
+/// `check_archetype`; here they simply fall back.
+pub fn archetype_of(diagram: &Diagram) -> &'static props::ArchetypeDef {
+    diagram
+        .archetype
+        .as_ref()
+        .and_then(|a| props::archetype(a.as_str()))
+        .or_else(|| props::archetype("free"))
+        .expect("free is always defined")
 }
 
 fn warn_ignored(diagram: &Diagram, archetype: &str, out: &mut Vec<Diag>) {

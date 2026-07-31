@@ -53,12 +53,51 @@ pub struct StyleDecl {
 
 #[derive(Debug)]
 pub struct NodeDecl {
+    /// What the source called it: `node`, `slice`, `field`. Validated against
+    /// the archetype by `check`.
+    pub keyword: Spanned<String>,
     pub id: Spanned<String>,
     pub label: Option<String>,
+    /// Values written after the label. `check` maps them onto the properties
+    /// the archetype declares; `effective_props` performs the mapping.
+    pub positional: Vec<Value>,
+    pub positional_span: Span,
     pub classes: Vec<Spanned<String>>,
     pub placement: Option<Placement>,
     pub props: Vec<Prop>,
     pub span: Span,
+}
+
+impl NodeDecl {
+    /// Inline properties, with the positional values folded in first — so an
+    /// explicit `{ value: … }` still wins, and `check` warns about the clash.
+    pub fn effective_props(&self, slots: &[crate::props::Slot]) -> Vec<Prop> {
+        if self.positional.is_empty() {
+            return self.props.clone();
+        }
+
+        let mut out = Vec::with_capacity(slots.len() + self.props.len());
+        let mut rest = self.positional.as_slice();
+
+        for slot in slots {
+            let take = slot.arity.min(rest.len());
+            if take == 0 {
+                break;
+            }
+            let (values, tail) = rest.split_at(take);
+            rest = tail;
+            out.push(Prop {
+                name: slot.prop.to_string(),
+                name_span: self.positional_span,
+                values: values.to_vec(),
+                values_span: self.positional_span,
+                span: self.positional_span,
+            });
+        }
+
+        out.extend(self.props.iter().cloned());
+        out
+    }
 }
 
 #[derive(Debug)]
