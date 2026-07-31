@@ -1426,29 +1426,16 @@ fn check_treemap(diagram: &Diagram, out: &mut Vec<Diag>) {
     }
 }
 
-/// `value` and `bits` are data for an archetype that is not in play.
+/// Members are the one thing a `free` graph can carry and not draw. Data
+/// properties no longer need a list here: each lives with the archetype that
+/// reads it, so writing one elsewhere is an unknown property, and
+/// `check_props_refined` says which genre it belongs to.
 fn check_unused_data(diagram: &Diagram, out: &mut Vec<Diag>) {
     for node in &diagram.nodes {
         if let Some(member) = node.members.first() {
             out.push(Diag::warn(
                 member.span,
                 "members are only drawn by `type class` and `type er`".to_string(),
-            ));
-        }
-        for prop in &node.props {
-            let owner = match prop.name.as_str() {
-                "value" => "pie` or `type treemap",
-                "bits" => "packet",
-                "x" | "y" => "quadrant",
-                "wave" | "data" => "wave",
-                "points" => "bar",
-                "kind" | "guard" => "state",
-                "start" | "length" => "gantt",
-                _ => continue,
-            };
-            out.push(Diag::warn(
-                prop.name_span,
-                format!("`{}` has no effect outside `type {owner}`", prop.name),
             ));
         }
     }
@@ -1528,10 +1515,23 @@ fn check_props_refined(
         let Some(def) = props::lookup(&prop.name, refinements)
             .or_else(|| props::lookup(&prop.name, table))
         else {
-            let hint = suggest(&prop.name, refinements)
-                .or_else(|| suggest(&prop.name, table))
-                .map(|s| format!(" — did you mean `{s}`?"))
-                .unwrap_or_default();
+            // A property that exists, but in another genre, is a different
+            // mistake from a typo — and the reader can only fix it if told
+            // which genre reads it.
+            let hint = match props::genres_reading(&prop.name).as_slice() {
+                [] => suggest(&prop.name, refinements)
+                    .or_else(|| suggest(&prop.name, table))
+                    .map(|s| format!(" — did you mean `{s}`?"))
+                    .unwrap_or_default(),
+                owners => format!(
+                    " — it belongs to {}",
+                    owners
+                        .iter()
+                        .map(|o| format!("`type {o}`"))
+                        .collect::<Vec<_>>()
+                        .join(" and ")
+                ),
+            };
             out.push(Diag::error(
                 prop.name_span,
                 format!("unknown {what} `{}`{hint}", prop.name),

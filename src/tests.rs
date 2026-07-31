@@ -643,18 +643,65 @@ fn a_packet_field_needs_bits() {
 }
 
 #[test]
-fn chart_data_outside_its_archetype_is_flagged() {
-    let d = diags("node a { value: 5 }");
-    assert!(
-        d.iter()
-            .any(|x| x.message.contains("no effect outside `type pie`"))
-    );
+fn chart_data_outside_its_archetype_is_named_with_the_genre_that_reads_it() {
+    // It used to be a warning that the property "has no effect" — which left
+    // the reader to guess where it *does*. Each data property now lives with
+    // the genre that reads it, so writing one elsewhere is an unknown
+    // property, and the message says whose it is.
+    let e = err("node a { value: 5 }");
+    assert!(e.contains("`type pie`") && e.contains("`type treemap`"), "{e}");
 
-    let d = diags("node a { bits: 0 7 }");
-    assert!(
-        d.iter()
-            .any(|x| x.message.contains("no effect outside `type packet`"))
-    );
+    let e = err("node a { bits: 0 7 }");
+    assert!(e.contains("`type packet`"), "{e}");
+
+    let e = err("type pie\nslice a \"A\" 1 { wave: \"01\" }");
+    assert!(e.contains("`type wave`"), "{e}");
+
+    // A name that is nobody's is still a typo, and gets the other message.
+    let e = err("node a { fll: #fff }");
+    assert!(e.contains("did you mean `fill`"), "{e}");
+}
+
+#[test]
+fn each_data_property_belongs_to_exactly_the_genres_that_read_it() {
+    // Wiring these tables by hand once put `wave`'s properties on `free`,
+    // where they silently became the answer for every diagram. Two names
+    // collide — `wave` is an archetype *and* a property — so the mapping is
+    // asserted rather than eyeballed.
+    for (prop, owners) in [
+        ("value", &["pie", "sankey", "treemap"][..]),
+        ("bits", &["packet"]),
+        ("x", &["quadrant"]),
+        ("y", &["quadrant"]),
+        ("wave", &["wave"]),
+        ("data", &["wave"]),
+        ("points", &["bar", "xy"]),
+        ("start", &["gantt"]),
+        ("length", &["gantt"]),
+        ("guard", &["state"]),
+        ("from-card", &["er"]),
+        ("to-card", &["er"]),
+        ("date", &["timeline"]),
+        ("tech", &["block"]),
+        ("description", &["block"]),
+        ("kind", &["block", "state"]),
+    ] {
+        let mut found = crate::props::genres_reading(prop);
+        found.sort_unstable();
+        let mut want = owners.to_vec();
+        want.sort_unstable();
+        assert_eq!(found, want, "`{prop}`");
+    }
+
+    // And nothing archetype-specific is left on the shared table, where it
+    // would be offered in every genre.
+    for def in crate::props::PROPS {
+        assert!(
+            crate::props::genres_reading(def.name).is_empty(),
+            "`{}` is on both the shared table and an archetype's",
+            def.name
+        );
+    }
 }
 
 #[test]
@@ -3642,4 +3689,95 @@ fn every_example_still_works() {
     }
 
     assert!(seen >= 16, "only {seen} examples found — the sweep is not finding them");
+}
+
+#[test]
+fn every_diagram_in_the_documentation_still_works() {
+    // A ```bgraph fence is a promise that the snippet is a complete, current
+    // file. Prose rots quietly — `language.md` was still calling a slice a
+    // `node` five archetypes after the word changed — so the snippets are run
+    // rather than trusted.
+    let root = env!("CARGO_MANIFEST_DIR");
+    let mut files: Vec<std::path::PathBuf> = vec![std::path::Path::new(root).join("README.md")];
+    for entry in std::fs::read_dir(std::path::Path::new(root).join("docs")).expect("docs/") {
+        let path = entry.expect("entry").path();
+        if path.extension().is_some_and(|e| e == "md") {
+            files.push(path);
+        }
+    }
+
+    let mut checked = 0;
+    for path in files {
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        let text = std::fs::read_to_string(&path).expect("readable");
+
+        for (i, block) in text.split("```bgraph\n").skip(1).enumerate() {
+            let source = block.split("```").next().expect("a closing fence");
+            checked += 1;
+
+            let diagram = parse_diagram(source)
+                .unwrap_or_else(|e| panic!("{name} block {i}: {e:#}\n---\n{source}"));
+            let errors: Vec<String> = crate::check::check(&diagram)
+                .into_iter()
+                .filter(|d| d.severity == crate::check::Severity::Error)
+                .map(|d| d.message)
+                .collect();
+            assert!(errors.is_empty(), "{name} block {i}: {errors:?}\n---\n{source}");
+        }
+    }
+
+    assert!(checked >= 8, "only {checked} documented diagrams found");
+}
+
+#[test]
+fn every_archetype_shows_a_complete_file() {
+    // The tables say what a property means; a reader still has to start from
+    // something. A genre with no example is a genre you have to guess at.
+    let reference = crate::docgen::reference();
+    for def in crate::props::ARCHETYPES {
+        let heading = format!("### `type {}`", def.name);
+        let section = reference
+            .split(&heading)
+            .nth(1)
+            .unwrap_or_else(|| panic!("`{}` has no section", def.name))
+            .split("\n### ")
+            .next()
+            .unwrap();
+        assert!(
+            section.contains("A complete file"),
+            "`type {}` shows no worked example",
+            def.name
+        );
+    }
+}
+
+#[test]
+fn the_highlighter_captures_every_kind_of_value() {
+    // Five archetypes shipped between the queries being written and this test:
+    // dates, durations, members, edge data and `{{holes}}` were all parsed by
+    // the grammar and coloured by nothing. A query that compiles is not a
+    // query that covers.
+    let highlights = std::fs::read_to_string(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/editors/zed/languages/bgraph/highlights.scm"
+    ))
+    .expect("the extension ships highlights.scm");
+
+    // Every named node type that carries text a reader looks at. Structural
+    // nodes are captured through their fields, not by name.
+    for node in [
+        "string", "number", "color", "date", "duration", "placeholder", "member", "identifier",
+        "comment", "arrow", "item_keyword", "property_name", "alignment", "direction",
+    ] {
+        assert!(
+            highlights.contains(&format!("({node}")),
+            "`{node}` is parsed but never highlighted"
+        );
+    }
+
+    // Positional data is captured on both statement kinds — an ER relation
+    // carries its cardinality exactly where an item carries its value.
+    for field in ["(item_declaration data:", "(edge_declaration data:"] {
+        assert!(highlights.contains(field), "`{field}` is not captured");
+    }
 }

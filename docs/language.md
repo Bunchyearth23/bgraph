@@ -4,7 +4,7 @@ A diagram is a plain text file. Five kinds of statement: `type`, `graph`,
 `style`, `node`, and edges. Statements are separated by newlines (`;` and `,`
 also work). Comments start with `//` — `#` is reserved for hex colors.
 
-```
+```bgraph
 graph { background: #0b1120 }
 
 style box { fill: #1e293b stroke: #38bdf8 1.5 }
@@ -53,11 +53,11 @@ every property, generated from the compiler's own tables.
 
 ### `type pie`
 
-Each node is a slice and needs a `value`. Colors come from a fixed
-categorical palette, stepped for a light or a dark `background`; a declared
-`fill` overrides it.
+Its elements are `slice`s, and the value comes straight after the label.
+Colors come from a fixed categorical palette, stepped for a light or a dark
+`background`; a declared `fill` overrides it.
 
-```
+```bgraph
 type pie {
   title: "Traffic sources"
   radius: 130          // outer radius, default 130
@@ -67,9 +67,9 @@ type pie {
   legend: on           // on by default
 }
 
-node organic "Organic search" { value: 4820 }
-node direct  "Direct"         { value: 2410 }
-node paid    "Paid"           { value: 410 fill: #f43f5e }
+slice organic "Organic search" 4820
+slice direct  "Direct"         2410
+slice paid    "Paid"            410 { fill: #f43f5e }
 ```
 
 The legend is on by default and slices too thin for text are left unlabelled
@@ -83,11 +83,11 @@ rather than repeating a hue.
 
 ### `type packet`
 
-Each node is a field and needs `bits`, an inclusive range. Fields are laid
-out in rows of `width` bits; one that crosses a row boundary is split across
-rows and named once.
+Its elements are `field`s, and the inclusive bit range comes straight after
+the label. Fields are laid out in rows of `width` bits; one that crosses a row
+boundary is split across rows and named once.
 
-```
+```bgraph
 type packet {
   title: "TCP header"
   width: 32            // bits per row, default 32
@@ -95,9 +95,9 @@ type packet {
   ruler: on            // bit indices above each row
 }
 
-node sport "Source port"      { bits: 0 15 }
-node dport "Destination port" { bits: 16 31 }
-node seq   "Sequence number"  { bits: 32 63 }
+field sport "Source port"       0 15
+field dport "Destination port" 16 31
+field seq   "Sequence number"  32 63
 ```
 
 `check` reports overlapping ranges as errors and unassigned bits between two
@@ -106,8 +106,14 @@ fields as warnings, so a header that does not add up says so.
 Edges and placement are ignored by both chart archetypes — and reported, not
 silently dropped.
 
-Worked examples: [`examples/pie.bd`](../examples/pie.bd) and
-[`examples/packet.bd`](../examples/packet.bd).
+**`node` still works everywhere** as a universal synonym for the archetype's
+own word, and every positional value can be written as a property instead —
+`slice a "A" 10` and `slice a "A" { value: 10 }` are the same statement. The
+positional form is the idiomatic one.
+
+Every archetype ships a complete, working file: they are in
+[`examples/`](../examples), and each one is reproduced in
+[`reference.md`](reference.md) under its genre.
 
 ---
 
@@ -131,7 +137,7 @@ renumber coordinates.
 `top` / `bottom` / `center` (or `middle`) for horizontal ones. It defaults
 to `center`.
 
-```
+```bgraph
 node a "A" at (0, 0)
 node b "B" right-of a gap 80 align top      // tops line up
 node c "C" below a gap 40 align left        // left edges line up
@@ -161,7 +167,7 @@ a -> b -> c    // (write these as two lines: a -> b, then b -> c)
 
 Styles are named blocks, applied with `.name`, and they compose.
 
-```
+```bgraph
 style service {
   fill: #172554
   stroke: #3b82f6 1.5
@@ -212,7 +218,7 @@ Colors are `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa` or an SVG color name
 there is no separate `opacity` property, because transparency belongs to the
 paint that carries it:
 
-```
+```bgraph
 node card "Card" {
   fill: #1e293b80      // half-transparent
   stroke: #38bdf8      // opaque border on a translucent fill
@@ -258,7 +264,7 @@ diamonds and ellipses on their edge, not on an invisible bounding box.
 
 ## Graph settings
 
-```
+```bgraph
 graph {
   background: #0b1120   // canvas fill (also backs edge labels)
                         // omit it and the surface is #ffffff, explicitly;

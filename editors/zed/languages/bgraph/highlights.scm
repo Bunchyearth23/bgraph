@@ -47,12 +47,26 @@
 ; Bare words in value position are enum members: cylinder, ortho, dashed…
 (property value: (identifier) @constant)
 
-; Positional data after the label — `slice a "A" 4820`.
+; Positional data after the label — `slice a "A" 4820`, and on an edge too:
+; `order -> line "contains" one many`.
 (item_declaration data: (identifier) @constant)
+(edge_declaration data: (identifier) @constant)
+
+; A member line — `- id: uuid` on a class, an entity or anything with a body.
+(member) @string.special.symbol
 
 (string) @string
 (number) @number
 (color) @string.special
+
+; A calendar day and a length of time are their own tokens, so a `gantt` or a
+; `timeline` reads as data rather than as unhighlighted text.
+(date) @number
+(duration) @number
+
+; `{{hole}}` — bound at render time, so it is neither a value nor an
+; identifier. It reads as the interpolation it is.
+(placeholder) @embedded
 
 ; ---------------------------------------------------------------- syntax
 

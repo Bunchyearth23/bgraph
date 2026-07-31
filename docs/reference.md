@@ -211,19 +211,6 @@ Aliases are marked. They behave identically to the property they alias; the edit
 | `head` *(alias)* | edge | `head: <solid\|open\|dot\|none>` | Alias of `arrow`. |
 | `router` | edge | `router: <straight\|ortho>` | `straight` draws a direct line; `ortho` draws a right-angled elbow. |
 | `route` *(alias)* | edge | `route: <straight\|ortho>` | Alias of `router`. |
-| `value` | both | `value: <number>` | Magnitude of a slice. Required by `type pie`, ignored elsewhere. |
-| `from-card` | edge | `from-card: <one\|many\|zero-one\|zero-many\|one-many>` | Cardinality at the tail of a relation, drawn as a crow's foot against that entity. Required by `type er`, ignored elsewhere. Usually written positionally: `order -> line "contains" one many`. |
-| `to-card` | edge | `to-card: <one\|many\|zero-one\|zero-many\|one-many>` | Cardinality at the head of a relation. A declared cardinality replaces the arrowhead at that end. |
-| `start` | node | `start: <date> <date\|duration>` | When a task begins, and either when it ends or how long it runs — read by value kind. Required by `type gantt`. |
-| `length` | node | `length: <duration>` | How long a task runs, when the start is given on its own. |
-| `kind` | node | `kind: <state\|initial\|final\|choice>` | What a state is. `initial` and `final` are drawn as marks rather than boxes and take no label; `choice` is a decision diamond. Read by `type state`. |
-| `guard` | edge | `guard: <text>` | A condition on a transition, shown in brackets after its label. |
-| `points` | node | `points: <n> <n> …` | One number per category, in order. Required by `type bar`. |
-| `wave` | node | `wave: "<characters>"` | One character per period: `0` `1` `l` `h` levels, `p` `n` clocks, `x` unknown, `z` high-impedance, `=` and `2`–`9` data, `.` repeats the previous, `\|` a gap. Required by `type wave`. |
-| `data` | node | `data: "<first>" "<second>" …` | Names for the data segments of a wave, in order. |
-| `x` | node | `x: <number>` | Horizontal position. Required by `type quadrant`, ignored elsewhere. |
-| `y` | node | `y: <number>` | Vertical position. Required by `type quadrant`, ignored elsewhere. |
-| `bits` | node | `bits: <first> <last>` | Inclusive bit range of a field. Required by `type packet`, ignored elsewhere; `bits: 8` is shorthand for a single bit. |
 | `shadow` | node | `shadow: <on\|off>` | Soft drop shadow under the shape. |
 
 ## Graph settings
@@ -257,6 +244,45 @@ node <id> ["label"]
 
 It takes no settings.
 
+<details>
+<summary>A complete file — <code>examples/groups.bd</code></summary>
+
+```
+// A group is a frame sized by what it holds. Give it a placement and the
+// whole subtree moves together.
+
+graph { background: #0f172a padding: 32 gap: 44 }
+
+style node  { fill: #1e293b stroke: #334155 1.5 font: 13 #e2e8f0 radius: 8 }
+style group { stroke: #38bdf8 1.2 font: 12 #38bdf8 fill: #38bdf80c radius: 12 }
+style edge  { stroke: #64748b 1.5 font: 11 #94a3b8 }
+style store extends node { shape: cylinder stroke: #10b981 1.5 }
+
+node client "Client" at (0, 0)
+
+group edge "Edge" right-of client gap 60 {
+  padding: 20
+  node gw   "Gateway"
+  node auth "Auth" below gw gap 26
+}
+
+group core "Core services" right-of edge gap 60 {
+  padding: 20
+  node orders  "Orders"
+  node billing "Billing" below orders gap 26
+}
+
+node db "Postgres" .store right-of core gap 60
+
+client -> gw    "https"
+gw     -> auth  "verify"
+gw     -> orders
+orders -> billing
+orders -> db    "sql"
+```
+
+</details>
+
 ### `type pie`
 
 A pie or donut chart. Each slice needs a value; its `fill` overrides the automatic palette.
@@ -274,6 +300,35 @@ slice <id> ["label"] <value>
 | `labels` | `labels: <percent\|value\|both\|none>` | What to write on each slice. Slices too thin to read are skipped. |
 | `legend` | `legend: <on\|off>` | Swatch-and-name list beside the chart. On by default — identity must never rest on color alone. |
 
+On a `slice` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `value` | node | `value: <number>` | Magnitude of a slice. Usually written positionally — `slice emea "EMEA" 4820`. |
+
+<details>
+<summary>A complete file — <code>examples/pie.bd</code></summary>
+
+```
+type pie {
+  title: "Traffic sources"
+  radius: 130
+  donut: 0.55
+  labels: percent
+}
+
+graph { background: #0b1120 padding: 32 }
+
+// `slice <id> ["label"] <value>` — the value rides in position.
+slice organic  "Organic search" 4820
+slice direct   "Direct"         2410
+slice referral "Referral"       1180
+slice social   "Social"          690
+slice paid     "Paid"            410
+```
+
+</details>
+
 ### `type gantt`
 
 Bars on a calendar. A task says when it starts and either when it ends or how long it runs; a `group` becomes a section.
@@ -289,6 +344,50 @@ task <id> ["label"] <start> <start>
 | `ticks` | `ticks: <day\|week\|month>` | How often the calendar is marked. Chosen from the span if unset. |
 | `today` | `today: <date>` | Draws a line at one date, for reading progress against it. |
 
+On a `task` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `start` | node | `start: <date> <date\|duration>` | When a task begins, and either when it ends or how long it runs — read by value kind. |
+| `length` | node | `length: <duration>` | How long a task runs, when the start is given on its own. |
+
+<details>
+<summary>A complete file — <code>examples/gantt.bd</code></summary>
+
+```
+type gantt {
+  title: "bgraph, the archetypes"
+  size: 560 26
+  today: 2026-09-14
+}
+graph { background: #0b1120 padding: 32 }
+style task  { font: 12 #e2e8f0 }
+style group { stroke: #334155 1 font: 11 #94a3b8 fill: #ffffff06 radius: 4 }
+
+group found "foundations" {
+  task vocab  "vocabulary"   2026-08-03 6d
+  task groups "containers"   2026-08-09 5d
+  task frame  "plot frame"   2026-08-14 4d
+  task dates  "dates"        2026-08-18 3d
+}
+
+group charts "charts" {
+  task pie  "pie"      2026-08-21 3d
+  task bars "bar & xy" 2026-08-24 6d
+  task tree "treemap"  2026-08-30 4d
+  task flow "sankey"   2026-09-03 5d
+}
+
+group dev "software" {
+  task seq   "sequence" 2026-09-08 5d
+  task state "state"    2026-09-13 4d
+  task uml   "class"    2026-09-17 4d
+  task plan  "gantt"    2026-09-21 2026-09-28
+}
+```
+
+</details>
+
 ### `type class`
 
 Boxes with a name and a list of members, placed by anchors like `free`. A bare string in the block is a member.
@@ -300,6 +399,47 @@ class <id> ["label"]
 | Setting | Syntax | Meaning |
 |---|---|---|
 | `title` | `title: <text>` | Heading drawn above the diagram. |
+
+<details>
+<summary>A complete file — <code>examples/class.bd</code></summary>
+
+```
+type class { title: "Ordering domain" }
+graph { background: #0b1120 padding: 32 gap: 56 }
+
+style class { fill: #1e293b stroke: #38bdf8 1.4 font: 13 #e2e8f0 radius: 6 padding: 14 }
+style edge  { stroke: #64748b 1.4 font: 11 #94a3b8 }
+
+class user "User" at (0, 0) {
+  - id: Uuid
+  - email: String
+  - name: String
+}
+
+class order "Order" right-of user gap 90 {
+  - id: Uuid
+  - user_id: Uuid
+  - total: Money
+  - placed_at: DateTime
+}
+
+class line "OrderLine" below order gap 44 {
+  - order_id: Uuid
+  - sku: String
+  - qty: u32
+}
+
+class money "Money" right-of order gap 90 {
+  - amount: i64
+  - currency: Iso4217
+}
+
+user  -> order "places"
+order -> line  "contains"
+order -> money "totals" { dash: dashed }
+```
+
+</details>
 
 ### `type timeline`
 
@@ -320,6 +460,25 @@ On an `event` — these are its own, and are not offered elsewhere:
 | Property | Where | Syntax | Meaning |
 |---|---|---|---|
 | `date` | node | `date: <date>` | When the event happened. Usually written positionally — `event launch "Launch" 2026-03-15`. Events are drawn in date order, and their labels staggered above and below the line so a cluster stays readable. |
+
+<details>
+<summary>A complete file — <code>examples/timeline.bd</code></summary>
+
+```
+type timeline { title: "Rust editions and releases" size: 860 36 }
+graph { background: #ffffff padding: 32 }
+
+event r1  "Rust 1.0"        2015-05-15
+event e15 "Edition 2015"    2015-05-15
+event e18 "Edition 2018"    2018-12-06
+event async "async/await"   2019-11-07
+event e21 "Edition 2021"    2021-10-21
+event gats "GATs stabilised" 2022-11-03
+event lets "let-else"       2022-06-30
+event e24 "Edition 2024"    2025-02-20
+```
+
+</details>
 
 ### `type block`
 
@@ -343,6 +502,49 @@ On a `block` — these are its own, and are not offered elsewhere:
 | `description` | node | `description: <text>` | A sentence under the technology line, smaller and lighter. Wrapped at a fixed column, and the box is sized around it. |
 | `desc` *(alias)* | node | `desc: <text>` | Alias of `description`. |
 
+<details>
+<summary>A complete file — <code>examples/block.bd</code></summary>
+
+```
+type block { title: "Internet banking — containers" }
+graph { background: #f8fafc padding: 36 gap: 72 }
+
+block customer "Personal Banking Customer" person {
+  description: "A customer of the bank, with personal accounts."
+}
+
+group system "Internet Banking System" below customer gap 52 {
+  block web "Web Application" container at (0, 0) {
+    tech: "Java, Spring MVC"
+    description: "Delivers the static content and the SPA."
+  }
+  block spa "Single-Page App" container right-of web gap 150 {
+    tech: "TypeScript, Angular"
+    description: "Provides all the banking functionality in the browser."
+  }
+  block api "API Application" container below spa gap 64 {
+    tech: "Java, Spring MVC"
+    description: "Provides banking functionality via a JSON/HTTPS API."
+  }
+  block db "Database" database left-of api gap 150 {
+    tech: "Oracle 19c"
+    description: "Stores user registration, hashed credentials and logs."
+  }
+}
+
+block mainframe "Mainframe Banking System" external below db gap 56 {
+  description: "Stores the core banking information."
+}
+
+customer -> web "Visits bigbank.com" { tech: "HTTPS" }
+web -> spa "Delivers to the browser"
+spa -> api "Makes API calls to" { tech: "JSON/HTTPS" }
+api -> db "Reads from and writes to" { tech: "SQL/TCP" }
+api -> mainframe "Makes API calls to" { tech: "XML/HTTPS" }
+```
+
+</details>
+
 ### `type er`
 
 Entities and the relations between them. A bare string in the block is a column, exactly as in `class`; what `er` adds is cardinality at each end of a relation, written after the label and read at the end nearest the entity it describes — `order -> line "contains" one many` is one order, many lines.
@@ -359,6 +561,55 @@ entity <id> ["label"]
 |---|---|---|
 | `title` | `title: <text>` | Heading drawn above the diagram. |
 
+On an `entity` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `from-card` | edge | `from-card: <one\|many\|zero-one\|zero-many\|one-many>` | Cardinality at the tail of a relation, drawn as a crow's foot against that entity. Usually written positionally — `order -> line "contains" one many`. |
+| `to-card` | edge | `to-card: <one\|many\|zero-one\|zero-many\|one-many>` | Cardinality at the head of a relation. A declared cardinality replaces the arrowhead at that end. |
+
+<details>
+<summary>A complete file — <code>examples/er.bd</code></summary>
+
+```
+type er { title: "Ordering schema" }
+graph { background: #0b1120 padding: 32 gap: 56 }
+
+style entity { fill: #1e293b stroke: #38bdf8 1.4 font: 13 #e2e8f0 radius: 6 padding: 14 }
+style edge   { stroke: #64748b 1.4 font: 11 #94a3b8 head: none }
+
+entity customer "Customer" at (0, 0) {
+  - id: uuid PK
+  - email: text
+  - created_at: timestamptz
+}
+
+entity order "Order" right-of customer gap 120 {
+  - id: uuid PK
+  - customer_id: uuid FK
+  - placed_at: timestamptz
+  - total_cents: bigint
+}
+
+entity line "OrderLine" below order gap 56 {
+  - order_id: uuid FK
+  - sku: text
+  - qty: integer
+}
+
+entity address "Address" below customer gap 56 {
+  - customer_id: uuid FK
+  - line1: text
+  - city: text
+}
+
+customer -> order   "places"    one many
+order    -> line    "contains"  one one-many
+customer -> address "ships to"  one zero-many
+```
+
+</details>
+
 ### `type state`
 
 A state machine. States are placed by anchors, exactly as in `free` — the archetype supplies the vocabulary and the shapes, not a layout engine. Nest them with `group`.
@@ -370,6 +621,49 @@ state <id> ["label"]
 | Setting | Syntax | Meaning |
 |---|---|---|
 | `title` | `title: <text>` | Heading drawn above the machine. |
+
+On a `state` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `kind` | node | `kind: <state\|initial\|final\|choice>` | What a state is. `initial` and `final` are drawn as marks rather than boxes and take no label; `choice` is a decision diamond. |
+| `guard` | edge | `guard: <text>` | A condition on a transition, shown in brackets after its label. |
+
+<details>
+<summary>A complete file — <code>examples/state.bd</code></summary>
+
+```
+type state { title: "Order lifecycle" }
+graph { background: #0b1120 padding: 32 gap: 54 }
+
+style state { fill: #1e293b stroke: #38bdf8 1.5 font: 13 #e2e8f0 padding: 16 }
+style edge  { stroke: #64748b 1.5 font: 11 #94a3b8 }
+style group { stroke: #f59e0b 1.2 font: 11 #f59e0b fill: #f59e0b0c }
+
+state begin      { kind: initial }
+state draft "Draft"        right-of begin gap 46
+state placed "Placed"      right-of draft
+
+group fulfil "fulfilment" {
+  padding: 22
+  state picking "Picking"  right-of placed gap 60
+  state shipped "Shipped"  right-of picking gap 46
+}
+
+state done "Delivered"     right-of fulfil gap 56
+state stop { kind: final }  right-of done gap 46
+state cancelled "Cancelled" below placed gap 62
+
+begin   -> draft
+draft   -> placed  "submit"
+placed  -> picking "pay"      { guard: "funds cleared" }
+picking -> shipped "dispatch"
+shipped -> done    "deliver"
+done    -> stop
+placed  -> cancelled "cancel"
+```
+
+</details>
 
 ### `type sequence`
 
@@ -385,6 +679,43 @@ participant <id> ["label"]
 | `column` | `column: <number>` | Width of a participant's column. 150 by default. |
 | `row` | `row: <number>` | Vertical space one message takes. 46 by default. |
 | `numbered` | `numbered: <on\|off>` | Number the messages in order. |
+
+<details>
+<summary>A complete file — <code>examples/sequence.bd</code></summary>
+
+```
+type sequence {
+  title: "Checkout"
+  column: 160
+  row: 46
+  numbered: on
+}
+graph { background: #0b1120 padding: 30 }
+style participant { fill: #1e293b stroke: #334155 1.5 font: 13 #e2e8f0 radius: 8 }
+style edge  { stroke: #7dd3fc 1.5 font: 11 #cbd5e1 }
+style group { stroke: #f59e0b 1.2 font: 11 #f59e0b fill: #f59e0b10 }
+
+participant browser "Browser"
+participant api     "API"
+participant bank    "Bank"
+participant db      "Postgres"
+
+browser -> api  "POST /checkout"
+api     -> db   "reserve stock"
+db      --> api "ok"
+
+group retry "retry up to 3×" {
+  api  -> bank "authorise"
+  bank --> api "declined" { stroke: #f43f5e }
+}
+
+api  -> bank "authorise"
+bank --> api "approved"
+api  -> db   "commit"
+api  --> browser "201 Created"
+```
+
+</details>
 
 ### `type xy`
 
@@ -404,6 +735,32 @@ series <id> ["label"] <points> …
 | `mark` | `mark: <line\|area\|dot>` | How a series is drawn. `line` by default; `area` fills beneath it, `dot` plots the points alone. |
 | `legend` | `legend: <on\|off>` | Swatch-and-name list. Shown from two series up. |
 
+On a `series` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `points` | node | `points: <n> <n> …` | One number per category, in order. Usually written positionally — `series north 4 8 15`. |
+
+<details>
+<summary>A complete file — <code>examples/xy.bd</code></summary>
+
+```
+type xy {
+  title: "Requests per second, by week"
+  size: 520 260
+  categories: "W1" "W2" "W3" "W4" "W5" "W6" "W7" "W8"
+  mark: line
+}
+graph { background: #0b1120 padding: 32 }
+style series { font: 12 #e2e8f0 }
+
+series edge   "Edge"    120 168 155 210 265 240 310 355
+series origin "Origin"   90 102 118 130 126 148 160 172
+series cache  "Cache"    30  66  37  80 139  92 150 183
+```
+
+</details>
+
 ### `type bar`
 
 Bars grouped or stacked across named categories. One series per statement, its numbers in category order.
@@ -420,6 +777,31 @@ series <id> ["label"] <points> …
 | `stack` | `stack: <on\|off>` | Stack the series instead of standing them side by side. |
 | `y-axis` | `y-axis: <min> <max>` | Force the value axis. Otherwise it is rounded outward from the data to human numbers. |
 | `legend` | `legend: <on\|off>` | Swatch-and-name list. Shown from two series up; identity must never rest on colour alone. |
+
+On a `series` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `points` | node | `points: <n> <n> …` | One number per category, in order. Usually written positionally — `series north 4 8 15`. |
+
+<details>
+<summary>A complete file — <code>examples/bar.bd</code></summary>
+
+```
+type bar {
+  title: "Quarterly revenue, by region"
+  size: 520 280
+  categories: "Q1" "Q2" "Q3" "Q4"
+}
+graph { background: #0b1120 padding: 32 }
+style series { font: 12 #e2e8f0 }
+
+series emea "EMEA"   120 185 240 310
+series amer "AMER"   200 210 265 280
+series apac "APAC"    80 130 175 260
+```
+
+</details>
 
 ### `type sankey`
 
@@ -441,6 +823,45 @@ node <id> ["label"]
 | `width` | `width: <number>` | Thickness of a node bar. |
 | `labels` | `labels: <name\|value\|both\|none>` | What to write beside each node. |
 
+On a `node` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `value` | edge | `value: <number>` | How much flows along this link. Usually written positionally — `coal -> grid 40`. |
+
+<details>
+<summary>A complete file — <code>examples/sankey.bd</code></summary>
+
+```
+type sankey {
+  title: "Where the traffic goes"
+  size: 620 340
+  gap: 16
+  labels: both
+}
+graph { background: #0b1120 padding: 32 }
+style node { font: 12 #e2e8f0 }
+
+node search "Organic"
+node social "Social"
+node paid   "Paid"
+node landing "Landing"
+node pricing "Pricing"
+node signup  "Sign-up"
+node bounce  "Bounce"
+
+search  -> landing 4200
+social  -> landing 1500
+paid    -> pricing  900
+search  -> pricing  620
+landing -> signup  2100
+landing -> bounce  3600
+pricing -> signup  1100
+pricing -> bounce   420
+```
+
+</details>
+
 ### `type wave`
 
 A timing diagram. Each signal carries a wave string, one character per period, in the WaveDrom alphabet.
@@ -457,6 +878,35 @@ signal <id> ["label"] <wave>
 | `ruler` | `ruler: <on\|off>` | Period numbers above the lanes. On by default. |
 | `every` | `every: <number>` | Label a ruler tick every N periods. 4 by default. |
 | `grid` | `grid: <on\|off>` | Vertical lines on the period boundaries. On by default. |
+
+On a `signal` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `wave` | node | `wave: "<characters>"` | One character per period: `0` `1` `l` `h` levels, `p` `n` clocks, `x` unknown, `z` high-impedance, `=` and `2`–`9` data, `.` repeats the previous, `\|` a gap. |
+| `data` | node | `data: "<first>" "<second>" …` | Names for the data segments of a wave, in order. |
+
+<details>
+<summary>A complete file — <code>examples/wave.bd</code></summary>
+
+```
+type wave {
+  title: "SPI transfer"
+  period: 34
+  lane: 26 16
+  every: 4
+}
+graph { background: #0b1120 padding: 30 }
+style signal { font: 12 #e2e8f0 stroke: #7dd3fc }
+
+signal sclk "SCLK"  "p........."
+signal cs   "~CS"   "10........1"
+signal mosi "MOSI"  "x.=.=.=.=.x" { data: "cmd" "addr" "data" "crc" }
+signal miso "MISO"  "z...=.=...z" { data: "ack" "status" }
+signal busy "BUSY"  "0..1...0..."
+```
+
+</details>
 
 ### `type quadrant`
 
@@ -476,6 +926,38 @@ point <id> ["label"] <x> <y>
 | `quadrants` | `quadrants: "<top-right>" "<top-left>" "<bottom-left>" "<bottom-right>"` | Names for the four regions, anticlockwise from the top right. |
 | `labels` | `labels: <name\|none>` | Whether each point carries its name. |
 
+On a `point` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `x` | node | `x: <number>` | Horizontal position, on the axis range the archetype declares. |
+| `y` | node | `y: <number>` | Vertical position, on the axis range the archetype declares. |
+
+<details>
+<summary>A complete file — <code>examples/quadrant.bd</code></summary>
+
+```
+type quadrant {
+  title: "Where the work sits"
+  size: 460 400
+  x-axis: "Cheap" "Costly"
+  y-axis: "Low value" "High value"
+  quadrants: "Do now" "Quick wins" "Drop" "Reconsider"
+  labels: name
+}
+graph { background: #0b1120 padding: 34 }
+style point { font: 12 #e2e8f0 }
+
+point wave     "type wave"     0.62 0.86
+point sankey   "type sankey"   0.28 0.72
+point quadrant "type quadrant" 0.16 0.64
+point block    "type block"    0.70 0.55
+point gantt    "type gantt"    0.80 0.30
+point venn     "Venn"          0.35 0.18
+```
+
+</details>
+
 ### `type treemap`
 
 Nested rectangles whose area is proportional to a value. The hierarchy is group nesting; a group's area is the sum of what it contains.
@@ -492,6 +974,48 @@ box <id> ["label"] <value>
 | `header` | `header: <number>` | Height reserved inside a group's tile for its name. |
 | `labels` | `labels: <name\|value\|both\|none>` | What to write on each tile. Tiles too small to read are skipped. |
 
+On a `box` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `value` | node | `value: <number>` | Area of a box, relative to its siblings. Usually written positionally — `box api "API" 42`. |
+
+<details>
+<summary>A complete file — <code>examples/treemap.bd</code></summary>
+
+```
+type treemap {
+  title: "Repository, by lines of code"
+  size: 660 380
+  labels: both
+}
+graph { background: #0b1120 padding: 30 }
+
+group rust "Rust" {
+  box lsp    "lsp.rs"        1180
+  box charts "charts.rs"      760
+  box layout "layout.rs"      620
+  box render "render_svg.rs"  560
+  box check  "check.rs"       540
+  box props  "props.rs"       520
+  box tests  "tests.rs"      1240
+}
+
+group grammar "Grammar" {
+  box pest "syntax.pest"  70
+  box ts   "grammar.js"  130
+  box corp "corpus"      420
+}
+
+group docs "Docs" {
+  box ref  "reference.md" 300
+  box lang "language.md"  260
+  box idx  "INDEX.md"     140
+}
+```
+
+</details>
+
 ### `type packet`
 
 A packet / bitfield diagram. Each field needs an inclusive bit range; one crossing a row boundary is split across rows.
@@ -506,6 +1030,48 @@ field <id> ["label"] <bits> <bits>
 | `width` | `width: <bits>` | Bits per row. 32 by default. |
 | `cell` | `cell: <width> <height>` | Width of one bit and the height of a row. |
 | `ruler` | `ruler: <on\|off>` | Bit indices above each row. On by default. |
+
+On a `field` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `bits` | node | `bits: <first> <last>` | Inclusive bit range of a field. `bits: 8` is shorthand for a single bit. Usually written positionally — `field flags "Flags" 8 15`. |
+
+<details>
+<summary>A complete file — <code>examples/packet.bd</code></summary>
+
+```
+type packet {
+  title: "TCP header"
+  width: 32
+  ruler: on
+}
+
+graph { background: #0b1120 }
+
+style field {
+  fill: #1e293b
+  stroke: #334155 1
+  radius: 3
+  font: 12 #e2e8f0
+}
+
+style flag extends field { fill: #422006 stroke: #f59e0b 1 }
+
+// `field <id> ["label"] <bits> <bits>` — an inclusive range, in position.
+field sport "Source port"           0 15
+field dport "Destination port"     16 31
+field seq   "Sequence number"      32 63
+field ack   "Acknowledgment number" 64 95
+field off   "Offset"               96 99
+field rsv   "Rsvd"                100 102
+field flags "Flags" .flag         103 111
+field win   "Window"              112 127
+field sum   "Checksum"            128 143
+field urg   "Urgent pointer"      144 159
+```
+
+</details>
 
 Edges and placement are ignored by the chart archetypes — and reported, not
 silently dropped.

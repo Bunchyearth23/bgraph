@@ -274,119 +274,6 @@ pub const PROPS: &[PropDef] = &[
         doc: "Alias of `router`.",
     },
     PropDef {
-        name: "value",
-        alias: false,
-        ctx: Ctx::Both,
-        words: &[],
-        syntax: "value: <number>",
-        doc: "Magnitude of a slice. Required by `type pie`, ignored elsewhere.",
-    },
-    PropDef {
-        name: "from-card",
-        alias: false,
-        ctx: Ctx::Edge,
-        words: CARDINALITIES,
-        syntax: "from-card: <one|many|zero-one|zero-many|one-many>",
-        doc: "Cardinality at the tail of a relation, drawn as a crow's foot \
-              against that entity. Required by `type er`, ignored elsewhere. \
-              Usually written positionally: `order -> line \"contains\" one many`.",
-    },
-    PropDef {
-        name: "to-card",
-        alias: false,
-        ctx: Ctx::Edge,
-        words: CARDINALITIES,
-        syntax: "to-card: <one|many|zero-one|zero-many|one-many>",
-        doc: "Cardinality at the head of a relation. A declared cardinality \
-              replaces the arrowhead at that end.",
-    },
-    PropDef {
-        name: "start",
-        alias: false,
-        ctx: Ctx::Node,
-        words: &[],
-        syntax: "start: <date> <date|duration>",
-        doc: "When a task begins, and either when it ends or how long it runs \
-              — read by value kind. Required by `type gantt`.",
-    },
-    PropDef {
-        name: "length",
-        alias: false,
-        ctx: Ctx::Node,
-        words: &[],
-        syntax: "length: <duration>",
-        doc: "How long a task runs, when the start is given on its own.",
-    },
-    PropDef {
-        name: "kind",
-        alias: false,
-        ctx: Ctx::Node,
-        words: STATE_KINDS,
-        syntax: "kind: <state|initial|final|choice>",
-        doc: "What a state is. `initial` and `final` are drawn as marks rather \
-              than boxes and take no label; `choice` is a decision diamond. \
-              Read by `type state`.",
-    },
-    PropDef {
-        name: "guard",
-        alias: false,
-        ctx: Ctx::Edge,
-        words: &[],
-        syntax: "guard: <text>",
-        doc: "A condition on a transition, shown in brackets after its label.",
-    },
-    PropDef {
-        name: "points",
-        alias: false,
-        ctx: Ctx::Node,
-        words: &[],
-        syntax: "points: <n> <n> …",
-        doc: "One number per category, in order. Required by `type bar`.",
-    },
-    PropDef {
-        name: "wave",
-        alias: false,
-        ctx: Ctx::Node,
-        words: &[],
-        syntax: "wave: \"<characters>\"",
-        doc: "One character per period: `0` `1` `l` `h` levels, `p` `n` clocks, \
-              `x` unknown, `z` high-impedance, `=` and `2`–`9` data, `.` repeats \
-              the previous, `|` a gap. Required by `type wave`.",
-    },
-    PropDef {
-        name: "data",
-        alias: false,
-        ctx: Ctx::Node,
-        words: &[],
-        syntax: "data: \"<first>\" \"<second>\" …",
-        doc: "Names for the data segments of a wave, in order.",
-    },
-    PropDef {
-        name: "x",
-        alias: false,
-        ctx: Ctx::Node,
-        words: &[],
-        syntax: "x: <number>",
-        doc: "Horizontal position. Required by `type quadrant`, ignored elsewhere.",
-    },
-    PropDef {
-        name: "y",
-        alias: false,
-        ctx: Ctx::Node,
-        words: &[],
-        syntax: "y: <number>",
-        doc: "Vertical position. Required by `type quadrant`, ignored elsewhere.",
-    },
-    PropDef {
-        name: "bits",
-        alias: false,
-        ctx: Ctx::Node,
-        words: &[],
-        syntax: "bits: <first> <last>",
-        doc: "Inclusive bit range of a field. Required by `type packet`, ignored \
-              elsewhere; `bits: 8` is shorthand for a single bit.",
-    },
-    PropDef {
         name: "shadow",
         alias: false,
         ctx: Ctx::Node,
@@ -457,6 +344,16 @@ pub fn item_lookup(def: &ArchetypeDef, name: &str) -> Option<&'static PropDef> {
     lookup(name, def.item_props).or_else(|| lookup(name, PROPS))
 }
 
+/// Which genres read a property, for an error that can say so. Empty when the
+/// name is not anyone's — that is a typo, and a different message.
+pub fn genres_reading(name: &str) -> Vec<&'static str> {
+    ARCHETYPES
+        .iter()
+        .filter(|a| lookup(name, a.item_props).is_some())
+        .map(|a| a.name)
+        .collect()
+}
+
 /// Every property an item of this archetype accepts, with its refinements
 /// shadowing the shared entries of the same name.
 pub fn item_table(def: &ArchetypeDef) -> Vec<&'static PropDef> {
@@ -469,6 +366,163 @@ pub fn item_table(def: &ArchetypeDef) -> Vec<&'static PropDef> {
         )
         .collect()
 }
+
+
+// The data each genre reads, kept with the genre. Off the shared table on
+// purpose: `wave` means nothing to a pie, and offering it there is the noise
+// that made completion get in the way (`D-019`).
+
+pub const PIE_ITEM_PROPS: &[PropDef] = &[PropDef {
+    name: "value",
+    alias: false,
+    ctx: Ctx::Node,
+    words: &[],
+    syntax: "value: <number>",
+    doc: "Magnitude of a slice. Usually written positionally — \
+          `slice emea \"EMEA\" 4820`.",
+}];
+
+pub const TREEMAP_ITEM_PROPS: &[PropDef] = &[PropDef {
+    name: "value",
+    alias: false,
+    ctx: Ctx::Node,
+    words: &[],
+    syntax: "value: <number>",
+    doc: "Area of a box, relative to its siblings. Usually written \
+          positionally — `box api \"API\" 42`.",
+}];
+
+pub const SANKEY_ITEM_PROPS: &[PropDef] = &[PropDef {
+    name: "value",
+    alias: false,
+    ctx: Ctx::Edge,
+    words: &[],
+    syntax: "value: <number>",
+    doc: "How much flows along this link. Usually written positionally — \
+          `coal -> grid 40`.",
+}];
+
+pub const PACKET_ITEM_PROPS: &[PropDef] = &[PropDef {
+    name: "bits",
+    alias: false,
+    ctx: Ctx::Node,
+    words: &[],
+    syntax: "bits: <first> <last>",
+    doc: "Inclusive bit range of a field. `bits: 8` is shorthand for a single \
+          bit. Usually written positionally — `field flags \"Flags\" 8 15`.",
+}];
+
+pub const QUADRANT_ITEM_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "x",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "x: <number>",
+        doc: "Horizontal position, on the axis range the archetype declares.",
+    },
+    PropDef {
+        name: "y",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "y: <number>",
+        doc: "Vertical position, on the axis range the archetype declares.",
+    },
+];
+
+pub const WAVE_ITEM_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "wave",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "wave: \"<characters>\"",
+        doc: "One character per period: `0` `1` `l` `h` levels, `p` `n` clocks, \
+              `x` unknown, `z` high-impedance, `=` and `2`–`9` data, `.` repeats \
+              the previous, `|` a gap.",
+    },
+    PropDef {
+        name: "data",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "data: \"<first>\" \"<second>\" …",
+        doc: "Names for the data segments of a wave, in order.",
+    },
+];
+
+pub const SERIES_ITEM_PROPS: &[PropDef] = &[PropDef {
+    name: "points",
+    alias: false,
+    ctx: Ctx::Node,
+    words: &[],
+    syntax: "points: <n> <n> …",
+    doc: "One number per category, in order. Usually written positionally — \
+          `series north 4 8 15`.",
+}];
+
+pub const GANTT_ITEM_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "start",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "start: <date> <date|duration>",
+        doc: "When a task begins, and either when it ends or how long it runs \
+              — read by value kind.",
+    },
+    PropDef {
+        name: "length",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "length: <duration>",
+        doc: "How long a task runs, when the start is given on its own.",
+    },
+];
+
+pub const STATE_ITEM_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "kind",
+        alias: false,
+        ctx: Ctx::Node,
+        words: STATE_KINDS,
+        syntax: "kind: <state|initial|final|choice>",
+        doc: "What a state is. `initial` and `final` are drawn as marks rather \
+              than boxes and take no label; `choice` is a decision diamond.",
+    },
+    PropDef {
+        name: "guard",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: &[],
+        syntax: "guard: <text>",
+        doc: "A condition on a transition, shown in brackets after its label.",
+    },
+];
+
+pub const ER_ITEM_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "from-card",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: CARDINALITIES,
+        syntax: "from-card: <one|many|zero-one|zero-many|one-many>",
+        doc: "Cardinality at the tail of a relation, drawn as a crow's foot \
+              against that entity. Usually written positionally — \
+              `order -> line \"contains\" one many`.",
+    },
+    PropDef {
+        name: "to-card",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: CARDINALITIES,
+        syntax: "to-card: <one|many|zero-one|zero-many|one-many>",
+        doc: "Cardinality at the head of a relation. A declared cardinality \
+              replaces the arrowhead at that end.",
+    },
+];
 
 // ---------------------------------------------------------------- archetypes
 
@@ -523,7 +577,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         doc: "A pie or donut chart. Each slice needs a value; its `fill` \
               overrides the automatic palette.",
         props: PIE_PROPS,
-        item_props: &[],
+        item_props: PIE_ITEM_PROPS,
         slots: &[Slot {
             prop: "value",
             arity: 1,
@@ -537,7 +591,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         doc: "Bars on a calendar. A task says when it starts and either when \
               it ends or how long it runs; a `group` becomes a section.",
         props: GANTT_PROPS,
-        item_props: &[],
+        item_props: GANTT_ITEM_PROPS,
         slots: &[Slot {
             prop: "start",
             arity: 2,
@@ -596,7 +650,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
               and read at the end nearest the entity it describes — \
               `order -> line \"contains\" one many` is one order, many lines.",
         props: ER_PROPS,
-        item_props: &[],
+        item_props: ER_ITEM_PROPS,
         slots: &[],
         edge_slots: &[
             Slot {
@@ -617,7 +671,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
               `free` — the archetype supplies the vocabulary and the shapes, \
               not a layout engine. Nest them with `group`.",
         props: STATE_PROPS,
-        item_props: &[],
+        item_props: STATE_ITEM_PROPS,
         slots: &[],
         edge_slots: &[],
     },
@@ -639,7 +693,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         doc: "Lines, areas or dots over a shared x axis. One series per \
               statement, its numbers evenly spaced across the plot.",
         props: XY_PROPS,
-        item_props: &[],
+        item_props: SERIES_ITEM_PROPS,
         slots: &[Slot {
             prop: "points",
             arity: VARIADIC,
@@ -653,7 +707,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         doc: "Bars grouped or stacked across named categories. One series per \
               statement, its numbers in category order.",
         props: BAR_PROPS,
-        item_props: &[],
+        item_props: SERIES_ITEM_PROPS,
         slots: &[Slot {
             prop: "points",
             arity: VARIADIC,
@@ -668,7 +722,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
               link, not on what it joins: a node's height is whatever passes \
               through it.",
         props: SANKEY_PROPS,
-        item_props: &[],
+        item_props: SANKEY_ITEM_PROPS,
         slots: &[],
         edge_slots: &[Slot {
             prop: "value",
@@ -682,7 +736,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         doc: "A timing diagram. Each signal carries a wave string, one \
               character per period, in the WaveDrom alphabet.",
         props: WAVE_PROPS,
-        item_props: &[],
+        item_props: WAVE_ITEM_PROPS,
         slots: &[Slot {
             prop: "wave",
             arity: 1,
@@ -696,7 +750,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         doc: "Points on two axes, divided into four named regions. A Wardley \
               map is this archetype with its own axis names.",
         props: QUADRANT_PROPS,
-        item_props: &[],
+        item_props: QUADRANT_ITEM_PROPS,
         slots: &[
             Slot {
                 prop: "x",
@@ -717,7 +771,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
               hierarchy is group nesting; a group's area is the sum of what \
               it contains.",
         props: TREEMAP_PROPS,
-        item_props: &[],
+        item_props: TREEMAP_ITEM_PROPS,
         slots: &[Slot {
             prop: "value",
             arity: 1,
@@ -731,7 +785,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         doc: "A packet / bitfield diagram. Each field needs an inclusive bit \
               range; one crossing a row boundary is split across rows.",
         props: PACKET_PROPS,
-        item_props: &[],
+        item_props: PACKET_ITEM_PROPS,
         slots: &[Slot {
             prop: "bits",
             arity: 2,

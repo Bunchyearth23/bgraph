@@ -309,7 +309,6 @@ impl Server {
                 .iter()
                 .filter(|p| !p.alias)
                 .filter(|p| want.is_none_or(|c| p.ctx.allows(c)))
-                .filter(|p| relevant_here(p.name, archetype))
                 .enumerate()
                 .map(|(i, p)| {
                     let mut it = completion(p.name, 10, p.syntax, p.doc);
@@ -666,14 +665,19 @@ impl Context {
 
         let block = stack.pop().map(|brace| {
             let line_start = text[..brace].rfind('\n').map(|i| i + 1).unwrap_or(0);
-            match text[line_start..brace].split_whitespace().next() {
+            let head = &text[line_start..brace];
+            match head.split_whitespace().next() {
                 Some("type") => Block::Type,
                 Some("graph") => Block::Graph,
                 // A group's block takes node-ish visual properties.
                 Some("group") => Block::Node,
                 Some("style") => Block::Style,
-                Some("node") => Block::Node,
-                _ => Block::Edge,
+                // Everything else is an item or an edge, and the arrow is what
+                // tells them apart. Matching the *keyword* instead would mean
+                // knowing all sixteen of them — which is how `slice a "A" {`
+                // came to be offered `arrow` and `router`, and denied `fill`.
+                _ if declares_an_edge(head) => Block::Edge,
+                _ => Block::Node,
             }
         });
 
@@ -683,6 +687,37 @@ impl Context {
             block,
         }
     }
+}
+
+/// Whether a statement's head is an edge: it has an arrow outside a label.
+fn declares_an_edge(head: &str) -> bool {
+    const ARROWS: [&str; 7] = ["<->", "<-", "-->", "..>", "--", "->", ".."];
+    let mut rest = head;
+
+    while !rest.is_empty() {
+        // A label may contain anything, arrows included; skip it whole.
+        if let Some(quote) = rest.find('"') {
+            let (before, after) = rest.split_at(quote);
+            if ARROWS.iter().any(|a| before.contains(a)) {
+                return true;
+            }
+            let mut chars = after[1..].char_indices();
+            rest = loop {
+                match chars.next() {
+                    Some((_, '\\')) => {
+                        chars.next();
+                    }
+                    Some((i, '"')) => break &after[1 + i + 1..],
+                    Some(_) => {}
+                    None => return false,
+                }
+            };
+        } else {
+            return ARROWS.iter().any(|a| rest.contains(a));
+        }
+    }
+
+    false
 }
 
 /// The archetype the file declares, by line scan — `free` when it declares none.
@@ -702,15 +737,6 @@ fn declared_archetype(text: &str) -> &str {
         }
     }
     "free"
-}
-
-/// Chart data is noise in an archetype that does not read it.
-fn relevant_here(name: &str, archetype: &str) -> bool {
-    match name {
-        "value" => archetype == "pie",
-        "bits" => archetype == "packet",
-        _ => true,
-    }
 }
 
 fn is_ident_char(c: char) -> bool {
@@ -1324,5 +1350,134 @@ mod block_vocabulary_tests {
         assert!(!free.contains(&"tech".to_string()), "{free:?}");
         // The shared vocabulary is still all there.
         assert!(free.contains(&"fill".to_string()), "{free:?}");
+    }
+}
+
+#[cfg(test)]
+mod archetype_completion_tests {
+    use super::*;
+
+    fn offered(source: &str, line: &str) -> Vec<String> {
+        let server = Server {
+            docs: HashMap::new(),
+        };
+        server
+            .items_for(source, line, source.len())
+            .iter()
+            .filter_map(|i| i["label"].as_str().map(str::to_string))
+            .collect()
+    }
+
+    #[test]
+    fn each_genre_offers_its_own_data_and_no_one_elses() {
+        // The filter this replaces knew two properties out of thirteen, and
+        // had one of them wrong: it hid `value` in a treemap, where it is
+        // required.
+        for (source, item, wanted, unwanted) in [
+            ("type treemap\nbox a \"A\" {\n  ", "box", "value", "wave"),
+            ("type pie\nslice a \"A\" {\n  ", "slice", "value", "bits"),
+            ("type wave\nsignal s \"S\" {\n  ", "signal", "wave", "value"),
+            ("type quadrant\npoint p \"P\" {\n  ", "point", "x", "points"),
+            ("type gantt\ntask t \"T\" {\n  ", "task", "start", "value"),
+            ("type packet\nfield f \"F\" {\n  ", "field", "bits", "start"),
+            ("type bar\nseries s {\n  ", "series", "points", "wave"),
+            ("type timeline\nevent e \"E\" {\n  ", "event", "date", "start"),
+            ("type block\nblock b \"B\" {\n  ", "block", "tech", "wave"),
+        ] {
+            let names = offered(source, "  ");
+            assert!(
+                names.iter().any(|n| n == wanted),
+                "`{item}` should offer `{wanted}`: {names:?}"
+            );
+            assert!(
+                !names.iter().any(|n| n == unwanted),
+                "`{item}` should not offer `{unwanted}`"
+            );
+            // The shared vocabulary is available everywhere, as it should be.
+            assert!(names.iter().any(|n| n == "fill"), "`{item}` lost `fill`");
+        }
+    }
+
+    #[test]
+    fn every_archetype_completes_after_type_and_offers_its_own_keyword() {
+        let names = offered("type ", "type ");
+        for def in props::ARCHETYPES {
+            assert!(
+                names.iter().any(|n| n == def.name),
+                "`type` completion is missing `{}`: {names:?}",
+                def.name
+            );
+        }
+
+        // And inside a file, the archetype's own word leads a statement.
+        for def in props::ARCHETYPES {
+            let source = format!("type {}\n", def.name);
+            let offered = offered(&source, "");
+            assert!(
+                offered.iter().any(|n| n == def.item),
+                "`type {}` should offer `{}`: {offered:?}",
+                def.name,
+                def.item
+            );
+        }
+    }
+
+    #[test]
+    fn an_item_block_is_not_mistaken_for_an_edge_block() {
+        // Every archetype names its elements its own way, and the block owner
+        // used to be matched against a list of five words — so `slice`, `box`,
+        // `signal`, `task`, `field`, `series`, `event`, `entity`, `point` and
+        // the rest all fell through to "edge", losing `fill`, `shape` and
+        // `size` and gaining `arrow` and `router`.
+        for def in props::ARCHETYPES {
+            let source = format!("type {}\n{} a \"A\" {{\n  ", def.name, def.item);
+            let names = offered(&source, "  ");
+            assert!(
+                names.iter().any(|n| n == "shape"),
+                "`{} {{ … }}` should offer node properties: {names:?}",
+                def.item
+            );
+            assert!(
+                !names.iter().any(|n| n == "router"),
+                "`{} {{ … }}` should not offer edge properties",
+                def.item
+            );
+        }
+
+        // And an edge still reads as one, label or no label.
+        for head in [
+            "a -> b {\n  ",
+            "a -> b \"calls\" {\n  ",
+            "a <-> b \"a -> b\" {\n  ",
+            "a ..> b {\n  ",
+        ] {
+            let names = offered(head, "  ");
+            assert!(
+                names.iter().any(|n| n == "router"),
+                "`{head}` should offer edge properties: {names:?}"
+            );
+        }
+
+        // A label holding an arrow does not make an item into an edge.
+        let names = offered("node a \"from -> to\" {\n  ", "  ");
+        assert!(names.iter().any(|n| n == "shape"), "{names:?}");
+        assert!(!names.iter().any(|n| n == "router"), "{names:?}");
+    }
+
+    #[test]
+    fn hover_documents_a_property_in_the_genre_that_reads_it() {
+        let server = Server {
+            docs: HashMap::new(),
+        };
+        let text = "type timeline\nevent e \"E\" {\n  date: 2026-03-01\n}\n";
+        let mut server = server;
+        server.docs.insert("file:///t.bd".into(), text.into());
+        let hover = server.hover(&json!({
+            "textDocument": { "uri": "file:///t.bd" },
+            "position": { "line": 2, "character": 3 },
+        }));
+        let value = hover["contents"]["value"].as_str().unwrap_or_default();
+        assert!(value.contains("date: <date>"), "{value}");
+        assert!(value.contains("When the event happened"), "{value}");
     }
 }

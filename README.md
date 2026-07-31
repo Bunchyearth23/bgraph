@@ -7,7 +7,7 @@ engine. `bgraph` inverts that: every node says where it goes, but says it
 *relative to its neighbours* — so you keep control without hand-editing
 coordinates every time the diagram grows.
 
-```
+```bgraph
 graph { background: #0b1120 gap: 70 }
 
 style node    { fill: #1e293b stroke: #334155 1.5 font: 14 #e2e8f0 }
