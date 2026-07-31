@@ -89,7 +89,7 @@ pub fn contrast(a: &str, b: &str) -> Option<f64> {
 }
 
 /// Which palette column this surface needs.
-fn is_dark(color: &str) -> bool {
+pub fn is_dark(color: &str) -> bool {
     luminance(color).is_some_and(|l| l < 0.18)
 }
 

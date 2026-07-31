@@ -48,6 +48,19 @@ pub enum StateKind {
     Choice,
 }
 
+/// What an element is in an architecture view. Drives shape and colour, so a
+/// reader tells a person from a datastore before reading the label.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BlockKind {
+    Person,
+    System,
+    Container,
+    Component,
+    Database,
+    Queue,
+    External,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Head {
     Solid,
@@ -118,6 +131,12 @@ pub struct Style {
     /// State-machine semantics.
     pub kind: Option<StateKind>,
     pub guard: Option<String>,
+    /// `type block` — what the element is.
+    pub block_kind: Option<BlockKind>,
+    /// `type block` — the technology line, drawn in brackets under the name.
+    pub tech: Option<String>,
+    /// `type block` — a sentence under the technology line.
+    pub description: Option<String>,
     /// Scheduling: a start day and a length in days.
     pub start: Option<i64>,
     pub length: Option<f64>,
@@ -174,6 +193,9 @@ impl Style {
             data,
             points,
             kind,
+            block_kind,
+            tech,
+            description,
             guard,
             start,
             length,
@@ -341,13 +363,26 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
         "points" => style.points = Some(v.iter().filter_map(|x| x.as_num()).collect()),
         "kind" => {
             let word = first.and_then(|x| x.as_word()).unwrap_or_default();
-            style.kind = Some(match word {
-                "initial" => StateKind::Initial,
-                "final" => StateKind::Final,
-                "choice" => StateKind::Choice,
-                "state" => StateKind::State,
-                other => bail!("unknown state kind `{other}`"),
-            });
+            // One word, two genres: `check` has already refused the wrong
+            // one for the declared archetype, so this only has to read it.
+            match word {
+                "initial" => style.kind = Some(StateKind::Initial),
+                "final" => style.kind = Some(StateKind::Final),
+                "choice" => style.kind = Some(StateKind::Choice),
+                "state" => style.kind = Some(StateKind::State),
+                "person" => style.block_kind = Some(BlockKind::Person),
+                "system" => style.block_kind = Some(BlockKind::System),
+                "container" => style.block_kind = Some(BlockKind::Container),
+                "component" => style.block_kind = Some(BlockKind::Component),
+                "database" => style.block_kind = Some(BlockKind::Database),
+                "queue" => style.block_kind = Some(BlockKind::Queue),
+                "external" => style.block_kind = Some(BlockKind::External),
+                other => bail!("unknown kind `{other}`"),
+            }
+        }
+        "tech" | "technology" => style.tech = first.and_then(|x| x.as_text()).map(String::from),
+        "description" | "desc" => {
+            style.description = first.and_then(|x| x.as_text()).map(String::from)
         }
         "guard" => style.guard = first.and_then(|x| x.as_text()).map(String::from),
         // `start: 2026-08-01 12d` or `start: 2026-08-01 2026-08-12` — read by

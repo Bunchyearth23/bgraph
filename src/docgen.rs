@@ -122,12 +122,27 @@ fn archetypes(m: &mut String) {
 
         if def.props.is_empty() {
             m.push_str("\nIt takes no settings.\n");
-            continue;
+        } else {
+            m.push_str("\n| Setting | Syntax | Meaning |\n|---|---|---|\n");
+            for prop in def.props {
+                row(m, prop, false);
+            }
         }
 
-        m.push_str("\n| Setting | Syntax | Meaning |\n|---|---|---|\n");
-        for prop in def.props {
-            row(m, prop, false);
+        // Properties this genre adds to its items, or gives its own meaning.
+        // They are looked up before the shared table and never appear in
+        // another archetype's completion, so this is the only place they are
+        // written down.
+        if !def.item_props.is_empty() {
+            let _ = write!(
+                m,
+                "\nOn a `{}` — these are its own, and are not offered elsewhere:\n",
+                def.item
+            );
+            m.push_str("\n| Property | Where | Syntax | Meaning |\n|---|---|---|---|\n");
+            for prop in def.item_props {
+                row(m, prop, true);
+            }
         }
     }
 

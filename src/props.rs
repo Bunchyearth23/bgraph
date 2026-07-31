@@ -451,6 +451,25 @@ pub fn lookup(name: &str, table: &'static [PropDef]) -> Option<&'static PropDef>
     table.iter().find(|p| p.name == name)
 }
 
+/// A property as this archetype means it: its own refinement first, then the
+/// shared table.
+pub fn item_lookup(def: &ArchetypeDef, name: &str) -> Option<&'static PropDef> {
+    lookup(name, def.item_props).or_else(|| lookup(name, PROPS))
+}
+
+/// Every property an item of this archetype accepts, with its refinements
+/// shadowing the shared entries of the same name.
+pub fn item_table(def: &ArchetypeDef) -> Vec<&'static PropDef> {
+    def.item_props
+        .iter()
+        .chain(
+            PROPS
+                .iter()
+                .filter(|p| lookup(p.name, def.item_props).is_none()),
+        )
+        .collect()
+}
+
 // ---------------------------------------------------------------- archetypes
 
 /// A diagram genre. `free` is the node-and-edge graph; the others reinterpret
@@ -462,7 +481,13 @@ pub struct ArchetypeDef {
     /// `node` stays a universal synonym everywhere.
     pub item: &'static str,
     pub doc: &'static str,
+    /// Settings the `type X { … }` block accepts.
     pub props: &'static [PropDef],
+    /// Properties this archetype adds to its *items*, or refines. Looked up
+    /// before the global table, so a genre can give a shared name its own
+    /// word list — `kind` means one thing to `state` and another to `block` —
+    /// without either leaking into the other's completion.
+    pub item_props: &'static [PropDef],
     /// Values written after the label, in order, and the property each one
     /// fills. `slice a "A" 4820` is sugar for `slice a "A" { value: 4820 }`.
     pub slots: &'static [Slot],
@@ -487,6 +512,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         doc: "Nodes and edges placed by anchors — the default when a file \
               declares no `type`.",
         props: &[],
+        item_props: &[],
         slots: &[],
         edge_slots: &[],
     },
@@ -496,6 +522,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         doc: "A pie or donut chart. Each slice needs a value; its `fill` \
               overrides the automatic palette.",
         props: PIE_PROPS,
+        item_props: &[],
         slots: &[Slot {
             prop: "value",
             arity: 1,
@@ -508,6 +535,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         doc: "Bars on a calendar. A task says when it starts and either when \
               it ends or how long it runs; a `group` becomes a section.",
         props: GANTT_PROPS,
+        item_props: &[],
         slots: &[Slot {
             prop: "start",
             arity: 2,
@@ -520,7 +548,23 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         doc: "Boxes with a name and a list of members, placed by anchors like \
               `free`. A bare string in the block is a member.",
         props: CLASS_PROPS,
+        item_props: &[],
         slots: &[],
+        edge_slots: &[],
+    },
+    ArchetypeDef {
+        name: "block",
+        item: "block",
+        doc: "Architecture and C4-style component views: typed elements with a \
+              technology and a description, nested with `group`, joined by \
+              relations that carry a protocol. Placed by anchors exactly as in \
+              `free` — the archetype supplies the vocabulary and the shapes.",
+        props: BLOCK_PROPS,
+        item_props: BLOCK_ITEM_PROPS,
+        slots: &[Slot {
+            prop: "kind",
+            arity: 1,
+        }],
         edge_slots: &[],
     },
     ArchetypeDef {
@@ -532,6 +576,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
               and read at the end nearest the entity it describes — \
               `order -> line \"contains\" one many` is one order, many lines.",
         props: ER_PROPS,
+        item_props: &[],
         slots: &[],
         edge_slots: &[
             Slot {
@@ -551,6 +596,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
               `free` — the archetype supplies the vocabulary and the shapes, \
               not a layout engine. Nest them with `group`.",
         props: STATE_PROPS,
+        item_props: &[],
         slots: &[],
         edge_slots: &[],
     },
@@ -560,6 +606,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         doc: "Participants across the top, messages down the page in the order \
               they are written. A `group` frames the messages inside it.",
         props: SEQUENCE_PROPS,
+        item_props: &[],
         slots: &[],
         edge_slots: &[],
     },
@@ -569,6 +616,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         doc: "Lines, areas or dots over a shared x axis. One series per \
               statement, its numbers evenly spaced across the plot.",
         props: XY_PROPS,
+        item_props: &[],
         slots: &[Slot {
             prop: "points",
             arity: VARIADIC,
@@ -581,6 +629,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         doc: "Bars grouped or stacked across named categories. One series per \
               statement, its numbers in category order.",
         props: BAR_PROPS,
+        item_props: &[],
         slots: &[Slot {
             prop: "points",
             arity: VARIADIC,
@@ -594,6 +643,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
               link, not on what it joins: a node's height is whatever passes \
               through it.",
         props: SANKEY_PROPS,
+        item_props: &[],
         slots: &[],
         edge_slots: &[Slot {
             prop: "value",
@@ -606,6 +656,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         doc: "A timing diagram. Each signal carries a wave string, one \
               character per period, in the WaveDrom alphabet.",
         props: WAVE_PROPS,
+        item_props: &[],
         slots: &[Slot {
             prop: "wave",
             arity: 1,
@@ -618,6 +669,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         doc: "Points on two axes, divided into four named regions. A Wardley \
               map is this archetype with its own axis names.",
         props: QUADRANT_PROPS,
+        item_props: &[],
         slots: &[
             Slot {
                 prop: "x",
@@ -637,6 +689,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
               hierarchy is group nesting; a group's area is the sum of what \
               it contains.",
         props: TREEMAP_PROPS,
+        item_props: &[],
         slots: &[Slot {
             prop: "value",
             arity: 1,
@@ -649,6 +702,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         doc: "A packet / bitfield diagram. Each field needs an inclusive bit \
               range; one crossing a row boundary is split across rows.",
         props: PACKET_PROPS,
+        item_props: &[],
         slots: &[Slot {
             prop: "bits",
             arity: 2,
@@ -757,6 +811,77 @@ pub const CLASS_PROPS: &[PropDef] = &[PropDef {
     syntax: "title: <text>",
     doc: "Heading drawn above the diagram.",
 }];
+
+/// What an element *is*, in the C4 sense. Drives its shape and its colour, so
+/// a reader tells a person from a datastore without reading the label.
+pub const BLOCK_KINDS: &[&str] = &[
+    "person",
+    "system",
+    "container",
+    "component",
+    "database",
+    "queue",
+    "external",
+];
+
+pub const BLOCK_PROPS: &[PropDef] = &[PropDef {
+    name: "title",
+    alias: false,
+    ctx: Ctx::Both,
+    words: &[],
+    syntax: "title: <text>",
+    doc: "Heading drawn above the diagram.",
+}];
+
+/// `block` refines `kind` and adds the two lines a C4 box carries under its
+/// name. Kept off the global table so they never appear in another genre.
+pub const BLOCK_ITEM_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "kind",
+        alias: false,
+        ctx: Ctx::Node,
+        words: BLOCK_KINDS,
+        syntax: "kind: <person|system|container|component|database|queue|external>",
+        doc: "What this element is. Usually written positionally — \
+              `block api \"API\" container`. `external` draws a dashed, muted \
+              box for something outside the system being described.",
+    },
+    PropDef {
+        name: "tech",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "tech: <text>",
+        doc: "The technology, drawn in brackets under the name — \
+              `[Container: Rust]`. On an edge it reads as the protocol: \
+              `web -> api \"reads\" { tech: \"HTTPS/JSON\" }`.",
+    },
+    PropDef {
+        name: "technology",
+        alias: true,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "technology: <text>",
+        doc: "Alias of `tech`.",
+    },
+    PropDef {
+        name: "description",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "description: <text>",
+        doc: "A sentence under the technology line, smaller and lighter. \
+              Wrapped at a fixed column, and the box is sized around it.",
+    },
+    PropDef {
+        name: "desc",
+        alias: true,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "desc: <text>",
+        doc: "Alias of `description`.",
+    },
+];
 
 pub const ER_PROPS: &[PropDef] = &[PropDef {
     name: "title",

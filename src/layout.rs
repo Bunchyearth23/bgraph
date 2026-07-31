@@ -171,15 +171,11 @@ pub fn text_width(lines: &[String], font_size: f64) -> f64 {
     longest as f64 * font_size * 0.56
 }
 
-fn natural_size(lines: &[String], style: &Style) -> (f64, f64) {
-    let font_size = style.font_size.unwrap_or(14.0);
-    let padding = style.padding.unwrap_or(14.0);
-
-    let mut w = text_width(lines, font_size) + padding * 2.0;
-    let mut h = lines.len().max(1) as f64 * font_size * LINE_HEIGHT + padding * 2.0;
-
-    // Round shapes need extra room: their corners cut into the text box.
-    match style.shape.unwrap_or(Shape::Rect) {
+/// Round shapes need extra room: their corners cut into the text box. Shared,
+/// because a second sizing path that forgets this puts the label on the edge —
+/// which is exactly what `type block` did until it was looked at.
+fn shape_allowance(shape: Option<Shape>, mut w: f64, mut h: f64) -> (f64, f64) {
+    match shape.unwrap_or(Shape::Rect) {
         Shape::Ellipse => {
             w *= 1.30;
             h *= 1.30;
@@ -192,11 +188,131 @@ fn natural_size(lines: &[String], style: &Style) -> (f64, f64) {
         Shape::Cylinder => h += 14.0,
         _ => {}
     }
+    (w, h)
+}
+
+fn natural_size(lines: &[String], style: &Style) -> (f64, f64) {
+    let font_size = style.font_size.unwrap_or(14.0);
+    let padding = style.padding.unwrap_or(14.0);
+
+    let mut w = text_width(lines, font_size) + padding * 2.0;
+    let mut h = lines.len().max(1) as f64 * font_size * LINE_HEIGHT + padding * 2.0;
+
+    (w, h) = shape_allowance(style.shape, w, h);
 
     (
         style.width.unwrap_or(w.max(MIN_WIDTH)),
         style.height.unwrap_or(h.max(MIN_HEIGHT)),
     )
+}
+
+/// How an element of a given kind is drawn.
+struct BlockLook {
+    fill: &'static str,
+    stroke: &'static str,
+    ink: &'static str,
+    shape: Shape,
+    dashed: bool,
+}
+
+/// C4 encodes *scope*, not identity: a ramp of blues from the person outward
+/// to the component, and grey for anything outside the system being described.
+/// So this is a sequential ramp plus a neutral, not the categorical palette —
+/// two elements sharing a hue is the point, it means they share a level.
+fn block_look(kind: Option<crate::style::BlockKind>, dark: bool) -> BlockLook {
+    use crate::style::BlockKind as K;
+    let (fill, ink) = match (kind, dark) {
+        (Some(K::Person), false) => ("#08427b", "#ffffff"),
+        (Some(K::Person), true) => ("#1e3a8a", "#e2e8f0"),
+        (Some(K::System), false) => ("#1168bd", "#ffffff"),
+        (Some(K::System), true) => ("#1d4ed8", "#f8fafc"),
+        (Some(K::Component), false) => ("#85bbf0", "#0b0b0b"),
+        (Some(K::Component), true) => ("#93c5fd", "#0b1120"),
+        (Some(K::External), false) => ("#8b8b8b", "#ffffff"),
+        (Some(K::External), true) => ("#475569", "#e2e8f0"),
+        // Container, database and queue sit at one level and share its hue;
+        // their shape is what tells them apart.
+        (_, false) => ("#438dd5", "#ffffff"),
+        (_, true) => ("#3b82f6", "#0b1120"),
+    };
+
+    // Every other kind reads by its fill alone; `external` earns a visible
+    // dashed border, which is the whole point of marking it as outside.
+    let stroke = match (kind, dark) {
+        (Some(K::External), false) => "#5f5f5f",
+        (Some(K::External), true) => "#94a3b8",
+        _ => fill,
+    };
+
+    BlockLook {
+        fill,
+        stroke,
+        ink,
+        shape: match kind {
+            Some(K::Database) => Shape::Cylinder,
+            Some(K::Queue) => Shape::Hexagon,
+            Some(K::Person) => Shape::Stadium,
+            _ => Shape::Rect,
+        },
+        dashed: kind == Some(K::External),
+    }
+}
+
+/// The lines a C4 box carries: its name, then `[Kind: Technology]`, then a
+/// wrapped description. Returned with a size factor and whether the line is
+/// secondary, because the three are not drawn at one weight.
+fn block_lines(name: &[String], style: &Style) -> Vec<(String, f64, bool)> {
+    use crate::style::BlockKind as K;
+    let mut out: Vec<(String, f64, bool)> = name.iter().map(|l| (l.clone(), 1.0, false)).collect();
+
+    let kind_word = match style.block_kind {
+        Some(K::Person) => Some("Person"),
+        Some(K::System) => Some("System"),
+        Some(K::Container) => Some("Container"),
+        Some(K::Component) => Some("Component"),
+        Some(K::Database) => Some("Database"),
+        Some(K::Queue) => Some("Queue"),
+        Some(K::External) => Some("External"),
+        None => None,
+    };
+    let bracket = match (kind_word, style.tech.as_deref()) {
+        (Some(k), Some(t)) => Some(format!("[{k}: {t}]")),
+        (Some(k), None) => Some(format!("[{k}]")),
+        (None, Some(t)) => Some(format!("[{t}]")),
+        (None, None) => None,
+    };
+    if let Some(text) = bracket {
+        out.push((text, 0.78, true));
+    }
+
+    if let Some(description) = &style.description {
+        for line in wrap(description, 30) {
+            out.push((line, 0.82, true));
+        }
+    }
+
+    out
+}
+
+/// Greedy wrap at a word boundary. A fixed column rather than a measured one:
+/// the box is sized from these lines, so measuring against a width that does
+/// not exist yet would be circular.
+fn wrap(text: &str, columns: usize) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut current = String::new();
+    for word in text.split_whitespace() {
+        if !current.is_empty() && current.chars().count() + 1 + word.chars().count() > columns {
+            lines.push(std::mem::take(&mut current));
+        }
+        if !current.is_empty() {
+            current.push(' ');
+        }
+        current.push_str(word);
+    }
+    if !current.is_empty() {
+        lines.push(current);
+    }
+    lines
 }
 
 pub fn solve(diagram: &Diagram) -> Result<Layout> {
@@ -244,6 +360,11 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
 
     let item = crate::check::archetype_of(diagram);
     let machine = item.name == "state";
+    let architecture = item.name == "block";
+    let dark = opts
+        .background
+        .as_deref()
+        .is_some_and(crate::charts::is_dark);
     // An entity box is a class box: a name over a ruled list of columns.
     let compartments = item.name == "class" || item.name == "er";
     // A base that leaves `shape` unset, so a declared one is distinguishable
@@ -251,6 +372,18 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     let node_base = if machine {
         Style {
             shape: None,
+            ..Style::node_defaults()
+        }
+    } else if architecture {
+        // Everything the element kind decides is left unset, so a declared
+        // value stays distinguishable from a default. Getting this wrong has
+        // silently overridden an archetype four times now.
+        Style {
+            shape: None,
+            fill: None,
+            stroke: None,
+            font_color: None,
+            dash: None,
             ..Style::node_defaults()
         }
     } else {
@@ -296,6 +429,17 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             }
         }
 
+        if architecture {
+            let look = block_look(style.block_kind, dark);
+            style.fill = style.fill.or(Some(look.fill.into()));
+            style.stroke = style.stroke.or(Some(look.stroke.into()));
+            style.font_color = style.font_color.or(Some(look.ink.into()));
+            style.shape = style.shape.or(Some(look.shape));
+            if look.dashed {
+                style.dash = style.dash.or(Some("dashed".into()));
+            }
+        }
+
         let lines: Vec<String> = if mark {
             Vec::new()
         } else {
@@ -307,9 +451,24 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                 .collect()
         };
 
-        // A class is sized by its widest line and the number of members, not
-        // by its name alone.
-        let size = if compartments {
+        // A block is sized by every line it will draw, at the size each one
+        // is drawn at — a description in 11px does not need a 14px column.
+        let size = if architecture {
+            let font = style.font_size.unwrap_or(14.0);
+            let pad = style.padding.unwrap_or(14.0);
+            let rows = block_lines(&lines, &style);
+            let widest = rows
+                .iter()
+                .map(|(text, scale, _)| text.chars().count() as f64 * font * scale * 0.56)
+                .fold(0.0, f64::max);
+            let tall: f64 = rows.iter().map(|(_, scale, _)| font * scale * 1.45).sum();
+            let (w, h) = shape_allowance(
+                style.shape,
+                (widest + pad * 2.0).max(MIN_WIDTH),
+                (tall + pad * 2.0).max(MIN_HEIGHT),
+            );
+            (style.width.unwrap_or(w), style.height.unwrap_or(h))
+        } else if compartments {
             let font = style.font_size.unwrap_or(14.0);
             let pad = style.padding.unwrap_or(14.0);
             let widest = lines
@@ -384,6 +543,15 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
 
         // `[guard]` after the label is the notation a reader expects.
         let mut label = edge.label.clone();
+        // The protocol goes on its own line under the relation, the way a C4
+        // diagram reads it. Declared and never drawn would be worse than
+        // refused, so this is not optional.
+        if architecture && let Some(tech) = &style.tech {
+            label = Some(match label {
+                Some(text) => format!("{text}\n[{tech}]"),
+                None => format!("[{tech}]"),
+            });
+        }
         if let Some(guard) = &style.guard {
             label = Some(match label {
                 Some(text) if !text.is_empty() => format!("{text} [{guard}]"),
@@ -507,6 +675,37 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                     weight: "400".into(),
                     family: s.font_family.clone().unwrap_or_default(),
                 });
+            }
+        }
+    }
+
+    // A block draws its own lines for the same reason a class does: the node
+    // renderer sets one size for the whole label, and these are three tiers.
+    if architecture {
+        for placed in nodes.iter_mut() {
+            let s = placed.style.clone();
+            let font = s.font_size.unwrap_or(14.0);
+            let rows = block_lines(&std::mem::take(&mut placed.lines), &s);
+            let tall: f64 = rows.iter().map(|(_, scale, _)| font * scale * 1.45).sum();
+
+            let ink = s.font_color.clone().unwrap_or_else(|| "#ffffff".into());
+            let mut y = placed.rect.cy() - tall / 2.0;
+            for (text, scale, secondary) in rows {
+                let height = font * scale * 1.45;
+                annotations.push(Annotation {
+                    text,
+                    x: placed.rect.cx(),
+                    y: y + height / 2.0,
+                    anchor: Anchor::Middle,
+                    size: font * scale,
+                    // The secondary tiers are the same ink at less weight, not
+                    // a second colour: the fill already carries the meaning,
+                    // and a third hue on top of it would only compete.
+                    color: ink.clone(),
+                    weight: if secondary { "400" } else { "600" }.into(),
+                    family: s.font_family.clone().unwrap_or_default(),
+                });
+                y += height;
             }
         }
     }

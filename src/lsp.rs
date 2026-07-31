@@ -261,10 +261,19 @@ impl Server {
         }
 
         if let Some(block) = ctx.block {
-            let table = match block {
-                Block::Graph => props::GRAPH_PROPS,
-                Block::Type => props::archetype(archetype).map_or(&[][..], |a| a.props),
-                _ => props::PROPS,
+            // An item block sees the archetype's own vocabulary first, so
+            // `kind:` offers state kinds in a machine and element kinds in an
+            // architecture view — never both.
+            let items: Vec<&'static props::PropDef> = props::archetype(archetype)
+                .map(props::item_table)
+                .unwrap_or_default();
+            let table: Vec<&'static props::PropDef> = match block {
+                Block::Graph => props::GRAPH_PROPS.iter().collect(),
+                Block::Type => props::archetype(archetype)
+                    .map_or(&[][..], |a| a.props)
+                    .iter()
+                    .collect(),
+                _ => items,
             };
 
             // `name: <here>` — complete the value, if the property enumerates.
@@ -278,7 +287,9 @@ impl Server {
                     .rev()
                     .collect();
 
-                return props::lookup(&key, table)
+                return table
+                    .iter()
+                    .find(|p| p.name == key)
                     .map(|def| {
                         def.words
                             .iter()
@@ -422,12 +433,20 @@ impl Server {
         let markdown = if text[line_start..span.start].trim_end().ends_with("type") {
             props::archetype(&word).map(|a| format!("**type** `{}`\n\n{}", a.name, a.doc))
         } else if is_key && ctx.block.is_some() {
-            let table = match ctx.block {
-                Some(Block::Graph) => props::GRAPH_PROPS,
-                Some(Block::Type) => props::archetype(archetype).map_or(&[][..], |a| a.props),
-                _ => props::PROPS,
+            let table: Vec<&'static props::PropDef> = match ctx.block {
+                Some(Block::Graph) => props::GRAPH_PROPS.iter().collect(),
+                Some(Block::Type) => props::archetype(archetype)
+                    .map_or(&[][..], |a| a.props)
+                    .iter()
+                    .collect(),
+                _ => props::archetype(archetype)
+                    .map(props::item_table)
+                    .unwrap_or_default(),
             };
-            props::lookup(&word, table).map(|d| format!("```\n{}\n```\n\n{}", d.syntax, d.doc))
+            table
+                .iter()
+                .find(|p| p.name == word)
+                .map(|d| format!("```\n{}\n```\n\n{}", d.syntax, d.doc))
         } else if text[line_start..span.start].trim_end().ends_with('.')
             || text[line_start..span.start].trim_end().ends_with("extends")
         {
@@ -1253,5 +1272,57 @@ mod tests {
         assert!(labels_at("node a ", "node a ").contains(&"right-of".to_string()));
         // A pie ignores placement, so it is not offered — with either word.
         assert!(!labels_at("type pie\nslice a ", "slice a ").contains(&"right-of".to_string()));
+    }
+}
+
+#[cfg(test)]
+mod block_vocabulary_tests {
+    use super::*;
+
+    fn words_after_kind(source: &str) -> Vec<String> {
+        let server = Server {
+            docs: HashMap::new(),
+        };
+        server
+            .items_for(source, "  kind: ", source.len())
+            .iter()
+            .filter_map(|i| i["label"].as_str().map(str::to_string))
+            .collect()
+    }
+
+    #[test]
+    fn kind_completes_the_declared_archetypes_words_and_not_the_others() {
+        // The whole reason an archetype may refine a shared property: one word
+        // means different things in two genres, and offering both would be
+        // exactly the noise that made autocompletion get in the way.
+        let machine = words_after_kind("type state\nstate a \"A\" {\n  kind: ");
+        assert!(machine.contains(&"initial".to_string()), "{machine:?}");
+        assert!(!machine.contains(&"person".to_string()), "{machine:?}");
+
+        let architecture = words_after_kind("type block\nblock a \"A\" {\n  kind: ");
+        assert!(architecture.contains(&"person".to_string()), "{architecture:?}");
+        assert!(!architecture.contains(&"initial".to_string()), "{architecture:?}");
+    }
+
+    #[test]
+    fn a_block_only_property_stays_out_of_other_genres() {
+        let server = Server {
+            docs: HashMap::new(),
+        };
+        let names = |source: &str, line: &str| -> Vec<String> {
+            server
+                .items_for(source, line, source.len())
+                .iter()
+                .filter_map(|i| i["label"].as_str().map(str::to_string))
+                .collect()
+        };
+
+        let architecture = names("type block\nblock a \"A\" {\n  ", "  ");
+        assert!(architecture.contains(&"tech".to_string()), "{architecture:?}");
+
+        let free = names("node a \"A\" {\n  ", "  ");
+        assert!(!free.contains(&"tech".to_string()), "{free:?}");
+        // The shared vocabulary is still all there.
+        assert!(free.contains(&"fill".to_string()), "{free:?}");
     }
 }

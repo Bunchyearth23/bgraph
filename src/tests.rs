@@ -3163,3 +3163,119 @@ fn an_entity_with_no_columns_is_flagged() {
         "{d:#?}"
     );
 }
+
+// ---------------------------------------------------------------------------
+// `block` — architecture views. Typed elements, a technology line, and a
+// vocabulary that is this genre's alone.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn an_element_kind_decides_its_look_and_a_declared_value_still_wins() {
+    let l = build("type block\nblock db \"Store\" database");
+    assert_eq!(l.nodes[0].style.shape, Some(Shape::Cylinder));
+    assert_eq!(l.nodes[0].style.fill.as_deref(), Some("#438dd5"));
+
+    // The base leaves everything the kind decides unset, so this is the
+    // difference between declared and defaulted — the mistake this codebase
+    // has made four times.
+    let l = build("type block\nblock db \"Store\" database { fill: #111827 shape: rect }");
+    assert_eq!(l.nodes[0].style.fill.as_deref(), Some("#111827"));
+    assert_eq!(l.nodes[0].style.shape, Some(Shape::Rect));
+}
+
+#[test]
+fn the_element_kind_ramp_follows_the_surface() {
+    let light = build("type block\nblock a \"A\" component");
+    let dark = build("type block\ngraph { background: #0b1120 }\nblock a \"A\" component");
+    assert_ne!(light.nodes[0].style.fill, dark.nodes[0].style.fill);
+}
+
+#[test]
+fn a_block_draws_its_name_technology_and_description_as_separate_lines() {
+    let l = build(
+        "type block\nblock api \"API\" container { tech: \"Rust\" description: \"Serves the public API.\" }",
+    );
+    let texts: Vec<&str> = l.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert!(texts.contains(&"API"), "{texts:?}");
+    assert!(texts.contains(&"[Container: Rust]"), "{texts:?}");
+    assert!(
+        texts.iter().any(|t| t.contains("Serves the public")),
+        "{texts:?}"
+    );
+
+    // The name leads at full size; the rest is smaller.
+    let name = l.annotations.iter().find(|a| a.text == "API").unwrap();
+    let tech = l
+        .annotations
+        .iter()
+        .find(|a| a.text.starts_with("[Container"))
+        .unwrap();
+    assert!(tech.size < name.size, "{} vs {}", tech.size, name.size);
+}
+
+#[test]
+fn a_relation_carries_its_protocol_on_its_own_line() {
+    // Declared and never drawn would be worse than refused.
+    let l = build("type block\nblock a \"A\"\nblock b \"B\" right-of a\na -> b \"calls\" { tech: \"gRPC\" }");
+    assert_eq!(l.edges[0].label.as_deref(), Some("calls\n[gRPC]"));
+}
+
+#[test]
+fn a_description_is_wrapped_and_the_box_grows_around_it() {
+    let short = build("type block\nblock a \"A\" container");
+    let long = build(
+        "type block\nblock a \"A\" container { description: \"A rather long sentence that has to wrap over several lines to fit.\" }",
+    );
+    assert!(
+        long.nodes[0].rect.h > short.nodes[0].rect.h * 1.5,
+        "{} vs {}",
+        long.nodes[0].rect.h,
+        short.nodes[0].rect.h
+    );
+    // Wrapped, not one runaway line.
+    assert!(
+        long.annotations.iter().filter(|a| a.size < 12.0).count() >= 2,
+        "{:?}",
+        long.annotations.iter().map(|a| &a.text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn an_external_element_is_the_one_with_a_visible_border() {
+    let external = build("type block\nblock m \"Mainframe\" external");
+    let s = &external.nodes[0].style;
+    assert_eq!(s.dash.as_deref(), Some("dashed"));
+    assert_ne!(s.stroke, s.fill, "a dash in the fill colour is invisible");
+
+    let internal = build("type block\nblock m \"Mainframe\" system");
+    assert_eq!(internal.nodes[0].style.dash, None);
+}
+
+#[test]
+fn a_kind_from_the_wrong_genre_is_refused_in_both_directions() {
+    // The point of letting an archetype refine a shared property.
+    let e = err("type block\nblock a \"A\" { kind: initial }");
+    assert!(e.contains("initial"), "{e}");
+
+    let e = err("type state\nstate a \"A\" { kind: person }");
+    assert!(e.contains("person"), "{e}");
+}
+
+#[test]
+fn a_block_only_property_is_unknown_in_another_genre() {
+    let e = err("node a \"A\" { tech: \"Rust\" }");
+    assert!(e.contains("unknown property `tech`"), "{e}");
+}
+
+#[test]
+fn a_non_rectangular_block_is_given_the_room_its_shape_takes() {
+    // A second sizing path that forgets the shape allowance puts the label on
+    // the edge of the cylinder — which is what this did until it was rendered
+    // and looked at.
+    let rect = build("type block\nblock a \"Metrics\" component { tech: \"Prometheus\" }");
+    let hex = build("type block\nblock a \"Metrics\" queue { tech: \"Prometheus\" }");
+    let cyl = build("type block\nblock a \"Metrics\" database { tech: \"Prometheus\" }");
+
+    assert!(hex.nodes[0].rect.w > rect.nodes[0].rect.w, "the hexagon's slanted sides eat width");
+    assert!(cyl.nodes[0].rect.h > rect.nodes[0].rect.h, "the cylinder's caps eat height");
+}

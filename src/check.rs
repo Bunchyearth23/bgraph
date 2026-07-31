@@ -59,10 +59,10 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
 
     let def = check_archetype(diagram, &mut out);
     let archetype = def.name;
-    check_styles(diagram, &mut out);
+    check_styles(diagram, def, &mut out);
     let nodes = check_nodes(diagram, def, &mut out);
-    check_groups(diagram, &nodes, &mut out);
-    check_edges(diagram, &nodes, &mut out);
+    check_groups(diagram, def, &nodes, &mut out);
+    check_edges(diagram, def, &nodes, &mut out);
     check_graph(diagram, &mut out);
 
     check_contrast(diagram, archetype, &mut out);
@@ -77,6 +77,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "sequence" => check_sequence(diagram, &mut out),
         "class" => check_class(diagram, "class", &mut out),
         "er" => check_er(diagram, &mut out),
+        "block" => check_block(diagram, &mut out),
         "gantt" => check_gantt(diagram, &mut out),
         "state" => {
             check_cycles(diagram, &nodes, &mut out);
@@ -152,7 +153,7 @@ fn style_names(diagram: &Diagram) -> HashSet<&str> {
     diagram.styles.iter().map(|s| s.name.as_str()).collect()
 }
 
-fn check_styles(diagram: &Diagram, out: &mut Vec<Diag>) {
+fn check_styles(diagram: &Diagram, def: &'static props::ArchetypeDef, out: &mut Vec<Diag>) {
     let mut seen: HashMap<&str, Span> = HashMap::new();
     let known = style_names(diagram);
 
@@ -183,7 +184,7 @@ fn check_styles(diagram: &Diagram, out: &mut Vec<Diag>) {
             "edge" => Some(Ctx::Edge),
             _ => None,
         };
-        check_props(&style.props, ctx, props::PROPS, "property", out);
+        check_props_refined(&style.props, ctx, def.item_props, props::PROPS, "property", out);
     }
 
     check_extends_cycles(diagram, out);
@@ -255,7 +256,14 @@ fn check_nodes<'a>(
 
         check_keyword(node, def, out);
         check_positional(node, def, out);
-        check_props(&node.props, Some(Ctx::Node), props::PROPS, "property", out);
+        check_props_refined(
+            &node.props,
+            Some(Ctx::Node),
+            def.item_props,
+            props::PROPS,
+            "property",
+            out,
+        );
     }
 
     // Anchors are checked after the whole index exists, so forward references
@@ -304,7 +312,7 @@ fn placements(diagram: &Diagram) -> impl Iterator<Item = (&Spanned<String>, &Pla
         )
 }
 
-fn check_groups(diagram: &Diagram, nodes: &HashMap<&str, usize>, out: &mut Vec<Diag>) {
+fn check_groups(diagram: &Diagram, def: &'static props::ArchetypeDef, nodes: &HashMap<&str, usize>, out: &mut Vec<Diag>) {
     let known_styles = style_names(diagram);
     let mut seen: HashSet<&str> = HashSet::new();
 
@@ -350,7 +358,14 @@ fn check_groups(diagram: &Diagram, nodes: &HashMap<&str, usize>, out: &mut Vec<D
             }
         }
 
-        check_props(&group.props, Some(Ctx::Node), props::PROPS, "property", out);
+        check_props_refined(
+            &group.props,
+            Some(Ctx::Node),
+            def.item_props,
+            props::PROPS,
+            "property",
+            out,
+        );
     }
 
     // An edge to a frame has no obvious endpoint; say so rather than guess.
@@ -459,7 +474,7 @@ fn check_positional(node: &NodeDecl, def: &'static props::ArchetypeDef, out: &mu
     }
 }
 
-fn check_edges(diagram: &Diagram, nodes: &HashMap<&str, usize>, out: &mut Vec<Diag>) {
+fn check_edges(diagram: &Diagram, def: &'static props::ArchetypeDef, nodes: &HashMap<&str, usize>, out: &mut Vec<Diag>) {
     let known_styles = style_names(diagram);
 
     let groups: HashSet<&str> = diagram.groups.iter().map(|g| g.id.as_str()).collect();
@@ -482,7 +497,14 @@ fn check_edges(diagram: &Diagram, nodes: &HashMap<&str, usize>, out: &mut Vec<Di
             }
         }
 
-        check_props(&edge.props, Some(Ctx::Edge), props::PROPS, "property", out);
+        check_props_refined(
+            &edge.props,
+            Some(Ctx::Edge),
+            def.item_props,
+            props::PROPS,
+            "property",
+            out,
+        );
     }
 }
 
@@ -994,6 +1016,18 @@ fn check_class(diagram: &Diagram, word: &str, out: &mut Vec<Diag>) {
     }
 }
 
+fn check_block(diagram: &Diagram, out: &mut Vec<Diag>) {
+    check_cycles_free(diagram, out);
+    for node in &diagram.nodes {
+        if let Some(member) = node.members.first() {
+            out.push(Diag::warn(
+                member.span,
+                "a block carries a `description`, not members".to_string(),
+            ));
+        }
+    }
+}
+
 fn check_er(diagram: &Diagram, out: &mut Vec<Diag>) {
     check_class(diagram, "entity", out);
 
@@ -1361,7 +1395,7 @@ fn check_unused_data(diagram: &Diagram, out: &mut Vec<Diag>) {
         if let Some(member) = node.members.first() {
             out.push(Diag::warn(
                 member.span,
-                "members are only drawn by `type class`".to_string(),
+                "members are only drawn by `type class` and `type er`".to_string(),
             ));
         }
         for prop in &node.props {
@@ -1440,9 +1474,25 @@ fn check_props(
     what: &str,
     out: &mut Vec<Diag>,
 ) {
+    check_props_refined(entries, ctx, &[], table, what, out)
+}
+
+/// The same, with an archetype's refinements consulted first — so `kind`
+/// carries `state`'s words in a machine and `block`'s in an architecture view.
+fn check_props_refined(
+    entries: &[Prop],
+    ctx: Option<Ctx>,
+    refinements: &'static [props::PropDef],
+    table: &'static [props::PropDef],
+    what: &str,
+    out: &mut Vec<Diag>,
+) {
     for prop in entries {
-        let Some(def) = props::lookup(&prop.name, table) else {
-            let hint = suggest(&prop.name, table)
+        let Some(def) = props::lookup(&prop.name, refinements)
+            .or_else(|| props::lookup(&prop.name, table))
+        else {
+            let hint = suggest(&prop.name, refinements)
+                .or_else(|| suggest(&prop.name, table))
                 .map(|s| format!(" — did you mean `{s}`?"))
                 .unwrap_or_default();
             out.push(Diag::error(
@@ -1504,23 +1554,14 @@ fn check_props(
             let Some(word) = value.as_word() else {
                 continue;
             };
-            // A compound like `stroke` mixes colors, widths and patterns; a
-            // bare word there may legitimately be a named color.
-            let strict = matches!(
-                prop.name.as_str(),
-                "shape"
-                    | "router"
-                    | "route"
-                    | "arrow"
-                    | "head"
-                    | "flow"
-                    | "direction"
-                    | "shadow"
-                    | "labels"
-                    | "legend"
-                    | "ruler"
-            );
-            if strict && !def.words.contains(&word) {
+            // Strict by default, and the exceptions are named: a compound
+            // paint property mixes colors, widths and patterns, so a bare word
+            // there may legitimately be a named color. Listing the *strict*
+            // side instead is how `kind`, `ticks` and `mark` went unvalidated
+            // — a new enumeration must be caught by construction, not by
+            // someone remembering to add it.
+            let lenient = matches!(prop.name.as_str(), "stroke" | "border" | "color");
+            if !lenient && !def.words.contains(&word) {
                 out.push(Diag::error(
                     prop.values_span,
                     format!(

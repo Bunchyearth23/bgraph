@@ -127,6 +127,13 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-07-31] **`check_props` validated enumerated words only for a hard-coded
+  allow-list of property names.** Anything not on it — `kind`, `ticks`, `mark`,
+  `numbered`, `stack`, `grid` — accepted any word silently, against `D-005`.
+  The rule is now inverted: **strict by default**, with the compound paint
+  properties (`stroke`, `border`, `color`) named as the exceptions, because a
+  bare word there may be a named colour. A new enumeration is validated by
+  construction; nobody has to remember.
 - [2026-07-31] **`pest` parses by recursive descent, so nesting depth is stack
   depth.** About 1500 nested `{` overflowed the stack and aborted the process
   with `SIGABRT` — not a panic, so no caller could catch it, in a library meant
@@ -171,6 +178,11 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   silently reuses the cached grammar. `editors/zed/install.sh` does both.
 
 ### Gotchas
+- [2026-07-31] Box sizing existed in three places — `natural_size`, the class
+  compartment path, and `block`. The shape allowance (a cylinder's caps, a
+  hexagon's slanted sides) lived only in the first, so a `block` cylinder drew
+  its label on the curve. Extracted as `shape_allowance`; any fourth sizing
+  path must call it.
 - [2026-07-31] A `member` line (`- id: uuid`) runs to the **end of the line**,
   so it cannot share one with the closing brace. `class a "A" { - id: Uuid }`
   does not parse — and a doc example written that way is a doc that lies.

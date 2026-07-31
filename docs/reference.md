@@ -301,6 +301,28 @@ class <id> ["label"]
 |---|---|---|
 | `title` | `title: <text>` | Heading drawn above the diagram. |
 
+### `type block`
+
+Architecture and C4-style component views: typed elements with a technology and a description, nested with `group`, joined by relations that carry a protocol. Placed by anchors exactly as in `free` — the archetype supplies the vocabulary and the shapes.
+
+```
+block <id> ["label"] <kind>
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+
+On a `block` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `kind` | node | `kind: <person\|system\|container\|component\|database\|queue\|external>` | What this element is. Usually written positionally — `block api "API" container`. `external` draws a dashed, muted box for something outside the system being described. |
+| `tech` | both | `tech: <text>` | The technology, drawn in brackets under the name — `[Container: Rust]`. On an edge it reads as the protocol: `web -> api "reads" { tech: "HTTPS/JSON" }`. |
+| `technology` *(alias)* | both | `technology: <text>` | Alias of `tech`. |
+| `description` | node | `description: <text>` | A sentence under the technology line, smaller and lighter. Wrapped at a fixed column, and the box is sized around it. |
+| `desc` *(alias)* | node | `desc: <text>` | Alias of `description`. |
+
 ### `type er`
 
 Entities and the relations between them. A bare string in the block is a column, exactly as in `class`; what `er` adds is cardinality at each end of a relation, written after the label and read at the end nearest the entity it describes — `order -> line "contains" one many` is one order, many lines.
