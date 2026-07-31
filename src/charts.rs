@@ -334,6 +334,7 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
     }
 
     Ok(Layout {
+        groups: Vec::new(),
         nodes,
         edges: Vec::new(),
         opts,
@@ -499,6 +500,7 @@ pub fn packet(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
     }
 
     Ok(Layout {
+        groups: Vec::new(),
         nodes,
         edges: Vec::new(),
         opts,

@@ -39,6 +39,7 @@ module.exports = grammar({
         $.type_declaration,
         $.graph_declaration,
         $.style_declaration,
+        $.group_declaration,
         $.edge_declaration,
         $.item_declaration,
       ),
@@ -54,6 +55,37 @@ module.exports = grammar({
       seq('type', field('name', $.identifier), optional(field('body', $.block))),
 
     graph_declaration: ($) => seq('graph', field('body', $.block)),
+
+    // A container. Its block holds properties *and* statements, so a group
+    // nests. Its rectangle is derived from its members, never declared.
+    group_declaration: ($) =>
+      seq(
+        'group',
+        field('name', $.identifier),
+        optional(field('label', $.string)),
+        // No positional data: a group has no slots, it is a frame.
+        repeat(field('class', $.class_reference)),
+        optional(field('placement', $._placement)),
+        field('body', $.group_block),
+      ),
+
+    // Entries are separated, for the same reason statements are: without it
+    // `padding: 22 node a` cannot be told from a property with three values.
+    group_block: ($) =>
+      seq(
+        '{',
+        repeat($._newline),
+        optional(
+          seq(
+            $._group_entry,
+            repeat(seq(repeat1($._newline), $._group_entry)),
+            repeat($._newline),
+          ),
+        ),
+        '}',
+      ),
+
+    _group_entry: ($) => choice($.property, $._statement),
 
     style_declaration: ($) =>
       seq(

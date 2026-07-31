@@ -1272,3 +1272,180 @@ fn the_editor_queries_match_the_grammar() {
         broken.join("\n  ")
     );
 }
+
+#[test]
+fn the_grammar_corpus_expectations_still_hold() {
+    // `tree-sitter test`'s summary line counts *parses*, not expectation
+    // matches — "failed parses: 0" says nothing about whether the trees are
+    // what the corpus claims. Only the exit code does, and reading the wrong
+    // line let the corpus go stale across a whole rename.
+    let status = std::process::Command::new("tree-sitter")
+        .arg("test")
+        .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/tree-sitter-bgraph"))
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+
+    let Ok(status) = status else {
+        println!(
+            "SKIPPED: `tree-sitter` is not on PATH, so the grammar corpus was \
+             not checked. Install it with `cargo install tree-sitter-cli`."
+        );
+        return;
+    };
+
+    assert!(
+        status.success(),
+        "the grammar corpus no longer matches the parser — run \
+         `cd tree-sitter-bgraph && tree-sitter test` to see which cases, and \
+         `--update` once you have read the diff"
+    );
+}
+
+// ---------------------------------------------------------------- groups
+
+#[test]
+fn a_group_is_sized_by_its_members() {
+    let l = build(
+        r#"
+        group box "Box" {
+          padding: 10
+          node a at (0, 0) { size: 50 40 }
+          node b at (100, 60) { size: 50 40 }
+        }
+    "#,
+    );
+
+    assert_eq!(l.groups.len(), 1);
+    let r = l.groups[0].rect;
+    // Members span (0,0)..(150,100); the frame adds its padding all round.
+    assert_eq!((r.x, r.y, r.w, r.h), (-10.0, -10.0, 170.0, 120.0));
+    assert_eq!(l.groups[0].lines, vec!["Box"]);
+}
+
+#[test]
+fn groups_nest() {
+    let l = build(
+        r#"
+        group outer {
+          padding: 10
+          node a at (0, 0) { size: 20 20 }
+          group inner {
+            padding: 5
+            node b at (100, 0) { size: 20 20 }
+          }
+        }
+    "#,
+    );
+
+    assert_eq!(l.groups.len(), 2);
+    let inner = l
+        .groups
+        .iter()
+        .min_by(|x, y| x.rect.w.total_cmp(&y.rect.w))
+        .unwrap();
+    let outer = l
+        .groups
+        .iter()
+        .max_by(|x, y| x.rect.w.total_cmp(&y.rect.w))
+        .unwrap();
+    assert_eq!((inner.rect.x, inner.rect.w), (95.0, 30.0));
+    // The outer frame encloses the inner frame, not merely the inner nodes.
+    assert_eq!((outer.rect.x, outer.rect.w), (-10.0, 145.0));
+}
+
+#[test]
+fn a_group_can_be_anchored_to() {
+    let l = build(
+        r#"
+        group cluster {
+          padding: 10
+          node a at (0, 0) { size: 40 40 }
+        }
+        node after right-of cluster gap 20 { size: 30 30 }
+    "#,
+    );
+
+    // The frame spans -10..50; `after` starts a gap beyond its right edge.
+    assert_eq!(l.groups[0].rect.right(), 50.0);
+    assert_eq!(l.nodes[1].rect.x, 70.0);
+}
+
+#[test]
+fn a_placed_group_translates_its_whole_subtree() {
+    let l = build(
+        r#"
+        node origin at (0, 0) { size: 10 10 }
+        group moved at (200, 100) {
+          padding: 0
+          node a at (0, 0) { size: 40 40 }
+          node b right-of a gap 10 { size: 40 40 }
+        }
+    "#,
+    );
+
+    let frame = l.groups[0].rect;
+    assert_eq!((frame.x, frame.y), (200.0, 100.0));
+    // Members keep their relative arrangement and move with the frame.
+    assert_eq!((l.nodes[1].rect.x, l.nodes[1].rect.y), (200.0, 100.0));
+    assert_eq!(l.nodes[2].rect.x, 250.0);
+}
+
+#[test]
+fn an_unplaced_node_flows_from_its_sibling_not_the_previous_line() {
+    let l = build(
+        r#"
+        graph { gap: 10 }
+        node outside at (0, 0) { size: 20 20 }
+        group g {
+          padding: 0
+          node first { size: 20 20 }
+          node second { size: 20 20 }
+        }
+    "#,
+    );
+
+    // `first` is the first declaration inside `g`, so it starts the group's
+    // own flow rather than trailing `outside`.
+    assert_eq!((l.nodes[1].rect.x, l.nodes[1].rect.y), (0.0, 0.0));
+    assert_eq!(l.nodes[2].rect.x, 30.0);
+}
+
+#[test]
+fn groups_share_the_item_namespace() {
+    assert!(err("group g {\n node g\n}").contains("declared twice"));
+    assert!(err("group node {\n node a\n}").contains("reserved word"));
+    assert!(err("node a\nnode b right-of ghost").contains("unknown node `ghost`"));
+}
+
+#[test]
+fn an_edge_to_a_frame_is_refused() {
+    let e = err("group g {\n node a\n}\nnode b\ng -> b");
+    assert!(
+        e.contains("is a group; edges connect items, not frames"),
+        "{e}"
+    );
+}
+
+#[test]
+fn an_empty_group_says_so() {
+    let d = diags("group g {\n}");
+    assert!(d.iter().any(|x| x.message.contains("is empty")), "{d:?}");
+}
+
+#[test]
+fn a_group_cycle_is_reported() {
+    // The frame cannot be placed relative to something it encloses.
+    let e = err("group g right-of a {\n node a\n}");
+    assert!(e.contains("anchor cycle"), "{e}");
+}
+
+#[test]
+fn a_group_is_drawn_behind_what_it_encloses() {
+    let svg = render_svg::render(&build(
+        "group g \"G\" {\n node a \"A\" at (0,0) { size: 40 40 }\n}",
+    ));
+    let frame = svg.find("rx=\"10\"").expect("the frame is drawn");
+    let node = svg.find("rx=\"8\"").expect("the node is drawn");
+    assert!(frame < node, "the frame must come first in document order");
+}

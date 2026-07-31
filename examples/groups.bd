@@ -1,0 +1,31 @@
+// A group is a frame sized by what it holds. Give it a placement and the
+// whole subtree moves together.
+
+graph { background: #0f172a padding: 32 gap: 44 }
+
+style node  { fill: #1e293b stroke: #334155 1.5 font: 13 #e2e8f0 radius: 8 }
+style group { stroke: #38bdf8 1.2 font: 12 #38bdf8 fill: #38bdf80c radius: 12 }
+style edge  { stroke: #64748b 1.5 font: 11 #94a3b8 }
+style store extends node { shape: cylinder stroke: #10b981 1.5 }
+
+node client "Client" at (0, 0)
+
+group edge "Edge" right-of client gap 60 {
+  padding: 20
+  node gw   "Gateway"
+  node auth "Auth" below gw gap 26
+}
+
+group core "Core services" right-of edge gap 60 {
+  padding: 20
+  node orders  "Orders"
+  node billing "Billing" below orders gap 26
+}
+
+node db "Postgres" .store right-of core gap 60
+
+client -> gw    "https"
+gw     -> auth  "verify"
+gw     -> orders
+orders -> billing
+orders -> db    "sql"

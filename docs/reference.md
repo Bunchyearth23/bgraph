@@ -31,6 +31,7 @@ bgraph-lsp                          # language server, LSP over stdin/stdout
 type <archetype> { … }      // the genre of diagram; optional, defaults to free
 graph { … }                 // diagram-wide settings
 style <name> [extends <name>] { … }
+group <id> ["<label>"] [.class …] [<placement>] { … }
 <keyword> <id> ["<label>"] <data…> [.class …] [<placement>] { … }
 <id> <arrow> <id> ["<label>"] [.class …] { … }
 ```
@@ -65,6 +66,39 @@ and cannot name a node.
 Labels are quoted. `\n` splits a label into centred lines; `\t` and `\"` also
 work. A node with no label falls back to its identifier. Label text is
 XML-escaped on output, so `<`, `&` and quotes are safe.
+
+## Groups
+
+A `group` is a frame. Its block holds properties *and* nested statements, so
+groups nest:
+
+```
+group edge "Edge" {
+  padding: 22
+  node gw   "Gateway"
+  node auth "Auth" below gw gap 30
+}
+
+group core "Core" right-of edge gap 60 {
+  node orders "Orders"
+}
+
+node db "Postgres" right-of core gap 60
+```
+
+**A group is sized by its members, never the other way round** — its rectangle
+is their bounding box plus its `padding`. That keeps the rule this language is
+built on: the items say where they go.
+
+A group may still carry a placement, and then it **translates its whole
+subtree** once its members have landed. Members of a placed group only become
+anchorable after that translation, so nothing outside can latch onto a
+position that is about to move.
+
+Groups and items share one namespace, so a group can be anchored to by name.
+An edge to a group is refused — a frame has no obvious endpoint. Style them
+with `style group { … }` or a `.class`; the default is a dashed border, a
+transparent fill and the label set into the top-left.
 
 ## Placement
 

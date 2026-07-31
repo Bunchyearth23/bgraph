@@ -7,5 +7,10 @@
   name: (identifier) @name
   label: (string)? @context) @item
 
+(group_declaration
+  "group" @context
+  name: (identifier) @name
+  label: (string)? @context) @item
+
 (graph_declaration
   "graph" @context @name) @item

@@ -7,6 +7,7 @@
   "type"
   "graph"
   "style"
+  "group"
   "extends"
   "at"
   "gap"
@@ -22,8 +23,9 @@
 
 ; ---------------------------------------------------------------- names
 
-; An item declaration is a definition; references to it are plain variables.
+; An item or group declaration is a definition; references are plain variables.
 (item_declaration name: (identifier) @variable.special)
+(group_declaration name: (identifier) @variable.special)
 
 (edge_declaration from: (identifier) @variable)
 (edge_declaration to: (identifier) @variable)

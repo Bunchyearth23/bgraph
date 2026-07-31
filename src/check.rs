@@ -46,6 +46,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
     let archetype = def.name;
     check_styles(diagram, &mut out);
     let nodes = check_nodes(diagram, def, &mut out);
+    check_groups(diagram, &nodes, &mut out);
     check_edges(diagram, &nodes, &mut out);
     check_graph(diagram, &mut out);
 
@@ -230,17 +231,18 @@ fn check_nodes<'a>(
     }
 
     // Anchors are checked after the whole index exists, so forward references
-    // are legal.
-    for node in &diagram.nodes {
-        let Some(Placement::Rel { anchor, .. }) = &node.placement else {
+    // are legal. A group is a perfectly good anchor.
+    let anchorable = anchor_names(diagram);
+    for (owner, placement) in placements(diagram) {
+        let Placement::Rel { anchor, .. } = placement else {
             continue;
         };
-        if anchor.as_str() == node.id.as_str() {
+        if anchor.as_str() == owner.as_str() {
             out.push(Diag::error(
                 anchor.span,
-                format!("node `{}` is anchored to itself", node.id.as_str()),
+                format!("`{}` is anchored to itself", owner.as_str()),
             ));
-        } else if !index.contains_key(anchor.as_str()) {
+        } else if !anchorable.contains(anchor.as_str()) {
             out.push(Diag::error(
                 anchor.span,
                 format!("unknown node `{}`", anchor.as_str()),
@@ -249,6 +251,93 @@ fn check_nodes<'a>(
     }
 
     index
+}
+
+/// Every name a placement may point at.
+fn anchor_names(diagram: &Diagram) -> HashSet<&str> {
+    diagram
+        .nodes
+        .iter()
+        .map(|n| n.id.as_str())
+        .chain(diagram.groups.iter().map(|g| g.id.as_str()))
+        .collect()
+}
+
+fn placements(diagram: &Diagram) -> impl Iterator<Item = (&Spanned<String>, &Placement)> {
+    diagram
+        .nodes
+        .iter()
+        .filter_map(|n| n.placement.as_ref().map(|p| (&n.id, p)))
+        .chain(
+            diagram
+                .groups
+                .iter()
+                .filter_map(|g| g.placement.as_ref().map(|p| (&g.id, p))),
+        )
+}
+
+fn check_groups(diagram: &Diagram, nodes: &HashMap<&str, usize>, out: &mut Vec<Diag>) {
+    let known_styles = style_names(diagram);
+    let mut seen: HashSet<&str> = HashSet::new();
+
+    for group in &diagram.groups {
+        if nodes.contains_key(group.id.as_str()) || !seen.insert(group.id.as_str()) {
+            out.push(Diag::error(
+                group.id.span,
+                format!(
+                    "`{}` is declared twice — groups and items share one namespace",
+                    group.id.as_str()
+                ),
+            ));
+        }
+
+        if props::KEYWORDS.iter().any(|(k, _)| *k == group.id.as_str()) {
+            out.push(Diag::error(
+                group.id.span,
+                format!(
+                    "`{}` is a reserved word and cannot name a group",
+                    group.id.as_str()
+                ),
+            ));
+        }
+
+        if group.members.is_empty() {
+            out.push(Diag::warn(
+                group.span,
+                format!(
+                    "group `{}` is empty; its frame has nothing to enclose",
+                    group.id.as_str()
+                ),
+            ));
+        }
+
+        for class in &group.classes {
+            if !known_styles.contains(class.as_str()) {
+                out.push(Diag::error(
+                    class.span,
+                    format!("unknown style `.{}`", class.as_str()),
+                ));
+            }
+        }
+
+        check_props(&group.props, Some(Ctx::Node), props::PROPS, "property", out);
+    }
+
+    // An edge to a frame has no obvious endpoint; say so rather than guess.
+    let groups: HashSet<&str> = diagram.groups.iter().map(|g| g.id.as_str()).collect();
+    for edge in &diagram.edges {
+        for endpoint in [&edge.from, &edge.to] {
+            if groups.contains(endpoint.as_str()) {
+                out.push(Diag::error(
+                    endpoint.span,
+                    format!(
+                        "`{}` is a group; edges connect items, not frames",
+                        endpoint.as_str()
+                    ),
+                ));
+            }
+        }
+    }
 }
 
 /// `node` is a universal synonym; anything else must be the archetype's own
@@ -326,9 +415,10 @@ fn check_positional(node: &NodeDecl, def: &'static props::ArchetypeDef, out: &mu
 fn check_edges(diagram: &Diagram, nodes: &HashMap<&str, usize>, out: &mut Vec<Diag>) {
     let known_styles = style_names(diagram);
 
+    let groups: HashSet<&str> = diagram.groups.iter().map(|g| g.id.as_str()).collect();
     for edge in &diagram.edges {
         for endpoint in [&edge.from, &edge.to] {
-            if !nodes.contains_key(endpoint.as_str()) {
+            if !nodes.contains_key(endpoint.as_str()) && !groups.contains(endpoint.as_str()) {
                 out.push(Diag::error(
                     endpoint.span,
                     format!("unknown node `{}`", endpoint.as_str()),

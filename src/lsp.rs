@@ -650,6 +650,8 @@ impl Context {
             match text[line_start..brace].split_whitespace().next() {
                 Some("type") => Block::Type,
                 Some("graph") => Block::Graph,
+                // A group's block takes node-ish visual properties.
+                Some("group") => Block::Node,
                 Some("style") => Block::Style,
                 Some("node") => Block::Node,
                 _ => Block::Edge,
@@ -733,6 +735,8 @@ fn declared_items(text: &str, item: &str) -> Vec<(String, String)> {
     if item != "node" {
         out.extend(declared(text, "node"));
     }
+    // A group is a perfectly good anchor.
+    out.extend(declared(text, "group"));
     out
 }
 

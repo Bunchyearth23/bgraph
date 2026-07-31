@@ -51,7 +51,15 @@ pub struct PlacedEdge {
     pub style: Style,
 }
 
+pub struct PlacedGroup {
+    pub lines: Vec<String>,
+    pub rect: Rect,
+    pub style: Style,
+}
+
 pub struct Layout {
+    /// Drawn first, behind everything they enclose.
+    pub groups: Vec<PlacedGroup>,
     pub nodes: Vec<PlacedNode>,
     pub edges: Vec<PlacedEdge>,
     pub opts: GraphOpts,
@@ -169,9 +177,12 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         _ => {}
     }
 
-    let mut index: HashMap<&str, usize> = HashMap::new();
+    let mut index: HashMap<&str, Entity> = HashMap::new();
     for (i, node) in diagram.nodes.iter().enumerate() {
-        index.insert(node.id.as_str(), i);
+        index.insert(node.id.as_str(), Entity::Node(i));
+    }
+    for (i, group) in diagram.groups.iter().enumerate() {
+        index.insert(group.id.as_str(), Entity::Group(i));
     }
 
     // Pass 1 — resolve styles and intrinsic sizes; positions come later.
@@ -203,58 +214,12 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         labels.push(lines);
     }
 
-    // Pass 2 — place, retrying until every anchor is known.
-    let mut placed: Vec<Option<Rect>> = vec![None; diagram.nodes.len()];
-    let mut remaining: Vec<usize> = (0..diagram.nodes.len()).collect();
-
-    while !remaining.is_empty() {
-        let before = remaining.len();
-        let mut deferred = Vec::new();
-
-        for &i in &remaining {
-            let node = &diagram.nodes[i];
-            let (w, h) = sizes[i];
-
-            // No explicit placement: flow from the previous node in source order.
-            let placement = node.placement.clone().unwrap_or_else(|| match i {
-                0 => Placement::At { x: 0.0, y: 0.0 },
-                _ => Placement::Rel {
-                    dir: opts.flow,
-                    anchor: diagram.nodes[i - 1].id.clone(),
-                    gap: None,
-                    align: None,
-                },
-            });
-
-            let rect = match placement {
-                Placement::At { x, y } => Rect { x, y, w, h },
-                Placement::Rel {
-                    dir,
-                    ref anchor,
-                    gap,
-                    align,
-                } => {
-                    let a = index[anchor.as_str()];
-                    let Some(anchor_rect) = placed[a] else {
-                        deferred.push(i);
-                        continue;
-                    };
-                    offset_from(&anchor_rect, dir, gap.unwrap_or(opts.gap), align, w, h)
-                }
-            };
-
-            placed[i] = Some(rect);
-        }
-
-        if deferred.len() == before {
-            let names: Vec<&str> = deferred
-                .iter()
-                .map(|&i| diagram.nodes[i].id.as_str())
-                .collect();
-            bail!("anchor cycle between: {}", names.join(", "));
-        }
-        remaining = deferred;
-    }
+    // Pass 2 — place. Nodes and groups share one namespace and one fixpoint:
+    // a node waits for its anchor, a group waits for its members. A group
+    // carrying a placement translates its whole subtree once solved, so its
+    // members only count as anchorable after that translation.
+    let solved = place_all(diagram, &index, &sizes, &opts)?;
+    let placed = solved.nodes;
 
     let nodes: Vec<PlacedNode> = diagram
         .nodes
@@ -269,7 +234,12 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
 
     let mut edges = Vec::with_capacity(diagram.edges.len());
     for edge in &diagram.edges {
-        let (from, to) = (index[edge.from.as_str()], index[edge.to.as_str()]);
+        let (Entity::Node(from), Entity::Node(to)) =
+            (index[edge.from.as_str()], index[edge.to.as_str()])
+        else {
+            // `check` rejects an edge touching a group; nothing to draw.
+            continue;
+        };
 
         let mut style = registry
             .resolve(Style::edge_defaults(), "edge", &edge.classes, &edge.props)
@@ -297,7 +267,33 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         });
     }
 
+    let groups = diagram
+        .groups
+        .iter()
+        .enumerate()
+        .map(|(g, group)| {
+            let style = registry
+                .resolve(
+                    Style::group_defaults(),
+                    "group",
+                    &group.classes,
+                    &group.props,
+                )
+                .map_err(|e| e.context(format!("in group `{}`", group.id.as_str())))?;
+            Ok(PlacedGroup {
+                lines: group
+                    .label
+                    .clone()
+                    .map(|l| l.split('\n').map(|s| s.trim().to_string()).collect())
+                    .unwrap_or_default(),
+                rect: solved.groups[g].expect("every group is solved"),
+                style,
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
     Ok(Layout {
+        groups,
         nodes,
         edges,
         opts,
@@ -335,4 +331,358 @@ fn offset_from(a: &Rect, dir: RelDir, gap: f64, align: Option<Align>, w: f64, h:
             Rect { x, y, w, h }
         }
     }
+}
+
+// ---------------------------------------------------------------- containers
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Entity {
+    Node(usize),
+    Group(usize),
+}
+
+pub struct Solved {
+    pub nodes: Vec<Option<Rect>>,
+    pub groups: Vec<Option<Rect>>,
+}
+
+/// One fixpoint over both kinds of entity.
+///
+/// A node waits for its anchor; a group waits for its members. A group is
+/// *sized* by its members — never the other way round — which keeps `D-001`
+/// intact: the nodes still say where they go. A group that carries a
+/// placement translates its whole subtree once its members have landed, and
+/// its members only become anchorable after that translation, so nothing
+/// outside can latch onto a position that is about to move.
+fn place_all(
+    diagram: &Diagram,
+    index: &HashMap<&str, Entity>,
+    sizes: &[(f64, f64)],
+    opts: &GraphOpts,
+) -> Result<Solved> {
+    let mut node_rect: Vec<Option<Rect>> = vec![None; diagram.nodes.len()];
+    let mut group_rect: Vec<Option<Rect>> = vec![None; diagram.groups.len()];
+
+    // Placed means "has coordinates"; settled means "they will not move".
+    let mut node_settled = vec![false; diagram.nodes.len()];
+    let mut group_settled = vec![false; diagram.groups.len()];
+
+    let owner = ownership(diagram, index);
+    let previous_sibling = siblings(diagram, &owner);
+
+    // Two entities that will be translated by the same delta may anchor to
+    // each other as soon as they have coordinates — they move together. Only
+    // an anchor reaching *out* of its translation unit has to wait.
+    let unit = |e: Entity| placed_unit(diagram, &owner, e);
+
+    let settled = |e: Entity, ns: &[bool], gs: &[bool]| match e {
+        Entity::Node(i) => ns[i],
+        Entity::Group(i) => gs[i],
+    };
+    let rect_of = |e: Entity, nr: &[Option<Rect>], gr: &[Option<Rect>]| match e {
+        Entity::Node(i) => nr[i],
+        Entity::Group(i) => gr[i],
+    };
+
+    loop {
+        let mut progress = false;
+
+        for i in 0..diagram.nodes.len() {
+            if node_rect[i].is_some() {
+                continue;
+            }
+            let node = &diagram.nodes[i];
+            let (w, h) = sizes[i];
+
+            // No placement: flow from the previous sibling — the previous
+            // declaration inside the same container, not merely the previous
+            // line in the file.
+            let placement = node.placement.clone().or_else(|| {
+                previous_sibling[i].map(|prev| Placement::Rel {
+                    dir: opts.flow,
+                    anchor: diagram.nodes[prev].id.clone(),
+                    gap: None,
+                    align: None,
+                })
+            });
+
+            let rect = match placement {
+                None => Rect {
+                    x: 0.0,
+                    y: 0.0,
+                    w,
+                    h,
+                },
+                Some(Placement::At { x, y }) => Rect { x, y, w, h },
+                Some(Placement::Rel {
+                    dir,
+                    ref anchor,
+                    gap,
+                    align,
+                }) => {
+                    let target = index[anchor.as_str()];
+                    let together =
+                        unit(Entity::Node(i)).is_some() && unit(Entity::Node(i)) == unit(target);
+                    let ready = if together {
+                        rect_of(target, &node_rect, &group_rect).is_some()
+                    } else {
+                        settled(target, &node_settled, &group_settled)
+                    };
+                    if !ready {
+                        continue;
+                    }
+                    let anchor_rect = rect_of(target, &node_rect, &group_rect)
+                        .expect("readiness implies a rectangle");
+                    offset_from(&anchor_rect, dir, gap.unwrap_or(opts.gap), align, w, h)
+                }
+            };
+
+            node_rect[i] = Some(rect);
+            // A node outside every placed group settles immediately.
+            node_settled[i] = unit(Entity::Node(i)).is_none();
+            progress = true;
+        }
+
+        for g in 0..diagram.groups.len() {
+            if group_rect[g].is_some() {
+                continue;
+            }
+            let group = &diagram.groups[g];
+
+            let members: Vec<Entity> = group
+                .members
+                .iter()
+                .filter_map(|m| index.get(m.as_str()).copied())
+                .collect();
+            if members
+                .iter()
+                .any(|m| rect_of(*m, &node_rect, &group_rect).is_none())
+            {
+                continue;
+            }
+
+            let padding = group_padding(diagram, g);
+            let Some(inner) = bbox(
+                members
+                    .iter()
+                    .filter_map(|m| rect_of(*m, &node_rect, &group_rect)),
+            ) else {
+                // An empty group has nothing to enclose; `check` reports it.
+                group_rect[g] = Some(Rect {
+                    x: 0.0,
+                    y: 0.0,
+                    w: 0.0,
+                    h: 0.0,
+                });
+                group_settled[g] = true;
+                progress = true;
+                continue;
+            };
+
+            let frame = Rect {
+                x: inner.x - padding,
+                y: inner.y - padding,
+                w: inner.w + padding * 2.0,
+                h: inner.h + padding * 2.0,
+            };
+
+            let (frame, delta) = match &group.placement {
+                None => (frame, (0.0, 0.0)),
+                Some(Placement::At { x, y }) => (
+                    Rect {
+                        x: *x,
+                        y: *y,
+                        ..frame
+                    },
+                    (x - frame.x, y - frame.y),
+                ),
+                Some(Placement::Rel {
+                    dir,
+                    anchor,
+                    gap,
+                    align,
+                }) => {
+                    let target = index[anchor.as_str()];
+                    if !settled(target, &node_settled, &group_settled) {
+                        continue;
+                    }
+                    let anchor_rect = rect_of(target, &node_rect, &group_rect)
+                        .expect("a settled entity has a rectangle");
+                    let moved = offset_from(
+                        &anchor_rect,
+                        *dir,
+                        gap.unwrap_or(opts.gap),
+                        *align,
+                        frame.w,
+                        frame.h,
+                    );
+                    (moved, (moved.x - frame.x, moved.y - frame.y))
+                }
+            };
+
+            if delta != (0.0, 0.0) {
+                translate_subtree(diagram, index, g, delta, &mut node_rect, &mut group_rect);
+            }
+
+            group_rect[g] = Some(frame);
+            group_settled[g] = true;
+            settle_subtree(diagram, index, g, &mut node_settled, &mut group_settled);
+            progress = true;
+        }
+
+        let done = node_rect.iter().all(Option::is_some)
+            && group_rect.iter().all(Option::is_some)
+            && node_settled.iter().all(|s| *s)
+            && group_settled.iter().all(|s| *s);
+        if done {
+            break;
+        }
+        if !progress {
+            let stuck: Vec<&str> = diagram
+                .nodes
+                .iter()
+                .enumerate()
+                .filter(|(i, _)| node_rect[*i].is_none())
+                .map(|(_, n)| n.id.as_str())
+                .chain(
+                    diagram
+                        .groups
+                        .iter()
+                        .enumerate()
+                        .filter(|(g, _)| group_rect[*g].is_none())
+                        .map(|(_, g)| g.id.as_str()),
+                )
+                .collect();
+            bail!("anchor cycle between: {}", stuck.join(", "));
+        }
+    }
+
+    Ok(Solved {
+        nodes: node_rect,
+        groups: group_rect,
+    })
+}
+
+/// Which group, if any, declares each entity.
+fn ownership(diagram: &Diagram, index: &HashMap<&str, Entity>) -> HashMap<Entity, usize> {
+    let mut owner = HashMap::new();
+    for (g, group) in diagram.groups.iter().enumerate() {
+        for member in &group.members {
+            if let Some(entity) = index.get(member.as_str()) {
+                owner.insert(*entity, g);
+            }
+        }
+    }
+    owner
+}
+
+/// The node an unplaced node flows from: the previous *node* declared in the
+/// same container, so a group does not inherit the drift of the one before it.
+fn siblings(diagram: &Diagram, owner: &HashMap<Entity, usize>) -> Vec<Option<usize>> {
+    let mut previous: HashMap<Option<usize>, usize> = HashMap::new();
+    let mut out = Vec::with_capacity(diagram.nodes.len());
+
+    for i in 0..diagram.nodes.len() {
+        let container = owner.get(&Entity::Node(i)).copied();
+        out.push(previous.get(&container).copied());
+        previous.insert(container, i);
+    }
+
+    out
+}
+
+/// The innermost ancestor group that carries a placement — the block this
+/// entity will be translated with, if any.
+fn placed_unit(diagram: &Diagram, owner: &HashMap<Entity, usize>, entity: Entity) -> Option<usize> {
+    let mut cursor = owner.get(&entity).copied();
+    let mut seen = Vec::new();
+    while let Some(g) = cursor {
+        if seen.contains(&g) {
+            return None;
+        }
+        seen.push(g);
+        if diagram.groups[g].placement.is_some() {
+            return Some(g);
+        }
+        cursor = owner.get(&Entity::Group(g)).copied();
+    }
+    None
+}
+
+fn translate_subtree(
+    diagram: &Diagram,
+    index: &HashMap<&str, Entity>,
+    group: usize,
+    (dx, dy): (f64, f64),
+    node_rect: &mut [Option<Rect>],
+    group_rect: &mut [Option<Rect>],
+) {
+    for member in &diagram.groups[group].members {
+        match index.get(member.as_str()) {
+            Some(Entity::Node(i)) => {
+                if let Some(r) = node_rect[*i].as_mut() {
+                    r.x += dx;
+                    r.y += dy;
+                }
+            }
+            Some(Entity::Group(g)) => {
+                if let Some(r) = group_rect[*g].as_mut() {
+                    r.x += dx;
+                    r.y += dy;
+                }
+                translate_subtree(diagram, index, *g, (dx, dy), node_rect, group_rect);
+            }
+            None => {}
+        }
+    }
+}
+
+fn settle_subtree(
+    diagram: &Diagram,
+    index: &HashMap<&str, Entity>,
+    group: usize,
+    node_settled: &mut [bool],
+    group_settled: &mut [bool],
+) {
+    for member in &diagram.groups[group].members {
+        match index.get(member.as_str()) {
+            Some(Entity::Node(i)) => node_settled[*i] = true,
+            Some(Entity::Group(g)) => {
+                group_settled[*g] = true;
+                settle_subtree(diagram, index, *g, node_settled, group_settled);
+            }
+            None => {}
+        }
+    }
+}
+
+fn bbox(rects: impl Iterator<Item = Rect>) -> Option<Rect> {
+    let mut bounds: Option<(f64, f64, f64, f64)> = None;
+    for r in rects {
+        bounds = Some(match bounds {
+            None => (r.x, r.y, r.right(), r.bottom()),
+            Some((x0, y0, x1, y1)) => (
+                x0.min(r.x),
+                y0.min(r.y),
+                x1.max(r.right()),
+                y1.max(r.bottom()),
+            ),
+        });
+    }
+    bounds.map(|(x0, y0, x1, y1)| Rect {
+        x: x0,
+        y: y0,
+        w: x1 - x0,
+        h: y1 - y0,
+    })
+}
+
+fn group_padding(diagram: &Diagram, g: usize) -> f64 {
+    diagram.groups[g]
+        .props
+        .iter()
+        .find(|p| p.name == "padding")
+        .and_then(|p| p.values.first())
+        .and_then(|v| v.as_num())
+        .unwrap_or(18.0)
 }

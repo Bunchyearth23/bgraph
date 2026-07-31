@@ -5,7 +5,9 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 
 use crate::charts::annotation_bounds;
-use crate::layout::{Anchor, Annotation, Chart, Layout, Pie, PlacedNode, Rect, text_width};
+use crate::layout::{
+    Anchor, Annotation, Chart, Layout, Pie, PlacedGroup, PlacedNode, Rect, text_width,
+};
 use crate::style::{Head, Router, Shape, Style};
 
 /// An edge after routing, with its label already placed.
@@ -30,6 +32,11 @@ pub fn render(layout: &Layout) -> String {
     let mut body = String::new();
     let mut markers = BTreeMap::new();
     let mut needs_shadow = false;
+
+    // Frames go down first: everything they enclose is drawn over them.
+    for group in &layout.groups {
+        body.push_str(&group_frame(group));
+    }
 
     for (edge, route) in layout.edges.iter().zip(&routed) {
         if route.points.len() < 2 {
@@ -316,6 +323,7 @@ fn bounds(layout: &Layout, routed: &[Routed]) -> (f64, f64, f64, f64) {
     let mut max_y = f64::MIN;
 
     let mut boxes: Vec<Rect> = layout.nodes.iter().map(|n| n.rect).collect();
+    boxes.extend(layout.groups.iter().map(|g| g.rect));
     boxes.extend(layout.annotations.iter().map(annotation_bounds));
     boxes.extend(routed.iter().filter_map(|r| r.label.as_ref().map(|l| l.1)));
 
@@ -351,6 +359,46 @@ fn bounds(layout: &Layout, routed: &[Routed]) -> (f64, f64, f64, f64) {
         max_y = max_y.max(r.bottom());
     }
     (min_x, min_y, max_x, max_y)
+}
+
+/// A frame and its name, set into the top-left of the border.
+fn group_frame(group: &PlacedGroup) -> String {
+    let s = &group.style;
+    let r = &group.rect;
+
+    let dash = s
+        .dash_array()
+        .map(|d| format!(r#" stroke-dasharray="{d}""#))
+        .unwrap_or_default();
+
+    let mut out = format!(
+        r#"<rect x="{}" y="{}" width="{}" height="{}" rx="{}"{}{} stroke-width="{}"{dash}/>"#,
+        n(r.x),
+        n(r.y),
+        n(r.w),
+        n(r.h),
+        n(s.radius.unwrap_or(10.0)),
+        paint("fill", s.fill.as_deref().unwrap_or("none")),
+        paint("stroke", s.stroke.as_deref().unwrap_or("#94a3b8")),
+        n(s.stroke_width.unwrap_or(1.0))
+    );
+
+    if group.lines.iter().any(|l| !l.is_empty()) {
+        let size = s.font_size.unwrap_or(12.0);
+        let _ = write!(
+            out,
+            r#"<text x="{}" y="{}" text-anchor="start" dominant-baseline="central" font-family="{}" font-size="{}" font-weight="{}"{}>{}</text>"#,
+            n(r.x + 10.0),
+            n(r.y + size),
+            esc(s.font_family.as_deref().unwrap_or("sans-serif")),
+            n(size),
+            esc(s.font_weight.as_deref().unwrap_or("600")),
+            paint("fill", s.font_color.as_deref().unwrap_or("#64748b")),
+            esc(&group.lines.join(" "))
+        );
+    }
+
+    out
 }
 
 // ---------------------------------------------------------------- shapes

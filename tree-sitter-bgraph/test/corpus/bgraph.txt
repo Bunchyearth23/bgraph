@@ -12,8 +12,12 @@ graph {
 (source_file
   (graph_declaration
     body: (block
-      (property name: (property_name) value: (color))
-      (property name: (property_name) value: (number)))))
+      (property
+        name: (property_name)
+        value: (color))
+      (property
+        name: (property_name)
+        value: (number)))))
 
 ================================================================================
 Hex colors are not comments
@@ -26,11 +30,15 @@ node a "A" { fill: #0b1120 }  // trailing
 
 (source_file
   (comment)
-  (node_declaration
+  (item_declaration
+    keyword: (item_keyword
+      (identifier))
     name: (identifier)
     label: (string)
     body: (block
-      (property name: (property_name) value: (color))))
+      (property
+        name: (property_name)
+        value: (color))))
   (comment))
 
 ================================================================================
@@ -42,10 +50,14 @@ node a { fill: #111111 stroke: #222222 2 dashed }
 --------------------------------------------------------------------------------
 
 (source_file
-  (node_declaration
+  (item_declaration
+    keyword: (item_keyword
+      (identifier))
     name: (identifier)
     body: (block
-      (property name: (property_name) value: (color))
+      (property
+        name: (property_name)
+        value: (color))
       (property
         name: (property_name)
         value: (color)
@@ -67,12 +79,16 @@ style leaf extends base {
   (style_declaration
     name: (identifier)
     body: (block
-      (property name: (property_name) value: (number))))
+      (property
+        name: (property_name)
+        value: (number))))
   (style_declaration
     name: (identifier)
     parent: (identifier)
     body: (block
-      (property name: (property_name) value: (identifier)))))
+      (property
+        name: (property_name)
+        value: (identifier)))))
 
 ================================================================================
 Absolute and relative placement
@@ -85,21 +101,32 @@ node c above b
 --------------------------------------------------------------------------------
 
 (source_file
-  (node_declaration
+  (item_declaration
+    keyword: (item_keyword
+      (identifier))
     name: (identifier)
     label: (string)
     placement: (absolute_position
-      point: (point x: (number) y: (number))))
-  (node_declaration
+      point: (point
+        x: (number)
+        y: (number))))
+  (item_declaration
+    keyword: (item_keyword
+      (identifier))
     name: (identifier)
     label: (string)
-    class: (class_reference (identifier))
+    class: (class_reference
+      (identifier))
     placement: (relative_position
       direction: (direction)
       anchor: (identifier)
-      (gap_clause amount: (number))
-      (align_clause alignment: (alignment))))
-  (node_declaration
+      (gap_clause
+        amount: (number))
+      (align_clause
+        alignment: (alignment))))
+  (item_declaration
+    keyword: (item_keyword
+      (identifier))
     name: (identifier)
     placement: (relative_position
       direction: (direction)
@@ -120,13 +147,34 @@ a .. b
 --------------------------------------------------------------------------------
 
 (source_file
-  (edge_declaration from: (identifier) operator: (arrow) to: (identifier))
-  (edge_declaration from: (identifier) operator: (arrow) to: (identifier))
-  (edge_declaration from: (identifier) operator: (arrow) to: (identifier))
-  (edge_declaration from: (identifier) operator: (arrow) to: (identifier))
-  (edge_declaration from: (identifier) operator: (arrow) to: (identifier))
-  (edge_declaration from: (identifier) operator: (arrow) to: (identifier))
-  (edge_declaration from: (identifier) operator: (arrow) to: (identifier)))
+  (edge_declaration
+    from: (identifier)
+    operator: (arrow)
+    to: (identifier))
+  (edge_declaration
+    from: (identifier)
+    operator: (arrow)
+    to: (identifier))
+  (edge_declaration
+    from: (identifier)
+    operator: (arrow)
+    to: (identifier))
+  (edge_declaration
+    from: (identifier)
+    operator: (arrow)
+    to: (identifier))
+  (edge_declaration
+    from: (identifier)
+    operator: (arrow)
+    to: (identifier))
+  (edge_declaration
+    from: (identifier)
+    operator: (arrow)
+    to: (identifier))
+  (edge_declaration
+    from: (identifier)
+    operator: (arrow)
+    to: (identifier)))
 
 ================================================================================
 Arrows without surrounding space
@@ -137,7 +185,10 @@ alpha->beta
 --------------------------------------------------------------------------------
 
 (source_file
-  (edge_declaration from: (identifier) operator: (arrow) to: (identifier)))
+  (edge_declaration
+    from: (identifier)
+    operator: (arrow)
+    to: (identifier)))
 
 ================================================================================
 Edge with label, class and inline block
@@ -153,9 +204,12 @@ orders -> billing "charge" .hot { router: ortho }
     operator: (arrow)
     to: (identifier)
     label: (string)
-    class: (class_reference (identifier))
+    class: (class_reference
+      (identifier))
     body: (block
-      (property name: (property_name) value: (identifier)))))
+      (property
+        name: (property_name)
+        value: (identifier)))))
 
 ================================================================================
 Escapes and braces inside labels
@@ -167,8 +221,16 @@ node b "a { brace } and a \" quote"
 --------------------------------------------------------------------------------
 
 (source_file
-  (node_declaration name: (identifier) label: (string))
-  (node_declaration name: (identifier) label: (string)))
+  (item_declaration
+    keyword: (item_keyword
+      (identifier))
+    name: (identifier)
+    label: (string))
+  (item_declaration
+    keyword: (item_keyword
+      (identifier))
+    name: (identifier)
+    label: (string)))
 
 ================================================================================
 Archetype declaration
@@ -187,13 +249,21 @@ node organic "Organic" { value: 4820 }
   (type_declaration
     name: (identifier)
     body: (block
-      (property name: (property_name) value: (string))
-      (property name: (property_name) value: (number))))
-  (node_declaration
+      (property
+        name: (property_name)
+        value: (string))
+      (property
+        name: (property_name)
+        value: (number))))
+  (item_declaration
+    keyword: (item_keyword
+      (identifier))
     name: (identifier)
     label: (string)
     body: (block
-      (property name: (property_name) value: (number)))))
+      (property
+        name: (property_name)
+        value: (number)))))
 
 ================================================================================
 Bare archetype
@@ -204,7 +274,8 @@ type free
 --------------------------------------------------------------------------------
 
 (source_file
-  (type_declaration name: (identifier)))
+  (type_declaration
+    name: (identifier)))
 
 ================================================================================
 Colors carry their alpha
@@ -216,13 +287,73 @@ node b { fill: #ff0000 stroke: #ff0000aa }
 --------------------------------------------------------------------------------
 
 (source_file
-  (node_declaration
+  (item_declaration
+    keyword: (item_keyword
+      (identifier))
     name: (identifier)
     body: (block
-      (property name: (property_name) value: (color))
-      (property name: (property_name) value: (color))))
-  (node_declaration
+      (property
+        name: (property_name)
+        value: (color))
+      (property
+        name: (property_name)
+        value: (color))))
+  (item_declaration
+    keyword: (item_keyword
+      (identifier))
     name: (identifier)
     body: (block
-      (property name: (property_name) value: (color))
-      (property name: (property_name) value: (color)))))
+      (property
+        name: (property_name)
+        value: (color))
+      (property
+        name: (property_name)
+        value: (color)))))
+
+================================================================================
+Groups nest and carry properties
+================================================================================
+
+group outer "Outer" .frame at (0, 0) {
+  padding: 22
+  node a "A"
+  group inner "Inner" {
+    node b "B"
+  }
+  a -> b
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (group_declaration
+    name: (identifier)
+    label: (string)
+    class: (class_reference
+      (identifier))
+    placement: (absolute_position
+      point: (point
+        x: (number)
+        y: (number)))
+    body: (group_block
+      (property
+        name: (property_name)
+        value: (number))
+      (item_declaration
+        keyword: (item_keyword
+          (identifier))
+        name: (identifier)
+        label: (string))
+      (group_declaration
+        name: (identifier)
+        label: (string)
+        body: (group_block
+          (item_declaration
+            keyword: (item_keyword
+              (identifier))
+            name: (identifier)
+            label: (string))))
+      (edge_declaration
+        from: (identifier)
+        operator: (arrow)
+        to: (identifier)))))

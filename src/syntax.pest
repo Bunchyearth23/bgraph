@@ -30,9 +30,18 @@ term = _{ (nl | ";" | ",")+ | &EOI }
 // an edge; PEG backtracking still lets a node actually named `type` have edges.
 // `edge_decl` precedes `item_decl` only for speed: `item_decl` would fail on
 // the arrow anyway and backtrack.
-stmt = _{ type_decl | graph_decl | style_decl | edge_decl | item_decl }
+stmt = _{ type_decl | graph_decl | style_decl | group_decl | edge_decl | item_decl }
 
 type_decl  = { "type" ~ ident ~ block? }
+
+// A container. Its block holds properties *and* statements, so a group nests.
+// Its rectangle is derived from its members, not declared.
+// No positional data: a group has no slots, it is a frame.
+group_decl  = { "group" ~ ident ~ string? ~ class_ref* ~ placement? ~ group_block }
+// Entries are separated, for the same reason statements are: without it
+// `padding: 22 node a` cannot be told from a property with three values.
+group_block = { "{" ~ sep ~ ((prop | stmt) ~ inner_term)* ~ "}" }
+inner_term  = _{ (nl | ";" | ",")+ | &"}" }
 graph_decl = { "graph" ~ block }
 style_decl = { "style" ~ ident ~ ("extends" ~ ident)? ~ block }
 // The leading identifier is the archetype's element keyword — `node`, `slice`,
@@ -54,7 +63,7 @@ edge_decl  = { !(keyword) ~ ident ~ arrow ~ ident ~ string? ~ class_ref* ~ block
 // Atomic: a non-atomic rule would let implicit whitespace slip between the
 // word and the boundary test, so `style -> a` would read the `-` as part
 // of an identifier and the guard would never fire.
-keyword    = @{ ("type" | "graph" | "style" | "node") ~ !(ASCII_ALPHANUMERIC | "_" | "-") }
+keyword    = @{ ("type" | "graph" | "style" | "node" | "group") ~ !(ASCII_ALPHANUMERIC | "_" | "-") }
 
 class_ref = { "." ~ ident }
 arrow     = @{ "<->" | "<-" | "-->" | "..>" | "--" | "->" | ".." }

@@ -41,6 +41,23 @@ pub struct Diagram {
     pub styles: Vec<StyleDecl>,
     pub nodes: Vec<NodeDecl>,
     pub edges: Vec<EdgeDecl>,
+    /// Containers. Members live in the flat `nodes`/`groups` lists and are
+    /// named here, so the identifier namespace stays single and global.
+    pub groups: Vec<GroupDecl>,
+}
+
+#[derive(Debug)]
+pub struct GroupDecl {
+    pub id: Spanned<String>,
+    pub label: Option<String>,
+    pub classes: Vec<Spanned<String>>,
+    /// Where the group goes. Its *size* always comes from its members; a
+    /// placement translates the whole subtree once they are solved.
+    pub placement: Option<Placement>,
+    pub props: Vec<Prop>,
+    /// Items and groups declared directly inside, in source order.
+    pub members: Vec<Spanned<String>>,
+    pub span: Span,
 }
 
 #[derive(Debug)]

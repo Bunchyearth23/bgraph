@@ -121,6 +121,24 @@ impl Style {
         }
     }
 
+    /// A frame, not a box: the fill is subtle and the border is what reads.
+    pub fn group_defaults() -> Style {
+        Style {
+            fill: Some("#00000000".into()),
+            stroke: Some("#94a3b8".into()),
+            stroke_width: Some(1.0),
+            dash: Some("dashed".into()),
+            radius: Some(10.0),
+            shape: Some(Shape::Rect),
+            padding: Some(18.0),
+            font_size: Some(12.0),
+            font_family: Some("Inter, ui-sans-serif, system-ui, sans-serif".into()),
+            font_color: Some("#64748b".into()),
+            font_weight: Some("600".into()),
+            ..Style::default()
+        }
+    }
+
     pub fn edge_defaults() -> Style {
         Style {
             stroke: Some("#64748b".into()),

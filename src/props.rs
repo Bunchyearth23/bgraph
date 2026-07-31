@@ -518,6 +518,11 @@ pub const KEYWORDS: &[(&str, &str)] = &[
         "Diagram-wide settings: padding, gap, background, flow.",
     ),
     (
+        "group",
+        "A container. Its block holds properties and nested statements; its \
+         rectangle is the bounding box of its members plus its `padding`.",
+    ),
+    (
         "style",
         "A named, reusable style block. `style x extends y { … }`.",
     ),

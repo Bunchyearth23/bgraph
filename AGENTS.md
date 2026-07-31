@@ -57,9 +57,9 @@ disagree.
 - `cargo run --bin bgraph -- watch diagram.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check diagram.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (104 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (115 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
-- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (15 corpus cases)
+- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (16 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
 - `./editors/zed/install.sh` — installs the server, regenerates + pins the grammar
 
@@ -126,6 +126,11 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-07-31] `tree-sitter test`'s summary line — "failed parses: 0" — counts
+  **parses**, not expectation matches. It says nothing about whether the trees
+  are what the corpus claims, and reading it let seven expectations go stale
+  across a rename. Only the **exit code** tells the truth;
+  `the_grammar_corpus_expectations_still_hold` now asserts it.
 - [2026-07-31] A `.scm` query naming a node type the grammar no longer has does
   **not** degrade gracefully: Zed fails to load the language and stops
   recognising `.bd` files entirely — no highlighting, no LSP, nothing. Renaming
@@ -216,6 +221,16 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
 - [2026-07-31] `pos_value` excludes the placement keywords in pest, or `at`
   and `right-of` would be eaten as bare-word positional data before
   `placement?` ever gets to look.
+
+- [2026-07-31] A group is sized by its members, never the reverse — that is what
+  keeps `D-001` intact. A group carrying a placement translates its subtree, so
+  its members are `placed` before they are `settled`; an anchor inside the same
+  translation unit needs only `placed`, one reaching outside needs `settled`.
+  Getting that distinction wrong deadlocks the solver instantly.
+- [2026-07-31] `group_block` mixes properties and statements, so its entries
+  need a separator for the same reason statements do. pest and tree-sitter
+  both read `padding: 22 node a` as one four-valued property — they agree, and
+  the corpus case sits in `accept/` saying so.
 
 ### Workarounds
 

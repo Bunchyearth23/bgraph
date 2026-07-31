@@ -170,6 +170,105 @@
     }
   },
   {
+    "type": "group_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "edge_declaration",
+          "named": true
+        },
+        {
+          "type": "graph_declaration",
+          "named": true
+        },
+        {
+          "type": "group_declaration",
+          "named": true
+        },
+        {
+          "type": "item_declaration",
+          "named": true
+        },
+        {
+          "type": "property",
+          "named": true
+        },
+        {
+          "type": "style_declaration",
+          "named": true
+        },
+        {
+          "type": "type_declaration",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "group_declaration",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "group_block",
+            "named": true
+          }
+        ]
+      },
+      "class": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "class_reference",
+            "named": true
+          }
+        ]
+      },
+      "label": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "placement": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "absolute_position",
+            "named": true
+          },
+          {
+            "type": "relative_position",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "item_declaration",
     "named": true,
     "fields": {
@@ -398,6 +497,10 @@
           "named": true
         },
         {
+          "type": "group_declaration",
+          "named": true
+        },
+        {
           "type": "item_declaration",
           "named": true
         },
@@ -549,6 +652,10 @@
   },
   {
     "type": "graph",
+    "named": false
+  },
+  {
+    "type": "group",
     "named": false
   },
   {

@@ -111,6 +111,7 @@ fn build(file: Pair<Rule>) -> Result<Diagram> {
             }
             Rule::style_decl => diagram.styles.push(parse_style(pair)?),
             Rule::item_decl => diagram.nodes.push(parse_item(pair)?),
+            Rule::group_decl => parse_group(pair, &mut diagram)?,
             Rule::edge_decl => diagram.edges.push(parse_edge(pair)?),
             Rule::EOI => {}
             other => bail!("unexpected rule {other:?}"),
@@ -157,6 +158,68 @@ fn parse_style(pair: Pair<Rule>) -> Result<StyleDecl> {
         props,
         span,
     })
+}
+
+/// Flattens a group: its members are appended to the diagram's own lists and
+/// named on the group, so every identifier stays in one global namespace.
+fn parse_group(pair: Pair<Rule>, diagram: &mut Diagram) -> Result<()> {
+    let span = span_of(&pair);
+    let mut id = None;
+    let mut label = None;
+    let mut classes = Vec::new();
+    let mut placement = None;
+    let mut props = Vec::new();
+    let mut members = Vec::new();
+
+    for part in pair.into_inner() {
+        match part.as_rule() {
+            Rule::ident if id.is_none() => id = Some(spanned(&part)),
+            Rule::string if label.is_none() => label = Some(unescape(part)),
+            Rule::class_ref => classes.push(class_name(part)),
+            Rule::abs_pos | Rule::rel_pos => placement = Some(parse_placement(part)?),
+            Rule::group_block => {
+                for inner in part.into_inner() {
+                    match inner.as_rule() {
+                        Rule::prop => props.extend(parse_prop(inner)?),
+                        Rule::item_decl => {
+                            let node = parse_item(inner)?;
+                            members.push(node.id.clone());
+                            diagram.nodes.push(node);
+                        }
+                        Rule::group_decl => {
+                            let name = group_name(&inner)?;
+                            members.push(name);
+                            parse_group(inner, diagram)?;
+                        }
+                        Rule::edge_decl => diagram.edges.push(parse_edge(inner)?),
+                        Rule::style_decl => diagram.styles.push(parse_style(inner)?),
+                        other => bail!("`{other:?}` cannot be nested in a group"),
+                    }
+                }
+            }
+            other => bail!("unexpected rule {other:?} in group declaration"),
+        }
+    }
+
+    diagram.groups.push(GroupDecl {
+        id: id.expect("a group declaration always names the group"),
+        label,
+        classes,
+        placement,
+        props,
+        members,
+        span,
+    });
+
+    Ok(())
+}
+
+fn group_name(pair: &Pair<Rule>) -> Result<Spanned<String>> {
+    pair.clone()
+        .into_inner()
+        .find(|p| p.as_rule() == Rule::ident)
+        .map(|p| spanned(&p))
+        .ok_or_else(|| anyhow::anyhow!("a group declaration always names the group"))
 }
 
 fn parse_item(pair: Pair<Rule>) -> Result<NodeDecl> {
@@ -296,8 +359,15 @@ fn parse_placement(pair: Pair<Rule>) -> Result<Placement> {
 
 fn parse_block(pair: Pair<Rule>) -> Result<Vec<Prop>> {
     let mut props = Vec::new();
-
     for prop in pair.into_inner() {
+        props.extend(parse_prop(prop)?);
+    }
+    Ok(props)
+}
+
+fn parse_prop(prop: Pair<Rule>) -> Result<Vec<Prop>> {
+    let mut props = Vec::new();
+    {
         let span = span_of(&prop);
         let mut parts = prop.into_inner();
         let key = parts.next().expect("property name");
