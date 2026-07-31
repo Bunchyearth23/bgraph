@@ -18,7 +18,6 @@ use crate::style::{GraphOpts, Registry, Shape, Style};
 /// distinguishable from a default, both here and in `check`.
 pub fn chart_defaults() -> Style {
     Style {
-        opacity: Some(1.0),
         font_size: Some(13.0),
         font_family: Some("Inter, ui-sans-serif, system-ui, sans-serif".into()),
         font_weight: Some("500".into()),
@@ -29,25 +28,20 @@ pub fn chart_defaults() -> Style {
 /// sRGB channels of a hex color. `None` for a named color, which we cannot
 /// read without a lookup table — callers treat that as "no opinion".
 fn rgb(color: &str) -> Option<(f64, f64, f64)> {
-    let hex = color.trim_start_matches('#');
-    if !hex.chars().all(|c| c.is_ascii_hexdigit()) {
+    // The alpha channel is not a color; contrast and the palette choice read
+    // the opaque part.
+    let (opaque, _) = crate::render_svg::split_alpha(color);
+    let hex = opaque.strip_prefix('#')?;
+    if hex.len() != 6 || !hex.chars().all(|c| c.is_ascii_hexdigit()) {
         return None;
     }
-    let channel = |s: &str| u8::from_str_radix(s, 16).ok().map(|v| v as f64 / 255.0);
+    let channel = |s: &str| u8::from_str_radix(s, 16).ok().map(|v| f64::from(v) / 255.0);
 
-    match hex.len() {
-        3 => Some((
-            channel(&hex[0..1].repeat(2))?,
-            channel(&hex[1..2].repeat(2))?,
-            channel(&hex[2..3].repeat(2))?,
-        )),
-        6 | 8 => Some((
-            channel(&hex[0..2])?,
-            channel(&hex[2..4])?,
-            channel(&hex[4..6])?,
-        )),
-        _ => None,
-    }
+    Some((
+        channel(&hex[0..2])?,
+        channel(&hex[2..4])?,
+        channel(&hex[4..6])?,
+    ))
 }
 
 /// WCAG relative luminance.
@@ -61,6 +55,27 @@ pub fn luminance(color: &str) -> Option<f64> {
         }
     };
     Some(0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b))
+}
+
+/// Flattens a translucent color onto what sits behind it. Contrast is a
+/// property of what the eye receives, not of what was written down: a fill at
+/// alpha 20 is mostly its backdrop.
+pub fn composite(over: &str, under: &str) -> String {
+    let (opaque, alpha) = crate::render_svg::split_alpha(over);
+    let Some(a) = alpha else {
+        return opaque;
+    };
+    let (Some(f), Some(b)) = (rgb(&opaque), rgb(under)) else {
+        return opaque;
+    };
+
+    let mix = |f: f64, b: f64| ((a * f + (1.0 - a) * b) * 255.0).round() as u8;
+    format!(
+        "#{:02x}{:02x}{:02x}",
+        mix(f.0, b.0),
+        mix(f.1, b.1),
+        mix(f.2, b.2)
+    )
 }
 
 /// WCAG contrast ratio, 1.0 (invisible) to 21.0 (black on white).
@@ -286,7 +301,6 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
                     stroke_width: Some(0.0),
                     radius: Some(3.0),
                     shape: Some(Shape::Rect),
-                    opacity: Some(1.0),
                     ..Style::default()
                 },
             });

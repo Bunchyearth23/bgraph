@@ -183,14 +183,6 @@ pub const PROPS: &[PropDef] = &[
         doc: "Inset between the label and the outline; drives the auto-size.",
     },
     PropDef {
-        name: "opacity",
-        alias: false,
-        ctx: Ctx::Both,
-        words: &[],
-        syntax: "opacity: <0..1>",
-        doc: "Overall transparency.",
-    },
-    PropDef {
         name: "font",
         alias: false,
         ctx: Ctx::Both,

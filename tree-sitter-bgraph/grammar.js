@@ -121,7 +121,10 @@ module.exports = grammar({
 
     number: (_) => token(seq(optional('-'), /\d+/, optional(seq('.', /\d+/)), optional(choice('px', '%')))),
 
-    color: (_) => token(seq('#', /[0-9a-fA-F]{3,8}/)),
+    // Any run of hex digits; `check` accepts only 3, 4, 6 or 8 of them.
+    // Tree-sitter regexes have no lookahead, so a length pinned here would
+    // split `#1234567` into a six-digit color and a stray number.
+    color: (_) => token(seq('#', /[0-9a-fA-F]+/)),
 
     // One token, so `extras` cannot leak whitespace or a `//` into a label.
     string: (_) => token(seq('"', repeat(choice(/[^"\\]/, seq('\\', /./))), '"')),

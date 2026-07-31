@@ -505,19 +505,24 @@ fn check_contrast(diagram: &Diagram, archetype: &str, out: &mut Vec<Diag>) {
             continue;
         };
         // A pie's legend sits on the canvas; a box's label sits on its fill.
-        let behind = match archetype {
+        let nominal = match archetype {
             "pie" => surface.as_str(),
             _ => style.fill.as_deref().unwrap_or(surface.as_str()),
         };
 
-        let Some(ratio) = crate::charts::contrast(ink, behind) else {
+        // What the eye receives, not what was written: a translucent fill is
+        // mostly its backdrop, and translucent ink is mostly its fill.
+        let behind = crate::charts::composite(nominal, &surface);
+        let ink_seen = crate::charts::composite(ink, &behind);
+
+        let Some(ratio) = crate::charts::contrast(&ink_seen, &behind) else {
             continue;
         };
         if ratio < 3.0 {
             out.push(Diag::warn(
                 node.id.span,
                 format!(
-                    "`{}` writes {ink} on {behind} — contrast {ratio:.1}:1, \
+                    "`{}` writes {ink_seen} on {behind} — contrast {ratio:.1}:1, \
                      below the 3:1 floor; this text will not be readable",
                     node.id.as_str()
                 ),
@@ -557,6 +562,21 @@ fn check_props(
                 prop.name_span,
                 format!("`{}` has no effect on {where_}", prop.name),
             ));
+        }
+
+        for value in &prop.values {
+            if let Value::Color(c) = value {
+                let digits = c.len() - 1;
+                if !matches!(digits, 3 | 4 | 6 | 8) {
+                    out.push(Diag::error(
+                        prop.values_span,
+                        format!(
+                            "`{c}` has {digits} hex digits; a color needs 3, 4, 6 or 8 \
+                             (#rgb, #rgba, #rrggbb, #rrggbbaa)"
+                        ),
+                    ));
+                }
+            }
         }
 
         if prop.values.is_empty() {

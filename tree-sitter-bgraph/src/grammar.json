@@ -745,7 +745,7 @@
           },
           {
             "type": "PATTERN",
-            "value": "[0-9a-fA-F]{3,8}"
+            "value": "[0-9a-fA-F]+"
           }
         ]
       }

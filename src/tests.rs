@@ -953,3 +953,128 @@ fn statement_keywords_cannot_name_a_node() {
         assert!(parse_diagram(&source).is_ok(), "`{word}` should be usable");
     }
 }
+
+// ------------------------------------------------------------- alpha
+
+#[test]
+fn the_fourth_channel_is_alpha_and_defaults_to_opaque() {
+    use crate::render_svg::split_alpha;
+
+    // Opaque: no alpha attribute is worth emitting.
+    assert_eq!(split_alpha("#ff0000"), ("#ff0000".into(), None));
+    assert_eq!(split_alpha("#f00"), ("#ff0000".into(), None));
+    assert_eq!(split_alpha("#ff0000ff"), ("#ff0000".into(), None));
+    assert_eq!(split_alpha("#f00f"), ("#ff0000".into(), None));
+
+    // Translucent.
+    let (rgb, alpha) = split_alpha("#ff000080");
+    assert_eq!(rgb, "#ff0000");
+    assert!((alpha.expect("alpha") - 0.502).abs() < 0.002, "{alpha:?}");
+
+    let (rgb, alpha) = split_alpha("#f008");
+    assert_eq!(rgb, "#ff0000");
+    assert!((alpha.expect("alpha") - 0.533).abs() < 0.002, "{alpha:?}");
+
+    // A named color carries no alpha and must pass through untouched.
+    assert_eq!(split_alpha("tomato"), ("tomato".into(), None));
+    assert_eq!(split_alpha("none"), ("none".into(), None));
+}
+
+#[test]
+fn alpha_is_emitted_as_its_own_attribute() {
+    // Inline eight-digit hex is dropped silently by several SVG-to-PDF paths.
+    let svg = render_svg::render(&build(
+        r#"node a "A" { fill: #1e293b80 stroke: #38bdf8 font-color: #ffffff40 }"#,
+    ));
+
+    assert!(
+        svg.contains(r##"fill="#1e293b" fill-opacity="0.5""##),
+        "{svg}"
+    );
+    assert!(
+        svg.contains(r##"stroke="#38bdf8" stroke-width"##),
+        "opaque needs no attribute: {svg}"
+    );
+    assert!(
+        !svg.contains("#1e293b80"),
+        "no eight-digit hex should reach the output: {svg}"
+    );
+    assert!(
+        svg.contains(r##"fill="#ffffff" fill-opacity="0.25""##),
+        "{svg}"
+    );
+}
+
+#[test]
+fn opacity_is_no_longer_a_property() {
+    let e = err("node a { opacity: 0.5 }");
+    assert!(e.contains("unknown property `opacity`"), "{e}");
+    assert!(crate::props::lookup("opacity", crate::props::PROPS).is_none());
+}
+
+#[test]
+fn a_malformed_hex_length_is_reported_by_check() {
+    // Both grammars take any run of hex digits — tree-sitter regexes have no
+    // lookahead, so pinning lengths there would have split `#1234567` in two.
+    // `check` is where the length is closed.
+    for bad in ["#12345", "#1234567", "#123456789", "#12"] {
+        let source = format!("node a {{ fill: {bad} }}");
+        assert!(parse_diagram(&source).is_ok(), "`{bad}` should parse");
+        let e = err(&source);
+        assert!(
+            e.contains("hex digits; a color needs 3, 4, 6 or 8"),
+            "`{bad}`: {e}"
+        );
+    }
+    for good in ["#123", "#1234", "#123456", "#12345678"] {
+        let source = format!("node a {{ fill: {good} }}");
+        let diagram = parse_diagram(&source).expect("should parse");
+        assert!(
+            crate::check::first_error(&diagram).is_none(),
+            "`{good}` should be a color"
+        );
+    }
+}
+
+#[test]
+fn alpha_does_not_confuse_contrast_or_the_palette() {
+    // The alpha channel is not a color: both read the opaque part.
+    let d = diags("style node { fill: #101010ff font-color: #1a1a1a80 }\nnode a \"A\"");
+    assert!(
+        d.iter().any(|x| x.message.contains("not be readable")),
+        "{d:?}"
+    );
+
+    let l = build("type pie\ngraph { background: #0b1120ff }\nnode a { value: 1 }");
+    let crate::layout::Chart::Pie(pie) = &l.chart else {
+        panic!("expected a pie");
+    };
+    assert_eq!(pie.slices[0].fill, crate::props::PALETTE_DARK[0]);
+}
+
+#[test]
+fn contrast_is_measured_on_what_the_eye_receives() {
+    use crate::charts::composite;
+
+    // Half of sky blue over near-black is much darker than sky blue.
+    assert_eq!(composite("#ffffff80", "#000000"), "#808080");
+    assert_eq!(composite("#ffffff", "#000000"), "#ffffff");
+    assert_eq!(composite("#ffffff00", "#123456"), "#123456");
+
+    // A pale label on a barely-there fill over a dark canvas is readable, and
+    // must not be reported. The same label on the opaque fill is not.
+    let translucent = diags(
+        "graph { background: #0f172a }\nnode a \"A\" { fill: #38bdf820 font-color: #e2e8f0 }",
+    );
+    assert!(
+        !translucent.iter().any(|d| d.message.contains("readable")),
+        "alpha was ignored when compositing: {translucent:?}"
+    );
+
+    let opaque =
+        diags("graph { background: #0f172a }\nnode a \"A\" { fill: #38bdf8 font-color: #e2e8f0 }");
+    assert!(
+        opaque.iter().any(|d| d.message.contains("readable")),
+        "{opaque:?}"
+    );
+}

@@ -50,9 +50,9 @@ disagree.
 - `cargo run --bin bgraph -- watch diagram.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check diagram.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (86 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (92 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
-- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (11 corpus cases)
+- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (12 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
 - `./editors/zed/install.sh` — installs the server, regenerates + pins the grammar
 
@@ -177,6 +177,17 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
 - [2026-07-31] `bgraph check`'s exit code covers **semantic** errors too, so it
   cannot stand in for "did this parse". Cross-grammar probing must compare
   `parser::parse` against `tree-sitter parse`, never the CLI's exit status.
+
+- [2026-07-31] Tree-sitter regexes have **no lookahead**. `color` cannot pin its
+  length there (`#1234567` would lex as a six-digit color plus a stray `7`), so
+  both grammars take any run of hex digits and `check` closes the set. The
+  cross-check test found this — the second real divergence it has caught.
+- [2026-07-31] There is no `opacity` property: alpha is the fourth channel of a
+  color (`#38bdf880`), defaulting to `ff`. It is emitted as `fill-opacity`
+  rather than inline eight-digit hex, which several SVG-to-PDF paths drop.
+  Contrast checks must **composite** before measuring — a fill at alpha 20 is
+  mostly its backdrop, and comparing against the nominal color reports text
+  that is perfectly readable.
 
 ### Workarounds
 

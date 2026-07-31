@@ -58,7 +58,6 @@ pub struct Style {
     pub width: Option<f64>,
     pub height: Option<f64>,
     pub padding: Option<f64>,
-    pub opacity: Option<f64>,
     pub font_size: Option<f64>,
     pub font_family: Option<String>,
     pub font_color: Option<String>,
@@ -93,7 +92,6 @@ impl Style {
             width,
             height,
             padding,
-            opacity,
             font_size,
             font_family,
             font_color,
@@ -114,7 +112,6 @@ impl Style {
             radius: Some(8.0),
             shape: Some(Shape::Rect),
             padding: Some(14.0),
-            opacity: Some(1.0),
             font_size: Some(14.0),
             font_family: Some("Inter, ui-sans-serif, system-ui, sans-serif".into()),
             font_color: Some("#111827".into()),
@@ -128,7 +125,6 @@ impl Style {
         Style {
             stroke: Some("#64748b".into()),
             stroke_width: Some(1.5),
-            opacity: Some(1.0),
             font_size: Some(12.0),
             font_family: Some("Inter, ui-sans-serif, system-ui, sans-serif".into()),
             font_color: Some("#475569".into()),
@@ -199,7 +195,6 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
         "width" => style.width = first.and_then(|x| x.as_num()),
         "height" => style.height = first.and_then(|x| x.as_num()),
         "padding" => style.padding = first.and_then(|x| x.as_num()),
-        "opacity" => style.opacity = first.and_then(|x| x.as_num()),
         "font" => {
             // `font: 14 "Inter" #e2e8f0 bold` — order-free, read by value kind.
             for value in v {

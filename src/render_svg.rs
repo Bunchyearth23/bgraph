@@ -65,11 +65,10 @@ pub fn render(layout: &Layout) -> String {
             .collect();
         let _ = write!(
             body,
-            r#"<polyline points="{}" fill="none" stroke="{}" stroke-width="{}" stroke-linejoin="round" stroke-linecap="round" opacity="{}"{}/>"#,
+            r#"<polyline points="{}" fill="none"{} stroke-width="{}" stroke-linejoin="round" stroke-linecap="round"{}/>"#,
             path.join(" "),
-            esc(stroke),
+            paint("stroke", stroke),
             n(edge.style.stroke_width.unwrap_or(1.5)),
-            n(edge.style.opacity.unwrap_or(1.0)),
             attrs
         );
     }
@@ -123,10 +122,10 @@ pub fn render(layout: &Layout) -> String {
     if let Some(bg) = &layout.opts.background {
         let _ = write!(
             svg,
-            r#"<rect x="0" y="0" width="{}" height="{}" fill="{}"/>"#,
+            r#"<rect x="0" y="0" width="{}" height="{}"{}/>"#,
             n(width),
             n(height),
-            esc(bg)
+            paint("fill", bg)
         );
     }
     let _ = write!(svg, r#"<g transform="translate({},{})">"#, n(dx), n(dy));
@@ -359,10 +358,9 @@ fn bounds(layout: &Layout, routed: &[Routed]) -> (f64, f64, f64, f64) {
 fn node_shape(node: &PlacedNode) -> String {
     let r = &node.rect;
     let s = &node.style;
-    let fill = esc(s.fill.as_deref().unwrap_or("#ffffff"));
-    let stroke = esc(s.stroke.as_deref().unwrap_or("#1f2937"));
+    let fill = paint("fill", s.fill.as_deref().unwrap_or("#ffffff"));
+    let stroke = paint("stroke", s.stroke.as_deref().unwrap_or("#1f2937"));
     let sw = n(s.stroke_width.unwrap_or(1.5));
-    let opacity = n(s.opacity.unwrap_or(1.0));
     let dash = s
         .dash_array()
         .map(|d| format!(r#" stroke-dasharray="{d}""#))
@@ -372,9 +370,7 @@ fn node_shape(node: &PlacedNode) -> String {
     } else {
         ""
     };
-    let common = format!(
-        r#" fill="{fill}" stroke="{stroke}" stroke-width="{sw}" opacity="{opacity}"{dash}{shadow}"#
-    );
+    let common = format!(r#"{fill}{stroke} stroke-width="{sw}"{dash}{shadow}"#);
 
     match s.shape.unwrap_or(Shape::Rect) {
         Shape::Rect => format!(
@@ -571,13 +567,13 @@ fn node_label(node: &PlacedNode) -> String {
     let start = node.rect.cy() - (node.lines.len() as f64 - 1.0) * line_h / 2.0;
 
     let mut out = format!(
-        r#"<text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" font-family="{}" font-size="{}" font-weight="{}" fill="{}">"#,
+        r#"<text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" font-family="{}" font-size="{}" font-weight="{}"{}>"#,
         n(node.rect.cx()),
         n(start),
         esc(s.font_family.as_deref().unwrap_or("sans-serif")),
         n(font_size),
         esc(s.font_weight.as_deref().unwrap_or("500")),
-        esc(s.font_color.as_deref().unwrap_or("#111827"))
+        paint("fill", s.font_color.as_deref().unwrap_or("#111827"))
     );
 
     for (i, line) in node.lines.iter().enumerate() {
@@ -601,25 +597,25 @@ fn edge_label(label: &str, rect: &Rect, style: &Style, background: &Option<Strin
     let plate = background.as_deref().unwrap_or("#ffffff");
 
     let mut out = format!(
-        r#"<rect x="{}" y="{}" width="{}" height="{}" rx="3" fill="{}"/>"#,
+        r#"<rect x="{}" y="{}" width="{}" height="{}" rx="3"{}/>"#,
         n(rect.x),
         n(rect.y),
         n(rect.w),
         n(rect.h),
-        esc(plate)
+        paint("fill", plate)
     );
 
     let line_h = font_size * 1.3;
     let start = y - (lines.len() as f64 - 1.0) * line_h / 2.0;
     let _ = write!(
         out,
-        r#"<text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" font-family="{}" font-size="{}" font-weight="{}" fill="{}">"#,
+        r#"<text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" font-family="{}" font-size="{}" font-weight="{}"{}>"#,
         n(x),
         n(start),
         esc(style.font_family.as_deref().unwrap_or("sans-serif")),
         n(font_size),
         esc(style.font_weight.as_deref().unwrap_or("400")),
-        esc(style.font_color.as_deref().unwrap_or("#475569"))
+        paint("fill", style.font_color.as_deref().unwrap_or("#475569"))
     );
     for (i, line) in lines.iter().enumerate() {
         let _ = write!(
@@ -651,13 +647,14 @@ fn marker_id(head: Head, color: &str) -> String {
 }
 
 fn marker_def(id: &str, head: Head, color: &str) -> String {
-    let color = esc(color);
+    let fill = paint("fill", color);
+    let stroke = paint("stroke", color);
     let inner = match head {
-        Head::Solid => format!(r#"<path d="M0,0 L10,5 L0,10 z" fill="{color}"/>"#),
+        Head::Solid => format!(r#"<path d="M0,0 L10,5 L0,10 z"{fill}/>"#),
         Head::Open => format!(
-            r#"<path d="M0,0 L10,5 L0,10" fill="none" stroke="{color}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>"#
+            r#"<path d="M0,0 L10,5 L0,10" fill="none"{stroke} stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>"#
         ),
-        Head::Dot => format!(r#"<circle cx="5" cy="5" r="3.5" fill="{color}"/>"#),
+        Head::Dot => format!(r#"<circle cx="5" cy="5" r="3.5"{fill}/>"#),
         Head::None => String::new(),
     };
     let ref_x = if head == Head::Dot { 5 } else { 10 };
@@ -677,6 +674,47 @@ fn n(v: f64) -> String {
     } else {
         format!("{r}")
     }
+}
+
+/// A color and its SVG attribute pair.
+///
+/// `#rrggbbaa` is CSS Color 4 and modern renderers honour it, but several
+/// SVG-to-PDF paths and older viewers silently drop the alpha. Emitting the
+/// opacity as its own attribute renders identically everywhere.
+fn paint(name: &str, color: &str) -> String {
+    let (rgb, alpha) = split_alpha(color);
+    match alpha {
+        Some(a) => format!(r#" {name}="{}" {name}-opacity="{}""#, esc(&rgb), n(a)),
+        None => format!(r#" {name}="{}""#, esc(&rgb)),
+    }
+}
+
+/// Splits `#rgba` / `#rrggbbaa` into the opaque color and its alpha. A named
+/// color, or one with no alpha channel, is fully opaque.
+pub fn split_alpha(color: &str) -> (String, Option<f64>) {
+    let Some(hex) = color.strip_prefix('#') else {
+        return (color.to_string(), None);
+    };
+    if !hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        return (color.to_string(), None);
+    }
+
+    let expand = |s: &str| -> String { s.chars().flat_map(|c| [c, c]).collect() };
+
+    let (rgb, alpha) = match hex.len() {
+        4 => (expand(&hex[0..3]), Some(expand(&hex[3..4]))),
+        8 => (hex[0..6].to_string(), Some(hex[6..8].to_string())),
+        3 => (expand(hex), None),
+        _ => (hex.to_string(), None),
+    };
+
+    let alpha = alpha
+        .and_then(|a| u8::from_str_radix(&a, 16).ok())
+        .map(|a| f64::from(a) / 255.0)
+        // Fully opaque is the default; saying so would be noise.
+        .filter(|a| *a < 1.0);
+
+    (format!("#{rgb}"), alpha)
 }
 
 fn esc(s: &str) -> String {
@@ -717,9 +755,9 @@ fn pie_slices(pie: &Pie) -> String {
 
         let _ = write!(
             out,
-            r#"<path d="{d}" fill="{}" stroke="{}" stroke-width="2" stroke-linejoin="round"/>"#,
-            esc(&slice.fill),
-            esc(&pie.gap_color)
+            r#"<path d="{d}"{}{} stroke-width="2" stroke-linejoin="round"/>"#,
+            paint("fill", &slice.fill),
+            paint("stroke", &pie.gap_color)
         );
     }
 
@@ -795,7 +833,7 @@ fn full_ring(pie: &Pie) -> String {
 
 fn annotation_text(a: &Annotation) -> String {
     format!(
-        r#"<text x="{}" y="{}" text-anchor="{}" dominant-baseline="central" font-family="{}" font-size="{}" font-weight="{}" fill="{}">{}</text>"#,
+        r#"<text x="{}" y="{}" text-anchor="{}" dominant-baseline="central" font-family="{}" font-size="{}" font-weight="{}"{}>{}</text>"#,
         n(a.x),
         n(a.y),
         match a.anchor {
@@ -806,7 +844,7 @@ fn annotation_text(a: &Annotation) -> String {
         esc(&a.family),
         n(a.size),
         esc(&a.weight),
-        esc(&a.color),
+        paint("fill", &a.color),
         esc(&a.text)
     )
 }

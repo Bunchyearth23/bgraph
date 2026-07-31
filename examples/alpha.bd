@@ -1,0 +1,26 @@
+// The fourth channel of a color is its alpha. Omitted, it is ff.
+// There is no `opacity` property: transparency belongs to the paint.
+
+graph { background: #0f172a padding: 30 gap: 30 }
+
+style node {
+  fill: #38bdf8
+  stroke: #38bdf8
+  font: 13 #0f172a bold
+  radius: 8
+  size: 118 62
+}
+
+node ff "ff\nopaque"
+node cc "cc"      { fill: #38bdf8cc }
+node aa "aa"      { fill: #38bdf8aa font-color: #e2e8f0 }
+node w80 "80"     { fill: #38bdf880 font-color: #e2e8f0 }
+node w40 "40"     { fill: #38bdf840 font-color: #e2e8f0 }
+node w10 "10\nborder still ff" { fill: #38bdf810 font-color: #e2e8f0 }
+
+// An edge can be translucent while its head stays solid.
+ff -> cc
+cc -> aa
+aa -> w80  { stroke: #f43f5e 3 }
+w80 -> w40 { stroke: #f43f5e80 3 }
+w40 -> w10 { stroke: #f43f5e30 3 }

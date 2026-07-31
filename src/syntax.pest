@@ -16,7 +16,10 @@ ident  = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_" | ("-" ~ (ASCII_ALPH
 string = ${ "\"" ~ str_inner ~ "\"" }
 str_inner = @{ (!("\"" | "\\") ~ ANY | "\\" ~ ANY)* }
 number = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ ("px" | "%")? }
-color  = @{ "#" ~ ASCII_HEX_DIGIT{3, 8} }
+// Any run of hex digits; `check` accepts only 3, 4, 6 or 8 of them. The
+// tree-sitter lexer has no lookahead, so pinning the lengths here would have
+// made one grammar reject `#1234567` and the other split it in two.
+color  = @{ "#" ~ ASCII_HEX_DIGIT+ }
 
 file = { SOI ~ sep ~ (stmt ~ sep)* ~ EOI }
 

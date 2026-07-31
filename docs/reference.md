@@ -83,6 +83,32 @@ clipped, and negative coordinates are fine.
 
 The token's dash pattern is a default; `{ dash: solid }` overrides it.
 
+## Colors
+
+`#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa`, or an SVG color name (`white`,
+`tomato`).
+
+**The fourth channel is the alpha**, and it defaults to `ff` — opaque. There
+is no separate `opacity` property: transparency belongs to the color that
+carries it, which is what lets a shape have an opaque border and a translucent
+fill.
+
+```
+node card "Card" {
+  fill: #1e293b80      // half-transparent slate
+  stroke: #38bdf8      // fully opaque, alpha omitted
+  font-color: #e2e8f0c0
+}
+```
+
+On output the alpha becomes its own attribute — `fill="#1e293b" fill-opacity="0.5"`
+rather than an eight-digit hex. Both render identically in a modern viewer, but
+several SVG-to-PDF paths and older renderers drop the inline alpha silently.
+
+Note that this is per-paint, not per-element: a translucent fill lets the inner
+half of a thick stroke show through, which a single element opacity would have
+composited away first.
+
 ## The style cascade
 
 ```
@@ -116,7 +142,6 @@ Aliases are marked. They behave identically to the property they alias; the edit
 | `width` | node | `width: <number>` | Fixed width; the height still follows the label. |
 | `height` | node | `height: <number>` | Fixed height; the width still follows the label. |
 | `padding` | node | `padding: <number>` | Inset between the label and the outline; drives the auto-size. |
-| `opacity` | both | `opacity: <0..1>` | Overall transparency. |
 | `font` | both | `font: <size> "<family>" <color> <weight>` | Shorthand read by value kind, so the order is free: a number is the size, a string the family, a color the ink, a bare word the weight. |
 | `font-size` | both | `font-size: <number>` | Text size in user units. |
 | `font-family` | both | `font-family: "<family>"` | Font stack, emitted verbatim into the SVG. |

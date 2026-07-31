@@ -190,8 +190,19 @@ the compiler's own tables so it cannot drift. The ones you reach for most:
 | `router` | edges | `straight` \| `ortho` |
 | `shadow` | nodes | `on` / `off` |
 
-Colors are `#rgb`/`#rrggbb`/`#rrggbbaa` or an SVG color name (`white`,
-`tomato`). Numbers accept a `px` suffix; it is ignored.
+Colors are `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa` or an SVG color name
+(`white`, `tomato`). **The fourth channel is the alpha and defaults to `ff`** —
+there is no separate `opacity` property, because transparency belongs to the
+paint that carries it:
+
+```
+node card "Card" {
+  fill: #1e293b80      // half-transparent
+  stroke: #38bdf8      // opaque border on a translucent fill
+}
+```
+
+Numbers accept a `px` suffix; it is ignored.
 
 ### Shapes
 

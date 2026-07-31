@@ -205,3 +205,24 @@ type free
 
 (source_file
   (type_declaration name: (identifier)))
+
+================================================================================
+Colors carry their alpha
+================================================================================
+
+node a { fill: #f00 stroke: #f00a }
+node b { fill: #ff0000 stroke: #ff0000aa }
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (node_declaration
+    name: (identifier)
+    body: (block
+      (property name: (property_name) value: (color))
+      (property name: (property_name) value: (color))))
+  (node_declaration
+    name: (identifier)
+    body: (block
+      (property name: (property_name) value: (color))
+      (property name: (property_name) value: (color)))))
