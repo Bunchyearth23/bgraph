@@ -298,6 +298,11 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   sitting on a node, and labels fled three rows to escape it — where they read
   as belonging to another edge.
 
+- [2026-07-31] Every test that shells out to `tree-sitter` takes
+  `tree_sitter_lock()` first. The CLI rebuilds the parser library into a
+  shared path, and cargo's parallel test runner had two of them catching it
+  mid-write — the corpus guard failed spuriously twice before this.
+
 ### Workarounds
 
 ### Performance Notes

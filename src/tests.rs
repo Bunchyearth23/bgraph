@@ -780,6 +780,17 @@ fn every_documented_word_is_accepted() {
 
 const CORPUS: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/grammar");
 
+/// The `tree-sitter` CLI rebuilds the parser library on demand, into a path
+/// it shares. Cargo runs tests in parallel, so two of them invoking it at
+/// once could catch the library mid-write — which failed the corpus guard
+/// twice, spuriously. Serialising the calls costs nothing and a flaky guard
+/// stops being believed.
+static TREE_SITTER: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+fn tree_sitter_lock() -> std::sync::MutexGuard<'static, ()> {
+    TREE_SITTER.lock().unwrap_or_else(|e| e.into_inner())
+}
+
 fn corpus_files(kind: &str) -> Vec<std::path::PathBuf> {
     let dir = std::path::Path::new(CORPUS).join(kind);
     let mut files: Vec<_> = std::fs::read_dir(&dir)
@@ -795,6 +806,7 @@ fn corpus_files(kind: &str) -> Vec<std::path::PathBuf> {
 /// `tree-sitter parse` exits non-zero when the tree contains an ERROR node.
 /// Run from the grammar directory so the CLI finds the parser.
 fn tree_sitter_accepts(path: &std::path::Path) -> Option<bool> {
+    let _serial = tree_sitter_lock();
     let status = std::process::Command::new("tree-sitter")
         .args(["parse", "-q"])
         .arg(std::fs::canonicalize(path).ok()?)
@@ -1237,6 +1249,7 @@ fn the_editor_queries_match_the_grammar() {
     assert!(!files.is_empty(), "no .scm files in {}", queries.display());
 
     let run = |path: &std::path::Path| -> Option<std::process::Output> {
+        let _serial = tree_sitter_lock();
         std::process::Command::new("tree-sitter")
             .arg("query")
             .arg(path)
@@ -1282,6 +1295,7 @@ fn the_grammar_corpus_expectations_still_hold() {
     // matches — "failed parses: 0" says nothing about whether the trees are
     // what the corpus claims. Only the exit code does, and reading the wrong
     // line let the corpus go stale across a whole rename.
+    let _serial = tree_sitter_lock();
     let status = std::process::Command::new("tree-sitter")
         .arg("test")
         .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/tree-sitter-bgraph"))
