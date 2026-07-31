@@ -25,6 +25,11 @@ bgraph docs -o docs/reference.md    # regenerate this file
 bgraph-lsp                          # language server, LSP over stdin/stdout
 ```
 
+The watch page reloads on every save and reports parse and layout errors in
+place, so a broken file never costs you the preview. Scroll to zoom, drag to
+pan, `f` to fit, `0` for actual size — and the view survives the reload, or
+zooming while editing would be pointless.
+
 ## The five statements
 
 ```

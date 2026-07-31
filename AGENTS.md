@@ -126,6 +126,14 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-07-31] **Check a command's exit code, never grep its output for a
+  success word.** `cargo test 2>&1 | grep 'test result: ok'` matches the
+  passing suites and hides the failing one; `tree-sitter test`'s summary line
+  counts parses rather than matches. Both have already let a broken tree be
+  reported as green. Run the command, then read `$?`.
+- [2026-07-31] `bgraph docs` runs the **built** binary. Editing `docgen.rs` and
+  regenerating without `cargo build` first writes the old manual and the drift
+  test then fails on the next run — after the commit has gone out.
 - [2026-07-31] **A `*_defaults()` base hides whether the author declared
   anything.** `node_defaults` always sets `fill`, `edge_defaults` always sets
   `stroke` — so `style.fill.unwrap_or(palette)` silently never reaches the
