@@ -60,6 +60,16 @@ pub const DASHES: &[&str] = &["solid", "dashed", "dotted", "none"];
 
 pub const FLOWS: &[&str] = &["right", "left", "down", "up", "LR", "RL", "TB", "BT"];
 
+/// Crow's-foot cardinality, read at the end nearest the entity it describes.
+pub const CARDINALITIES: &[&str] = &[
+    "one",
+    "many",
+    "zero-one",
+    "optional",
+    "zero-many",
+    "one-many",
+];
+
 pub const PROPS: &[PropDef] = &[
     PropDef {
         name: "fill",
@@ -270,6 +280,25 @@ pub const PROPS: &[PropDef] = &[
         words: &[],
         syntax: "value: <number>",
         doc: "Magnitude of a slice. Required by `type pie`, ignored elsewhere.",
+    },
+    PropDef {
+        name: "from-card",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: CARDINALITIES,
+        syntax: "from-card: <one|many|zero-one|zero-many|one-many>",
+        doc: "Cardinality at the tail of a relation, drawn as a crow's foot \
+              against that entity. Required by `type er`, ignored elsewhere. \
+              Usually written positionally: `order -> line \"contains\" one many`.",
+    },
+    PropDef {
+        name: "to-card",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: CARDINALITIES,
+        syntax: "to-card: <one|many|zero-one|zero-many|one-many>",
+        doc: "Cardinality at the head of a relation. A declared cardinality \
+              replaces the arrowhead at that end.",
     },
     PropDef {
         name: "start",
@@ -495,6 +524,27 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         edge_slots: &[],
     },
     ArchetypeDef {
+        name: "er",
+        item: "entity",
+        doc: "Entities and the relations between them. A bare string in the \
+              block is a column, exactly as in `class`; what `er` adds is \
+              cardinality at each end of a relation, written after the label \
+              and read at the end nearest the entity it describes — \
+              `order -> line \"contains\" one many` is one order, many lines.",
+        props: ER_PROPS,
+        slots: &[],
+        edge_slots: &[
+            Slot {
+                prop: "from-card",
+                arity: 1,
+            },
+            Slot {
+                prop: "to-card",
+                arity: 1,
+            },
+        ],
+    },
+    ArchetypeDef {
         name: "state",
         item: "state",
         doc: "A state machine. States are placed by anchors, exactly as in \
@@ -700,6 +750,15 @@ pub const GANTT_PROPS: &[PropDef] = &[
 ];
 
 pub const CLASS_PROPS: &[PropDef] = &[PropDef {
+    name: "title",
+    alias: false,
+    ctx: Ctx::Both,
+    words: &[],
+    syntax: "title: <text>",
+    doc: "Heading drawn above the diagram.",
+}];
+
+pub const ER_PROPS: &[PropDef] = &[PropDef {
     name: "title",
     alias: false,
     ctx: Ctx::Both,

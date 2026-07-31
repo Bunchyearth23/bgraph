@@ -24,15 +24,30 @@ it the file is `free` — the node-and-edge graph everything else in this
 document describes.
 
 ```
-type free            // implicit; nodes and edges placed by anchors
-type pie   { … }     // slices
-type packet { … }    // bitfields
+type free       // implicit; nodes and edges placed by anchors
+type pie        // slice a "A" 42
+type packet     // field a "A" 0 7
+type treemap    // box a "A" 42
+type quadrant   // point a "A" 0.8 0.2
+type bar        // series s 4 8 15
+type xy         // series s 4 8 15
+type sankey     // a -> b 40
+type wave       // signal s "clk" "p...."
+type gantt      // task a "A" 2026-01-01 5d
+type class      // class a "A", then `- id: Uuid` on its own line
+type er         // entity a "A", then a -> b "places" one many
+type state      // state a "A"
+type sequence   // participant a "A"
 ```
 
-Every archetype reads the *same* statements. A `node` is a box, a slice or a
-field depending on the genre; the style cascade, the diagnostics and the
-editor support are identical in all of them. What changes is which properties
-carry meaning — `check` tells you when one is in the wrong place.
+Every archetype reads the *same* statements, under its own word: a box is a
+`node`, a `slice`, a `field`, an `entity`. The style cascade, the diagnostics
+and the editor support are identical in all of them. What changes is which
+properties carry meaning — `check` tells you when one is in the wrong place.
+
+The two sections below walk through `pie` and `packet` in prose.
+**[`reference.md`](reference.md) is the exhaustive list** — every archetype,
+every property, generated from the compiler's own tables.
 
 ### `type pie`
 

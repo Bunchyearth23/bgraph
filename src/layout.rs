@@ -244,7 +244,8 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
 
     let item = crate::check::archetype_of(diagram);
     let machine = item.name == "state";
-    let compartments = item.name == "class";
+    // An entity box is a class box: a name over a ruled list of columns.
+    let compartments = item.name == "class" || item.name == "er";
     // A base that leaves `shape` unset, so a declared one is distinguishable
     // from the default and a state can fall back to a rounded box.
     let node_base = if machine {
@@ -363,8 +364,16 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             continue;
         };
 
+        // `effective_props`, not `props`: an archetype with edge slots writes
+        // its data after the label — `order -> line "contains" one many` — and
+        // it has to reach the cascade like any other property.
         let mut style = registry
-            .resolve(Style::edge_defaults(), "edge", &edge.classes, &edge.props)
+            .resolve(
+                Style::edge_defaults(),
+                "edge",
+                &edge.classes,
+                &edge.effective_props(item.edge_slots),
+            )
             .map_err(|e| {
                 e.context(format!(
                     "in edge `{} -> {}`",
@@ -478,7 +487,18 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
 
             for (i, member) in node.members.iter().enumerate() {
                 annotations.push(Annotation {
-                    text: member.value.clone(),
+                    // `- ` and `+ ` are UML visibility on a class and mean
+                    // something; on a column they are only the syntax that
+                    // marked the line as a member, so `er` drops them.
+                    text: if item.name == "er" {
+                        member
+                            .value
+                            .trim_start_matches(['-', '+'])
+                            .trim_start()
+                            .to_string()
+                    } else {
+                        member.value.clone()
+                    },
                     x: placed.rect.x + pad,
                     y: head + 8.0 + (i as f64 + 0.5) * font * 1.45,
                     anchor: Anchor::Start,

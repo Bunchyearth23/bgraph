@@ -25,12 +25,11 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-Ordered by what each unblocks, not by number. `W-011`, `W-012`, `W-015` and
-`W-029` have landed, so nesting, the plot frame, edge data and per-archetype
-vocabulary are available to everything below. `W-013` and `W-014` are the
-remaining foundations; each archetype names the one
-it waits for. **Every foundation has landed.** What is left either unblocks
-nothing — `W-025`, `W-031`, `W-032` — or belongs to the library track, where
+Ordered by what each unblocks, not by number. **Every foundation has landed** —
+nesting (`W-011`), the plot frame (`W-012`), edge data (`W-015`), per-archetype
+vocabulary (`W-029`), members (`W-013`) and dates (`W-014`) — so nothing below
+waits on anything but itself. What is left either unblocks
+nothing — `W-025`, `W-032` — or belongs to the library track, where
 the engineering is done and the two open items are decisions for a human:
 `Q-005` (release) and `Q-004` (repetition in templates).
 
@@ -39,12 +38,10 @@ string lists (`data: "a" "b" "c"`), number lists (`points: 1 2 3`),
 fractional coordinates (`at (0.82, 0.15)`) and repeated edges between the
 same pair in source order. So most archetypes below need *no grammar change
 at all* — only new properties and a renderer. Exactly three foundations
-change the language: `W-011`, `W-013`, `W-014`.
+changed the language: `W-011`, `W-013`, `W-014` — all three have landed.
 
 | id | state | title | notes |
 |---|---|---|---|
-| `W-011` | planned | **Containers / nesting** — `group` with children | **DSL change.** The one structural gap that keeps recurring: sequence `loop`/`alt` blocks, nested states, class packages, architecture groups, swimlanes, kanban columns, treemap nesting all need it. Promotes `I-006`. Blocks `W-020`, `W-021`, `W-022`. |
-| `W-031` | planned | `type er` — entities and cardinality | Data. Members and the box are `W-023`'s; what remains is cardinality at each end of a relation — crow's-foot markers, or `from-card:` / `to-card:` read as text. |
 | `W-025` | planned | `type block` — architecture and C4-style component views | Dev. Boxes inside boxes with typed relations; `W-011` has landed. Closest of all of them to `free`, which is why it is worth doing as an archetype rather than by hand. |
 | `W-032` | planned | `type timeline` — events on a date line | Project. `W-014` gives it the dates and `W-026` the axis; what remains is the marks and the label stagger. |
 | `Q-005` | open | Publish to crates.io, and under which licence? | **The Archmagos's call, and only his.** A version on crates.io cannot be withdrawn, only yanked, and the name is spent the moment it lands. `Cargo.toml` carries `publish = false` and deliberately omits `license` and `authors`, so `cargo publish` refuses rather than merely being discouraged. The name `bgraph` was free on 2026-07-31. Blocks `W-034`. |
@@ -100,6 +97,7 @@ not copies.
 | `W-005` | 2026-07-31 | Tree-sitter grammar and Zed extension | `1b53ec3`, regenerated `d6997b1` |
 | `W-006` | 2026-07-31 | `type` archetypes (`pie`, `packet`), quiet completion, explicit surface, generated reference manual | `4b4c548` |
 | `W-033` | 2026-07-31 | Templating: `{{holes}}` that parse, typed bindings, context-aware escaping, `--set` on the CLI | 6d166eb |
+| `W-031` | 2026-07-31 | `type er` — entities, columns and crow's-foot cardinality at each end of a relation | this commit |
 | `W-027` | 2026-07-31 | **The embedding promise**: hostile input cannot bring down the host, and the public surface says what semver covers | this commit |
 | `W-014` | 2026-07-31 | Date and duration literals — `2026-08-01`, `12d`, `2w`, `6h`, with civil-calendar arithmetic | this commit |
 | `W-026` | 2026-07-31 | `type gantt` — bars on a calendar, sections from groups, a today line | this commit |

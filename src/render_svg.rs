@@ -62,19 +62,27 @@ pub fn render(layout: &Layout) -> String {
         let stroke = edge.style.stroke.as_deref().unwrap_or("#64748b");
         let mut attrs = String::new();
 
-        if edge.arrow.head_end && head != Head::None {
+        // Each end is decided on its own: a declared cardinality replaces the
+        // arrowhead there, because a crow's foot already says which way the
+        // relation reads and two marks at one end would fight.
+        let end_head = edge
+            .style
+            .to_card
+            .or_else(|| edge.arrow.head_end.then_some(head));
+        let start_head = edge
+            .style
+            .from_card
+            .or_else(|| edge.arrow.head_start.then_some(head));
+
+        for (which, head) in [("end", end_head), ("start", start_head)] {
+            let Some(head) = head.filter(|h| *h != Head::None) else {
+                continue;
+            };
             let id = marker_id(head, stroke);
             markers
                 .entry(id.clone())
                 .or_insert((head, stroke.to_string()));
-            let _ = write!(attrs, r#" marker-end="url(#{id})""#);
-        }
-        if edge.arrow.head_start && head != Head::None {
-            let id = marker_id(head, stroke);
-            markers
-                .entry(id.clone())
-                .or_insert((head, stroke.to_string()));
-            let _ = write!(attrs, r#" marker-start="url(#{id})""#);
+            let _ = write!(attrs, r#" marker-{which}="url(#{id})""#);
         }
         if let Some(dash) = edge.style.dash_array() {
             let _ = write!(attrs, r#" stroke-dasharray="{dash}""#);
@@ -125,7 +133,7 @@ pub fn render(layout: &Layout) -> String {
 
     let mut defs = String::new();
     for (id, (head, color)) in &markers {
-        defs.push_str(&marker_def(id, *head, color));
+        defs.push_str(&marker_def(id, *head, color, &layout.opts.background));
     }
     if needs_shadow {
         defs.push_str(
@@ -797,6 +805,11 @@ fn marker_id(head: Head, color: &str) -> String {
         Head::Open => "open",
         Head::Dot => "dot",
         Head::None => "none",
+        Head::One => "one",
+        Head::Many => "many",
+        Head::ZeroOne => "zeroone",
+        Head::ZeroMany => "zeromany",
+        Head::OneMany => "onemany",
     };
     let slug: String = color
         .chars()
@@ -805,9 +818,14 @@ fn marker_id(head: Head, color: &str) -> String {
     format!("h-{kind}-{slug}")
 }
 
-fn marker_def(id: &str, head: Head, color: &str) -> String {
+fn marker_def(id: &str, head: Head, color: &str, background: &Option<String>) -> String {
     let fill = paint("fill", color);
     let stroke = paint("stroke", color);
+
+    if head.is_cardinality() {
+        return cardinality_def(id, head, color, background);
+    }
+
     let inner = match head {
         Head::Solid => format!(r#"<path d="M0,0 L10,5 L0,10 z"{fill}/>"#),
         Head::Open => format!(
@@ -815,11 +833,47 @@ fn marker_def(id: &str, head: Head, color: &str) -> String {
         ),
         Head::Dot => format!(r#"<circle cx="5" cy="5" r="3.5"{fill}/>"#),
         Head::None => String::new(),
+        _ => unreachable!("cardinality is drawn by `cardinality_def`"),
     };
     let ref_x = if head == Head::Dot { 5 } else { 10 };
 
     format!(
         r#"<marker id="{id}" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" refX="{ref_x}" refY="5" orient="auto-start-reverse">{inner}</marker>"#
+    )
+}
+
+/// Crow's foot, drawn in a wider box so two symbols fit.
+///
+/// The marker box runs from x=0 (out along the line) to x=18 (against the
+/// entity), which is where `refX` pins it. Notation reads inward: the symbol
+/// nearest the entity is the cardinality, the one behind it the optionality.
+fn cardinality_def(id: &str, head: Head, color: &str, background: &Option<String>) -> String {
+    let stroke = paint("stroke", color);
+    let line = |d: String| {
+        format!(r#"<path d="{d}" fill="none"{stroke} stroke-width="1.6" stroke-linecap="round"/>"#)
+    };
+    // Three prongs meeting at a vertex back down the line.
+    let foot = |from: f64| line(format!("M{from},9 L18,1 M{from},9 L18,9 M{from},9 L18,17"));
+    let bar = |at: f64| line(format!("M{at},1 L{at},17"));
+    // Filled with the surface, not left transparent: the relation line runs
+    // under the marker, and a see-through ring reads as a crossed-out circle
+    // rather than as "zero".
+    let surface = paint("fill", background.as_deref().unwrap_or("#ffffff"));
+    let ring = |cx: f64| {
+        format!(r#"<circle cx="{cx}" cy="9" r="3.6"{surface}{stroke} stroke-width="1.6"/>"#)
+    };
+
+    let inner = match head {
+        Head::One => bar(12.0),
+        Head::Many => foot(8.0),
+        Head::ZeroOne => format!("{}{}", ring(5.0), bar(13.0)),
+        Head::ZeroMany => format!("{}{}", ring(4.0), foot(9.0)),
+        Head::OneMany => format!("{}{}", bar(5.0), foot(9.0)),
+        _ => unreachable!("not a cardinality"),
+    };
+
+    format!(
+        r#"<marker id="{id}" markerUnits="userSpaceOnUse" markerWidth="19" markerHeight="18" refX="18" refY="9" orient="auto-start-reverse">{inner}</marker>"#
     )
 }
 

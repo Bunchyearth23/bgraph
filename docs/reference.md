@@ -212,6 +212,8 @@ Aliases are marked. They behave identically to the property they alias; the edit
 | `router` | edge | `router: <straight\|ortho>` | `straight` draws a direct line; `ortho` draws a right-angled elbow. |
 | `route` *(alias)* | edge | `route: <straight\|ortho>` | Alias of `router`. |
 | `value` | both | `value: <number>` | Magnitude of a slice. Required by `type pie`, ignored elsewhere. |
+| `from-card` | edge | `from-card: <one\|many\|zero-one\|zero-many\|one-many>` | Cardinality at the tail of a relation, drawn as a crow's foot against that entity. Required by `type er`, ignored elsewhere. Usually written positionally: `order -> line "contains" one many`. |
+| `to-card` | edge | `to-card: <one\|many\|zero-one\|zero-many\|one-many>` | Cardinality at the head of a relation. A declared cardinality replaces the arrowhead at that end. |
 | `start` | node | `start: <date> <date\|duration>` | When a task begins, and either when it ends or how long it runs — read by value kind. Required by `type gantt`. |
 | `length` | node | `length: <duration>` | How long a task runs, when the start is given on its own. |
 | `kind` | node | `kind: <state\|initial\|final\|choice>` | What a state is. `initial` and `final` are drawn as marks rather than boxes and take no label; `choice` is a decision diamond. Read by `type state`. |
@@ -293,6 +295,22 @@ Boxes with a name and a list of members, placed by anchors like `free`. A bare s
 
 ```
 class <id> ["label"]
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+
+### `type er`
+
+Entities and the relations between them. A bare string in the block is a column, exactly as in `class`; what `er` adds is cardinality at each end of a relation, written after the label and read at the end nearest the entity it describes — `order -> line "contains" one many` is one order, many lines.
+
+```
+entity <id> ["label"]
+```
+
+```
+<from> -> <to> ["label"] <from-card> <to-card>
 ```
 
 | Setting | Syntax | Meaning |

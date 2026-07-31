@@ -54,6 +54,31 @@ pub enum Head {
     Open,
     Dot,
     None,
+    // Crow's-foot cardinality. These are heads rather than a parallel system
+    // because that is exactly what they are — a mark at one end of a line —
+    // and it buys the whole marker pipeline, per-colour dedup included.
+    /// One: a bar across the line.
+    One,
+    /// Many: the crow's foot.
+    Many,
+    /// Zero or one: a circle, then a bar.
+    ZeroOne,
+    /// Zero or many: a circle, then the foot.
+    ZeroMany,
+    /// One or many: a bar, then the foot.
+    OneMany,
+}
+
+impl Head {
+    /// Whether this head reads as a cardinality rather than a direction.
+    /// Cardinality is drawn at both ends independently, and suppresses the
+    /// arrowhead the edge would otherwise carry.
+    pub fn is_cardinality(self) -> bool {
+        matches!(
+            self,
+            Head::One | Head::Many | Head::ZeroOne | Head::ZeroMany | Head::OneMany
+        )
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -72,6 +97,10 @@ pub struct Style {
     pub font_color: Option<String>,
     pub font_weight: Option<String>,
     pub head: Option<Head>,
+    /// Cardinality at the tail of an edge — `er` only.
+    pub from_card: Option<Head>,
+    /// Cardinality at the head of an edge — `er` only.
+    pub to_card: Option<Head>,
     pub router: Option<Router>,
     pub shadow: Option<bool>,
     /// Chart data, carried on the same layer stack as decoration so a class
@@ -100,6 +129,19 @@ macro_rules! overlay {
     };
 }
 
+/// The crow's-foot vocabulary. Read at the end nearest the entity it
+/// describes: `order -> line "contains" one many` is one order, many lines.
+fn cardinality(word: &str) -> anyhow::Result<Head> {
+    Ok(match word {
+        "one" => Head::One,
+        "many" => Head::Many,
+        "zero-one" | "optional" => Head::ZeroOne,
+        "zero-many" => Head::ZeroMany,
+        "one-many" => Head::OneMany,
+        other => bail!("unknown cardinality `{other}`"),
+    })
+}
+
 impl Style {
     /// Values set in `other` win; everything else is left untouched.
     pub fn overlay(&mut self, other: &Style) {
@@ -120,6 +162,8 @@ impl Style {
             font_color,
             font_weight,
             head,
+            from_card,
+            to_card,
             router,
             shadow,
             value,
@@ -275,6 +319,15 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
                 "none" => Head::None,
                 other => bail!("unknown arrow head `{other}`"),
             });
+        }
+        "from-card" | "to-card" => {
+            let word = first.and_then(|x| x.as_word()).unwrap_or_default();
+            let card = cardinality(word)?;
+            if prop.name == "from-card" {
+                style.from_card = Some(card);
+            } else {
+                style.to_card = Some(card);
+            }
         }
         "router" | "route" => {
             let word = first.and_then(|x| x.as_word()).unwrap_or_default();

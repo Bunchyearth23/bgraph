@@ -171,6 +171,14 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   silently reuses the cached grammar. `editors/zed/install.sh` does both.
 
 ### Gotchas
+- [2026-07-31] A `member` line (`- id: uuid`) runs to the **end of the line**,
+  so it cannot share one with the closing brace. `class a "A" { - id: Uuid }`
+  does not parse — and a doc example written that way is a doc that lies.
+- [2026-07-31] Edge styles were resolved from `edge.props`, not
+  `effective_props(edge_slots)`, so positional edge data never reached the
+  cascade in the free solver. `sankey` did not notice because it builds its own
+  layout in `charts.rs`. Any archetype with `edge_slots` on the free path needs
+  the folded form.
 - [2026-07-31] `#![warn(missing_docs)]` over the whole crate produced 290
   warnings, most of them on struct fields of the layout engine. Documenting
   them all would have been ceremony; the useful move was to *narrow the

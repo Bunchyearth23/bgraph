@@ -75,7 +75,8 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "quadrant" => check_quadrant(diagram, &mut out),
         "wave" => check_wave(diagram, &mut out),
         "sequence" => check_sequence(diagram, &mut out),
-        "class" => check_class(diagram, &mut out),
+        "class" => check_class(diagram, "class", &mut out),
+        "er" => check_er(diagram, &mut out),
         "gantt" => check_gantt(diagram, &mut out),
         "state" => {
             check_cycles(diagram, &nodes, &mut out);
@@ -978,15 +979,37 @@ fn check_gantt(diagram: &Diagram, out: &mut Vec<Diag>) {
     }
 }
 
-fn check_class(diagram: &Diagram, out: &mut Vec<Diag>) {
+fn check_class(diagram: &Diagram, word: &str, out: &mut Vec<Diag>) {
     check_cycles_free(diagram, out);
     for node in &diagram.nodes {
         if node.members.is_empty() {
             out.push(Diag::warn(
                 node.id.span,
                 format!(
-                    "`{}` has no members; a class with none is a plain box",
+                    "`{}` has no members; a {word} with none is a plain box",
                     node.id.as_str()
+                ),
+            ));
+        }
+    }
+}
+
+fn check_er(diagram: &Diagram, out: &mut Vec<Diag>) {
+    check_class(diagram, "entity", out);
+
+    // A relation with cardinality at one end only is almost always a slip —
+    // the second word was forgotten — and it reads as a deliberate blank.
+    for edge in &diagram.edges {
+        let props = edge.effective_props(archetype_of(diagram).edge_slots);
+        let has = |name: &str| props.iter().any(|p| p.name == name);
+        if has("from-card") != has("to-card") {
+            out.push(Diag::warn(
+                edge.positional_span,
+                format!(
+                    "`{} -> {}` gives cardinality at one end only; \
+                     write both, as in `one many`",
+                    edge.from.as_str(),
+                    edge.to.as_str()
                 ),
             ));
         }

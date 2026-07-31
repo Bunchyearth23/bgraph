@@ -2867,6 +2867,15 @@ fn hostile_corpus() -> Vec<(&'static str, String)> {
         ),
         ("year zero", "type gantt\ntask a \"A\" 0000-01-01 1d".into()),
         ("packet zero bits", "type packet\nfield a \"A\" 0 0".into()),
+        ("er with no relations", "type er\nentity a \"A\"".into()),
+        (
+            "er cardinality on a self relation",
+            "type er\nentity a \"A\"\na -> a \"loops\" many many".into(),
+        ),
+        (
+            "er cardinality on a free graph",
+            "node a\nnode b\na -> b { from-card: many }".into(),
+        ),
         (
             "packet backwards",
             "type packet\nfield a \"A\" 31 0".into(),
@@ -3030,4 +3039,127 @@ fn braces_that_are_not_blocks_do_not_count_toward_the_limit() {
         .expect("fills");
     let d = parse_diagram(&filled).expect("parses");
     assert_eq!(d.nodes.len(), 2);
+}
+
+// ---------------------------------------------------------------------------
+// `er` — entities, columns, and cardinality at each end of a relation.
+// ---------------------------------------------------------------------------
+
+// A member runs to the end of its line, so it cannot share one with the
+// closing brace — the same shape every real file has.
+const ER: &str = r#"type er
+entity customer "Customer" {
+  - id: uuid
+}
+entity order "Order" right-of customer {
+  - id: uuid
+}
+"#;
+
+#[test]
+fn cardinality_written_after_the_label_reaches_both_ends() {
+    let svg = render_svg::render(&build(&format!(
+        "{ER}customer -> order \"places\" one many"
+    )));
+    // Start is the tail of the arrow, end its head: `one` belongs to the
+    // customer, `many` to the order.
+    assert!(svg.contains("marker-start=\"url(#h-one-"), "{svg}");
+    assert!(svg.contains("marker-end=\"url(#h-many-"), "{svg}");
+    // The crow's foot spreads against the entity and meets back down the line.
+    assert!(svg.contains(r#"L18,1 M"#), "the foot is drawn: {svg}");
+}
+
+#[test]
+fn cardinality_can_be_written_as_a_property_instead() {
+    let positional = render_svg::render(&build(&format!(
+        "{ER}customer -> order \"places\" one many"
+    )));
+    let block = render_svg::render(&build(&format!(
+        "{ER}customer -> order \"places\" {{ from-card: one to-card: many }}"
+    )));
+    assert_eq!(positional, block, "the two forms are the same statement");
+}
+
+#[test]
+fn a_cardinality_replaces_the_arrowhead_at_that_end() {
+    // Both would land on the same point and fight; the foot already says
+    // which way the relation reads.
+    let svg = render_svg::render(&build(&format!("{ER}customer -> order \"places\" one many")));
+    assert!(!svg.contains("h-solid-"), "no arrowhead survives: {svg}");
+
+    // The other end keeps its arrow when only one cardinality is given.
+    let half = render_svg::render(&build(&format!(
+        "{ER}customer -> order \"places\" {{ from-card: one }}"
+    )));
+    assert!(half.contains("marker-start=\"url(#h-one-"), "{half}");
+    assert!(half.contains("marker-end=\"url(#h-solid-"), "{half}");
+}
+
+#[test]
+fn an_unknown_cardinality_is_refused() {
+    let e = err(&format!("{ER}customer -> order \"places\" one lots"));
+    assert!(e.contains("lots"), "{e}");
+}
+
+#[test]
+fn cardinality_at_one_end_only_is_flagged() {
+    let d = diags(&format!("{ER}customer -> order \"places\" one"));
+    assert!(
+        d.iter().any(|d| d.message.contains("one end only")),
+        "{d:#?}"
+    );
+    // Both ends, or neither, is silent.
+    for both in ["one many", ""] {
+        let d = diags(&format!("{ER}customer -> order \"places\" {both}"));
+        assert!(
+            !d.iter().any(|d| d.message.contains("one end only")),
+            "`{both}` should not be flagged: {d:#?}"
+        );
+    }
+}
+
+#[test]
+fn a_column_drops_the_member_marker_but_a_class_member_keeps_it() {
+    // `- ` is UML visibility on a class and means something; on a column it is
+    // only the syntax that marked the line.
+    let er = build("type er\nentity t \"T\" {\n  - id: uuid\n}");
+    assert!(
+        er.annotations.iter().any(|a| a.text == "id: uuid"),
+        "{:?}",
+        er.annotations.iter().map(|a| &a.text).collect::<Vec<_>>()
+    );
+
+    let class = build("type class\nclass t \"T\" {\n  - id: Uuid\n}");
+    assert!(
+        class.annotations.iter().any(|a| a.text == "- id: Uuid"),
+        "{:?}",
+        class.annotations.iter().map(|a| &a.text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn the_zero_ring_is_filled_with_the_surface() {
+    // Left transparent, the relation line runs through it and it reads as a
+    // crossed-out circle rather than as "zero".
+    let svg = render_svg::render(&build(&format!(
+        "{ER}graph {{ background: #0b1120 }}\ncustomer -> order \"places\" one zero-many"
+    )));
+    let ring = svg
+        .split("<circle")
+        .nth(1)
+        .expect("a ring is drawn")
+        .split("/>")
+        .next()
+        .unwrap();
+    assert!(ring.contains("#0b1120"), "{ring}");
+}
+
+#[test]
+fn an_entity_with_no_columns_is_flagged() {
+    let d = diags("type er\nentity t \"T\"");
+    assert!(
+        d.iter()
+            .any(|d| d.message.contains("entity with none is a plain box")),
+        "{d:#?}"
+    );
 }
