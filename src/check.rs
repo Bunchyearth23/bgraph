@@ -56,6 +56,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
     match archetype {
         "pie" => check_pie(diagram, &mut out),
         "packet" => check_packet(diagram, &mut out),
+        "treemap" => check_treemap(diagram, &mut out),
         _ => {
             check_cycles(diagram, &nodes, &mut out);
             check_unused_data(diagram, &mut out);
@@ -654,12 +655,86 @@ fn check_packet(diagram: &Diagram, out: &mut Vec<Diag>) {
     }
 }
 
+fn check_treemap(diagram: &Diagram, out: &mut Vec<Diag>) {
+    warn_ignored(diagram, "treemap", out);
+
+    let styles = resolved_nodes(diagram, crate::charts::chart_defaults());
+    let owned: HashSet<&str> = diagram
+        .groups
+        .iter()
+        .flat_map(|g| g.members.iter().map(|m| m.as_str()))
+        .collect();
+
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        match styles.get(i).and_then(|s| s.value) {
+            None => out.push(Diag::error(
+                node.id.span,
+                format!(
+                    "`{}` has no value — every tile of a treemap needs an area",
+                    node.id.as_str()
+                ),
+            )),
+            Some(v) if v < 0.0 => out.push(Diag::error(
+                node.id.span,
+                format!(
+                    "`{}` has a negative value; area cannot be negative",
+                    node.id.as_str()
+                ),
+            )),
+            Some(0.0) => out.push(Diag::warn(
+                node.id.span,
+                format!("`{}` has value 0 and will not be drawn", node.id.as_str()),
+            )),
+            Some(_) => {}
+        }
+    }
+
+    // A group's area is the sum of what it holds; declaring one would be a
+    // second, contradictory truth.
+    for group in &diagram.groups {
+        if let Some(prop) = group.props.iter().find(|p| p.name == "value") {
+            out.push(Diag::error(
+                prop.name_span,
+                format!(
+                    "group `{}` cannot declare a value — its area is the sum of \
+                     what it contains",
+                    group.id.as_str()
+                ),
+            ));
+        }
+    }
+
+    let roots = diagram
+        .nodes
+        .iter()
+        .map(|n| n.id.as_str())
+        .chain(diagram.groups.iter().map(|g| g.id.as_str()))
+        .filter(|name| !owned.contains(name))
+        .count();
+
+    let span = diagram
+        .archetype
+        .as_ref()
+        .map(|a| a.span)
+        .unwrap_or_default();
+    if roots > crate::props::PALETTE_LIGHT.len() {
+        out.push(Diag::warn(
+            span,
+            format!(
+                "{roots} top-level tiles exhaust the categorical palette ({} hues) \
+                 — group the tail rather than repeating a colour",
+                crate::props::PALETTE_LIGHT.len()
+            ),
+        ));
+    }
+}
+
 /// `value` and `bits` are data for an archetype that is not in play.
 fn check_unused_data(diagram: &Diagram, out: &mut Vec<Diag>) {
     for node in &diagram.nodes {
         for prop in &node.props {
             let owner = match prop.name.as_str() {
-                "value" => "pie",
+                "value" => "pie` or `type treemap",
                 "bits" => "packet",
                 _ => continue,
             };

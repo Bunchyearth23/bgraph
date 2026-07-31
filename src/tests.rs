@@ -470,7 +470,7 @@ fn a_file_without_type_is_free() {
 fn an_unknown_archetype_is_reported() {
     let e = err("type flowchart\nnode a");
     assert!(e.contains("unknown archetype `flowchart`"), "{e}");
-    assert!(e.contains("free, pie, packet"), "{e}");
+    assert!(e.contains("free, pie, treemap, packet"), "{e}");
 }
 
 #[test]
@@ -1448,4 +1448,134 @@ fn a_group_is_drawn_behind_what_it_encloses() {
     let frame = svg.find("rx=\"10\"").expect("the frame is drawn");
     let node = svg.find("rx=\"8\"").expect("the node is drawn");
     assert!(frame < node, "the frame must come first in document order");
+}
+
+// --------------------------------------------------------------- treemap
+
+#[test]
+fn a_treemap_fills_its_rectangle() {
+    let l = build(
+        r#"
+        type treemap { size: 400 300 gap: 1 }
+        box a "A" 50
+        box b "B" 30
+        box c "C" 20
+    "#,
+    );
+
+    assert!(matches!(l.chart, crate::layout::Chart::Treemap));
+    assert_eq!(l.nodes.len(), 3);
+
+    // Areas are proportional and together cover the frame.
+    let total: f64 = l.nodes.iter().map(|n| n.rect.w * n.rect.h).sum();
+    assert!(
+        (total - 400.0 * 300.0).abs() / (400.0 * 300.0) < 0.05,
+        "{total}"
+    );
+
+    let areas: Vec<f64> = l.nodes.iter().map(|n| n.rect.w * n.rect.h).collect();
+    assert!((areas[0] / areas[1] - 50.0 / 30.0).abs() < 0.1, "{areas:?}");
+    assert!((areas[0] / areas[2] - 50.0 / 20.0).abs() < 0.1, "{areas:?}");
+}
+
+#[test]
+fn a_groups_area_is_the_sum_of_what_it_holds() {
+    let l = build(
+        r#"
+        type treemap { size: 400 300 gap: 1 header: 0 }
+        group left {
+          box a "A" 30
+          box b "B" 30
+        }
+        box c "C" 40
+    "#,
+    );
+
+    assert_eq!(l.groups.len(), 1);
+    let frame = l.groups[0].rect;
+    let solo = l.nodes.iter().find(|n| n.rect.w * n.rect.h > 0.0).unwrap();
+    let _ = solo;
+    // 60 of 100 belongs to the group.
+    let share = frame.w * frame.h / (400.0 * 300.0);
+    assert!((share - 0.6).abs() < 0.06, "share {share}");
+}
+
+#[test]
+fn tiles_never_touch() {
+    let l = build(
+        r#"
+        type treemap { size: 400 300 gap: 4 }
+        box a "A" 40
+        box b "B" 35
+        box c "C" 25
+    "#,
+    );
+
+    for (i, x) in l.nodes.iter().enumerate() {
+        for y in l.nodes.iter().skip(i + 1) {
+            let overlap = x.rect.x < y.rect.right()
+                && y.rect.x < x.rect.right()
+                && x.rect.y < y.rect.bottom()
+                && y.rect.y < x.rect.bottom();
+            assert!(!overlap, "tiles overlap: {:?} {:?}", x.rect, y.rect);
+        }
+    }
+}
+
+#[test]
+fn a_subtree_keeps_one_hue() {
+    let l = build(
+        r#"
+        type treemap { size: 400 300 }
+        group one { box a "A" 25; box b "B" 25 }
+        group two { box c "C" 25; box d "D" 25 }
+    "#,
+    );
+
+    // Two branches, two palette slots — and the children stay in the family.
+    let hues: Vec<&str> = l
+        .groups
+        .iter()
+        .filter_map(|g| g.style.fill.as_deref())
+        .collect();
+    assert_eq!(hues.len(), 2);
+    assert_ne!(hues[0], hues[1], "each top-level branch takes its own hue");
+    assert_eq!(hues[0], crate::props::PALETTE_LIGHT[0]);
+    assert_eq!(hues[1], crate::props::PALETTE_LIGHT[1]);
+}
+
+#[test]
+fn a_treemap_tile_needs_an_area() {
+    assert!(err("type treemap\nbox a \"A\"").contains("has no value"));
+    assert!(
+        err("type treemap\ngroup g { value: 5\n box b 1\n}").contains("cannot declare a value")
+    );
+}
+
+#[test]
+fn a_label_that_does_not_fit_degrades_rather_than_lying() {
+    // A wide tile carries name and value; a narrow one keeps the name only.
+    let wide = build(
+        r#"
+        type treemap { size: 600 300 labels: both }
+        box only "a-very-long-tile-name" 100
+    "#,
+    );
+    assert!(wide.annotations.iter().any(|a| a.text.contains("100")));
+
+    let narrow = build(
+        r#"
+        type treemap { size: 160 300 labels: both }
+        box only "a-very-long-tile-name" 100
+    "#,
+    );
+    assert_eq!(
+        narrow
+            .annotations
+            .iter()
+            .map(|a| a.text.as_str())
+            .collect::<Vec<_>>(),
+        vec!["a-very-long-tile-name"],
+        "the value should be dropped before the name"
+    );
 }

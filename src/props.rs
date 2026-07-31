@@ -389,6 +389,18 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         }],
     },
     ArchetypeDef {
+        name: "treemap",
+        item: "box",
+        doc: "Nested rectangles whose area is proportional to a value. The \
+              hierarchy is group nesting; a group's area is the sum of what \
+              it contains.",
+        props: TREEMAP_PROPS,
+        slots: &[Slot {
+            prop: "value",
+            arity: 1,
+        }],
+    },
+    ArchetypeDef {
         name: "packet",
         item: "field",
         doc: "A packet / bitfield diagram. Each field needs an inclusive bit \
@@ -453,6 +465,52 @@ pub const PIE_PROPS: &[PropDef] = &[
         syntax: "legend: <on|off>",
         doc: "Swatch-and-name list beside the chart. On by default — identity \
               must never rest on color alone.",
+    },
+];
+
+pub const TREEMAP_LABELS: &[&str] = &["name", "value", "both", "none"];
+
+pub const TREEMAP_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the map.",
+    },
+    PropDef {
+        name: "size",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "size: <width> <height>",
+        doc: "The rectangle the map fills. 640 by 400 by default.",
+    },
+    PropDef {
+        name: "gap",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "gap: <number>",
+        doc: "Surface showing between sibling tiles. Adjacent fills must never \
+              touch, so this is 2 by default and never 0.",
+    },
+    PropDef {
+        name: "header",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "header: <number>",
+        doc: "Height reserved inside a group's tile for its name.",
+    },
+    PropDef {
+        name: "labels",
+        alias: false,
+        ctx: Ctx::Both,
+        words: TREEMAP_LABELS,
+        syntax: "labels: <name|value|both|none>",
+        doc: "What to write on each tile. Tiles too small to read are skipped.",
     },
 ];
 

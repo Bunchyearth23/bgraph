@@ -124,7 +124,7 @@ is a single item with two stray values rather than two items.
 | `state` (`W-022`) | `state` | — |
 | `sequence` (`W-021`) | `participant` | — |
 | `class` / `er` (`W-023`) | `class` / `entity` | — (members are `W-013`) |
-| `treemap` (`W-020`) | `box` | `value` — one number |
+| `treemap` | `box` | `value` — one number ✔ |
 | `gantt` / `timeline` (`W-026`) | `task` / `event` | start and duration (`W-014`) |
 | `block` (`W-025`) | `block` | — |
 

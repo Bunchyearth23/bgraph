@@ -258,6 +258,22 @@ slice <id> ["label"] <value>
 | `labels` | `labels: <percent\|value\|both\|none>` | What to write on each slice. Slices too thin to read are skipped. |
 | `legend` | `legend: <on\|off>` | Swatch-and-name list beside the chart. On by default — identity must never rest on color alone. |
 
+### `type treemap`
+
+Nested rectangles whose area is proportional to a value. The hierarchy is group nesting; a group's area is the sum of what it contains.
+
+```
+box <id> ["label"] <value>
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the map. |
+| `size` | `size: <width> <height>` | The rectangle the map fills. 640 by 400 by default. |
+| `gap` | `gap: <number>` | Surface showing between sibling tiles. Adjacent fills must never touch, so this is 2 by default and never 0. |
+| `header` | `header: <number>` | Height reserved inside a group's tile for its name. |
+| `labels` | `labels: <name\|value\|both\|none>` | What to write on each tile. Tiles too small to read are skipped. |
+
 ### `type packet`
 
 A packet / bitfield diagram. Each field needs an inclusive bit range; one crossing a row boundary is split across rows.

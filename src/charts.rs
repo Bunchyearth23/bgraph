@@ -9,7 +9,9 @@ use std::collections::HashMap;
 use anyhow::Result;
 
 use crate::ast::{Diagram, Prop, Value};
-use crate::layout::{Anchor, Annotation, Chart, Layout, Pie, PlacedNode, Rect, Slice, text_width};
+use crate::layout::{
+    Anchor, Annotation, Chart, Layout, Pie, PlacedGroup, PlacedNode, Rect, Slice, text_width,
+};
 use crate::props;
 use crate::style::{GraphOpts, Registry, Shape, Style};
 
@@ -524,4 +526,404 @@ pub fn annotation_bounds(a: &Annotation) -> Rect {
         w,
         h: a.size * 1.4,
     }
+}
+
+// --------------------------------------------------------------- treemap
+
+/// One entry in the hierarchy: a leaf box, or a group and what it holds.
+struct Tile {
+    label: String,
+    value: f64,
+    style: Style,
+    children: Vec<Tile>,
+    /// Groups get a header band and a frame; leaves get neither.
+    is_group: bool,
+}
+
+pub fn treemap(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
+    let cfg = &diagram.archetype_props;
+    let theme = Theme::of(&opts);
+    let def = crate::check::archetype_of(diagram);
+
+    let width = setting(cfg, "size")
+        .and_then(|v| v.first())
+        .and_then(|v| v.as_num())
+        .unwrap_or(640.0)
+        .max(40.0);
+    let height = setting(cfg, "size")
+        .and_then(|v| v.get(1))
+        .and_then(|v| v.as_num())
+        .unwrap_or(400.0)
+        .max(40.0);
+    // Adjacent fills must never touch; a gap of zero is not on offer.
+    let gap = number(cfg, "gap", 2.0).max(1.0);
+    let header = number(cfg, "header", 20.0).max(0.0);
+    let labels = word(cfg, "labels", "name");
+    let title = text(cfg, "title");
+
+    let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
+    let roots = build_tiles(diagram, registry, def, None)?;
+
+    let title_h = if title.is_some() {
+        TITLE_SIZE * 2.0
+    } else {
+        0.0
+    };
+    let frame = Rect {
+        x: 0.0,
+        y: title_h,
+        w: width,
+        h: height,
+    };
+
+    let mut nodes = Vec::new();
+    let mut groups = Vec::new();
+    let mut annotations = Vec::new();
+
+    if let Some(title) = title {
+        annotations.push(Annotation {
+            text: title,
+            x: 0.0,
+            y: TITLE_SIZE,
+            anchor: Anchor::Start,
+            size: TITLE_SIZE,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    let palette = theme.palette();
+    emit_tiles(
+        &roots,
+        frame,
+        gap,
+        header,
+        &labels,
+        palette,
+        None,
+        0,
+        &mut nodes,
+        &mut groups,
+        &mut annotations,
+    );
+
+    Ok(Layout {
+        groups,
+        nodes,
+        edges: Vec::new(),
+        opts,
+        chart: Chart::Treemap,
+        annotations,
+    })
+}
+
+/// Reads the hierarchy out of group nesting. A group's value is the sum of
+/// what it holds — the whole point of a treemap is that the parts add up.
+fn build_tiles(
+    diagram: &Diagram,
+    registry: &Registry,
+    def: &'static props::ArchetypeDef,
+    parent: Option<usize>,
+) -> Result<Vec<Tile>> {
+    let members = match parent {
+        Some(g) => diagram.groups[g]
+            .members
+            .iter()
+            .map(|m| m.value.clone())
+            .collect::<Vec<_>>(),
+        None => roots_of(diagram),
+    };
+
+    let mut tiles = Vec::new();
+    for name in members {
+        if let Some(g) = diagram.groups.iter().position(|x| x.id.as_str() == name) {
+            let group = &diagram.groups[g];
+            let children = build_tiles(diagram, registry, def, Some(g))?;
+            let style =
+                registry.resolve(chart_defaults(), "group", &group.classes, &group.props)?;
+            tiles.push(Tile {
+                label: group
+                    .label
+                    .clone()
+                    .unwrap_or_else(|| group.id.value.clone()),
+                value: children.iter().map(|c| c.value).sum(),
+                style,
+                children,
+                is_group: true,
+            });
+        } else if let Some(i) = diagram.nodes.iter().position(|x| x.id.as_str() == name) {
+            let node = &diagram.nodes[i];
+            let style = registry.resolve(
+                chart_defaults(),
+                def.item,
+                &node.classes,
+                &node.effective_props(def.slots),
+            )?;
+            tiles.push(Tile {
+                label: node.label.clone().unwrap_or_else(|| node.id.value.clone()),
+                value: style.value.unwrap_or(0.0).max(0.0),
+                style,
+                children: Vec::new(),
+                is_group: false,
+            });
+        }
+    }
+
+    tiles.retain(|t| t.value > 0.0);
+    Ok(tiles)
+}
+
+/// Names declared at the top level — everything no group claims.
+fn roots_of(diagram: &Diagram) -> Vec<String> {
+    let owned: std::collections::HashSet<&str> = diagram
+        .groups
+        .iter()
+        .flat_map(|g| g.members.iter().map(|m| m.as_str()))
+        .collect();
+
+    let mut out = Vec::new();
+    for node in &diagram.nodes {
+        if !owned.contains(node.id.as_str()) {
+            out.push(node.id.value.clone());
+        }
+    }
+    for group in &diagram.groups {
+        if !owned.contains(group.id.as_str()) {
+            out.push(group.id.value.clone());
+        }
+    }
+    out
+}
+
+#[allow(clippy::too_many_arguments)]
+fn emit_tiles(
+    tiles: &[Tile],
+    frame: Rect,
+    gap: f64,
+    header: f64,
+    labels: &str,
+    palette: &'static [&'static str],
+    inherited: Option<&str>,
+    depth: usize,
+    nodes: &mut Vec<PlacedNode>,
+    groups: &mut Vec<PlacedGroup>,
+    annotations: &mut Vec<Annotation>,
+) {
+    let values: Vec<f64> = tiles.iter().map(|t| t.value).collect();
+    let rects = squarify(&values, frame);
+
+    for (slot, (tile, rect)) in tiles.iter().zip(rects).enumerate() {
+        // Colour identifies the top-level branch and nothing else: a subtree
+        // inherits its root's hue and varies only in depth, so it always
+        // reads as one family. Slots are taken in order, never cycled — past
+        // eight, `check` says to merge the tail.
+        let hue = tile
+            .style
+            .fill
+            .clone()
+            .or_else(|| inherited.map(String::from))
+            .unwrap_or_else(|| palette[slot.min(palette.len() - 1)].to_string());
+
+        let inset = Rect {
+            x: rect.x + gap / 2.0,
+            y: rect.y + gap / 2.0,
+            w: (rect.w - gap).max(1.0),
+            h: (rect.h - gap).max(1.0),
+        };
+
+        if tile.is_group {
+            groups.push(PlacedGroup {
+                lines: Vec::new(),
+                rect: inset,
+                style: Style {
+                    fill: Some(shade(&hue, depth)),
+                    stroke: Some("none".into()),
+                    stroke_width: Some(0.0),
+                    dash: Some("solid".into()),
+                    radius: Some(3.0),
+                    ..tile.style.clone()
+                },
+            });
+
+            let band = header.min(inset.h * 0.5);
+            if band >= 11.0 && inset.w > 34.0 {
+                annotations.push(Annotation {
+                    text: tile.label.clone(),
+                    x: inset.x + 6.0,
+                    y: inset.y + band / 2.0,
+                    anchor: Anchor::Start,
+                    size: 11.0,
+                    color: "#ffffff".into(),
+                    weight: "600".into(),
+                    family: family(&tile.style),
+                });
+            }
+
+            emit_tiles(
+                &tile.children,
+                Rect {
+                    x: inset.x + gap,
+                    y: inset.y + band + gap / 2.0,
+                    w: (inset.w - gap * 2.0).max(1.0),
+                    h: (inset.h - band - gap * 1.5).max(1.0),
+                },
+                gap,
+                header,
+                labels,
+                palette,
+                Some(&hue),
+                depth + 1,
+                nodes,
+                groups,
+                annotations,
+            );
+            continue;
+        }
+
+        nodes.push(PlacedNode {
+            lines: Vec::new(),
+            rect: inset,
+            style: Style {
+                fill: Some(shade(&hue, depth)),
+                stroke: Some("none".into()),
+                stroke_width: Some(0.0),
+                radius: Some(3.0),
+                shape: Some(Shape::Rect),
+                ..tile.style.clone()
+            },
+        });
+
+        // A label that does not fit is worse than none: it spills over its
+        // neighbours and reads as belonging to the wrong tile. So try the
+        // full form, then the shorter one, then say nothing.
+        let candidates: Vec<String> = match labels {
+            "none" => Vec::new(),
+            "value" => vec![trim_number(tile.value)],
+            // A lone number identifies nothing, so it is not a fallback.
+            "both" => vec![
+                format!("{}  {}", tile.label, trim_number(tile.value)),
+                tile.label.clone(),
+            ],
+            _ => vec![tile.label.clone()],
+        };
+
+        let size = 11.0;
+        let Some(text) = candidates.into_iter().find(|t| {
+            inset.h >= size * 1.8 && inset.w >= text_width(std::slice::from_ref(t), size) + 10.0
+        }) else {
+            continue;
+        };
+
+        annotations.push(Annotation {
+            text,
+            x: inset.x + 6.0,
+            y: inset.y + size,
+            anchor: Anchor::Start,
+            size,
+            color: "#ffffff".into(),
+            weight: "500".into(),
+            family: family(&tile.style),
+        });
+    }
+}
+
+/// Depth darkens the family so a nested tile reads as part of its parent
+/// without inventing a hue that would claim to be a different category.
+fn shade(color: &str, depth: usize) -> String {
+    if depth == 0 {
+        return color.to_string();
+    }
+    let alpha = 255 - (depth.min(4) * 40);
+    let (opaque, _) = crate::render_svg::split_alpha(color);
+    composite(&format!("{opaque}{alpha:02x}"), "#000000")
+}
+
+/// Squarified treemap (Bruls, Huizing & van Wijk): fill along the shorter
+/// side, growing each row while the worst aspect ratio keeps improving.
+fn squarify(values: &[f64], frame: Rect) -> Vec<Rect> {
+    let mut out = vec![
+        Rect {
+            x: frame.x,
+            y: frame.y,
+            w: 0.0,
+            h: 0.0
+        };
+        values.len()
+    ];
+    let total: f64 = values.iter().sum();
+    if total <= 0.0 {
+        return out;
+    }
+
+    let mut order: Vec<usize> = (0..values.len()).collect();
+    order.sort_by(|a, b| values[*b].total_cmp(&values[*a]));
+
+    let scale = frame.w * frame.h / total;
+    let mut rect = frame;
+    let mut i = 0;
+
+    while i < order.len() {
+        let short = rect.w.min(rect.h).max(1e-6);
+        let mut end = i;
+        let mut sum = 0.0;
+        let mut best = f64::MAX;
+
+        while end < order.len() {
+            let candidate = sum + values[order[end]] * scale;
+            let areas: Vec<f64> = order[i..=end].iter().map(|k| values[*k] * scale).collect();
+            let ratio = worst_ratio(&areas, candidate, short);
+            if ratio > best {
+                break;
+            }
+            best = ratio;
+            sum = candidate;
+            end += 1;
+        }
+
+        let depth = (sum / short).min(rect.w.max(rect.h));
+        let mut offset = 0.0;
+        for &k in &order[i..end] {
+            let area = values[k] * scale;
+            let along = if sum > 0.0 { area / depth } else { 0.0 };
+            out[k] = if rect.w <= rect.h {
+                Rect {
+                    x: rect.x + offset,
+                    y: rect.y,
+                    w: along,
+                    h: depth,
+                }
+            } else {
+                Rect {
+                    x: rect.x,
+                    y: rect.y + offset,
+                    w: depth,
+                    h: along,
+                }
+            };
+            offset += along;
+        }
+
+        if rect.w <= rect.h {
+            rect.y += depth;
+            rect.h = (rect.h - depth).max(0.0);
+        } else {
+            rect.x += depth;
+            rect.w = (rect.w - depth).max(0.0);
+        }
+        i = end;
+    }
+
+    out
+}
+
+fn worst_ratio(areas: &[f64], sum: f64, short: f64) -> f64 {
+    if sum <= 0.0 || areas.is_empty() {
+        return f64::MAX;
+    }
+    let max = areas.iter().copied().fold(f64::MIN, f64::max);
+    let min = areas.iter().copied().fold(f64::MAX, f64::min);
+    let s2 = sum * sum;
+    let w2 = short * short;
+    (w2 * max / s2).max(s2 / (w2 * min))
 }

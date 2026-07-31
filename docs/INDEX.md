@@ -28,8 +28,8 @@ purpose — an identifier is earned by being cited.
 Ordered by what each unblocks, not by number. `W-011` and `W-029` have landed,
 so nesting and per-archetype vocabulary are available to everything below.
 `W-012` … `W-015` are the remaining foundations; each archetype names the one
-it waits for. Five now wait for nothing — `W-019`, `W-024`, `W-018`, `W-020`
-and `W-025`.
+it waits for. Four now wait for nothing — `W-019`, `W-024`, `W-018` and
+`W-025`.
 
 **DSL impact, measured rather than assumed.** The grammar already accepts
 string lists (`data: "a" "b" "c"`), number lists (`points: 1 2 3`),
@@ -49,7 +49,6 @@ change the language: `W-011`, `W-013`, `W-014`.
 | `W-017` | planned | `type xy` — line, scatter, area, multi-series | Data / stats. A series is a node carrying a number list; categories are a string list on the `type` block. Needs `W-012`. |
 | `W-018` | planned | `type sankey` — flows sized by magnitude | Data. Needs `W-015`; nothing else. |
 | `W-019` | planned | `type quadrant` — incl. a Wardley-map flavour | Stats / strategy. **Reuses `at (x, y)` verbatim** — the cheapest archetype on this list, and the closest to what the tool already is. |
-| `W-020` | planned | `type treemap` — hierarchical area | Data. `W-011` gives it nesting, `value` for area. |
 | `W-021` | planned | `type sequence` — participants, ordered messages, activations | Dev. Repeated edges between the same pair already survive in source order; `loop`/`alt`/`opt` have `W-011`. |
 | `W-022` | planned | `type state` — state machines | Dev / embedded. Nested states have `W-011`; entry/exit pseudo-states are nodes with a shape. |
 | `W-023` | planned | `type class` and `type er` | Dev / data. Needs `W-013` for members, plus cardinality on arrows (`\|\|--o{`) — either new arrow tokens or `from-card:` / `to-card:` properties. |
@@ -107,6 +106,7 @@ not copies.
 | `W-004` | 2026-07-31 | `bgraph-lsp`: diagnostics, completion, hover, go-to-definition, outline | `1b53ec3` |
 | `W-005` | 2026-07-31 | Tree-sitter grammar and Zed extension | `1b53ec3`, regenerated `d6997b1` |
 | `W-006` | 2026-07-31 | `type` archetypes (`pie`, `packet`), quiet completion, explicit surface, generated reference manual | `4b4c548` |
+| `W-020` | 2026-07-31 | `type treemap` — squarified tiles, hierarchy from group nesting, one hue per top-level branch | this commit |
 | `W-011` | 2026-07-31 | Containers: `group` with nested statements, sized by its members, anchorable, translating its subtree when placed | this commit |
 | `W-029` | 2026-07-31 | Per-archetype vocabulary: `slice a "A" 4820`, `field b "B" 0 15` — one statement form, keyword and slots declared in `props.rs` | this commit |
 | `W-007` | 2026-07-31 | Re-pin the Zed grammar — `extension.toml` now points at `288f785`, which carries the `type` parser; `bgraph-lsp` reinstalled | this commit |

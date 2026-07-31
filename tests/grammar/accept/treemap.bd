@@ -1,0 +1,5 @@
+type treemap
+group g {
+ box a "A" 3
+}
+box b "B" 5

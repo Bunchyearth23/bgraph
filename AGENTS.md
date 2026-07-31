@@ -57,9 +57,9 @@ disagree.
 - `cargo run --bin bgraph -- watch diagram.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check diagram.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (115 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (121 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
-- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (16 corpus cases)
+- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (17 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
 - `./editors/zed/install.sh` — installs the server, regenerates + pins the grammar
 
@@ -231,6 +231,14 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   need a separator for the same reason statements do. pest and tree-sitter
   both read `padding: 22 node a` as one four-valued property — they agree, and
   the corpus case sits in `accept/` saying so.
+
+- [2026-07-31] `type treemap` reads its hierarchy from **group nesting**, not
+  from edges — the first archetype to consume `W-011`. A group's area is the
+  sum of what it holds, so declaring a value on one is an error rather than a
+  second, contradictory truth.
+- [2026-07-31] Treemap colour identifies the **top-level branch only**; depth
+  darkens the same hue rather than inventing one, because a new hue would
+  claim to be a new category. Slots are taken in order and never cycled.
 
 ### Workarounds
 

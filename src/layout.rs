@@ -76,6 +76,9 @@ pub enum Chart {
     /// Bitfields. `nodes` already carries one rect per row segment, so the
     /// ordinary node renderer draws it.
     Packet,
+    /// Nested tiles. Like `Packet`, the geometry is already in `nodes` and
+    /// `groups`; the variant exists so the intent is legible.
+    Treemap,
     /// Slices, which need arcs the node renderer cannot make.
     Pie(Pie),
 }
@@ -174,6 +177,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     {
         "pie" => return crate::charts::pie(diagram, opts, &registry),
         "packet" => return crate::charts::packet(diagram, opts, &registry),
+        "treemap" => return crate::charts::treemap(diagram, opts, &registry),
         _ => {}
     }
 
