@@ -1,5 +1,5 @@
 use crate::layout::{self, Layout};
-use crate::parser::parse_diagram;
+use crate::parser::{MAX_NESTING, parse_diagram};
 use crate::render_svg;
 use crate::style::{Head, Router, Shape};
 
@@ -2795,4 +2795,239 @@ fn a_hole_inside_a_comment_is_still_a_hole() {
     assert_eq!(t.holes(), ["year"]);
     let filled = t.fill(&Bindings::new().set("year", 2026i64)).unwrap();
     assert!(filled.starts_with("// for 2026"), "{filled}");
+}
+
+// ---------------------------------------------------------------------------
+// The embedding promise: hostile text produces an SVG or an error, never a
+// panic and never an abort. A document generator holds this library inside its
+// own process; a bad input file must not be able to take that process down.
+// ---------------------------------------------------------------------------
+
+/// Sources chosen to reach the places that can panic: division by zero, empty
+/// collections, out-of-range indices, unbounded recursion, degenerate geometry.
+fn hostile_corpus() -> Vec<(&'static str, String)> {
+    let mut cases: Vec<(&'static str, String)> = vec![
+        ("empty", String::new()),
+        ("whitespace only", "\n\n   \t\n".into()),
+        ("one brace", "{".into()),
+        ("closing braces", "}}}}}}".into()),
+        ("bare type", "type".into()),
+        ("unknown type", "type nonsense\nnode a".into()),
+        ("type with no items", "type pie".into()),
+        ("pie of zeros", "type pie\nslice a \"A\" 0\nslice b \"B\" 0".into()),
+        ("pie of one", "type pie\nslice a \"A\" 1".into()),
+        (
+            "negative slice",
+            "type pie\nslice a \"A\" -5\nslice b \"B\" 3".into(),
+        ),
+        ("zero radius", "type pie { radius: 0 }\nslice a \"A\" 1".into()),
+        ("treemap of zeros", "type treemap\nbox a \"A\" 0".into()),
+        (
+            "treemap gap past its box",
+            "type treemap { size: 20 20 gap: 400 }\nbox a \"A\" 1\nbox b \"B\" 1".into(),
+        ),
+        (
+            "flat axis",
+            "type xy { y-axis: 5 5 }\nseries s 5 5 5".into(),
+        ),
+        ("empty series", "type xy\nseries s".into()),
+        (
+            "one point",
+            "type xy { x-axis: 0 0 }\nseries s 1".into(),
+        ),
+        ("bar with no categories", "type bar\nseries s 1 2 3".into()),
+        (
+            "more points than categories",
+            "type bar { categories: \"a\" }\nseries s 1 2 3 4 5".into(),
+        ),
+        ("wave with no wave", "type wave\nsignal s \"S\" \"\"".into()),
+        (
+            "wave of repeats only",
+            "type wave\nsignal s \"S\" \"....\"".into(),
+        ),
+        ("wave period zero", "type wave { period: 0 }\nsignal s \"S\" \"01\"".into()),
+        ("sankey with no flow", "type sankey\nnode a\nnode b".into()),
+        ("sankey zero flow", "type sankey\nnode a\nnode b\na -> b 0".into()),
+        (
+            "sankey cycle",
+            "type sankey\nnode a\nnode b\na -> b 1\nb -> a 1".into(),
+        ),
+        (
+            "gantt zero duration",
+            "type gantt\ntask a \"A\" 2026-01-01 0d".into(),
+        ),
+        (
+            "gantt backwards",
+            "type gantt\ntask a \"A\" 2026-01-01 2025-01-01".into(),
+        ),
+        ("leap day", "type gantt\ntask a \"A\" 2024-02-29 1d".into()),
+        (
+            "impossible date",
+            "type gantt\ntask a \"A\" 2026-02-31 1d".into(),
+        ),
+        ("year zero", "type gantt\ntask a \"A\" 0000-01-01 1d".into()),
+        ("packet zero bits", "type packet\nfield a \"A\" 0 0".into()),
+        (
+            "packet backwards",
+            "type packet\nfield a \"A\" 31 0".into(),
+        ),
+        ("quadrant off scale", "type quadrant\npoint a \"A\" 1e9 -1e9".into()),
+        ("anchor cycle", "node a right-of b\nnode b right-of a".into()),
+        ("self anchor", "node a right-of a".into()),
+        ("unknown anchor", "node a right-of nowhere".into()),
+        ("duplicate ids", "node a\nnode a".into()),
+        ("edge to nothing", "a -> b".into()),
+        ("negative geometry", "node a { size: -10 -10 }".into()),
+        ("infinite size", "node a { size: 1e308 1e308 }".into()),
+        ("subnormal size", "node a { size: 1e-308 1e-308 }".into()),
+        ("bad colour", "node a { fill: #12345 }".into()),
+        ("long colour", "node a { fill: #1234567890abcdef }".into()),
+        ("unknown property", "node a { flibbertigibbet: 3 }".into()),
+        ("unknown class", "node a .nonexistent".into()),
+        ("style of nothing", "style".into()),
+        ("empty group", "group g { }".into()),
+        ("group holding itself", "group g { group g { node a } }".into()),
+        ("unterminated string", "node a \"never closed".into()),
+        ("lone backslash", "node a \"\\".into()),
+        ("nul byte", "node a \"\0\"".into()),
+        ("bom", "\u{feff}node a".into()),
+        ("rtl label", "node a \"\u{202e}reversed\"".into()),
+        ("combining marks", "node a \"e\u{301}\u{301}\u{301}\u{301}\"".into()),
+        ("unpaired brace in label", "node a \"a { b\"".into()),
+        ("empty hole", "node a \"{{}}\"".into()),
+        ("hole as a keyword", "{{kind}} a".into()),
+        ("unterminated hole", "node a \"{{never".into()),
+    ];
+
+    // Sizes chosen to sit either side of every bound that exists.
+    cases.push(("very long label", format!("node a \"{}\"", "x".repeat(100_000))));
+    cases.push(("very long identifier", format!("node {}", "a".repeat(100_000))));
+    cases.push((
+        "many nodes",
+        (0..5_000).map(|i| format!("node n{i}\n")).collect(),
+    ));
+    cases.push((
+        "many slices",
+        std::iter::once("type pie\n".to_string())
+            .chain((0..2_000).map(|i| format!("slice s{i} \"S\" 1\n")))
+            .collect(),
+    ));
+    cases.push((
+        "chain of anchors",
+        std::iter::once("node n0\n".to_string())
+            .chain((1..2_000).map(|i| format!("node n{i} right-of n{}\n", i - 1)))
+            .collect(),
+    ));
+    for depth in [MAX_NESTING - 1, MAX_NESTING, MAX_NESTING + 1, 5_000] {
+        cases.push((
+            "nested groups",
+            (0..depth)
+                .map(|i| format!("group g{i} {{\n"))
+                .chain(std::iter::once("node leaf\n".to_string()))
+                .chain((0..depth).map(|_| "}\n".to_string()))
+                .collect(),
+        ));
+    }
+
+    cases
+}
+
+#[test]
+fn hostile_input_never_panics() {
+    for (name, source) in hostile_corpus() {
+        // Not `catch_unwind`: a panic here should fail loudly with its own
+        // message and location, which is what makes the failure diagnosable.
+        // The assertion is simply that the call returns at all.
+        match crate::render_source(&source) {
+            Ok(svg) => assert!(
+                svg.starts_with("<svg") && svg.trim_end().ends_with("</svg>"),
+                "`{name}` produced something that is not an SVG document"
+            ),
+            Err(e) => assert!(
+                !format!("{e:#}").is_empty(),
+                "`{name}` failed without saying why"
+            ),
+        }
+    }
+}
+
+#[test]
+fn hostile_input_never_panics_in_the_language_server() {
+    // The editor sees the same text and must survive the same way — it reports
+    // every problem rather than the first, so it walks further into the checks.
+    for (name, source) in hostile_corpus() {
+        let _ = crate::parser::parse(&source).map(|d| {
+            let diags = crate::check::check(&d);
+            assert!(
+                diags.iter().all(|d| !d.message.is_empty()),
+                "`{name}` produced a diagnostic with no message"
+            );
+        });
+    }
+}
+
+#[test]
+fn a_bound_value_cannot_escape_its_template() {
+    // The one place hostile input arrives as *data* rather than as source: a
+    // program binding a customer's string into a document.
+    let t = Template::parse("node a \"{{label}}\" { fill: #eee }").expect("parses");
+    for hostile in [
+        "plain",
+        "with \"quotes\"",
+        "with a \\ backslash",
+        "\" } node injected \"",
+        "\"\nnode injected \"",
+        "{{label}}",
+        "\u{0}\u{1}",
+    ] {
+        let filled = t
+            .fill(&Bindings::new().set("label", hostile))
+            .expect("fills");
+        let d = parse_diagram(&filled)
+            .unwrap_or_else(|e| panic!("`{hostile}` broke the template: {e}\n{filled}"));
+        assert_eq!(d.nodes.len(), 1, "`{hostile}` injected a statement");
+        assert_eq!(
+            d.nodes[0].label.as_deref(),
+            Some(hostile),
+            "`{hostile}` did not survive the round trip"
+        );
+    }
+}
+
+#[test]
+fn nesting_is_refused_before_the_stack_gives_out() {
+    // Guarding this at all is the point: `pest` descends recursively, so deep
+    // enough nesting aborts the process outright, which no caller can catch.
+    let deep: String = (0..5_000)
+        .map(|i| format!("group g{i} {{\n"))
+        .chain(std::iter::once("node leaf\n".to_string()))
+        .chain((0..5_000).map(|_| "}\n".to_string()))
+        .collect();
+    let e = parse_diagram(&deep).expect_err("should refuse");
+    assert!(format!("{e:#}").contains("levels deep"), "{e:#}");
+
+    // And the limit is not so tight that it refuses a real diagram.
+    let fine: String = (0..MAX_NESTING - 1)
+        .map(|i| format!("group g{i} {{\n"))
+        .chain(std::iter::once("node leaf\n".to_string()))
+        .chain((0..MAX_NESTING - 1).map(|_| "}\n".to_string()))
+        .collect();
+    parse_diagram(&fine).expect("just under the limit still parses");
+}
+
+#[test]
+fn braces_that_are_not_blocks_do_not_count_toward_the_limit() {
+    // The guard runs before the grammar, so it has to know the three places a
+    // brace is not structure. Miscounting here would refuse a valid file.
+    let source = format!(
+        "// {}\nnode a \"{}\" {{ fill: #eee }}\nnode b {{ fill: {{{{c}}}} }}",
+        "{".repeat(200),
+        "{".repeat(200),
+    );
+    let filled = crate::template::Template::parse(&source)
+        .expect("braces in comments, strings and holes are not depth")
+        .fill(&Bindings::new().set("c", Bound::Raw("#111".into())))
+        .expect("fills");
+    let d = parse_diagram(&filled).expect("parses");
+    assert_eq!(d.nodes.len(), 2);
 }

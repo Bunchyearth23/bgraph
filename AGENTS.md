@@ -127,6 +127,18 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-07-31] **`pest` parses by recursive descent, so nesting depth is stack
+  depth.** About 1500 nested `{` overflowed the stack and aborted the process
+  with `SIGABRT` — not a panic, so no caller could catch it, in a library meant
+  to be embedded. `parser::check_nesting` now counts brace depth *lexically*,
+  before pest runs, and refuses past `MAX_NESTING`. Any future grammar rule
+  that can nest inherits this: the guard counts braces, so a nestable
+  construct written with different delimiters would slip past it.
+- [2026-07-31] **Never publish anything outward without being asked.** Adding
+  crates.io metadata was taken as preparing to release, and it was not the
+  Archmagos's decision to make. `Cargo.toml` carries `publish = false` and
+  omits `license`/`authors` so `cargo publish` *refuses*, rather than relying
+  on anyone reading a comment. Same rule for any registry, remote or service.
 - [2026-07-31] **Check a command's exit code, never grep its output for a
   success word.** `cargo test 2>&1 | grep 'test result: ok'` matches the
   passing suites and hides the failing one; `tree-sitter test`'s summary line
@@ -159,6 +171,14 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   silently reuses the cached grammar. `editors/zed/install.sh` does both.
 
 ### Gotchas
+- [2026-07-31] `#![warn(missing_docs)]` over the whole crate produced 290
+  warnings, most of them on struct fields of the layout engine. Documenting
+  them all would have been ceremony; the useful move was to *narrow the
+  promise* — see `D-018`. `#[allow(missing_docs)]` on a `pub mod` item covers
+  everything inside it, which is what makes the two tiers expressible.
+- [2026-07-31] A `#[allow(...)]` on a `#[derive]`d struct does **not** cover
+  the other items the macro emits. `pest_derive` emits `pub enum Rule`
+  alongside the struct; silencing it needed a wrapping private module.
 - [2026-07-31] Comments are `//`, not `#`. pest applies `COMMENT` as implicit
   skipping everywhere, so a `#` comment marker swallowed every `#rrggbb`
   color. The two cannot coexist.

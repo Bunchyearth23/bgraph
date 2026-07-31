@@ -1,19 +1,36 @@
+//! Source text to a [`Diagram`].
+//!
+//! The grammar in `syntax.pest` is authoritative; the tree-sitter grammar the
+//! editor extension ships is a mirror of it, and a test holds the two to the
+//! same corpus.
+
 use anyhow::{Context, Result, bail};
 use pest::Parser;
 use pest::iterators::Pair;
-use pest_derive::Parser as DeriveParser;
-
 use crate::ast::*;
 
-#[derive(DeriveParser)]
-#[grammar = "syntax.pest"]
-pub struct DiagramParser;
+// The generated grammar, and the `Rule` enum that comes with it. Private: the
+// shape of a pest parse tree is not something a caller should be able to
+// depend on, and nothing outside this module reads it.
+#[allow(missing_docs)]
+mod grammar {
+    use pest_derive::Parser as DeriveParser;
+
+    #[derive(DeriveParser)]
+    #[grammar = "syntax.pest"]
+    pub struct DiagramParser;
+}
+
+use grammar::{DiagramParser, Rule};
 
 /// A parse failure with the byte range it points at, so the language server
 /// can underline it. The CLI just prints `message`.
 #[derive(Debug)]
 pub struct ParseError {
+    /// What is wrong, phrased for the person writing the file.
     pub message: String,
+    /// Byte range in the source. Zero-length when the failure is structural
+    /// rather than positional.
     pub span: Span,
 }
 
@@ -25,11 +42,31 @@ impl std::fmt::Display for ParseError {
 
 impl std::error::Error for ParseError {}
 
+/// Parses source text, discarding the span an error carries.
+///
+/// This is the form the CLI wants. Editors want [`parse`], which keeps the
+/// range so it can be underlined.
 pub fn parse_diagram(input: &str) -> Result<Diagram> {
     parse(input).map_err(anyhow::Error::from)
 }
 
+/// How deeply groups may nest.
+///
+/// This is not a taste judgement about diagrams — it is a guard on the host
+/// process. `pest` parses by recursive descent, so nesting depth is stack
+/// depth, and a few thousand braces abort the program with `SIGABRT` before
+/// any Rust code of ours runs. A library that a document generator embeds must
+/// not be able to kill its caller with a text file, and an abort cannot even be
+/// caught. So the depth is counted lexically, first, and refused cleanly.
+///
+/// Sixty-four is roughly an order of magnitude below where the stack gives out
+/// and two orders above anything a person draws.
+pub const MAX_NESTING: usize = 64;
+
+/// Parses source text, keeping the span an error points at.
 pub fn parse(input: &str) -> std::result::Result<Diagram, ParseError> {
+    check_nesting(input)?;
+
     let parsed = DiagramParser::parse(Rule::file, input).map_err(|err| ParseError {
         message: format!("syntax error: {}", expectation(&err)),
         span: error_span(&err, input),
@@ -44,6 +81,70 @@ pub fn parse(input: &str) -> std::result::Result<Diagram, ParseError> {
         message: format!("{err:#}"),
         span: Span { start: 0, end: 0 },
     })
+}
+
+/// Counts brace depth without parsing, skipping the three places a brace is
+/// not structure: string literals, comments, and `{{holes}}`.
+///
+/// Deliberately its own scanner rather than a grammar rule — pest would have to
+/// recurse to find the depth, which is the very thing being guarded against.
+fn check_nesting(input: &str) -> std::result::Result<(), ParseError> {
+    let mut chars = input.char_indices().peekable();
+    let mut depth = 0usize;
+
+    while let Some((i, c)) = chars.next() {
+        match c {
+            '"' => {
+                while let Some((_, c)) = chars.next() {
+                    match c {
+                        '\\' => {
+                            chars.next();
+                        }
+                        '"' | '\n' => break,
+                        _ => {}
+                    }
+                }
+            }
+            '/' if chars.peek().map(|&(_, c)| c) == Some('/') => {
+                for (_, c) in chars.by_ref() {
+                    if c == '\n' {
+                        break;
+                    }
+                }
+            }
+            '{' if chars.peek().map(|&(_, c)| c) == Some('{') => {
+                // A placeholder, not two blocks. Skip to its close, or give up
+                // on it — an unterminated `{{` is pest's error to report.
+                chars.next();
+                let mut prev = None;
+                for (_, c) in chars.by_ref() {
+                    if prev == Some('}') && c == '}' {
+                        break;
+                    }
+                    prev = Some(c);
+                }
+            }
+            '{' => {
+                depth += 1;
+                if depth > MAX_NESTING {
+                    return Err(ParseError {
+                        message: format!(
+                            "nested more than {MAX_NESTING} levels deep — \
+                             refused before it overflows the stack"
+                        ),
+                        span: Span {
+                            start: i,
+                            end: i + 1,
+                        },
+                    });
+                }
+            }
+            '}' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+
+    Ok(())
 }
 
 fn expectation(err: &pest::error::Error<Rule>) -> String {

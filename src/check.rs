@@ -8,16 +8,26 @@ use std::collections::{HashMap, HashSet};
 use crate::ast::*;
 use crate::props::{self, Ctx};
 
+/// Whether a diagnostic stops the render.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Severity {
+    /// The diagram cannot be drawn. [`crate::render_source`] reports the first
+    /// of these and renders nothing.
     Error,
+    /// The diagram draws, but something about it will not read as intended —
+    /// a label too dark against its fill, a series with no legend to name it.
     Warning,
 }
 
+/// One problem found in a diagram, and where it is.
 #[derive(Debug, Clone)]
 pub struct Diag {
+    /// Whether this stops the render.
     pub severity: Severity,
+    /// Written for the person who has to fix it: what is wrong, and with which
+    /// item by name.
     pub message: String,
+    /// Byte range in the source, for an editor to underline.
     pub span: Span,
 }
 
@@ -39,6 +49,11 @@ impl Diag {
     }
 }
 
+/// Every problem in a diagram, not just the first.
+///
+/// [`crate::render_source`] stops at the first [`Severity::Error`]; an editor
+/// wants them all at once, and so does anything reporting on a file it did not
+/// write. An empty result means the diagram draws.
 pub fn check(diagram: &Diagram) -> Vec<Diag> {
     let mut out = Vec::new();
 

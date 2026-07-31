@@ -20,7 +20,12 @@ use anyhow::{Result, bail};
 /// What a program binds to a hole.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
+    /// Escaped for wherever it lands: inside a string literal it is escaped
+    /// for one, in a value position it is quoted. Hostile text cannot become
+    /// a statement.
     Text(String),
+    /// Written without a decimal point when it has none, so `4820.0` reaches
+    /// the diagram as `4820`.
     Number(f64),
     /// Several values in one hole — a series, a bit range, a date and a
     /// duration. Rendered space-separated, which is how the language reads
@@ -66,23 +71,28 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
 pub struct Bindings(HashMap<String, Value>);
 
 impl Bindings {
+    /// Empty bindings.
     pub fn new() -> Bindings {
         Bindings::default()
     }
 
+    /// Binds a value and returns the bindings, for chaining at a call site.
     pub fn set(mut self, name: impl Into<String>, value: impl Into<Value>) -> Bindings {
         self.0.insert(name.into(), value.into());
         self
     }
 
+    /// Binds a value in place. The form to use when building in a loop.
     pub fn insert(&mut self, name: impl Into<String>, value: impl Into<Value>) {
         self.0.insert(name.into(), value.into());
     }
 
+    /// What is bound to `name`, if anything.
     pub fn get(&self, name: &str) -> Option<&Value> {
         self.0.get(name)
     }
 
+    /// Whether nothing is bound.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }

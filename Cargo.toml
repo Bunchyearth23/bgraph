@@ -2,6 +2,17 @@
 name = "bgraph"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.87"
+description = "Stylable diagrams from a layout-first DSL — you place the boxes, it draws the SVG."
+repository = "https://github.com/Bunchyearth23/bgraph"
+readme = "README.md"
+
+# Not published. A release is a decision, and it is not this file's to make:
+# a version on crates.io cannot be withdrawn, only yanked, and the name is
+# spent the moment it lands. `license` and `authors` are deliberately absent —
+# `cargo publish` refuses without them, which makes this refusal load-bearing
+# rather than a note someone can miss.
+publish = false
 
 [lib]
 name = "bgraph"

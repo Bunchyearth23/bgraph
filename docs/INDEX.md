@@ -31,7 +31,8 @@ vocabulary are available to everything below. `W-013` and `W-014` are the
 remaining foundations; each archetype names the one
 it waits for. **Every foundation has landed.** What is left either unblocks
 nothing — `W-025`, `W-031`, `W-032` — or belongs to the library track, where
-`Q-003` is still waiting on a decision.
+the engineering is done and the two open items are decisions for a human:
+`Q-005` (release) and `Q-004` (repetition in templates).
 
 **DSL impact, measured rather than assumed.** The grammar already accepts
 string lists (`data: "a" "b" "c"`), number lists (`points: 1 2 3`),
@@ -46,7 +47,8 @@ change the language: `W-011`, `W-013`, `W-014`.
 | `W-031` | planned | `type er` — entities and cardinality | Data. Members and the box are `W-023`'s; what remains is cardinality at each end of a relation — crow's-foot markers, or `from-card:` / `to-card:` read as text. |
 | `W-025` | planned | `type block` — architecture and C4-style component views | Dev. Boxes inside boxes with typed relations; `W-011` has landed. Closest of all of them to `free`, which is why it is worth doing as an archetype rather than by hand. |
 | `W-032` | planned | `type timeline` — events on a date line | Project. `W-014` gives it the dates and `W-026` the axis; what remains is the marks and the label stagger. |
-| `W-027` | planned | **A stable embeddable API** | The long-term aim (`D-014`). Templating (`D-017`) is the shape it takes; what remains is the promise around it — a documented public surface, no panics on hostile input, semver, and a crates.io release. |
+| `Q-005` | open | Publish to crates.io, and under which licence? | **The Archmagos's call, and only his.** A version on crates.io cannot be withdrawn, only yanked, and the name is spent the moment it lands. `Cargo.toml` carries `publish = false` and deliberately omits `license` and `authors`, so `cargo publish` refuses rather than merely being discouraged. The name `bgraph` was free on 2026-07-31. Blocks `W-034`. |
+| `W-034` | blocked | Release to crates.io | Blocked by `Q-005`. Needs a licence choice, `LICENSE` files, `authors`, `publish = true`, and a `cargo publish --dry-run`. Nothing else: `W-027` did the engineering. |
 | `Q-004` | open | Does a template need repetition? | A pie with a variable *number* of slices cannot be templated by substitution alone. Either the calling program builds the source string itself — the honest answer for that case — or the language grows a `for` construct, which is a template language and a much larger promise. |
 | `W-028` | planned | Cargo features per archetype | So a program embedding `bgraph` for one chart does not compile all of them. Matters most for the embedded audience. |
 | `Q-002` | open | Which archetype after `pie` and `packet`? | Answered in part by the survey above; what remains is the *order*. `W-019`, `W-024`, `W-018` and `W-016` are the ones with no prerequisite. |
@@ -63,9 +65,9 @@ change the language: `W-011`, `W-013`, `W-014`.
 ## Settled
 
 ### Decisions
-
 | id | state | date | title | was |
 |---|---|---|---|---|
+| `D-018` | active | 2026-07-31 | **The embedding surface is narrow on purpose.** Semver covers `render_source`, `template`, `parser` and `check` — nothing else. `ast`, `layout`, `style`, `charts`, `render_svg` and `props` stay public to be inspected but are not a promise; pinning them would mean the diagrams could never be improved. The vocabulary's stable form is `docs/reference.md`, generated from those tables | |
 | `D-001` | active | 2026-07-31 | Placement is declared with **relative anchors plus absolute** — `at`, `right-of`, `gap`, `align` — not auto-layout | |
 | `D-002` | active | 2026-07-31 | Styling is a **cascade of named classes**: defaults → implicit `node`/`edge` → `.classes` → inline | |
 | `D-003` | active | 2026-07-31 | Ship a **CLI plus a live preview** (`bgraph watch`), not export formats | |
@@ -97,7 +99,8 @@ not copies.
 | `W-004` | 2026-07-31 | `bgraph-lsp`: diagnostics, completion, hover, go-to-definition, outline | `1b53ec3` |
 | `W-005` | 2026-07-31 | Tree-sitter grammar and Zed extension | `1b53ec3`, regenerated `d6997b1` |
 | `W-006` | 2026-07-31 | `type` archetypes (`pie`, `packet`), quiet completion, explicit surface, generated reference manual | `4b4c548` |
-| `W-033` | 2026-07-31 | Templating: `{{holes}}` that parse, typed bindings, context-aware escaping, `--set` on the CLI | this commit |
+| `W-033` | 2026-07-31 | Templating: `{{holes}}` that parse, typed bindings, context-aware escaping, `--set` on the CLI | 6d166eb |
+| `W-027` | 2026-07-31 | **The embedding promise**: hostile input cannot bring down the host, and the public surface says what semver covers | this commit |
 | `W-014` | 2026-07-31 | Date and duration literals — `2026-08-01`, `12d`, `2w`, `6h`, with civil-calendar arithmetic | this commit |
 | `W-026` | 2026-07-31 | `type gantt` — bars on a calendar, sections from groups, a today line | this commit |
 | `W-013` | 2026-07-31 | Member lists — a `- ` or `+ ` line in a block, kept with its marker | this commit |
@@ -135,6 +138,7 @@ Nothing is marked `landed` without a commit to point at.
 |---|---|---|---|
 | `X-001` | 2026-07-31 | The Zed extension had never been exercised inside Zed | The Archmagos installed it and reported live completion and rendering behaviour, which drove `D-011` and the `font-color` fix |
 | `X-007` | 2026-07-31 | `W-029` was going to move some syntax errors to semantic ones | It did, exactly once: `alpha beta` is now an item with an unknown keyword. The message names the archetype's word, and `tests/grammar/accept/bare-words-parse-as-items.bd` pins the new category |
+| `X-012` | 2026-07-31 | Deeply nested groups aborted the host process | `pest` descends recursively, so ~1500 nested `{` overflowed the stack — `SIGABRT`, which a caller cannot catch, in a library meant to be embedded. A lexical depth scan now runs *before* pest and refuses past `MAX_NESTING` (64). Proven by removing the guard and watching the suite abort |
 | `X-011` | 2026-07-31 | Two tests shelling out to `tree-sitter` in parallel could catch the parser library mid-rebuild | It fired twice before being fixed. The calls now take a mutex; serialising them costs nothing, and a flaky guard stops being believed |
 | `X-003` | 2026-07-31 | Self-loops were declared but not drawn | `W-009` draws them; the stale "not drawn yet" warning is gone |
 
