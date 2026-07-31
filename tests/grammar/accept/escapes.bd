@@ -1,0 +1,2 @@
+node a "two\nlines"
+node b "a { brace } and a \" quote and a // slash"

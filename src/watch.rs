@@ -96,15 +96,25 @@ fn page(input: &Path) -> String {
 <meta charset="utf-8">
 <title>bgraph — {name}</title>
 <style>
-  :root {{ color-scheme: light dark; }}
+  :root {{ color-scheme: light dark; --surround: #d4d4d8; }}
+  @media (prefers-color-scheme: dark) {{ :root {{ --surround: #3f3f46; }} }}
   body {{ margin: 0; min-height: 100vh; display: grid; place-items: center;
-         background: #f8fafc; font: 13px ui-sans-serif, system-ui, sans-serif; }}
-  @media (prefers-color-scheme: dark) {{ body {{ background: #0b1120; }} }}
+         background: var(--surround); font: 13px ui-sans-serif, system-ui, sans-serif; }}
   #stage {{ padding: 24px; }}
-  #stage svg {{ max-width: 96vw; height: auto; }}
+  /* A checkerboard, not a solid color: the diagram paints its own surface, so
+     whatever shows through here is genuinely transparent in the exported file. */
+  #stage svg {{ max-width: 96vw; height: auto; display: block;
+                background-color: #ffffff;
+                background-image:
+                  linear-gradient(45deg, #cbd5e1 25%, transparent 25%),
+                  linear-gradient(-45deg, #cbd5e1 25%, transparent 25%),
+                  linear-gradient(45deg, transparent 75%, #cbd5e1 75%),
+                  linear-gradient(-45deg, transparent 75%, #cbd5e1 75%);
+                background-size: 16px 16px;
+                background-position: 0 0, 0 8px, 8px -8px, -8px 0; }}
   .err {{ color: #dc2626; font: 12px ui-monospace, monospace; white-space: pre-wrap;
          max-width: 80ch; padding: 16px; border: 1px solid #dc2626; border-radius: 8px; }}
-  #tag {{ position: fixed; bottom: 10px; right: 12px; color: #94a3b8; }}
+  #tag {{ position: fixed; bottom: 10px; right: 12px; color: #71717a; }}
 </style>
 </head>
 <body>

@@ -19,13 +19,24 @@ properties that have no effect where they are written.
 
 | Where you are | What you get |
 |---|---|
-| start of a line | `graph`, `style`, `node`, plus existing node ids |
+| start of a line | `type`, `graph`, `style`, `node`, plus node ids |
+| after `type` | archetype names |
 | after `.` | declared style names |
+| after `extends` | declared style names |
 | after `right-of` / `above` / … | declared node ids |
 | inside `node { }` | node properties only |
 | inside an edge `{ }` | edge properties only |
 | inside `graph { }` | graph settings only |
+| inside `type pie { }` | that archetype's settings only |
 | after `shape:`, `router:`, `arrow:` … | that property's accepted values |
+
+It is also deliberately **quiet**. It never fires inside a label or a
+comment; `.` only opens the style list where a class reference can actually
+go, so `0.55` and `..>` stay silent; aliases (`border`, `text-color`, …) are
+valid and documented but kept out of the list; and `value` / `bits` appear
+only under the archetype that reads them. Space is not a trigger character —
+a popup on every word boundary is the fastest way to make completion feel
+like an obstacle.
 
 **Hover** — a property's syntax and meaning; a node's label, styles and
 **resolved position and size**; a style's flattened property list.

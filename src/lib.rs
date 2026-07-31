@@ -5,7 +5,9 @@
 //! CLI can never disagree about what a file means.
 
 pub mod ast;
+pub mod charts;
 pub mod check;
+pub mod docgen;
 pub mod layout;
 pub mod lsp;
 pub mod parser;

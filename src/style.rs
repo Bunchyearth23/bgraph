@@ -66,6 +66,10 @@ pub struct Style {
     pub head: Option<Head>,
     pub router: Option<Router>,
     pub shadow: Option<bool>,
+    /// Chart data, carried on the same layer stack as decoration so a class
+    /// can supply it: `value` feeds `type pie`, `bits` feeds `type packet`.
+    pub value: Option<f64>,
+    pub bits: Option<(u32, u32)>,
 }
 
 macro_rules! overlay {
@@ -97,6 +101,8 @@ impl Style {
             head,
             router,
             shadow,
+            value,
+            bits,
         );
     }
 
@@ -229,6 +235,15 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
                 other => bail!("unknown router `{other}`"),
             });
         }
+        "value" => style.value = first.and_then(|x| x.as_num()),
+        "bits" => {
+            let start = first.and_then(|x| x.as_num()).unwrap_or(0.0).max(0.0) as u32;
+            let end = v
+                .get(1)
+                .and_then(|x| x.as_num())
+                .map_or(start, |n| n.max(0.0) as u32);
+            style.bits = Some((start.min(end), start.max(end)));
+        }
         "shadow" => {
             style.shadow = Some(!matches!(
                 first.and_then(|x| x.as_word()),
@@ -341,7 +356,9 @@ impl Default for GraphOpts {
         GraphOpts {
             padding: 32.0,
             gap: 64.0,
-            background: None,
+            // Explicit, so the preview and the exported file agree on what
+            // the surface is. `background: none` opts back out.
+            background: Some("#ffffff".into()),
             flow: RelDir::RightOf,
         }
     }
@@ -357,7 +374,10 @@ impl GraphOpts {
                 "padding" => opts.padding = first.and_then(|x| x.as_num()).unwrap_or(opts.padding),
                 "gap" => opts.gap = first.and_then(|x| x.as_num()).unwrap_or(opts.gap),
                 "background" | "bg" => {
-                    opts.background = first.and_then(|x| x.as_paint()).map(String::from)
+                    opts.background = match first.and_then(|x| x.as_paint()) {
+                        Some("none" | "transparent") => None,
+                        other => other.map(String::from),
+                    }
                 }
                 "flow" | "direction" => {
                     let word = first.and_then(|x| x.as_word()).unwrap_or_default();

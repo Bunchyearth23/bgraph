@@ -90,6 +90,20 @@ fn build(file: Pair<Rule>) -> Result<Diagram> {
 
     for pair in file.into_inner() {
         match pair.as_rule() {
+            Rule::type_decl => {
+                let mut parts = pair.into_inner();
+                let name = parts.next().expect("a type declaration names an archetype");
+                // A second `type` line is reported by `check`, not silently
+                // dropped, so keep the first and let validation speak.
+                if diagram.archetype.is_none() {
+                    diagram.archetype = Some(spanned(&name));
+                    if let Some(block) = parts.next() {
+                        diagram.archetype_props = parse_block(block)?;
+                    }
+                } else {
+                    diagram.extra_archetypes.push(spanned(&name));
+                }
+            }
             Rule::graph_decl => {
                 diagram.graph_span = Some(span_of(&pair));
                 let block = pair.into_inner().next().expect("graph block");

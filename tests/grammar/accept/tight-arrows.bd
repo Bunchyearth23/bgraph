@@ -1,0 +1,6 @@
+node alpha
+node beta
+alpha->beta
+alpha <-> beta
+alpha..>beta
+alpha--beta

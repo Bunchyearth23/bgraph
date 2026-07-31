@@ -34,6 +34,12 @@ enum Command {
         #[arg(short, long, default_value_t = 7878)]
         port: u16,
     },
+    /// Write the generated reference manual
+    Docs {
+        /// Output file; stdout when omitted
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
     /// Report diagnostics for a file without rendering it
     Check {
         /// Input DSL file
@@ -60,6 +66,18 @@ fn run() -> Result<i32> {
             return Ok(0);
         }
         Some(Command::Check { input }) => return check_file(&input),
+        Some(Command::Docs { output }) => {
+            let manual = bgraph::docgen::reference();
+            match output {
+                Some(path) => {
+                    fs::write(&path, &manual)
+                        .with_context(|| format!("cannot write {}", path.display()))?;
+                    println!("reference written to {}", path.display());
+                }
+                None => print!("{manual}"),
+            }
+            return Ok(0);
+        }
         None => {}
     }
 

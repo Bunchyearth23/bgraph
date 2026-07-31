@@ -1,0 +1,3 @@
+style base { radius: 4 }
+style leaf extends base { shape: cylinder }
+node a .leaf .base { opacity: 0.5 }

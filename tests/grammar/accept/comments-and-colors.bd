@@ -1,0 +1,4 @@
+// a leading comment
+graph { background: #0b1120 }   // trailing comment
+node a "A" { fill: #fff }
+// #not-a-color-here

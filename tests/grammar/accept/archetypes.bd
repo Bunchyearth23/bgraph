@@ -1,0 +1,2 @@
+type packet { width: 32 ruler: off }
+node head "Header" { bits: 0 31 }

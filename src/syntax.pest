@@ -20,12 +20,23 @@ color  = @{ "#" ~ ASCII_HEX_DIGIT{3, 8} }
 
 file = { SOI ~ sep ~ (stmt ~ sep)* ~ EOI }
 
-stmt = _{ graph_decl | style_decl | node_decl | edge_decl }
+// `type_decl` precedes `edge_decl` so `type pie` is not read as the start of
+// an edge; PEG backtracking still lets a node actually named `type` have edges.
+stmt = _{ type_decl | graph_decl | style_decl | node_decl | edge_decl }
 
+type_decl  = { "type" ~ ident ~ block? }
 graph_decl = { "graph" ~ block }
 style_decl = { "style" ~ ident ~ ("extends" ~ ident)? ~ block }
 node_decl  = { "node" ~ ident ~ string? ~ class_ref* ~ placement? ~ block? }
-edge_decl  = { ident ~ arrow ~ ident ~ string? ~ class_ref* ~ block? }
+
+// An edge may not start with a statement keyword. Without this, `style -> a`
+// parses here (pest backtracks out of `style_decl`) but not in tree-sitter,
+// whose lexer commits to the keyword. `check` reserves these names outright.
+edge_decl  = { !(keyword) ~ ident ~ arrow ~ ident ~ string? ~ class_ref* ~ block? }
+// Atomic: a non-atomic rule would let implicit whitespace slip between the
+// word and the boundary test, so `style -> a` would read the `-` as part
+// of an identifier and the guard would never fire.
+keyword    = @{ ("type" | "graph" | "style" | "node") ~ !(ASCII_ALPHANUMERIC | "_" | "-") }
 
 class_ref = { "." ~ ident }
 arrow     = @{ "<->" | "<-" | "-->" | "..>" | "--" | "->" | ".." }

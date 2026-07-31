@@ -232,12 +232,25 @@ impl Server {
         json!({ "isIncomplete": false, "items": items })
     }
 
+    /// Completion is deliberately quiet: it stays out of labels and comments,
+    /// hides aliases, and only fires on `.` where a class reference can go.
+    /// A suggestion that appears while you are typing prose is worse than none.
     fn items_for(&self, text: &str, line: &str, offset: usize) -> Vec<Value> {
-        let trimmed = line.trim_start();
+        let ctx = Context::at(text, offset);
+        if ctx.in_string || ctx.in_comment {
+            return Vec::new();
+        }
 
-        // `.` opens a style reference, wherever it appears.
+        let trimmed = line.trim_start();
+        let archetype = declared_archetype(text);
+
+        // `.class` — only after whitespace, so `1.5` and `..>` stay quiet.
         if let Some(dot) = line.rfind('.')
             && line[dot + 1..].chars().all(is_ident_char)
+            && line[..dot]
+                .chars()
+                .next_back()
+                .is_none_or(char::is_whitespace)
         {
             return declared(text, "style")
                 .into_iter()
@@ -245,8 +258,12 @@ impl Server {
                 .collect();
         }
 
-        if let Some(kind) = enclosing_block(text, offset) {
-            let graph = kind == Block::Graph;
+        if let Some(block) = ctx.block {
+            let table = match block {
+                Block::Graph => props::GRAPH_PROPS,
+                Block::Type => props::archetype(archetype).map_or(&[][..], |a| a.props),
+                _ => props::PROPS,
+            };
 
             // `name: <here>` — complete the value, if the property enumerates.
             if let Some(colon) = line.rfind(':') {
@@ -259,79 +276,106 @@ impl Server {
                     .rev()
                     .collect();
 
-                if let Some(def) = props::lookup(&key, graph) {
-                    return def
-                        .words
-                        .iter()
-                        .map(|w| item(w, 20, def.syntax, def.doc))
-                        .collect();
-                }
-                return Vec::new();
+                return props::lookup(&key, table)
+                    .map(|def| {
+                        def.words
+                            .iter()
+                            .map(|w| item(w, 20, def.syntax, def.doc))
+                            .collect()
+                    })
+                    .unwrap_or_default();
             }
 
-            let ctx = match kind {
-                Block::Graph => None,
+            let want = match block {
                 Block::Node => Some(Ctx::Node),
                 Block::Edge => Some(Ctx::Edge),
-                Block::Style => None,
-            };
-            let table = if graph {
-                props::GRAPH_PROPS
-            } else {
-                props::PROPS
+                _ => None,
             };
 
             return table
                 .iter()
-                .filter(|p| ctx.is_none_or(|c| p.ctx.allows(c)))
-                .map(|p| {
+                .filter(|p| !p.alias)
+                .filter(|p| want.is_none_or(|c| p.ctx.allows(c)))
+                .filter(|p| relevant_here(p.name, archetype))
+                .enumerate()
+                .map(|(i, p)| {
                     let mut it = item(p.name, 10, p.syntax, p.doc);
                     it["insertText"] = json!(format!("{}: ", p.name));
+                    // Table order is meaningful; keep it instead of alphabetical.
+                    it["sortText"] = json!(format!("{i:03}"));
                     it
                 })
                 .collect();
         }
 
-        // Statement level.
-        let words: Vec<&str> = trimmed.split_whitespace().collect();
-        let last = words.last().copied().unwrap_or("");
-        let ends_with_space = line.ends_with(char::is_whitespace);
-        let anchor_position = matches!(last, "right-of" | "left-of" | "above" | "below")
-            || (ends_with_space && words.len() >= 2 && is_rel_dir(words[words.len() - 1]));
+        // ------------------------------------------------ statement level
 
-        if anchor_position || (words.len() >= 2 && is_rel_dir(words[words.len() - 2])) {
+        let words: Vec<&str> = trimmed.split_whitespace().collect();
+        let ends_with_space = line.ends_with(char::is_whitespace);
+        // The word being completed, or "" when a fresh one is starting.
+        let current = if ends_with_space {
+            ""
+        } else {
+            words.last().copied().unwrap_or("")
+        };
+        let preceding = if ends_with_space {
+            words.last().copied().unwrap_or("")
+        } else if words.len() >= 2 {
+            words[words.len() - 2]
+        } else {
+            ""
+        };
+
+        if preceding == "type" {
+            return props::ARCHETYPES
+                .iter()
+                .map(|a| item(a.name, 20, "archetype", a.doc))
+                .collect();
+        }
+
+        if is_rel_dir(preceding) {
             return declared(text, "node")
                 .into_iter()
                 .map(|(name, label)| item(&name, 6, "node", &label))
                 .collect();
         }
 
-        if trimmed.starts_with("align") {
+        if preceding == "align" {
             return props::ALIGNMENTS
                 .iter()
                 .map(|a| item(a, 20, "align", "Cross-axis alignment against the anchor."))
                 .collect();
         }
 
-        // A node statement that already has an id accepts placements next.
-        if trimmed.starts_with("node ") && words.len() >= 2 {
+        if preceding == "extends" {
+            return declared(text, "style")
+                .into_iter()
+                .map(|(name, _)| item(&name, 7, "style", &format!("Inherit from `{name}`.")))
+                .collect();
+        }
+
+        // Placements only make sense where placement is honoured, and only
+        // once the node already has an identifier.
+        if trimmed.starts_with("node ") && words.len() >= 2 && archetype == "free" {
             return props::PLACEMENTS
                 .iter()
                 .map(|(name, doc)| item(name, 14, "placement", doc))
                 .collect();
         }
 
-        if words.len() <= 1 {
+        // The first word of a statement: a keyword, or a node id starting an edge.
+        if words.len() <= 1 && !ends_with_space {
             let mut out: Vec<Value> = props::KEYWORDS
                 .iter()
                 .map(|(name, doc)| item(name, 14, "keyword", doc))
                 .collect();
-            // An edge starts with a node name, so offer those too.
-            out.extend(
-                declared(text, "node")
-                    .into_iter()
-                    .map(|(name, label)| item(&name, 6, "node", &label)),
-            );
+            if archetype == "free" && !current.is_empty() {
+                out.extend(
+                    declared(text, "node")
+                        .into_iter()
+                        .map(|(name, label)| item(&name, 6, "node", &label)),
+                );
+            }
             return out;
         }
 
@@ -352,11 +396,18 @@ impl Server {
         let line_start = prefix.rfind('\n').map(|i| i + 1).unwrap_or(0);
         let after = &text[span.end..];
         let is_key = after.trim_start().starts_with(':');
-        let in_block = enclosing_block(text, offset);
+        let ctx = Context::at(text, offset);
+        let archetype = declared_archetype(text);
 
-        let markdown = if is_key && in_block.is_some() {
-            let graph = in_block == Some(Block::Graph);
-            props::lookup(&word, graph).map(|d| format!("```\n{}\n```\n\n{}", d.syntax, d.doc))
+        let markdown = if text[line_start..span.start].trim_end().ends_with("type") {
+            props::archetype(&word).map(|a| format!("**type** `{}`\n\n{}", a.name, a.doc))
+        } else if is_key && ctx.block.is_some() {
+            let table = match ctx.block {
+                Some(Block::Graph) => props::GRAPH_PROPS,
+                Some(Block::Type) => props::archetype(archetype).map_or(&[][..], |a| a.props),
+                _ => props::PROPS,
+            };
+            props::lookup(&word, table).map(|d| format!("```\n{}\n```\n\n{}", d.syntax, d.doc))
         } else if text[line_start..span.start].trim_end().ends_with('.')
             || text[line_start..span.start].trim_end().ends_with("extends")
         {
@@ -526,49 +577,99 @@ fn diagnostics(text: &str) -> Vec<Value> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Block {
+    Type,
     Graph,
     Style,
     Node,
     Edge,
 }
 
-/// Which kind of statement owns the innermost unclosed `{` before `offset`.
-/// Purely lexical, so it keeps working while the document is unparseable.
-fn enclosing_block(text: &str, offset: usize) -> Option<Block> {
-    let mut stack = Vec::new();
-    let mut chars = text[..offset.min(text.len())].char_indices().peekable();
-    let mut in_string = false;
+/// Where the cursor sits, decided lexically so it keeps working while the
+/// document does not parse.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Context {
+    in_string: bool,
+    in_comment: bool,
+    /// The statement owning the innermost unclosed `{`.
+    block: Option<Block>,
+}
 
-    while let Some((i, c)) = chars.next() {
-        match c {
-            '"' => in_string = !in_string,
-            '/' if !in_string && matches!(chars.peek(), Some((_, '/'))) => {
-                // Skip to end of line.
-                for (_, c) in chars.by_ref() {
-                    if c == '\n' {
-                        break;
+impl Context {
+    fn at(text: &str, offset: usize) -> Context {
+        let mut stack = Vec::new();
+        let mut chars = text[..offset.min(text.len())].char_indices().peekable();
+        let mut in_string = false;
+        let mut in_comment = false;
+
+        while let Some((_, c)) = chars.next() {
+            let i = chars.peek().map(|(j, _)| *j).unwrap_or(text.len());
+            match c {
+                '\\' if in_string => {
+                    chars.next();
+                }
+                '"' => in_string = !in_string,
+                '/' if !in_string && matches!(chars.peek(), Some((_, '/'))) => {
+                    in_comment = true;
+                    for (_, c) in chars.by_ref() {
+                        if c == '\n' {
+                            in_comment = false;
+                            break;
+                        }
                     }
                 }
+                '{' if !in_string => stack.push(i - c.len_utf8()),
+                '}' if !in_string => {
+                    stack.pop();
+                }
+                _ => {}
             }
-            '{' if !in_string => stack.push(i),
-            '}' if !in_string => {
-                stack.pop();
+        }
+
+        let block = stack.pop().map(|brace| {
+            let line_start = text[..brace].rfind('\n').map(|i| i + 1).unwrap_or(0);
+            match text[line_start..brace].split_whitespace().next() {
+                Some("type") => Block::Type,
+                Some("graph") => Block::Graph,
+                Some("style") => Block::Style,
+                Some("node") => Block::Node,
+                _ => Block::Edge,
             }
-            _ => {}
+        });
+
+        Context {
+            in_string,
+            in_comment,
+            block,
         }
     }
+}
 
-    let brace = stack.pop()?;
-    let line_start = text[..brace].rfind('\n').map(|i| i + 1).unwrap_or(0);
-    let line = &text[line_start..brace];
-    let first = line.split_whitespace().next().unwrap_or("");
+/// The archetype the file declares, by line scan — `free` when it declares none.
+fn declared_archetype(text: &str) -> &str {
+    for line in text.lines() {
+        let trimmed = line.trim_start();
+        let Some(rest) = trimmed.strip_prefix("type") else {
+            continue;
+        };
+        if !rest.starts_with(char::is_whitespace) {
+            continue;
+        }
+        let name = rest.trim_start();
+        let end = name.find(|c: char| !is_ident_char(c)).unwrap_or(name.len());
+        if end > 0 {
+            return &name[..end];
+        }
+    }
+    "free"
+}
 
-    Some(match first {
-        "graph" => Block::Graph,
-        "style" => Block::Style,
-        "node" => Block::Node,
-        _ => Block::Edge,
-    })
+/// Chart data is noise in an archetype that does not read it.
+fn relevant_here(name: &str, archetype: &str) -> bool {
+    match name {
+        "value" => archetype == "pie",
+        "bits" => archetype == "packet",
+        _ => true,
+    }
 }
 
 fn is_ident_char(c: char) -> bool {
@@ -695,6 +796,9 @@ fn capabilities() -> Value {
         "capabilities": {
             "textDocumentSync": 1,               // full document on every change
             "completionProvider": {
+                // Space is a trigger again, but `items_for` now answers with
+                // nothing wherever a suggestion would be in the way — the
+                // quiet comes from the answer, not from refusing to be asked.
                 "triggerCharacters": [".", ":", " "],
             },
             "hoverProvider": true,
@@ -763,28 +867,28 @@ mod tests {
     #[test]
     fn enclosing_block_identifies_the_owner() {
         let text = "graph {\n  pad";
-        assert_eq!(enclosing_block(text, text.len()), Some(Block::Graph));
+        assert_eq!(Context::at(text, text.len()).block, Some(Block::Graph));
 
         let text = "style x {\n  fill";
-        assert_eq!(enclosing_block(text, text.len()), Some(Block::Style));
+        assert_eq!(Context::at(text, text.len()).block, Some(Block::Style));
 
         let text = "node a \"A\" {\n  fill";
-        assert_eq!(enclosing_block(text, text.len()), Some(Block::Node));
+        assert_eq!(Context::at(text, text.len()).block, Some(Block::Node));
 
         let text = "a -> b {\n  rou";
-        assert_eq!(enclosing_block(text, text.len()), Some(Block::Edge));
+        assert_eq!(Context::at(text, text.len()).block, Some(Block::Edge));
 
         let text = "graph { padding: 4 }\nnode a";
-        assert_eq!(enclosing_block(text, text.len()), None);
+        assert_eq!(Context::at(text, text.len()).block, None);
     }
 
     #[test]
     fn braces_inside_strings_and_comments_are_ignored() {
         let text = "node a \"{\"\nnode b";
-        assert_eq!(enclosing_block(text, text.len()), None);
+        assert_eq!(Context::at(text, text.len()).block, None);
 
         let text = "// a { comment\nnode b";
-        assert_eq!(enclosing_block(text, text.len()), None);
+        assert_eq!(Context::at(text, text.len()).block, None);
     }
 
     #[test]
@@ -952,5 +1056,127 @@ mod tests {
         let hover = server.hover(&params);
         let value = hover["contents"]["value"].as_str().unwrap_or_default();
         assert!(value.contains("Outline geometry"), "{value}");
+    }
+
+    fn server_with(text: &str) -> Server {
+        let mut server = Server::default();
+        server.docs.insert("file:///t.bd".into(), text.into());
+        server
+    }
+
+    fn labels_at(text: &str, line: &str) -> Vec<String> {
+        server_with(text)
+            .items_for(text, line, text.len())
+            .iter()
+            .filter_map(|i| i["label"].as_str().map(String::from))
+            .collect()
+    }
+
+    #[test]
+    fn completion_stays_out_of_labels_and_comments() {
+        // Typing prose is exactly when a popup is in the way.
+        assert!(labels_at("node a \"Cli", "node a \"Cli").is_empty());
+        assert!(labels_at("// note: sha", "// note: sha").is_empty());
+        assert!(labels_at("node a { fill: #fff } // sh", "node a { fill: #fff } // sh").is_empty());
+    }
+
+    #[test]
+    fn a_dot_only_opens_styles_where_a_class_can_go() {
+        let text = "style dark { fill: #000 }\n";
+
+        // A decimal is not a class reference.
+        let line = "node a { opacity: 0.";
+        assert!(labels_at(&format!("{text}{line}"), line).is_empty());
+
+        // Neither is a dotted arrow.
+        let line = "a ..";
+        assert!(!labels_at(&format!("{text}{line}"), line).contains(&"dark".to_string()));
+
+        let line = "node a .";
+        assert!(labels_at(&format!("{text}{line}"), line).contains(&"dark".to_string()));
+    }
+
+    #[test]
+    fn aliases_are_hidden_from_completion() {
+        let labels = labels_at("node a {\n  ", "  ");
+        assert!(labels.contains(&"stroke".to_string()));
+        assert!(!labels.contains(&"border".to_string()), "{labels:?}");
+        assert!(!labels.contains(&"color".to_string()));
+        assert!(!labels.contains(&"text-color".to_string()));
+    }
+
+    #[test]
+    fn statement_level_stops_suggesting_once_a_word_is_finished() {
+        // Trailing space used to re-open the keyword list on every word.
+        assert!(
+            labels_at("node alpha ", "node alpha ")
+                .iter()
+                .all(|l| l != "graph")
+        );
+        assert!(labels_at("n", "n").contains(&"node".to_string()));
+    }
+
+    #[test]
+    fn archetype_names_complete_after_type() {
+        let labels = labels_at("type ", "type ");
+        assert!(labels.contains(&"pie".to_string()));
+        assert!(labels.contains(&"packet".to_string()));
+        assert!(labels.contains(&"free".to_string()));
+    }
+
+    #[test]
+    fn a_type_block_completes_that_archetypes_settings() {
+        let text = "type pie {\n  ";
+        let labels = labels_at(text, "  ");
+        assert!(labels.contains(&"donut".to_string()));
+        assert!(!labels.contains(&"padding".to_string()), "{labels:?}");
+
+        let text = "type packet {\n  ";
+        let labels = labels_at(text, "  ");
+        assert!(labels.contains(&"ruler".to_string()));
+        assert!(!labels.contains(&"donut".to_string()));
+    }
+
+    #[test]
+    fn chart_data_is_offered_only_where_it_is_read() {
+        let labels = labels_at("type pie\nnode a {\n  ", "  ");
+        assert!(labels.contains(&"value".to_string()));
+        assert!(!labels.contains(&"bits".to_string()));
+
+        let labels = labels_at("type packet\nnode a {\n  ", "  ");
+        assert!(labels.contains(&"bits".to_string()));
+        assert!(!labels.contains(&"value".to_string()));
+
+        let labels = labels_at("node a {\n  ", "  ");
+        assert!(!labels.contains(&"value".to_string()));
+        assert!(!labels.contains(&"bits".to_string()));
+    }
+
+    #[test]
+    fn placements_are_not_offered_where_placement_is_ignored() {
+        assert!(labels_at("node a ", "node a ").contains(&"right-of".to_string()));
+        assert!(!labels_at("type pie\nnode a ", "node a ").contains(&"right-of".to_string()));
+    }
+
+    #[test]
+    fn declared_archetype_defaults_to_free() {
+        assert_eq!(declared_archetype("node a\n"), "free");
+        assert_eq!(declared_archetype("type packet\nnode a\n"), "packet");
+        assert_eq!(declared_archetype("type pie {\n}\n"), "pie");
+        // `typed` is not `type`.
+        assert_eq!(declared_archetype("node typed\n"), "free");
+    }
+
+    #[test]
+    fn hover_documents_an_archetype() {
+        let text = "type packet";
+        let server = server_with(text);
+        let params = json!({
+            "textDocument": { "uri": "file:///t.bd" },
+            "position": { "line": 0, "character": 7 },
+        });
+        let hover = server.hover(&params);
+        let value = hover["contents"]["value"].as_str().unwrap_or_default();
+        assert!(value.contains("**type** `packet`"), "{value}");
     }
 }

@@ -1,0 +1,5 @@
+node a at (0, 0)
+node b right-of a gap 40 align top
+node c below a align left
+node d left-of a
+node e above a

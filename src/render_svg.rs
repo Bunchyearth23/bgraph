@@ -4,12 +4,24 @@
 use std::collections::BTreeMap;
 use std::fmt::Write;
 
-use crate::layout::{Layout, PlacedNode, Rect, text_width};
+use crate::charts::annotation_bounds;
+use crate::layout::{Anchor, Annotation, Chart, Layout, Pie, PlacedNode, Rect, text_width};
 use crate::style::{Head, Router, Shape, Style};
 
+/// An edge after routing, with its label already placed.
+struct Routed {
+    points: Vec<(f64, f64)>,
+    label: Option<(String, Rect)>,
+}
+
 pub fn render(layout: &Layout) -> String {
+    // Routing comes first: a self-loop reaches above its node, and a label
+    // may be nudged clear of a neighbouring line, so neither the canvas nor
+    // the label placement can be decided before the geometry exists.
+    let routed = route_all(layout);
+
     let pad = layout.opts.padding;
-    let (min_x, min_y, max_x, max_y) = bounds(layout);
+    let (min_x, min_y, max_x, max_y) = bounds(layout, &routed);
     let width = (max_x - min_x) + pad * 2.0;
     let height = (max_y - min_y) + pad * 2.0;
     let dx = pad - min_x;
@@ -19,11 +31,8 @@ pub fn render(layout: &Layout) -> String {
     let mut markers = BTreeMap::new();
     let mut needs_shadow = false;
 
-    for edge in &layout.edges {
-        let from = &layout.nodes[edge.from];
-        let to = &layout.nodes[edge.to];
-        let points = route(from, to, edge.style.router.unwrap_or(Router::Straight));
-        if points.len() < 2 {
+    for (edge, route) in layout.edges.iter().zip(&routed) {
+        if route.points.len() < 2 {
             continue;
         }
 
@@ -49,7 +58,8 @@ pub fn render(layout: &Layout) -> String {
             let _ = write!(attrs, r#" stroke-dasharray="{dash}""#);
         }
 
-        let path: Vec<String> = points
+        let path: Vec<String> = route
+            .points
             .iter()
             .map(|(x, y)| format!("{},{}", n(*x), n(*y)))
             .collect();
@@ -62,17 +72,22 @@ pub fn render(layout: &Layout) -> String {
             n(edge.style.opacity.unwrap_or(1.0)),
             attrs
         );
+    }
 
-        if let Some(label) = &edge.label {
-            let (lx, ly) = midpoint(&points);
+    // Labels last among the edge layer, so no line is drawn over a plate.
+    for (edge, route) in layout.edges.iter().zip(&routed) {
+        if let Some((text, rect)) = &route.label {
             body.push_str(&edge_label(
-                label,
-                lx,
-                ly,
+                text,
+                rect,
                 &edge.style,
                 &layout.opts.background,
             ));
         }
+    }
+
+    if let Chart::Pie(pie) = &layout.chart {
+        body.push_str(&pie_slices(pie));
     }
 
     for node in &layout.nodes {
@@ -81,6 +96,10 @@ pub fn render(layout: &Layout) -> String {
         }
         body.push_str(&node_shape(node));
         body.push_str(&node_label(node));
+    }
+
+    for annotation in &layout.annotations {
+        body.push_str(&annotation_text(annotation));
     }
 
     let mut defs = String::new();
@@ -116,21 +135,221 @@ pub fn render(layout: &Layout) -> String {
     svg
 }
 
-fn bounds(layout: &Layout) -> (f64, f64, f64, f64) {
+fn route_all(layout: &Layout) -> Vec<Routed> {
+    let mut routed: Vec<Routed> = layout
+        .edges
+        .iter()
+        .map(|edge| Routed {
+            points: if edge.from == edge.to {
+                self_loop(&layout.nodes[edge.from])
+            } else {
+                route(
+                    &layout.nodes[edge.from],
+                    &layout.nodes[edge.to],
+                    edge.style.router.unwrap_or(Router::Straight),
+                )
+            },
+            label: None,
+        })
+        .collect();
+
+    // Placed greedily in source order, each one avoiding what is already down.
+    let mut taken: Vec<Rect> = Vec::new();
+    for i in 0..routed.len() {
+        let Some(text) = layout.edges[i].label.clone() else {
+            continue;
+        };
+        let rect = place_label(&text, i, &routed, layout, &taken, &layout.edges[i].style);
+        taken.push(rect);
+        routed[i].label = Some((text, rect));
+    }
+
+    routed
+}
+
+/// A label sits on the midpoint of its own edge by default, and slides along
+/// the perpendicular when that would put it on top of something else.
+fn place_label(
+    text: &str,
+    index: usize,
+    routed: &[Routed],
+    layout: &Layout,
+    taken: &[Rect],
+    style: &Style,
+) -> Rect {
+    let (anchor, (dx, dy)) = label_anchor(&routed[index].points);
+    let (w, h) = label_size(text, style);
+
+    // Perpendicular to the segment the label sits on.
+    let len = (dx * dx + dy * dy).sqrt().max(1e-6);
+    let (px, py) = (-dy / len, dx / len);
+    let step = h * 0.85;
+
+    let mut best = (
+        f64::MAX,
+        Rect {
+            x: 0.0,
+            y: 0.0,
+            w,
+            h,
+        },
+    );
+
+    for k in [0.0, 1.0, -1.0, 2.0, -2.0, 3.0, -3.0] {
+        let cx = anchor.0 + px * step * k;
+        let cy = anchor.1 + py * step * k;
+        let rect = Rect {
+            x: cx - w / 2.0,
+            y: cy - h / 2.0,
+            w,
+            h,
+        };
+
+        let cost = label_cost(&rect, index, routed, layout, taken) + k.abs() * 0.01;
+        if cost < best.0 {
+            best = (cost, rect);
+        }
+        if cost < 0.011 {
+            break;
+        }
+    }
+
+    best.1
+}
+
+/// How much a candidate box overlaps things the reader needs to see. The
+/// edge's own line is excluded — a label sits on its own route by design.
+fn label_cost(
+    rect: &Rect,
+    index: usize,
+    routed: &[Routed],
+    layout: &Layout,
+    taken: &[Rect],
+) -> f64 {
+    let mut cost = 0.0;
+
+    for (i, other) in routed.iter().enumerate() {
+        if i == index {
+            continue;
+        }
+        for pair in other.points.windows(2) {
+            if segment_hits(pair[0], pair[1], rect) {
+                cost += 1.0;
+            }
+        }
+    }
+
+    for node in &layout.nodes {
+        if overlaps(rect, &node.rect) {
+            cost += 2.0;
+        }
+    }
+    for placed in taken {
+        if overlaps(rect, placed) {
+            cost += 2.0;
+        }
+    }
+
+    cost
+}
+
+fn label_size(text: &str, style: &Style) -> (f64, f64) {
+    let font_size = style.font_size.unwrap_or(12.0);
+    let lines: Vec<String> = text.split('\n').map(str::to_string).collect();
+    (
+        text_width(&lines, font_size) + 10.0,
+        lines.len() as f64 * font_size * 1.3 + 4.0,
+    )
+}
+
+/// The point a label hangs off, plus the direction of the segment it is on.
+fn label_anchor(points: &[(f64, f64)]) -> ((f64, f64), (f64, f64)) {
+    if points.len() < 2 {
+        return ((0.0, 0.0), (1.0, 0.0));
+    }
+    // For an elbow, the middle segment is the one that reads as "the middle".
+    let i = if points.len() == 2 {
+        0
+    } else {
+        points.len() / 2 - 1
+    };
+    let (a, b) = (points[i], points[i + 1]);
+    (
+        ((a.0 + b.0) / 2.0, (a.1 + b.1) / 2.0),
+        (b.0 - a.0, b.1 - a.1),
+    )
+}
+
+fn overlaps(a: &Rect, b: &Rect) -> bool {
+    a.x < b.right() && b.x < a.right() && a.y < b.bottom() && b.y < a.bottom()
+}
+
+fn segment_hits(p: (f64, f64), q: (f64, f64), r: &Rect) -> bool {
+    let inside =
+        |(x, y): (f64, f64)| (r.x..=r.right()).contains(&x) && (r.y..=r.bottom()).contains(&y);
+    if inside(p) || inside(q) {
+        return true;
+    }
+
+    let corners = [
+        (r.x, r.y),
+        (r.right(), r.y),
+        (r.right(), r.bottom()),
+        (r.x, r.bottom()),
+    ];
+    (0..4).any(|i| segments_cross(p, q, corners[i], corners[(i + 1) % 4]))
+}
+
+fn segments_cross(p1: (f64, f64), p2: (f64, f64), p3: (f64, f64), p4: (f64, f64)) -> bool {
+    let d = |a: (f64, f64), b: (f64, f64), c: (f64, f64)| {
+        (b.0 - a.0) * (c.1 - a.1) - (b.1 - a.1) * (c.0 - a.0)
+    };
+    let (d1, d2) = (d(p3, p4, p1), d(p3, p4, p2));
+    let (d3, d4) = (d(p1, p2, p3), d(p1, p2, p4));
+
+    ((d1 > 0.0) != (d2 > 0.0)) && ((d3 > 0.0) != (d4 > 0.0))
+}
+
+fn bounds(layout: &Layout, routed: &[Routed]) -> (f64, f64, f64, f64) {
     let mut min_x = f64::MAX;
     let mut min_y = f64::MAX;
     let mut max_x = f64::MIN;
     let mut max_y = f64::MIN;
 
-    for node in &layout.nodes {
-        min_x = min_x.min(node.rect.x);
-        min_y = min_y.min(node.rect.y);
-        max_x = max_x.max(node.rect.right());
-        max_y = max_y.max(node.rect.bottom());
+    let mut boxes: Vec<Rect> = layout.nodes.iter().map(|n| n.rect).collect();
+    boxes.extend(layout.annotations.iter().map(annotation_bounds));
+    boxes.extend(routed.iter().filter_map(|r| r.label.as_ref().map(|l| l.1)));
+
+    // Edge geometry can leave the nodes' box entirely — a self-loop does.
+    for route in routed {
+        for &(x, y) in &route.points {
+            boxes.push(Rect {
+                x,
+                y,
+                w: 0.0,
+                h: 0.0,
+            });
+        }
     }
 
-    if layout.nodes.is_empty() {
+    if let Chart::Pie(pie) = &layout.chart {
+        boxes.push(Rect {
+            x: pie.cx - pie.radius,
+            y: pie.cy - pie.radius,
+            w: pie.radius * 2.0,
+            h: pie.radius * 2.0,
+        });
+    }
+
+    if boxes.is_empty() {
         return (0.0, 0.0, 0.0, 0.0);
+    }
+
+    for r in &boxes {
+        min_x = min_x.min(r.x);
+        min_y = min_y.min(r.y);
+        max_x = max_x.max(r.right());
+        max_y = max_y.max(r.bottom());
     }
     (min_x, min_y, max_x, max_y)
 }
@@ -277,6 +496,26 @@ fn route(from: &PlacedNode, to: &PlacedNode, router: Router) -> Vec<(f64, f64)> 
     }
 }
 
+/// An edge from a node to itself: a loop over its top edge. Sampled as a
+/// polyline so it inherits the dash, opacity and arrow-head machinery every
+/// other edge already uses.
+fn self_loop(node: &PlacedNode) -> Vec<(f64, f64)> {
+    let r = &node.rect;
+    let rx = (r.w * 0.22).max(18.0);
+    let ry = (r.h * 0.70).max(26.0);
+    let (cx, top) = (r.cx(), r.y);
+
+    // t from π to 0: leaves the top edge on the left, arcs over, and comes
+    // back down on the right — so the arrow head points into the node.
+    const STEPS: usize = 24;
+    (0..=STEPS)
+        .map(|i| {
+            let t = std::f64::consts::PI * (1.0 - i as f64 / STEPS as f64);
+            (cx + rx * t.cos(), top - ry * t.sin())
+        })
+        .collect()
+}
+
 /// Where the ray from the node's centre toward `target` leaves the shape.
 fn boundary(node: &PlacedNode, target: (f64, f64)) -> (f64, f64) {
     let r = &node.rect;
@@ -320,24 +559,12 @@ fn boundary(node: &PlacedNode, target: (f64, f64)) -> (f64, f64) {
     (cx + dx * best, cy + dy * best)
 }
 
-fn midpoint(points: &[(f64, f64)]) -> (f64, f64) {
-    if points.len() == 2 {
-        return (
-            (points[0].0 + points[1].0) / 2.0,
-            (points[0].1 + points[1].1) / 2.0,
-        );
-    }
-    // For an elbow the middle segment is the one that reads as "the middle".
-    let i = points.len() / 2 - 1;
-    (
-        (points[i].0 + points[i + 1].0) / 2.0,
-        (points[i].1 + points[i + 1].1) / 2.0,
-    )
-}
-
 // ---------------------------------------------------------------- text
 
 fn node_label(node: &PlacedNode) -> String {
+    if node.lines.iter().all(|l| l.is_empty()) {
+        return String::new();
+    }
     let s = &node.style;
     let font_size = s.font_size.unwrap_or(14.0);
     let line_h = font_size * 1.3;
@@ -367,19 +594,18 @@ fn node_label(node: &PlacedNode) -> String {
     out
 }
 
-fn edge_label(label: &str, x: f64, y: f64, style: &Style, background: &Option<String>) -> String {
+fn edge_label(label: &str, rect: &Rect, style: &Style, background: &Option<String>) -> String {
     let font_size = style.font_size.unwrap_or(12.0);
     let lines: Vec<String> = label.split('\n').map(str::to_string).collect();
-    let w = text_width(&lines, font_size) + 10.0;
-    let h = lines.len() as f64 * font_size * 1.3 + 4.0;
+    let (x, y) = (rect.cx(), rect.cy());
     let plate = background.as_deref().unwrap_or("#ffffff");
 
     let mut out = format!(
         r#"<rect x="{}" y="{}" width="{}" height="{}" rx="3" fill="{}"/>"#,
-        n(x - w / 2.0),
-        n(y - h / 2.0),
-        n(w),
-        n(h),
+        n(rect.x),
+        n(rect.y),
+        n(rect.w),
+        n(rect.h),
         esc(plate)
     );
 
@@ -466,4 +692,121 @@ fn esc(s: &str) -> String {
         }
     }
     out
+}
+
+// ---------------------------------------------------------------- charts
+
+/// One path per slice, stroked in the surface color so adjacent fills keep a
+/// 2px gap instead of bleeding into each other.
+fn pie_slices(pie: &Pie) -> String {
+    let mut out = String::new();
+
+    for slice in &pie.slices {
+        let sweep = slice.end - slice.start;
+        if sweep <= 0.0 {
+            continue;
+        }
+
+        // A slice covering the whole circle has no arc endpoints to draw
+        // between; two half-circles do the job.
+        let d = if sweep >= 359.99 {
+            full_ring(pie)
+        } else {
+            wedge(pie, slice.start, slice.end)
+        };
+
+        let _ = write!(
+            out,
+            r#"<path d="{d}" fill="{}" stroke="{}" stroke-width="2" stroke-linejoin="round"/>"#,
+            esc(&slice.fill),
+            esc(&pie.gap_color)
+        );
+    }
+
+    out
+}
+
+/// `0` is twelve o'clock and angles grow clockwise, which is how people read
+/// a pie — not how SVG measures them.
+fn on_circle(cx: f64, cy: f64, r: f64, degrees: f64) -> (f64, f64) {
+    let a = degrees.to_radians();
+    (cx + r * a.sin(), cy - r * a.cos())
+}
+
+fn wedge(pie: &Pie, start: f64, end: f64) -> String {
+    let large = usize::from(end - start > 180.0);
+    let (ox1, oy1) = on_circle(pie.cx, pie.cy, pie.radius, start);
+    let (ox2, oy2) = on_circle(pie.cx, pie.cy, pie.radius, end);
+
+    if pie.inner <= 0.0 {
+        return format!(
+            "M {} {} L {} {} A {} {} 0 {large} 1 {} {} Z",
+            n(pie.cx),
+            n(pie.cy),
+            n(ox1),
+            n(oy1),
+            n(pie.radius),
+            n(pie.radius),
+            n(ox2),
+            n(oy2)
+        );
+    }
+
+    let (ix2, iy2) = on_circle(pie.cx, pie.cy, pie.inner, end);
+    let (ix1, iy1) = on_circle(pie.cx, pie.cy, pie.inner, start);
+
+    format!(
+        "M {} {} A {} {} 0 {large} 1 {} {} L {} {} A {} {} 0 {large} 0 {} {} Z",
+        n(ox1),
+        n(oy1),
+        n(pie.radius),
+        n(pie.radius),
+        n(ox2),
+        n(oy2),
+        n(ix2),
+        n(iy2),
+        n(pie.inner),
+        n(pie.inner),
+        n(ix1),
+        n(iy1)
+    )
+}
+
+fn full_ring(pie: &Pie) -> String {
+    let ring = |r: f64, sweep: usize| {
+        format!(
+            "M {} {} A {r2} {r2} 0 1 {sweep} {} {} A {r2} {r2} 0 1 {sweep} {} {} Z",
+            n(pie.cx - r),
+            n(pie.cy),
+            n(pie.cx + r),
+            n(pie.cy),
+            n(pie.cx - r),
+            n(pie.cy),
+            r2 = n(r)
+        )
+    };
+
+    match pie.inner > 0.0 {
+        // Opposite sweeps punch the hole with the even-odd default.
+        true => format!("{} {}", ring(pie.radius, 1), ring(pie.inner, 0)),
+        false => ring(pie.radius, 1),
+    }
+}
+
+fn annotation_text(a: &Annotation) -> String {
+    format!(
+        r#"<text x="{}" y="{}" text-anchor="{}" dominant-baseline="central" font-family="{}" font-size="{}" font-weight="{}" fill="{}">{}</text>"#,
+        n(a.x),
+        n(a.y),
+        match a.anchor {
+            Anchor::Start => "start",
+            Anchor::Middle => "middle",
+            Anchor::End => "end",
+        },
+        esc(&a.family),
+        n(a.size),
+        esc(&a.weight),
+        esc(&a.color),
+        esc(&a.text)
+    )
 }

@@ -1,0 +1,14 @@
+type pie {
+  title: "Traffic sources"
+  radius: 130
+  donut: 0.55
+  labels: percent
+}
+
+graph { background: #0b1120 padding: 32 }
+
+node organic  "Organic search" { value: 4820 }
+node direct   "Direct"         { value: 2410 }
+node referral "Referral"       { value: 1180 }
+node social   "Social"         { value: 690 }
+node paid     "Paid"           { value: 410 }

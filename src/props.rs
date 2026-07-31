@@ -21,6 +21,9 @@ impl Ctx {
 pub struct PropDef {
     pub name: &'static str,
     pub ctx: Ctx,
+    /// Aliases stay valid and documented, but are kept out of completion
+    /// lists — three ways to spell `stroke` is noise while you type.
+    pub alias: bool,
     /// Accepted keywords, when the property is an enumeration.
     pub words: &'static [&'static str],
     pub syntax: &'static str,
@@ -60,6 +63,7 @@ pub const FLOWS: &[&str] = &["right", "left", "down", "up", "LR", "RL", "TB", "B
 pub const PROPS: &[PropDef] = &[
     PropDef {
         name: "fill",
+        alias: false,
         ctx: Ctx::Node,
         words: &[],
         syntax: "fill: <color>",
@@ -67,6 +71,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "background",
+        alias: true,
         ctx: Ctx::Node,
         words: &[],
         syntax: "background: <color>",
@@ -74,6 +79,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "stroke",
+        alias: false,
         ctx: Ctx::Both,
         words: DASHES,
         syntax: "stroke: <color> <width> <solid|dashed|dotted>",
@@ -82,6 +88,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "border",
+        alias: true,
         ctx: Ctx::Both,
         words: DASHES,
         syntax: "border: <color> <width> <pattern>",
@@ -89,6 +96,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "color",
+        alias: true,
         ctx: Ctx::Both,
         words: DASHES,
         syntax: "color: <color> <width> <pattern>",
@@ -96,6 +104,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "stroke-width",
+        alias: false,
         ctx: Ctx::Both,
         words: &[],
         syntax: "stroke-width: <number>",
@@ -103,6 +112,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "weight",
+        alias: true,
         ctx: Ctx::Both,
         words: &[],
         syntax: "weight: <number>",
@@ -110,6 +120,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "dash",
+        alias: false,
         ctx: Ctx::Both,
         words: DASHES,
         syntax: "dash: <solid|dashed|dotted> | dash: <on> <off>",
@@ -117,6 +128,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "radius",
+        alias: false,
         ctx: Ctx::Node,
         words: &[],
         syntax: "radius: <number>",
@@ -124,6 +136,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "corner",
+        alias: true,
         ctx: Ctx::Node,
         words: &[],
         syntax: "corner: <number>",
@@ -131,6 +144,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "shape",
+        alias: false,
         ctx: Ctx::Node,
         words: SHAPES,
         syntax: "shape: <rect|stadium|ellipse|diamond|hexagon|cylinder>",
@@ -138,6 +152,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "size",
+        alias: false,
         ctx: Ctx::Node,
         words: &[],
         syntax: "size: <width> <height>",
@@ -145,6 +160,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "width",
+        alias: false,
         ctx: Ctx::Node,
         words: &[],
         syntax: "width: <number>",
@@ -152,6 +168,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "height",
+        alias: false,
         ctx: Ctx::Node,
         words: &[],
         syntax: "height: <number>",
@@ -159,6 +176,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "padding",
+        alias: false,
         ctx: Ctx::Node,
         words: &[],
         syntax: "padding: <number>",
@@ -166,6 +184,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "opacity",
+        alias: false,
         ctx: Ctx::Both,
         words: &[],
         syntax: "opacity: <0..1>",
@@ -173,6 +192,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "font",
+        alias: false,
         ctx: Ctx::Both,
         words: &[],
         syntax: "font: <size> \"<family>\" <color> <weight>",
@@ -181,6 +201,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "font-size",
+        alias: false,
         ctx: Ctx::Both,
         words: &[],
         syntax: "font-size: <number>",
@@ -188,6 +209,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "font-family",
+        alias: false,
         ctx: Ctx::Both,
         words: &[],
         syntax: "font-family: \"<family>\"",
@@ -195,6 +217,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "font-color",
+        alias: false,
         ctx: Ctx::Both,
         words: &[],
         syntax: "font-color: <color>",
@@ -202,6 +225,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "text-color",
+        alias: true,
         ctx: Ctx::Both,
         words: &[],
         syntax: "text-color: <color>",
@@ -209,6 +233,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "font-weight",
+        alias: false,
         ctx: Ctx::Both,
         words: &[],
         syntax: "font-weight: <weight>",
@@ -216,6 +241,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "arrow",
+        alias: false,
         ctx: Ctx::Edge,
         words: HEADS,
         syntax: "arrow: <solid|open|dot|none>",
@@ -223,6 +249,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "head",
+        alias: true,
         ctx: Ctx::Edge,
         words: HEADS,
         syntax: "head: <solid|open|dot|none>",
@@ -230,6 +257,7 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "router",
+        alias: false,
         ctx: Ctx::Edge,
         words: ROUTERS,
         syntax: "router: <straight|ortho>",
@@ -237,13 +265,32 @@ pub const PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "route",
+        alias: true,
         ctx: Ctx::Edge,
         words: ROUTERS,
         syntax: "route: <straight|ortho>",
         doc: "Alias of `router`.",
     },
     PropDef {
+        name: "value",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "value: <number>",
+        doc: "Magnitude of a slice. Required by `type pie`, ignored elsewhere.",
+    },
+    PropDef {
+        name: "bits",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "bits: <first> <last>",
+        doc: "Inclusive bit range of a field. Required by `type packet`, ignored \
+              elsewhere; `bits: 8` is shorthand for a single bit.",
+    },
+    PropDef {
         name: "shadow",
+        alias: false,
         ctx: Ctx::Node,
         words: &["on", "off", "true", "false"],
         syntax: "shadow: <on|off>",
@@ -254,6 +301,7 @@ pub const PROPS: &[PropDef] = &[
 pub const GRAPH_PROPS: &[PropDef] = &[
     PropDef {
         name: "padding",
+        alias: false,
         ctx: Ctx::Both,
         words: &[],
         syntax: "padding: <number>",
@@ -261,6 +309,7 @@ pub const GRAPH_PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "gap",
+        alias: false,
         ctx: Ctx::Both,
         words: &[],
         syntax: "gap: <number>",
@@ -268,6 +317,7 @@ pub const GRAPH_PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "background",
+        alias: false,
         ctx: Ctx::Both,
         words: &[],
         syntax: "background: <color>",
@@ -275,6 +325,7 @@ pub const GRAPH_PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "bg",
+        alias: true,
         ctx: Ctx::Both,
         words: &[],
         syntax: "bg: <color>",
@@ -282,6 +333,7 @@ pub const GRAPH_PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "flow",
+        alias: false,
         ctx: Ctx::Both,
         words: FLOWS,
         syntax: "flow: <right|left|down|up>",
@@ -289,6 +341,7 @@ pub const GRAPH_PROPS: &[PropDef] = &[
     },
     PropDef {
         name: "direction",
+        alias: true,
         ctx: Ctx::Both,
         words: FLOWS,
         syntax: "direction: <right|left|down|up>",
@@ -296,13 +349,154 @@ pub const GRAPH_PROPS: &[PropDef] = &[
     },
 ];
 
-pub fn lookup(name: &str, graph: bool) -> Option<&'static PropDef> {
-    let table = if graph { GRAPH_PROPS } else { PROPS };
+pub fn lookup(name: &str, table: &'static [PropDef]) -> Option<&'static PropDef> {
     table.iter().find(|p| p.name == name)
 }
 
+// ---------------------------------------------------------------- archetypes
+
+/// A diagram genre. `free` is the node-and-edge graph; the others reinterpret
+/// the same statements as chart data, so the style cascade, the validator and
+/// the editor support all carry over unchanged.
+pub struct ArchetypeDef {
+    pub name: &'static str,
+    pub doc: &'static str,
+    pub props: &'static [PropDef],
+}
+
+pub const ARCHETYPES: &[ArchetypeDef] = &[
+    ArchetypeDef {
+        name: "free",
+        doc: "Nodes and edges placed by anchors — the default when a file \
+              declares no `type`.",
+        props: &[],
+    },
+    ArchetypeDef {
+        name: "pie",
+        doc: "A pie or donut chart. Each node is a slice and needs a `value`; \
+              its `fill` overrides the automatic palette.",
+        props: PIE_PROPS,
+    },
+    ArchetypeDef {
+        name: "packet",
+        doc: "A packet / bitfield diagram. Each node is a field and needs \
+              `bits`; a field crossing a row boundary is split across rows.",
+        props: PACKET_PROPS,
+    },
+];
+
+pub const PIE_LABELS: &[&str] = &["percent", "value", "both", "none"];
+pub const TOGGLE: &[&str] = &["on", "off", "true", "false"];
+
+pub const PIE_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the chart.",
+    },
+    PropDef {
+        name: "radius",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "radius: <number>",
+        doc: "Outer radius in user units.",
+    },
+    PropDef {
+        name: "donut",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "donut: <0..1>",
+        doc: "Inner hole as a fraction of the radius. `0` is a full pie.",
+    },
+    PropDef {
+        name: "start",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "start: <degrees>",
+        doc: "Angle the first slice starts at. `0` is twelve o'clock.",
+    },
+    PropDef {
+        name: "labels",
+        alias: false,
+        ctx: Ctx::Both,
+        words: PIE_LABELS,
+        syntax: "labels: <percent|value|both|none>",
+        doc: "What to write on each slice. Slices too thin to read are skipped.",
+    },
+    PropDef {
+        name: "legend",
+        alias: false,
+        ctx: Ctx::Both,
+        words: TOGGLE,
+        syntax: "legend: <on|off>",
+        doc: "Swatch-and-name list beside the chart. On by default — identity \
+              must never rest on color alone.",
+    },
+];
+
+pub const PACKET_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the diagram.",
+    },
+    PropDef {
+        name: "width",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "width: <bits>",
+        doc: "Bits per row. 32 by default.",
+    },
+    PropDef {
+        name: "cell",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "cell: <width> <height>",
+        doc: "Width of one bit and the height of a row.",
+    },
+    PropDef {
+        name: "ruler",
+        alias: false,
+        ctx: Ctx::Both,
+        words: TOGGLE,
+        syntax: "ruler: <on|off>",
+        doc: "Bit indices above each row. On by default.",
+    },
+];
+
+pub fn archetype(name: &str) -> Option<&'static ArchetypeDef> {
+    ARCHETYPES.iter().find(|a| a.name == name)
+}
+
+/// Categorical slices, in fixed order — never cycled, never generated.
+/// Validated for both surfaces (adjacent-pair CVD ΔE 9.1 light / 8.4 dark).
+/// Past eight, `check` tells you to merge the tail rather than invent a hue.
+pub const PALETTE_LIGHT: &[&str] = &[
+    "#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948",
+];
+
+pub const PALETTE_DARK: &[&str] = &[
+    "#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767",
+];
+
 /// Keywords that open a statement.
 pub const KEYWORDS: &[(&str, &str)] = &[
+    (
+        "type",
+        "Diagram archetype, declared once at the top of the file — `type pie`. \
+         Defaults to `free`.",
+    ),
     (
         "graph",
         "Diagram-wide settings: padding, gap, background, flow.",

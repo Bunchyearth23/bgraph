@@ -1,9 +1,8 @@
 # The bgraph language
 
-A diagram is a plain text file. Four kinds of statement, in any order:
-`graph`, `style`, `node`, and edges. Statements are separated by newlines
-(`;` and `,` also work). Comments start with `//` — `#` is reserved for
-hex colors.
+A diagram is a plain text file. Five kinds of statement: `type`, `graph`,
+`style`, `node`, and edges. Statements are separated by newlines (`;` and `,`
+also work). Comments start with `//` — `#` is reserved for hex colors.
 
 ```
 graph { background: #0b1120 }
@@ -15,6 +14,83 @@ node b "Beta"  .box right-of a gap 60
 
 a -> b "carries"
 ```
+
+---
+
+## Archetypes
+
+`type` picks the **genre** of diagram, once, at the top of the file. Without
+it the file is `free` — the node-and-edge graph everything else in this
+document describes.
+
+```
+type free            // implicit; nodes and edges placed by anchors
+type pie   { … }     // slices
+type packet { … }    // bitfields
+```
+
+Every archetype reads the *same* statements. A `node` is a box, a slice or a
+field depending on the genre; the style cascade, the diagnostics and the
+editor support are identical in all of them. What changes is which properties
+carry meaning — `check` tells you when one is in the wrong place.
+
+### `type pie`
+
+Each node is a slice and needs a `value`. Colors come from a fixed
+categorical palette, stepped for a light or a dark `background`; a declared
+`fill` overrides it.
+
+```
+type pie {
+  title: "Traffic sources"
+  radius: 130          // outer radius, default 130
+  donut: 0.55          // inner hole as a fraction; 0 is a full pie
+  start: 0             // angle of the first slice; 0 is twelve o'clock
+  labels: percent      // percent | value | both | none
+  legend: on           // on by default
+}
+
+node organic "Organic search" { value: 4820 }
+node direct  "Direct"         { value: 2410 }
+node paid    "Paid"           { value: 410 fill: #f43f5e }
+```
+
+The legend is on by default and slices too thin for text are left unlabelled
+on purpose: identity must never rest on color alone, and an unreadable label
+is worse than none.
+
+Angles are hard to compare. `check` warns when a pie has fewer than three
+slices — a bar or a single number reads better — and when it has more than
+eight, which exhausts the palette; merge the tail into an `Other` slice
+rather than repeating a hue.
+
+### `type packet`
+
+Each node is a field and needs `bits`, an inclusive range. Fields are laid
+out in rows of `width` bits; one that crosses a row boundary is split across
+rows and named once.
+
+```
+type packet {
+  title: "TCP header"
+  width: 32            // bits per row, default 32
+  cell: 20 46          // width of one bit, height of a row
+  ruler: on            // bit indices above each row
+}
+
+node sport "Source port"      { bits: 0 15 }
+node dport "Destination port" { bits: 16 31 }
+node seq   "Sequence number"  { bits: 32 63 }
+```
+
+`check` reports overlapping ranges as errors and unassigned bits between two
+fields as warnings, so a header that does not add up says so.
+
+Edges and placement are ignored by both chart archetypes — and reported, not
+silently dropped.
+
+Worked examples: [`examples/pie.bd`](../examples/pie.bd) and
+[`examples/packet.bd`](../examples/packet.bd).
 
 ---
 
@@ -97,19 +173,19 @@ no-op — a typo surfaces the moment you save.
 
 ### Properties
 
+The full table — every property, which of nodes and edges it applies to, its
+syntax and its meaning — is in [`reference.md`](reference.md), generated from
+the compiler's own tables so it cannot drift. The ones you reach for most:
+
 | Property | Applies to | Values |
 |---|---|---|
 | `fill` | nodes | color |
 | `stroke` | both | color, width, and/or `solid`\|`dashed`\|`dotted`, in any order |
-| `stroke-width` | both | number |
-| `dash` | both | `solid`\|`dashed`\|`dotted`, or explicit numbers (`dash: 6 3`) |
 | `radius` | nodes | number (corner rounding on `rect`) |
 | `shape` | nodes | see below |
 | `size` / `width` / `height` | nodes | numbers |
 | `padding` | nodes | number (label inset, drives auto-size) |
-| `opacity` | both | 0–1 |
 | `font` | both | size, `"family"`, color, weight — in any order |
-| `font-size`, `font-family`, `font-color`, `font-weight` | both | individually |
 | `arrow` | edges | `solid` \| `open` \| `dot` \| `none` |
 | `router` | edges | `straight` \| `ortho` |
 | `shadow` | nodes | `on` / `off` |
@@ -157,6 +233,8 @@ diamonds and ellipses on their edge, not on an invisible bounding box.
 ```
 graph {
   background: #0b1120   // canvas fill (also backs edge labels)
+                        // omit it and the surface is #ffffff, explicitly;
+                        // `background: none` gives a transparent SVG
   padding: 40           // margin around the drawing
   gap: 70               // default anchor distance
   flow: right           // right | left | down | up — for unplaced nodes
@@ -184,6 +262,7 @@ bgraph diagram.bd -o diagram.svg    # render once
 bgraph watch diagram.bd             # http://127.0.0.1:7878, reloads on save
 bgraph watch diagram.bd --port 9000
 bgraph check diagram.bd             # diagnostics only, no output file
+bgraph docs -o docs/reference.md    # regenerate the reference manual
 ```
 
 The watch page shows parse and layout errors in place, so a broken file

@@ -4,6 +4,7 @@
 ; ---------------------------------------------------------------- keywords
 
 [
+  "type"
   "graph"
   "style"
   "extends"
@@ -24,6 +25,9 @@
 (edge_declaration from: (identifier) @variable)
 (edge_declaration to: (identifier) @variable)
 (relative_position anchor: (identifier) @variable)
+
+; The archetype name is a fixed vocabulary word, not a user identifier.
+(type_declaration name: (identifier) @constant.builtin)
 
 ; Styles read as types: declared once, applied by name.
 (style_declaration name: (identifier) @type)

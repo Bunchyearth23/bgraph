@@ -2,10 +2,22 @@
 
 Context for AI coding assistants. Read at the start of every session.
 
+**What is left is in [`docs/INDEX.md`](docs/INDEX.md)** — one line per open question, planned
+chantier and live risk, with an explicit state. Update it in the same commit as the work.
+
+```
+grep " open \| planned \| blocked " docs/INDEX.md
+```
+
 ## Intent
 
 `bgraph` — a diagram DSL (`*.bd`) that renders to SVG, plus a language server
 and a Zed extension for it.
+
+`type` picks the archetype once per file: `free` (nodes and edges, the
+default), `pie`, `packet`. Every archetype reads the *same* statements — a
+`node` is a box, a slice or a bitfield depending on the genre — so the style
+cascade, the validator and the editor support are written once.
 
 The premise: mermaid-class tools auto-place everything and you fight the
 engine. Here **layout is declared** (relative anchors between nodes) and
@@ -29,9 +41,10 @@ disagree.
 - `cargo run --bin bgraph -- diagram.bd -o diag.svg`
 - `cargo run --bin bgraph -- watch diagram.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check diagram.bd` — diagnostics as `file:line:col`
-- `cargo test` (48 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
+- `cargo test` (86 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
-- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (9 corpus cases)
+- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (11 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
 - `./editors/zed/install.sh` — installs the server, regenerates + pins the grammar
 
@@ -44,7 +57,9 @@ disagree.
 | `src/syntax.pest` | Grammar |
 | `src/parser.rs` | pest pairs → AST, with spans and friendly error text |
 | `src/ast.rs` | Untyped tree; `Span` / `Spanned<T>` on every declaration |
-| `src/props.rs` | **The property vocabulary** — names, contexts, docs, enum words |
+| `src/props.rs` | **The vocabulary** — properties, archetypes, palettes, docs |
+| `src/charts.rs` | The `pie` and `packet` archetypes |
+| `src/docgen.rs` | `docs/reference.md`, generated from the `props.rs` tables |
 | `src/check.rs` | **The validator** — spanned diagnostics, one source of truth |
 | `src/style.rs` | Style cascade, `extends` flattening, `GraphOpts` |
 | `src/layout.rs` | Anchor solver → absolute `Rect`s |
@@ -73,7 +88,18 @@ disagree.
   (`render_svg::esc`) — labels are user text
 - ALWAYS: derive the viewBox from solved bounds; never hardcode a canvas
 - ALWAYS: mirror a grammar change in **both** `src/syntax.pest` and
-  `tree-sitter-bgraph/grammar.js`, and add a corpus case for it
+  `tree-sitter-bgraph/grammar.js`, add a case to `tests/grammar/accept` or
+  `tests/grammar/reject`, and let `the_tree_sitter_grammar_agrees_with_pest`
+  prove they still accept the same language
+- ALWAYS: keep completion quiet. It must not fire inside strings or comments,
+  must not offer aliases, and must not offer a property the current archetype
+  does not read. A suggestion that appears while you type prose is worse than
+  no suggestion at all — that feedback is what drove the current rules
+- ALWAYS: regenerate `docs/reference.md` after touching `props.rs`. A test
+  compares the checked-in file to `docgen::reference()` and fails on drift
+- NEVER: add a color to a chart by eye. The categorical palette in `props.rs`
+  is validated (adjacent-pair CVD ΔE ≥ 8 in both modes); adding a ninth hue is
+  not an option — `check` tells the author to merge the tail instead
 - NEVER: use `#` for anything but hex colors in the DSL (comments are `//`)
 - NEVER: let a node's placement depend on render-time state
 
@@ -110,6 +136,39 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   postinstall script, which is blocked here. Use `cargo install tree-sitter-cli`.
 - [2026-07-31] Zed extensions default to edition 2021 in a fresh Cargo.toml;
   let-chains need edition 2024.
+
+- [2026-07-31] Completion trigger characters must NOT include a space: it fires
+  a popup on every word boundary and reads as an obstacle. `.` is a trigger,
+  but only opens the style list when the character before it is whitespace —
+  otherwise `0.55` and `..>` pop the menu too.
+- [2026-07-31] For `pie`, node styles are resolved on `charts::chart_defaults()`
+  rather than `Style::node_defaults()`. The latter always sets `fill`, which
+  would make a declared color indistinguishable from the default and defeat
+  the palette.
+- [2026-07-31] `packet` emits one `PlacedNode` per row segment, not per
+  declared field, so a field crossing a row boundary needs no renderer
+  support. Only the first segment carries the label.
+
+- [2026-07-31] The SVG surface is **explicit**: `GraphOpts::default()` sets
+  `background: Some("#ffffff")`. It used to be `None`, so a file with no
+  `background` exported a transparent SVG while the watch page painted its own
+  color behind it — the preview and the export disagreed. `background: none`
+  is the way back to transparency, and the preview shows a checkerboard so it
+  is visible rather than faked.
+- [2026-07-31] `check_contrast` must resolve node styles on the **same base**
+  the archetype uses (`charts::chart_defaults()` for pie, `node_defaults()`
+  otherwise) or it reports colors the renderer never emits.
+- [2026-07-31] A Rust `r#"…"#` literal ends at the first `"#`, which every
+  `fill="#rrggbb"` assertion contains. Use `r##"…"##` in tests that match SVG.
+
+- [2026-07-31] A pest rule used inside a `!` predicate must be **atomic**.
+  `keyword = _{ ("style"|…) ~ !(ALNUM|"_"|"-") }` silently never fired: pest
+  inserts implicit whitespace inside a non-atomic rule, so after `style` it
+  skipped the space and matched the `-` of `->` as an identifier character.
+  `@{ … }` fixes it. The guard looked right and did nothing for an hour.
+- [2026-07-31] `bgraph check`'s exit code covers **semantic** errors too, so it
+  cannot stand in for "did this parse". Cross-grammar probing must compare
+  `parser::parse` against `tree-sitter parse`, never the CLI's exit status.
 
 ### Workarounds
 

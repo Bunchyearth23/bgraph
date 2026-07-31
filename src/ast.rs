@@ -31,6 +31,11 @@ impl Spanned<String> {
 
 #[derive(Debug, Default)]
 pub struct Diagram {
+    /// Absent means `free` — the node-and-edge graph.
+    pub archetype: Option<Spanned<String>>,
+    pub archetype_props: Vec<Prop>,
+    /// Redeclarations, kept so `check` can point at each one.
+    pub extra_archetypes: Vec<Spanned<String>>,
     pub graph: Vec<Prop>,
     pub graph_span: Option<Span>,
     pub styles: Vec<StyleDecl>,

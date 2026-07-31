@@ -55,6 +55,57 @@ pub struct Layout {
     pub nodes: Vec<PlacedNode>,
     pub edges: Vec<PlacedEdge>,
     pub opts: GraphOpts,
+    pub chart: Chart,
+    /// Free-standing text the renderer draws last: titles, slice labels,
+    /// legend entries, bit rulers.
+    pub annotations: Vec<Annotation>,
+}
+
+/// What the statements in the file were interpreted as.
+pub enum Chart {
+    /// Nodes and edges. `nodes` carries the geometry.
+    Free,
+    /// Bitfields. `nodes` already carries one rect per row segment, so the
+    /// ordinary node renderer draws it.
+    Packet,
+    /// Slices, which need arcs the node renderer cannot make.
+    Pie(Pie),
+}
+
+pub struct Pie {
+    pub cx: f64,
+    pub cy: f64,
+    pub radius: f64,
+    /// Inner radius; `0` is a full pie.
+    pub inner: f64,
+    pub slices: Vec<Slice>,
+    /// Drawn between slices as a 2px gap so adjacent fills never touch.
+    pub gap_color: String,
+}
+
+pub struct Slice {
+    /// Degrees, `0` at twelve o'clock, growing clockwise.
+    pub start: f64,
+    pub end: f64,
+    pub fill: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Anchor {
+    Start,
+    Middle,
+    End,
+}
+
+pub struct Annotation {
+    pub text: String,
+    pub x: f64,
+    pub y: f64,
+    pub anchor: Anchor,
+    pub size: f64,
+    pub color: String,
+    pub weight: String,
+    pub family: String,
 }
 
 const MIN_WIDTH: f64 = 76.0;
@@ -105,6 +156,18 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
 
     let opts = GraphOpts::from_props(&diagram.graph)?;
     let registry = Registry::build(&diagram.styles)?;
+
+    // The archetype decides what the statements mean.
+    match diagram
+        .archetype
+        .as_ref()
+        .map(|a| a.as_str())
+        .unwrap_or("free")
+    {
+        "pie" => return crate::charts::pie(diagram, opts, &registry),
+        "packet" => return crate::charts::packet(diagram, opts, &registry),
+        _ => {}
+    }
 
     let mut index: HashMap<&str, usize> = HashMap::new();
     for (i, node) in diagram.nodes.iter().enumerate() {
@@ -228,7 +291,13 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         });
     }
 
-    Ok(Layout { nodes, edges, opts })
+    Ok(Layout {
+        nodes,
+        edges,
+        opts,
+        chart: Chart::Free,
+        annotations: Vec::new(),
+    })
 }
 
 fn offset_from(a: &Rect, dir: RelDir, gap: f64, align: Option<Align>, w: f64, h: f64) -> Rect {
