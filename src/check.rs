@@ -60,6 +60,10 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "quadrant" => check_quadrant(diagram, &mut out),
         "wave" => check_wave(diagram, &mut out),
         "sequence" => check_sequence(diagram, &mut out),
+        "state" => {
+            check_cycles(diagram, &nodes, &mut out);
+            check_state(diagram, &mut out);
+        }
         "sankey" => check_sankey(diagram, &mut out),
         "bar" | "xy" => check_bar(diagram, &mut out),
         _ => {
@@ -883,6 +887,85 @@ fn first_cycle(count: usize, edges: &[(usize, usize)]) -> Option<Vec<usize>> {
     Some((0..count).filter(|i| degree[*i] > 0).collect())
 }
 
+fn check_state(diagram: &Diagram, out: &mut Vec<Diag>) {
+    use crate::style::StateKind;
+
+    let styles = resolved_nodes(diagram, crate::style::Style::node_defaults());
+    let kinds: Vec<StateKind> = styles
+        .iter()
+        .map(|s| s.kind.unwrap_or(StateKind::State))
+        .collect();
+
+    let index: HashMap<&str, usize> = diagram
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.id.as_str(), i))
+        .collect();
+
+    let mut has_in = vec![false; diagram.nodes.len()];
+    let mut has_out = vec![false; diagram.nodes.len()];
+    for edge in &diagram.edges {
+        if let Some(&i) = index.get(edge.from.as_str()) {
+            has_out[i] = true;
+        }
+        if let Some(&i) = index.get(edge.to.as_str()) {
+            has_in[i] = true;
+        }
+    }
+
+    if !kinds.is_empty() && !kinds.contains(&StateKind::Initial) {
+        out.push(Diag::warn(
+            diagram
+                .archetype
+                .as_ref()
+                .map(|a| a.span)
+                .unwrap_or_default(),
+            "no `kind: initial` state, so the machine has no declared entry".to_string(),
+        ));
+    }
+
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        match kinds[i] {
+            StateKind::Initial if has_in[i] => out.push(Diag::error(
+                node.id.span,
+                format!(
+                    "`{}` is the entry point; nothing transitions into it",
+                    node.id.as_str()
+                ),
+            )),
+            StateKind::Final if has_out[i] => out.push(Diag::error(
+                node.id.span,
+                format!(
+                    "`{}` is final; nothing transitions out of it",
+                    node.id.as_str()
+                ),
+            )),
+            StateKind::Initial | StateKind::Final if node.label.is_some() => out.push(Diag::warn(
+                node.id.span,
+                format!(
+                    "`{}` is drawn as a mark, so its label is not shown",
+                    node.id.as_str()
+                ),
+            )),
+            _ => {}
+        }
+
+        // A state nothing reaches is either a mistake or an orphan; either
+        // way the reader cannot tell how the machine gets there.
+        let contained = diagram
+            .groups
+            .iter()
+            .any(|g| g.members.iter().any(|m| m.as_str() == node.id.as_str()));
+        if !has_in[i] && kinds[i] != StateKind::Initial && !contained {
+            out.push(Diag::warn(
+                node.id.span,
+                format!("nothing transitions into `{}`", node.id.as_str()),
+            ));
+        }
+    }
+}
+
 fn check_sequence(diagram: &Diagram, out: &mut Vec<Diag>) {
     for node in &diagram.nodes {
         if node.placement.is_some() {
@@ -1136,6 +1219,7 @@ fn check_unused_data(diagram: &Diagram, out: &mut Vec<Diag>) {
                 "x" | "y" => "quadrant",
                 "wave" | "data" => "wave",
                 "points" => "bar",
+                "kind" | "guard" => "state",
                 _ => continue,
             };
             out.push(Diag::warn(

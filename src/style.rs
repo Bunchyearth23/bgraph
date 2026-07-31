@@ -39,6 +39,15 @@ pub enum Router {
     Ortho,
 }
 
+/// What a state is, in `type state`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StateKind {
+    State,
+    Initial,
+    Final,
+    Choice,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Head {
     Solid,
@@ -77,6 +86,9 @@ pub struct Style {
     pub data: Option<Vec<String>>,
     /// A series, one number per category.
     pub points: Option<Vec<f64>>,
+    /// State-machine semantics.
+    pub kind: Option<StateKind>,
+    pub guard: Option<String>,
 }
 
 macro_rules! overlay {
@@ -114,6 +126,8 @@ impl Style {
             wave,
             data,
             points,
+            kind,
+            guard,
         );
     }
 
@@ -263,6 +277,17 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
         }
         "value" => style.value = first.and_then(|x| x.as_num()),
         "points" => style.points = Some(v.iter().filter_map(|x| x.as_num()).collect()),
+        "kind" => {
+            let word = first.and_then(|x| x.as_word()).unwrap_or_default();
+            style.kind = Some(match word {
+                "initial" => StateKind::Initial,
+                "final" => StateKind::Final,
+                "choice" => StateKind::Choice,
+                "state" => StateKind::State,
+                other => bail!("unknown state kind `{other}`"),
+            });
+        }
+        "guard" => style.guard = first.and_then(|x| x.as_text()).map(String::from),
         "wave" => style.wave = first.and_then(|v| v.as_text()).map(String::from),
         "data" => {
             style.data = Some(

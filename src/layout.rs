@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use anyhow::{Result, bail};
 
 use crate::ast::*;
-use crate::style::{GraphOpts, Registry, Shape, Style};
+use crate::style::{GraphOpts, Registry, Shape, StateKind, Style};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Rect {
@@ -240,23 +240,67 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     let mut labels = Vec::with_capacity(diagram.nodes.len());
 
     let item = crate::check::archetype_of(diagram);
+    let machine = item.name == "state";
+    // A base that leaves `shape` unset, so a declared one is distinguishable
+    // from the default and a state can fall back to a rounded box.
+    let node_base = if machine {
+        Style {
+            shape: None,
+            ..Style::node_defaults()
+        }
+    } else {
+        Style::node_defaults()
+    };
     for node in &diagram.nodes {
-        let style = registry
+        let mut style = registry
             .resolve(
-                Style::node_defaults(),
+                node_base.clone(),
                 item.item,
                 &node.classes,
                 &node.effective_props(item.slots),
             )
             .map_err(|e| e.context(format!("in node `{}`", node.id.as_str())))?;
 
-        let lines: Vec<String> = node
-            .label
-            .clone()
-            .unwrap_or_else(|| node.id.value.clone())
-            .split('\n')
-            .map(|l| l.trim().to_string())
-            .collect();
+        // A pseudo-state is a mark, not a box: it takes a shape and a fixed
+        // size, and carries no label of its own.
+        let mark = machine
+            && matches!(
+                style.kind,
+                Some(StateKind::Initial) | Some(StateKind::Final) | Some(StateKind::Choice)
+            );
+        if machine {
+            match style.kind {
+                Some(StateKind::Initial) => {
+                    style.shape = Some(Shape::Ellipse);
+                    style.fill = style.stroke.clone();
+                    style.width = Some(16.0);
+                    style.height = Some(16.0);
+                }
+                Some(StateKind::Final) => {
+                    style.shape = Some(Shape::Ellipse);
+                    style.stroke_width = Some(4.0);
+                    style.width = Some(22.0);
+                    style.height = Some(22.0);
+                }
+                Some(StateKind::Choice) => {
+                    style.shape = Some(Shape::Diamond);
+                    style.width = Some(34.0);
+                    style.height = Some(34.0);
+                }
+                _ => style.shape = style.shape.or(Some(Shape::Stadium)),
+            }
+        }
+
+        let lines: Vec<String> = if mark {
+            Vec::new()
+        } else {
+            node.label
+                .clone()
+                .unwrap_or_else(|| node.id.value.clone())
+                .split('\n')
+                .map(|l| l.trim().to_string())
+                .collect()
+        };
 
         sizes.push(natural_size(&lines, &style));
         styles.push(style);
@@ -300,6 +344,15 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                 ))
             })?;
 
+        // `[guard]` after the label is the notation a reader expects.
+        let mut label = edge.label.clone();
+        if let Some(guard) = &style.guard {
+            label = Some(match label {
+                Some(text) if !text.is_empty() => format!("{text} [{guard}]"),
+                _ => format!("[{guard}]"),
+            });
+        }
+
         // A dashed/dotted arrow token sets the pattern unless a style already did.
         if let Some(dash) = edge.arrow.dash
             && style.dash.is_none()
@@ -310,7 +363,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         edges.push(PlacedEdge {
             from,
             to,
-            label: edge.label.clone(),
+            label,
             arrow: edge.arrow,
             style,
         });

@@ -272,6 +272,24 @@ pub const PROPS: &[PropDef] = &[
         doc: "Magnitude of a slice. Required by `type pie`, ignored elsewhere.",
     },
     PropDef {
+        name: "kind",
+        alias: false,
+        ctx: Ctx::Node,
+        words: STATE_KINDS,
+        syntax: "kind: <state|initial|final|choice>",
+        doc: "What a state is. `initial` and `final` are drawn as marks rather \
+              than boxes and take no label; `choice` is a decision diamond. \
+              Read by `type state`.",
+    },
+    PropDef {
+        name: "guard",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: &[],
+        syntax: "guard: <text>",
+        doc: "A condition on a transition, shown in brackets after its label.",
+    },
+    PropDef {
         name: "points",
         alias: false,
         ctx: Ctx::Node,
@@ -439,6 +457,16 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         edge_slots: &[],
     },
     ArchetypeDef {
+        name: "state",
+        item: "state",
+        doc: "A state machine. States are placed by anchors, exactly as in \
+              `free` — the archetype supplies the vocabulary and the shapes, \
+              not a layout engine. Nest them with `group`.",
+        props: STATE_PROPS,
+        slots: &[],
+        edge_slots: &[],
+    },
+    ArchetypeDef {
         name: "sequence",
         item: "participant",
         doc: "Participants across the top, messages down the page in the order \
@@ -595,6 +623,17 @@ pub const PIE_PROPS: &[PropDef] = &[
               must never rest on color alone.",
     },
 ];
+
+pub const STATE_KINDS: &[&str] = &["state", "initial", "final", "choice"];
+
+pub const STATE_PROPS: &[PropDef] = &[PropDef {
+    name: "title",
+    alias: false,
+    ctx: Ctx::Both,
+    words: &[],
+    syntax: "title: <text>",
+    doc: "Heading drawn above the machine.",
+}];
 
 pub const SEQUENCE_PROPS: &[PropDef] = &[
     PropDef {

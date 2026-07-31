@@ -471,7 +471,7 @@ fn an_unknown_archetype_is_reported() {
     let e = err("type flowchart\nnode a");
     assert!(e.contains("unknown archetype `flowchart`"), "{e}");
     assert!(
-        e.contains("free, pie, sequence, xy, bar, sankey, wave, quadrant, treemap, packet"),
+        e.contains("free, pie, state, sequence, xy, bar, sankey, wave, quadrant, treemap, packet"),
         "{e}"
     );
 }
@@ -2312,4 +2312,132 @@ fn messages_can_be_numbered() {
 fn a_sequence_without_messages_says_so() {
     let d = diags("type sequence\nparticipant a \"A\"");
     assert!(d.iter().any(|x| x.message.contains("no messages")), "{d:?}");
+}
+
+// ---------------------------------------------------------------- state
+
+#[test]
+fn a_state_machine_keeps_its_declared_placement() {
+    // Unlike the chart archetypes, `state` places nothing itself — the
+    // anchors still decide, and the archetype only supplies the vocabulary.
+    let l = build(
+        r#"
+        type state
+        state a "A" at (0, 0) { size: 60 40 }
+        state b "B" right-of a gap 30 { size: 60 40 }
+        a -> b
+    "#,
+    );
+    assert_eq!(l.nodes[0].rect.x, 0.0);
+    assert_eq!(l.nodes[1].rect.x, 90.0);
+}
+
+#[test]
+fn pseudo_states_are_marks_rather_than_boxes() {
+    use crate::style::Shape;
+    let l = build(
+        r#"
+        type state
+        state begin { kind: initial }
+        state s "S" right-of begin
+        state stop { kind: final } right-of s
+        state pick { kind: choice } below s
+        begin -> s
+        s -> stop
+        s -> pick
+    "#,
+    );
+
+    assert_eq!(l.nodes[0].style.shape, Some(Shape::Ellipse));
+    assert_eq!(l.nodes[2].style.shape, Some(Shape::Ellipse));
+    assert_eq!(l.nodes[3].style.shape, Some(Shape::Diamond));
+    // An ordinary state is a rounded box; a mark carries no label.
+    assert_eq!(l.nodes[1].style.shape, Some(Shape::Stadium));
+    assert!(l.nodes[0].lines.is_empty());
+    assert!(l.nodes[2].lines.is_empty());
+    assert_eq!(l.nodes[1].lines, vec!["S"]);
+    // Marks are small and square.
+    assert_eq!(l.nodes[0].rect.w, l.nodes[0].rect.h);
+    assert!(l.nodes[0].rect.w < 30.0);
+}
+
+#[test]
+fn a_guard_reads_in_brackets_after_the_label() {
+    let l = build(
+        r#"
+        type state
+        state a
+        state b right-of a
+        a -> b "pay" { guard: "funds cleared" }
+    "#,
+    );
+    assert_eq!(l.edges[0].label.as_deref(), Some("pay [funds cleared]"));
+
+    let l = build("type state\nstate a\nstate b right-of a\na -> b { guard: \"ready\" }");
+    assert_eq!(l.edges[0].label.as_deref(), Some("[ready]"));
+}
+
+#[test]
+fn a_machine_reports_what_cannot_happen() {
+    let e = err("type state\nstate begin { kind: initial }\nstate s\ns -> begin");
+    assert!(e.contains("nothing transitions into it"), "{e}");
+
+    let e = err("type state\nstate stop { kind: final }\nstate s\nstop -> s");
+    assert!(e.contains("nothing transitions out of it"), "{e}");
+
+    let d = diags("type state\nstate a\nstate b right-of a\na -> b");
+    assert!(
+        d.iter().any(|x| x.message.contains("no `kind: initial`")),
+        "{d:?}"
+    );
+
+    let d = diags("type state\nstate begin { kind: initial }\nstate a\nstate orphan\nbegin -> a");
+    assert!(
+        d.iter()
+            .any(|x| x.message.contains("nothing transitions into `orphan`"))
+    );
+}
+
+#[test]
+fn a_block_and_a_placement_may_come_in_either_order() {
+    // `state stop { kind: final } right-of done` reads as naturally as the
+    // other way round, and `{` cannot be mistaken for a placement keyword.
+    for source in [
+        "node a at (0, 0) { fill: #fff }",
+        "node a { fill: #fff } at (0, 0)",
+    ] {
+        let l = build(source);
+        assert_eq!(l.nodes[0].rect.x, 0.0, "{source}");
+        assert_eq!(l.nodes[0].style.fill.as_deref(), Some("#fff"), "{source}");
+    }
+}
+
+#[test]
+fn a_label_prefers_clipping_a_node_to_leaving_its_edge() {
+    // Charging a five-pixel clip the same as sitting on top of a node exiled
+    // labels three rows away, where they read as belonging to something else.
+    let l = build(
+        r#"
+        node a "A" at (0, 0) { size: 100 40 }
+        node b "B" at (130, 0) { size: 100 40 }
+        a -> b "a long-ish label"
+    "#,
+    );
+
+    let svg = render_svg::render(&l);
+    let plate = svg.split(r#" rx="3""#).next().unwrap();
+    let y: f64 = plate
+        .rsplit(r#"y=""#)
+        .next()
+        .and_then(|s| s.split('"').next())
+        .and_then(|s| s.parse().ok())
+        .expect("the label plate declares a y");
+
+    // The edge runs at y = 20 (plus the canvas translation); the label should
+    // stay on it rather than fleeing the narrow gap.
+    let translation = 32.0;
+    assert!(
+        (y + 10.0 - (20.0 + translation)).abs() < 14.0,
+        "label at y={y}"
+    );
 }

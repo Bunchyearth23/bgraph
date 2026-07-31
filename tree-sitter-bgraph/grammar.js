@@ -113,8 +113,14 @@ module.exports = grammar({
           // Data and `.class` may interleave: the leading `.` keeps them apart.
           repeat(choice(field('data', $._bare_value), field('class', $.class_reference))),
         ),
-        optional(field('placement', $._placement)),
-        optional(field('body', $.block)),
+        // Either order reads naturally, and `{` cannot be mistaken for a
+        // placement keyword.
+        optional(
+          choice(
+            seq(field('placement', $._placement), optional(field('body', $.block))),
+            seq(field('body', $.block), optional(field('placement', $._placement))),
+          ),
+        ),
       ),
 
     item_keyword: ($) => $.identifier,

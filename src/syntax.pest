@@ -50,7 +50,10 @@ style_decl = { "style" ~ ident ~ ("extends" ~ ident)? ~ block }
 // archetype declares.
 // Data and `.class` may interleave: the leading `.` keeps them apart, so
 // there is no reason to make the author remember an order.
-item_decl  = { ident ~ ident ~ string? ~ (pos_value | class_ref)* ~ placement? ~ block? }
+// The placement and the block may come in either order — both read
+// naturally, and `{` cannot be mistaken for a placement keyword.
+item_decl  = { ident ~ ident ~ string? ~ (pos_value | class_ref)* ~ tail? }
+tail       = _{ placement ~ block? | block ~ placement? }
 
 // A placement keyword would otherwise be eaten as a bare-word value.
 pos_value  = _{ !(place_kw) ~ value }

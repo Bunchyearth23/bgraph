@@ -124,7 +124,7 @@ is a single item with two stray values rather than two items.
 | `xy` | `series` | `points` — a number list ✔ |
 | `quadrant` | `point` | `x`, `y` — two numbers ✔ |
 | `sankey` | `node` | — the value is an **edge** slot: `a -> b 40` ✔ |
-| `state` (`W-022`) | `state` | — |
+| `state` | `state` | — ✔ |
 | `sequence` | `participant` | — ✔ |
 | `class` / `er` (`W-023`) | `class` / `entity` | — (members are `W-013`) |
 | `treemap` | `box` | `value` — one number ✔ |

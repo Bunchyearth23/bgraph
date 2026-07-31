@@ -226,11 +226,14 @@ fn place_label(
             h,
         };
 
-        let cost = label_cost(&rect, index, routed, layout, taken) + k.abs() * 0.01;
+        // Distance is a real cost, not a tie-break: a label three steps from
+        // its own edge reads as belonging to something else, which is worse
+        // than crossing one line.
+        let cost = label_cost(&rect, index, routed, layout, taken) + k.abs() * 0.4;
         if cost < best.0 {
             best = (cost, rect);
         }
-        if cost < 0.011 {
+        if cost < 0.001 {
             break;
         }
     }
@@ -260,15 +263,39 @@ fn label_cost(
         }
     }
 
+    // Proportional, not flat: clipping a node by five pixels is nothing like
+    // sitting on top of it, and charging both the same exiles the label.
     for node in &layout.nodes {
-        if overlaps(rect, &node.rect) {
-            cost += 2.0;
+        cost += 2.0 * overlap_fraction(rect, &node.rect);
+    }
+    // A frame is a boundary the reader uses; a label astride one is confusing
+    // about what it belongs to.
+    for group in &layout.groups {
+        for pair in [
+            [
+                (group.rect.x, group.rect.y),
+                (group.rect.right(), group.rect.y),
+            ],
+            [
+                (group.rect.right(), group.rect.y),
+                (group.rect.right(), group.rect.bottom()),
+            ],
+            [
+                (group.rect.right(), group.rect.bottom()),
+                (group.rect.x, group.rect.bottom()),
+            ],
+            [
+                (group.rect.x, group.rect.bottom()),
+                (group.rect.x, group.rect.y),
+            ],
+        ] {
+            if segment_hits(pair[0], pair[1], rect) {
+                cost += 1.0;
+            }
         }
     }
     for placed in taken {
-        if overlaps(rect, placed) {
-            cost += 2.0;
-        }
+        cost += 2.0 * overlap_fraction(rect, placed);
     }
 
     cost
@@ -301,8 +328,12 @@ fn label_anchor(points: &[(f64, f64)]) -> ((f64, f64), (f64, f64)) {
     )
 }
 
-fn overlaps(a: &Rect, b: &Rect) -> bool {
-    a.x < b.right() && b.x < a.right() && a.y < b.bottom() && b.y < a.bottom()
+/// How much of `a` lies inside `b`, from 0 to 1.
+fn overlap_fraction(a: &Rect, b: &Rect) -> f64 {
+    let w = (a.right().min(b.right()) - a.x.max(b.x)).max(0.0);
+    let h = (a.bottom().min(b.bottom()) - a.y.max(b.y)).max(0.0);
+    let area = a.w * a.h;
+    if area <= 0.0 { 0.0 } else { (w * h) / area }
 }
 
 fn segment_hits(p: (f64, f64), q: (f64, f64), r: &Rect) -> bool {

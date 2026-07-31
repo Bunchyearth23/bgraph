@@ -57,9 +57,9 @@ disagree.
 - `cargo run --bin bgraph -- watch diagram.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check diagram.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (170 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (176 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
-- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (23 corpus cases)
+- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (24 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
 - `./editors/zed/install.sh` — installs the server, regenerates + pins the grammar
 
@@ -288,6 +288,15 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
 - [2026-07-31] A `group` records `members` (items) **and** `edge_members`
   (indices into `Diagram::edges`). A sequence frame spans message rows, not
   participants, so counting only `members` called every `loop` block empty.
+
+- [2026-07-31] `type state` is the first archetype that does **not** take over
+  placement: the anchors still decide, and it supplies only the vocabulary,
+  the shapes and the diagnostics. Adding an archetype does not oblige you to
+  write a layout engine.
+- [2026-07-31] Edge-label penalties are **proportional to the overlapped
+  area**, not flat. A flat charge made a five-pixel clip as expensive as
+  sitting on a node, and labels fled three rows to escape it — where they read
+  as belonging to another edge.
 
 ### Workarounds
 

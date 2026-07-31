@@ -212,6 +212,8 @@ Aliases are marked. They behave identically to the property they alias; the edit
 | `router` | edge | `router: <straight\|ortho>` | `straight` draws a direct line; `ortho` draws a right-angled elbow. |
 | `route` *(alias)* | edge | `route: <straight\|ortho>` | Alias of `router`. |
 | `value` | both | `value: <number>` | Magnitude of a slice. Required by `type pie`, ignored elsewhere. |
+| `kind` | node | `kind: <state\|initial\|final\|choice>` | What a state is. `initial` and `final` are drawn as marks rather than boxes and take no label; `choice` is a decision diamond. Read by `type state`. |
+| `guard` | edge | `guard: <text>` | A condition on a transition, shown in brackets after its label. |
 | `points` | node | `points: <n> <n> …` | One number per category, in order. Required by `type bar`. |
 | `wave` | node | `wave: "<characters>"` | One character per period: `0` `1` `l` `h` levels, `p` `n` clocks, `x` unknown, `z` high-impedance, `=` and `2`–`9` data, `.` repeats the previous, `\|` a gap. Required by `type wave`. |
 | `data` | node | `data: "<first>" "<second>" …` | Names for the data segments of a wave, in order. |
@@ -267,6 +269,18 @@ slice <id> ["label"] <value>
 | `start` | `start: <degrees>` | Angle the first slice starts at. `0` is twelve o'clock. |
 | `labels` | `labels: <percent\|value\|both\|none>` | What to write on each slice. Slices too thin to read are skipped. |
 | `legend` | `legend: <on\|off>` | Swatch-and-name list beside the chart. On by default — identity must never rest on color alone. |
+
+### `type state`
+
+A state machine. States are placed by anchors, exactly as in `free` — the archetype supplies the vocabulary and the shapes, not a layout engine. Nest them with `group`.
+
+```
+state <id> ["label"]
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the machine. |
 
 ### `type sequence`
 
