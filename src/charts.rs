@@ -2706,3 +2706,275 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         annotations,
     })
 }
+
+// ----------------------------------------------------------------- gantt
+
+pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
+    use crate::ast::civil_from_days;
+
+    let cfg = &diagram.archetype_props;
+    let theme = Theme::of(&opts);
+    let def = crate::check::archetype_of(diagram);
+    let palette = theme.palette();
+
+    let width = setting(cfg, "size")
+        .and_then(|v| v.first())
+        .and_then(|v| v.as_num())
+        .unwrap_or(620.0)
+        .max(160.0);
+    let row_h = setting(cfg, "size")
+        .and_then(|v| v.get(1))
+        .and_then(|v| v.as_num())
+        .unwrap_or(26.0)
+        .max(10.0);
+    let today = setting(cfg, "today")
+        .and_then(|v| v.first())
+        .and_then(|v| v.as_date());
+    let title = text(cfg, "title");
+
+    let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
+
+    // Which section, if any, each task belongs to.
+    let section_of: HashMap<&str, &str> = diagram
+        .groups
+        .iter()
+        .flat_map(|g| g.members.iter().map(move |m| (m.as_str(), g.id.as_str())))
+        .collect();
+
+    let mut tasks = Vec::new();
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        let style = registry.resolve(
+            chart_defaults(),
+            def.item,
+            &node.classes,
+            &node.effective_props(def.slots),
+        )?;
+        let Some(start) = style.start else { continue };
+        let length = style.length.unwrap_or(1.0).max(0.25);
+        let name = node.label.clone().unwrap_or_else(|| node.id.value.clone());
+        let section = section_of.get(node.id.as_str()).copied();
+        tasks.push((i, name, start, length, section, style));
+    }
+
+    let (first, last) = tasks.iter().fold((i64::MAX, i64::MIN), |(lo, hi), t| {
+        (lo.min(t.2), hi.max(t.2 + t.3.ceil() as i64))
+    });
+    let (first, last) = if tasks.is_empty() {
+        (0, 1)
+    } else {
+        (first, last.max(first + 1))
+    };
+    let span = (last - first) as f64;
+
+    let name_size = base.font_size.unwrap_or(13.0);
+    // Sections get a gutter of their own: a label sharing the task column
+    // lands on top of the first task's name.
+    let section_w = diagram
+        .groups
+        .iter()
+        .map(|g| {
+            let label = g.label.clone().unwrap_or_else(|| g.id.value.clone());
+            text_width(std::slice::from_ref(&label), 11.0) + 16.0
+        })
+        .fold(0.0_f64, f64::max);
+    let names_w = section_w
+        + tasks
+            .iter()
+            .map(|t| text_width(std::slice::from_ref(&t.1), name_size))
+            .fold(0.0_f64, f64::max)
+        + 18.0;
+
+    let title_h = if title.is_some() {
+        TITLE_SIZE * 2.0
+    } else {
+        0.0
+    };
+    const AXIS_H: f64 = 20.0;
+    let top = title_h + AXIS_H;
+    let day = width / span;
+    let x_of = |d: i64| names_w + (d - first) as f64 * day;
+
+    let mut guides = Vec::new();
+    let mut nodes = Vec::new();
+    let mut groups = Vec::new();
+    let mut annotations = Vec::new();
+
+    if let Some(title) = title {
+        annotations.push(Annotation {
+            text: title,
+            x: 0.0,
+            y: TITLE_SIZE,
+            anchor: Anchor::Start,
+            size: TITLE_SIZE,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    // Section bands first, so the bars land on them.
+    let mut ordered: Vec<(Option<&str>, usize)> = Vec::new();
+    let mut seen: Vec<&str> = Vec::new();
+    for name in tasks.iter().filter_map(|t| t.4) {
+        if !seen.contains(&name) {
+            seen.push(name);
+        }
+    }
+    // Sectioned tasks group together, in the order their sections appear.
+    for section in seen.iter().map(|s| Some(*s)).chain(std::iter::once(None)) {
+        for (i, task) in tasks.iter().enumerate() {
+            if task.4 == section {
+                ordered.push((section, i));
+            }
+        }
+    }
+
+    let rule = if theme.dark { "#1e293b" } else { "#e4e4e7" };
+    let step = pick_tick(span);
+    let mut d = first;
+    while d <= last {
+        let x = x_of(d);
+        guides.push(Guide {
+            from: (x, top),
+            to: (x, top + ordered.len() as f64 * row_h),
+            color: rule.into(),
+            width: 1.0,
+            dash: None,
+        });
+        let (y, m, dd) = civil_from_days(d);
+        annotations.push(Annotation {
+            text: match step {
+                s if s >= 28 => format!("{y}-{m:02}"),
+                _ => format!("{m:02}-{dd:02}"),
+            },
+            x: x + 3.0,
+            y: title_h + AXIS_H / 2.0,
+            anchor: Anchor::Start,
+            size: 10.0,
+            color: theme.muted.clone(),
+            weight: "400".into(),
+            family: family(&base),
+        });
+        d += step;
+    }
+
+    for (r, (section, i)) in ordered.iter().enumerate() {
+        let (_, name, start, length, _, style) = &tasks[*i];
+        let y = top + r as f64 * row_h;
+        let colour = style.fill.clone().unwrap_or_else(|| {
+            let slot = seen.iter().position(|s| Some(*s) == *section).unwrap_or(0);
+            palette[slot.min(palette.len() - 1)].to_string()
+        });
+
+        nodes.push(PlacedNode {
+            lines: Vec::new(),
+            rect: Rect {
+                x: x_of(*start),
+                y: y + row_h * 0.18,
+                w: (length * day).max(2.0),
+                h: row_h * 0.64,
+            },
+            style: Style {
+                fill: Some(colour),
+                stroke: Some("none".into()),
+                stroke_width: Some(0.0),
+                radius: Some(3.0),
+                shape: Some(Shape::Rect),
+                ..style.clone()
+            },
+        });
+
+        annotations.push(Annotation {
+            text: name.clone(),
+            x: names_w - 12.0,
+            y: y + row_h / 2.0,
+            anchor: Anchor::End,
+            size: name_size,
+            color: ink(style, &theme),
+            weight: style.font_weight.clone().unwrap_or_else(|| "400".into()),
+            family: family(style),
+        });
+    }
+
+    // A section frame spans the rows its tasks occupy.
+    for name in &seen {
+        let rows: Vec<usize> = ordered
+            .iter()
+            .enumerate()
+            .filter(|(_, (s, _))| *s == Some(*name))
+            .map(|(r, _)| r)
+            .collect();
+        let (Some(&lo), Some(&hi)) = (rows.first(), rows.last()) else {
+            continue;
+        };
+        let group = diagram.groups.iter().find(|g| g.id.as_str() == *name);
+        let style = registry.resolve(
+            Style::group_defaults(),
+            "group",
+            group.map(|g| g.classes.as_slice()).unwrap_or(&[]),
+            group.map(|g| g.props.as_slice()).unwrap_or(&[]),
+        )?;
+        let label = group
+            .and_then(|g| g.label.clone())
+            .unwrap_or_else(|| (*name).to_string());
+        let band = Rect {
+            x: section_w,
+            y: top + lo as f64 * row_h,
+            w: names_w - section_w + width,
+            h: (hi - lo + 1) as f64 * row_h,
+        };
+
+        // The label is an annotation of its own, in the section gutter,
+        // centred on the rows it covers.
+        annotations.push(Annotation {
+            text: label,
+            x: 0.0,
+            y: band.cy(),
+            anchor: Anchor::Start,
+            size: 11.0,
+            color: style
+                .font_color
+                .clone()
+                .unwrap_or_else(|| theme.muted.clone()),
+            weight: "600".into(),
+            family: family(&base),
+        });
+
+        groups.push(PlacedGroup {
+            lines: Vec::new(),
+            rect: band,
+            style,
+        });
+    }
+
+    if let Some(today) = today {
+        guides.push(Guide {
+            from: (x_of(today), top - 4.0),
+            to: (x_of(today), top + ordered.len() as f64 * row_h),
+            color: "#f43f5e".into(),
+            width: 1.5,
+            dash: Some("5 4".into()),
+        });
+    }
+
+    Ok(Layout {
+        guides,
+        polylines: Vec::new(),
+        groups,
+        nodes,
+        edges: Vec::new(),
+        opts,
+        chart: Chart::Gantt,
+        annotations,
+    })
+}
+
+/// Marks the calendar often enough to read and rarely enough to breathe.
+fn pick_tick(span_days: f64) -> i64 {
+    match span_days {
+        s if s <= 21.0 => 1,
+        s if s <= 120.0 => 7,
+        s if s <= 400.0 => 28,
+        _ => 91,
+    }
+}

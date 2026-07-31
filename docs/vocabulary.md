@@ -129,7 +129,8 @@ is a single item with two stray values rather than two items.
 | `class` | `class` | — members are `- ` / `+ ` lines ✔ |
 | `er` (`W-031`) | `entity` | — members, plus cardinality on the arrows |
 | `treemap` | `box` | `value` — one number ✔ |
-| `gantt` / `timeline` (`W-026`) | `task` / `event` | start and duration (`W-014`) |
+| `gantt` | `task` | `start` — a date, then a date or a duration ✔ |
+| `timeline` (`W-032`) | `event` | a date |
 | `block` (`W-025`) | `block` | — |
 
 ✔ marks what is implemented. The rest is the shape the survey suggests, to be

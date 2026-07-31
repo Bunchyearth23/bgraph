@@ -251,7 +251,12 @@ fn parse_item(pair: Pair<Rule>) -> Result<NodeDecl> {
             Rule::class_ref => classes.push(class_name(part)),
             Rule::abs_pos | Rule::rel_pos => placement = Some(parse_placement(part)?),
             Rule::block => (props, members) = parse_body(part)?,
-            Rule::ident | Rule::string | Rule::number | Rule::color => {
+            Rule::ident
+            | Rule::string
+            | Rule::number
+            | Rule::color
+            | Rule::date
+            | Rule::duration => {
                 let start = positional_span.map_or(part_span.start, |s: Span| s.start);
                 positional_span = Some(Span {
                     start,
@@ -297,7 +302,12 @@ fn parse_edge(pair: Pair<Rule>) -> Result<EdgeDecl> {
             Rule::string if label.is_none() => label = Some(unescape(part)),
             Rule::class_ref => classes.push(class_name(part)),
             Rule::block => props = parse_block(part)?,
-            Rule::ident | Rule::string | Rule::number | Rule::color => {
+            Rule::ident
+            | Rule::string
+            | Rule::number
+            | Rule::color
+            | Rule::date
+            | Rule::duration => {
                 let start = positional_span.map_or(part_span.start, |s: Span| s.start);
                 positional_span = Some(Span {
                     start,
@@ -445,6 +455,26 @@ fn parse_prop(prop: Pair<Rule>) -> Result<Vec<Prop>> {
 
 fn parse_value(pair: Pair<Rule>) -> Result<Value> {
     Ok(match pair.as_rule() {
+        Rule::date => {
+            let text = pair.as_str().to_string();
+            let part = |a: usize, b: usize| -> i64 { text[a..b].parse().unwrap_or(0) };
+            let day = crate::ast::days_from_civil(part(0, 4), part(5, 7), part(8, 10));
+            Value::Date { text, day }
+        }
+        Rule::duration => {
+            let raw = pair.as_str();
+            let cut = raw
+                .find(|c: char| c.is_ascii_alphabetic())
+                .unwrap_or(raw.len());
+            let amount: f64 = raw[..cut].parse().unwrap_or(0.0);
+            let days = match &raw[cut..] {
+                "h" => amount / 24.0,
+                "w" => amount * 7.0,
+                "mo" => amount * 30.0,
+                _ => amount,
+            };
+            Value::Duration(days)
+        }
         Rule::number => Value::Num(number(pair)?),
         Rule::color => Value::Color(pair.as_str().to_string()),
         Rule::string => Value::Str(unescape(pair)),

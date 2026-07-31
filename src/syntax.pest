@@ -88,4 +88,8 @@ member = @{ ("-" | "+") ~ " " ~ (!nl ~ ANY)* }
 // The lookahead stops a value list at the next `name:`, so several properties
 // can share a line without needing a separator.
 prop  = { ident ~ ":" ~ (!(ident ~ ":") ~ value)+ }
-value = _{ string | color | number | ident }
+// `date` and `duration` come before `number`, or `2026-07-31` would lex as
+// three numbers and `12d` as a number followed by an identifier.
+value    = _{ string | color | date | duration | number | ident }
+date     = @{ ASCII_DIGIT{4} ~ "-" ~ ASCII_DIGIT{2} ~ "-" ~ ASCII_DIGIT{2} }
+duration = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ ("mo" | "w" | "d" | "h") ~ !(ASCII_ALPHANUMERIC | "_") }

@@ -212,6 +212,8 @@ Aliases are marked. They behave identically to the property they alias; the edit
 | `router` | edge | `router: <straight\|ortho>` | `straight` draws a direct line; `ortho` draws a right-angled elbow. |
 | `route` *(alias)* | edge | `route: <straight\|ortho>` | Alias of `router`. |
 | `value` | both | `value: <number>` | Magnitude of a slice. Required by `type pie`, ignored elsewhere. |
+| `start` | node | `start: <date> <date\|duration>` | When a task begins, and either when it ends or how long it runs — read by value kind. Required by `type gantt`. |
+| `length` | node | `length: <duration>` | How long a task runs, when the start is given on its own. |
 | `kind` | node | `kind: <state\|initial\|final\|choice>` | What a state is. `initial` and `final` are drawn as marks rather than boxes and take no label; `choice` is a decision diamond. Read by `type state`. |
 | `guard` | edge | `guard: <text>` | A condition on a transition, shown in brackets after its label. |
 | `points` | node | `points: <n> <n> …` | One number per category, in order. Required by `type bar`. |
@@ -269,6 +271,21 @@ slice <id> ["label"] <value>
 | `start` | `start: <degrees>` | Angle the first slice starts at. `0` is twelve o'clock. |
 | `labels` | `labels: <percent\|value\|both\|none>` | What to write on each slice. Slices too thin to read are skipped. |
 | `legend` | `legend: <on\|off>` | Swatch-and-name list beside the chart. On by default — identity must never rest on color alone. |
+
+### `type gantt`
+
+Bars on a calendar. A task says when it starts and either when it ends or how long it runs; a `group` becomes a section.
+
+```
+task <id> ["label"] <start> <start>
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the chart. |
+| `size` | `size: <width> <row height>` | How wide the calendar runs and how tall one task is. |
+| `ticks` | `ticks: <day\|week\|month>` | How often the calendar is marked. Chosen from the span if unset. |
+| `today` | `today: <date>` | Draws a line at one date, for reading progress against it. |
 
 ### `type class`
 

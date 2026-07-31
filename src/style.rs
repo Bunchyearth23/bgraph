@@ -89,6 +89,9 @@ pub struct Style {
     /// State-machine semantics.
     pub kind: Option<StateKind>,
     pub guard: Option<String>,
+    /// Scheduling: a start day and a length in days.
+    pub start: Option<i64>,
+    pub length: Option<f64>,
 }
 
 macro_rules! overlay {
@@ -128,6 +131,8 @@ impl Style {
             points,
             kind,
             guard,
+            start,
+            length,
         );
     }
 
@@ -210,6 +215,8 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
                     }
                     Value::Word(w) => style.stroke = Some(w.clone()),
                     Value::Str(s) => style.dash = Some(s.clone()),
+                    // A date or a duration says nothing about a stroke.
+                    Value::Date { .. } | Value::Duration(_) => {}
                 }
             }
         }
@@ -248,6 +255,7 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
                     Value::Str(s) => style.font_family = Some(s.clone()),
                     Value::Color(c) => style.font_color = Some(c.clone()),
                     Value::Word(w) => style.font_weight = Some(w.clone()),
+                    Value::Date { .. } | Value::Duration(_) => {}
                 }
             }
         }
@@ -288,6 +296,17 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
             });
         }
         "guard" => style.guard = first.and_then(|x| x.as_text()).map(String::from),
+        // `start: 2026-08-01 12d` or `start: 2026-08-01 2026-08-12` — read by
+        // value kind, so either way of saying "how long" works.
+        "start" => {
+            style.start = first.and_then(|x| x.as_date());
+            style.length = match (style.start, v.get(1)) {
+                (_, Some(Value::Duration(days))) => Some(*days),
+                (Some(from), Some(Value::Date { day, .. })) => Some((day - from) as f64),
+                _ => style.length,
+            };
+        }
+        "length" => style.length = first.and_then(|x| x.as_duration().or_else(|| x.as_num())),
         "wave" => style.wave = first.and_then(|v| v.as_text()).map(String::from),
         "data" => {
             style.data = Some(

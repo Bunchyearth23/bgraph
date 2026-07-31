@@ -57,9 +57,9 @@ disagree.
 - `cargo run --bin bgraph -- watch diagram.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check diagram.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (183 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (191 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
-- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (25 corpus cases)
+- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (26 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
 - `./editors/zed/install.sh` — installs the server, regenerates + pins the grammar
 
@@ -310,6 +310,14 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
 - [2026-07-31] `Guide`s are drawn beneath the boxes. Anything that must appear
   **over** a node — a class's compartment rule — is a thin `PlacedNode` pushed
   after it, not a guide.
+
+- [2026-07-31] `date` and `duration` are lexed **before** `number`, or
+  `2026-07-31` reads as three numbers and `12d` as a number plus an
+  identifier. Civil-calendar arithmetic is twenty lines in `ast.rs`
+  (Hinnant's algorithm) rather than a dependency.
+- [2026-07-31] Every archetype clamps its `size`. A test asking for less than
+  the floor silently gets the floor — which cost an hour of reading the wrong
+  end of a division.
 
 ### Workarounds
 

@@ -61,6 +61,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "wave" => check_wave(diagram, &mut out),
         "sequence" => check_sequence(diagram, &mut out),
         "class" => check_class(diagram, &mut out),
+        "gantt" => check_gantt(diagram, &mut out),
         "state" => {
             check_cycles(diagram, &nodes, &mut out);
             check_state(diagram, &mut out);
@@ -905,6 +906,47 @@ fn first_cycle(count: usize, edges: &[(usize, usize)]) -> Option<Vec<usize>> {
     Some((0..count).filter(|i| degree[*i] > 0).collect())
 }
 
+fn check_gantt(diagram: &Diagram, out: &mut Vec<Diag>) {
+    warn_ignored(diagram, "gantt", out);
+
+    let styles = resolved_nodes(diagram, base_style("gantt"));
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        let style = styles.get(i);
+        match (style.and_then(|s| s.start), style.and_then(|s| s.length)) {
+            (None, _) => out.push(Diag::error(
+                node.id.span,
+                format!(
+                    "`{}` has no start — `task {} [\"label\"] <date> <date|duration>`",
+                    node.id.as_str(),
+                    node.id.as_str()
+                ),
+            )),
+            (Some(_), None) => out.push(Diag::error(
+                node.id.span,
+                format!(
+                    "`{}` has a start but no end — give it a duration like `6d`, \
+                     or the date it finishes",
+                    node.id.as_str()
+                ),
+            )),
+            (Some(_), Some(days)) if days <= 0.0 => out.push(Diag::error(
+                node.id.span,
+                format!("`{}` ends before it starts", node.id.as_str()),
+            )),
+            _ => {}
+        }
+    }
+
+    if let Some(prop) = diagram.archetype_props.iter().find(|p| p.name == "today")
+        && prop.values.first().and_then(|v| v.as_date()).is_none()
+    {
+        out.push(Diag::error(
+            prop.values_span,
+            "`today` takes a date, written `2026-09-14`".to_string(),
+        ));
+    }
+}
+
 fn check_class(diagram: &Diagram, out: &mut Vec<Diag>) {
     check_cycles_free(diagram, out);
     for node in &diagram.nodes {
@@ -1270,6 +1312,7 @@ fn check_unused_data(diagram: &Diagram, out: &mut Vec<Diag>) {
                 "wave" | "data" => "wave",
                 "points" => "bar",
                 "kind" | "guard" => "state",
+                "start" | "length" => "gantt",
                 _ => continue,
             };
             out.push(Diag::warn(

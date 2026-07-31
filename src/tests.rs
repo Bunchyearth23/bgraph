@@ -470,12 +470,10 @@ fn a_file_without_type_is_free() {
 fn an_unknown_archetype_is_reported() {
     let e = err("type flowchart\nnode a");
     assert!(e.contains("unknown archetype `flowchart`"), "{e}");
-    assert!(
-        e.contains(
-            "free, pie, class, state, sequence, xy, bar, sankey, wave, quadrant, treemap, packet"
-        ),
-        "{e}"
-    );
+    // Derived from the table, so adding an archetype cannot leave this stale.
+    for def in crate::props::ARCHETYPES {
+        assert!(e.contains(def.name), "`{}` is missing from: {e}", def.name);
+    }
 }
 
 #[test]
@@ -2546,4 +2544,134 @@ fn a_diagnostic_spells_its_plurals() {
     // `classs` in a message about class diagrams undermines the rest of it.
     let e = err("type pie\nclass a \"A\" 1");
     assert!(e.contains("declares slices, not classes"), "{e}");
+}
+
+// ---------------------------------------------------- dates and durations
+
+#[test]
+fn a_date_is_one_value_not_three() {
+    use crate::ast::{civil_from_days, days_from_civil};
+
+    // `2026-07-31` would otherwise lex as 2026, -7 and -31.
+    let d = parse_diagram("node a { start: 2026-07-31 3d }").expect("parses");
+    let values = &d.nodes[0].props[0].values;
+    assert_eq!(values.len(), 2);
+    assert_eq!(values[0].as_date(), Some(days_from_civil(2026, 7, 31)));
+    assert_eq!(values[1].as_duration(), Some(3.0));
+
+    // The civil-calendar round trip is the whole basis of the arithmetic.
+    for (y, m, day) in [(1970, 1, 1), (2000, 2, 29), (2026, 12, 31), (1899, 3, 1)] {
+        assert_eq!(
+            civil_from_days(days_from_civil(y, m, day)),
+            (y, m as u32, day as u32)
+        );
+    }
+    assert_eq!(days_from_civil(1970, 1, 1), 0);
+    assert_eq!(
+        days_from_civil(2026, 8, 20) - days_from_civil(2026, 8, 1),
+        19
+    );
+}
+
+#[test]
+fn durations_carry_their_unit() {
+    let d = parse_diagram("node a { length: 6h }\nnode b { length: 2w }\nnode c { length: 3mo }")
+        .expect("parses");
+    assert_eq!(d.nodes[0].props[0].values[0].as_duration(), Some(0.25));
+    assert_eq!(d.nodes[1].props[0].values[0].as_duration(), Some(14.0));
+    assert_eq!(d.nodes[2].props[0].values[0].as_duration(), Some(90.0));
+}
+
+#[test]
+fn a_negative_number_is_not_a_date() {
+    let l = build("node a at (-40, -20) { size: 10 10 }");
+    assert_eq!((l.nodes[0].rect.x, l.nodes[0].rect.y), (-40.0, -20.0));
+}
+
+// ----------------------------------------------------------------- gantt
+
+#[test]
+fn a_task_spans_from_its_start_to_its_end() {
+    // `size` has a floor of 160; asking for less silently gets the floor.
+    let l = build(
+        r#"
+        type gantt { size: 200 10 }
+        task a "A" 2026-08-01 5d
+        task b "B" 2026-08-06 5d
+    "#,
+    );
+
+    assert!(matches!(l.chart, crate::layout::Chart::Gantt));
+    // Ten days across two hundred units: each day is twenty wide.
+    assert!(
+        (l.nodes[0].rect.w - 100.0).abs() < 0.01,
+        "{:?}",
+        l.nodes[0].rect
+    );
+    assert!((l.nodes[1].rect.x - l.nodes[0].rect.right()).abs() < 0.01);
+    assert!(l.nodes[1].rect.y > l.nodes[0].rect.y, "one row each");
+}
+
+#[test]
+fn an_end_date_and_a_duration_say_the_same_thing() {
+    let by_length = build("type gantt { size: 100 10 }\ntask a \"A\" 2026-08-01 10d");
+    let by_end = build("type gantt { size: 100 10 }\ntask a \"A\" 2026-08-01 2026-08-11");
+    assert_eq!(by_length.nodes[0].rect.w, by_end.nodes[0].rect.w);
+}
+
+#[test]
+fn sections_group_their_tasks_and_keep_their_own_gutter() {
+    let l = build(
+        r#"
+        type gantt { size: 200 10 }
+        group one "First" { task a "A" 2026-08-01 2d }
+        group two "Second" { task b "B" 2026-08-03 2d }
+    "#,
+    );
+
+    assert_eq!(l.groups.len(), 2);
+    // The frames stack and never overlap.
+    assert!(l.groups[0].rect.bottom() <= l.groups[1].rect.y + 0.01);
+    // A section label lives left of every frame, so it cannot land on a task
+    // name — which is exactly what the first version did.
+    let labels: Vec<&crate::layout::Annotation> = l
+        .annotations
+        .iter()
+        .filter(|a| a.text == "First" || a.text == "Second")
+        .collect();
+    assert_eq!(labels.len(), 2);
+    assert!(labels.iter().all(|a| a.x < l.groups[0].rect.x + 0.01));
+}
+
+#[test]
+fn a_today_line_is_drawn_where_it_falls() {
+    let l = build(
+        r#"
+        type gantt { size: 200 10 today: 2026-08-06 }
+        task a "A" 2026-08-01 10d
+    "#,
+    );
+    // Halfway through a ten-day span.
+    let today = l
+        .guides
+        .iter()
+        .find(|g| g.dash.is_some())
+        .expect("a today line");
+    let start = l.nodes[0].rect.x;
+    assert!(
+        (today.from.0 - (start + 100.0)).abs() < 0.01,
+        "{:?}",
+        today.from
+    );
+
+    assert!(err("type gantt { today: soon }\ntask a 2026-08-01 1d").contains("takes a date"));
+}
+
+#[test]
+fn a_task_needs_both_ends() {
+    assert!(err("type gantt\ntask a \"A\"").contains("has no start"));
+    assert!(err("type gantt\ntask a \"A\" 2026-08-01").contains("no end"));
+    assert!(
+        err("type gantt\ntask a \"A\" 2026-08-10 2026-08-01").contains("ends before it starts")
+    );
 }

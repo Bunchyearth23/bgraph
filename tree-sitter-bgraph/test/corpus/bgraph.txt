@@ -384,3 +384,37 @@ class user "User" { fill: #111111 radius: 4
         value: (number))
       (member)
       (member))))
+
+================================================================================
+Dates and durations are single values
+================================================================================
+
+task a "A" 2026-08-01 12d
+task b "B" 2026-08-01 2026-08-13
+node c at (-40, -20)
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (item_declaration
+    keyword: (item_keyword
+      (identifier))
+    name: (identifier)
+    label: (string)
+    data: (date)
+    data: (duration))
+  (item_declaration
+    keyword: (item_keyword
+      (identifier))
+    name: (identifier)
+    label: (string)
+    data: (date)
+    data: (date))
+  (item_declaration
+    keyword: (item_keyword
+      (identifier))
+    name: (identifier)
+    placement: (absolute_position
+      point: (point
+        x: (number)
+        y: (number)))))

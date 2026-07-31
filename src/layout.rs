@@ -118,6 +118,8 @@ pub enum Chart {
     Xy,
     /// Participants, lifelines and messages in source order.
     Sequence,
+    /// Bars on a calendar.
+    Gantt,
     /// Slices, which need arcs the node renderer cannot make.
     Pie(Pie),
 }
@@ -223,6 +225,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         "bar" => return crate::charts::bar(diagram, opts, &registry),
         "xy" => return crate::charts::xy(diagram, opts, &registry),
         "sequence" => return crate::charts::sequence(diagram, opts, &registry),
+        "gantt" => return crate::charts::gantt(diagram, opts, &registry),
         _ => {}
     }
 

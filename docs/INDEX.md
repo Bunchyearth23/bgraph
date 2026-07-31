@@ -29,8 +29,9 @@ Ordered by what each unblocks, not by number. `W-011`, `W-012`, `W-015` and
 `W-029` have landed, so nesting, the plot frame, edge data and per-archetype
 vocabulary are available to everything below. `W-013` and `W-014` are the
 remaining foundations; each archetype names the one
-it waits for. `W-014` (dates) is the last foundation, and it unblocks `W-026`.
-`W-025` and `W-031` wait for nothing but unblock nothing in turn.
+it waits for. **Every foundation has landed.** What is left either unblocks
+nothing — `W-025`, `W-031`, `W-032` — or belongs to the library track, where
+`Q-003` is still waiting on a decision.
 
 **DSL impact, measured rather than assumed.** The grammar already accepts
 string lists (`data: "a" "b" "c"`), number lists (`points: 1 2 3`),
@@ -42,10 +43,9 @@ change the language: `W-011`, `W-013`, `W-014`.
 | id | state | title | notes |
 |---|---|---|---|
 | `W-011` | planned | **Containers / nesting** — `group` with children | **DSL change.** The one structural gap that keeps recurring: sequence `loop`/`alt` blocks, nested states, class packages, architecture groups, swimlanes, kanban columns, treemap nesting all need it. Promotes `I-006`. Blocks `W-020`, `W-021`, `W-022`. |
-| `W-014` | planned | **Date and duration literals** | **DSL change.** `2026-07-31`, `3d`, `2w`. Blocks `W-026`. |
 | `W-031` | planned | `type er` — entities and cardinality | Data. Members and the box are `W-023`'s; what remains is cardinality at each end of a relation — crow's-foot markers, or `from-card:` / `to-card:` read as text. |
 | `W-025` | planned | `type block` — architecture and C4-style component views | Dev. Boxes inside boxes with typed relations; `W-011` has landed. Closest of all of them to `free`, which is why it is worth doing as an archetype rather than by hand. |
-| `W-026` | planned | `type gantt` and `type timeline` | Project. Needs `W-014`. |
+| `W-032` | planned | `type timeline` — events on a date line | Project. `W-014` gives it the dates and `W-026` the axis; what remains is the marks and the label stagger. |
 | `W-027` | planned | **A stable embeddable API** | The long-term aim (`D-014`). `render_source` exists, but embedding needs a typed builder (construct a diagram without going through text), a documented public surface, no panics on hostile input, and semver. See `Q-003`. |
 | `W-028` | planned | Cargo features per archetype | So a program embedding `bgraph` for one chart does not compile all of them. Matters most for the embedded audience. |
 | `Q-003` | open | What shape should the embeddable API take? | Text-in/SVG-out only, or also a typed builder (`Diagram::new().node(…)`)? The second is far more useful for generating documents on the fly and far more surface to keep stable. Needed before `W-027`. |
@@ -96,6 +96,8 @@ not copies.
 | `W-004` | 2026-07-31 | `bgraph-lsp`: diagnostics, completion, hover, go-to-definition, outline | `1b53ec3` |
 | `W-005` | 2026-07-31 | Tree-sitter grammar and Zed extension | `1b53ec3`, regenerated `d6997b1` |
 | `W-006` | 2026-07-31 | `type` archetypes (`pie`, `packet`), quiet completion, explicit surface, generated reference manual | `4b4c548` |
+| `W-014` | 2026-07-31 | Date and duration literals — `2026-08-01`, `12d`, `2w`, `6h`, with civil-calendar arithmetic | this commit |
+| `W-026` | 2026-07-31 | `type gantt` — bars on a calendar, sections from groups, a today line | this commit |
 | `W-013` | 2026-07-31 | Member lists — a `- ` or `+ ` line in a block, kept with its marker | this commit |
 | `W-023` | 2026-07-31 | `type class` — a name, a rule, and its members; placement stays declared | this commit |
 | `W-022` | 2026-07-31 | `type state` — declared placement kept, pseudo-states as marks, guards in brackets, nesting via groups | this commit |

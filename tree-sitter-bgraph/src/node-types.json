@@ -108,6 +108,14 @@
             "named": true
           },
           {
+            "type": "date",
+            "named": true
+          },
+          {
+            "type": "duration",
+            "named": true
+          },
+          {
             "type": "identifier",
             "named": true
           },
@@ -327,6 +335,14 @@
             "named": true
           },
           {
+            "type": "date",
+            "named": true
+          },
+          {
+            "type": "duration",
+            "named": true
+          },
+          {
             "type": "identifier",
             "named": true
           },
@@ -447,6 +463,14 @@
         "types": [
           {
             "type": "color",
+            "named": true
+          },
+          {
+            "type": "date",
+            "named": true
+          },
+          {
+            "type": "duration",
             "named": true
           },
           {
@@ -667,6 +691,14 @@
     "type": "comment",
     "named": true,
     "extra": true
+  },
+  {
+    "type": "date",
+    "named": true
+  },
+  {
+    "type": "duration",
+    "named": true
   },
   {
     "type": "extends",

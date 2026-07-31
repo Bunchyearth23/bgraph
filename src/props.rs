@@ -272,6 +272,23 @@ pub const PROPS: &[PropDef] = &[
         doc: "Magnitude of a slice. Required by `type pie`, ignored elsewhere.",
     },
     PropDef {
+        name: "start",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "start: <date> <date|duration>",
+        doc: "When a task begins, and either when it ends or how long it runs \
+              — read by value kind. Required by `type gantt`.",
+    },
+    PropDef {
+        name: "length",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "length: <duration>",
+        doc: "How long a task runs, when the start is given on its own.",
+    },
+    PropDef {
         name: "kind",
         alias: false,
         ctx: Ctx::Node,
@@ -457,6 +474,18 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         edge_slots: &[],
     },
     ArchetypeDef {
+        name: "gantt",
+        item: "task",
+        doc: "Bars on a calendar. A task says when it starts and either when \
+              it ends or how long it runs; a `group` becomes a section.",
+        props: GANTT_PROPS,
+        slots: &[Slot {
+            prop: "start",
+            arity: 2,
+        }],
+        edge_slots: &[],
+    },
+    ArchetypeDef {
         name: "class",
         item: "class",
         doc: "Boxes with a name and a list of members, placed by anchors like \
@@ -630,6 +659,43 @@ pub const PIE_PROPS: &[PropDef] = &[
         syntax: "legend: <on|off>",
         doc: "Swatch-and-name list beside the chart. On by default — identity \
               must never rest on color alone.",
+    },
+];
+
+pub const GANTT_TICKS: &[&str] = &["day", "week", "month"];
+
+pub const GANTT_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the chart.",
+    },
+    PropDef {
+        name: "size",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "size: <width> <row height>",
+        doc: "How wide the calendar runs and how tall one task is.",
+    },
+    PropDef {
+        name: "ticks",
+        alias: false,
+        ctx: Ctx::Both,
+        words: GANTT_TICKS,
+        syntax: "ticks: <day|week|month>",
+        doc: "How often the calendar is marked. Chosen from the span if unset.",
+    },
+    PropDef {
+        name: "today",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "today: <date>",
+        doc: "Draws a line at one date, for reading progress against it.",
     },
 ];
 

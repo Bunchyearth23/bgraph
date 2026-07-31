@@ -188,9 +188,16 @@ module.exports = grammar({
     property_name: (_) =>
       token(seq(/[a-zA-Z_][a-zA-Z0-9_]*(-[a-zA-Z0-9_]+)*/, /[ \t]*/, ':')),
 
-    _value: ($) => choice($.string, $.color, $.number, $.identifier),
+    // `date` and `duration` come before `number`, or `2026-07-31` would lex
+    // as three numbers and `12d` as a number followed by an identifier.
+    _value: ($) => choice($.string, $.color, $.date, $.duration, $.number, $.identifier),
 
-    _bare_value: ($) => choice($.color, $.number, $.identifier),
+    date: (_) => token(seq(/\d{4}/, '-', /\d{2}/, '-', /\d{2}/)),
+
+    duration: (_) =>
+      token(seq(/\d+/, optional(seq('.', /\d+/)), choice('mo', 'w', 'd', 'h'))),
+
+    _bare_value: ($) => choice($.color, $.date, $.duration, $.number, $.identifier),
 
     // ---------------------------------------------------------- tokens
 
