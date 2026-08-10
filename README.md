@@ -69,6 +69,22 @@ a dependency and a build step for four functions whose job is to move bytes.
 and a page has no disk, which is why the wasm build exposes `render_source`
 and nothing that touches a filesystem.
 
+## In a Typst document
+
+```sh
+./typst/build.sh                 # → typst/bgraph.wasm
+```
+
+```typst
+#import "typst/bgraph.typ": diagram
+#diagram(read("arch.bd"), width: 70%)
+```
+
+A diagram that does not parse **fails the build**, with the compiler's own
+message — which matches what `check` does and beats shipping a document with a
+hole where a diagram should be. See [`typst/README.md`](typst/README.md),
+including the two-command form that needs no plugin at all.
+
 ## Other archetypes
 
 `type`, declared once at the top of a file, picks the genre. `free` — nodes

@@ -145,6 +145,13 @@ cli = ["dep:clap"]
 # functions whose whole job is to move bytes.
 wasm = []
 
+# Typst's own plugin protocol, which is a different shape: the host writes the
+# arguments into memory itself and takes the result through functions it
+# provides. Those are *imports*, so a module built with them cannot start
+# anywhere that does not supply them — hence a separate feature and a separate
+# module, rather than one that only Typst can instantiate.
+typst = ["wasm"]
+
 [dependencies]
 anyhow = "1.0.104"
 clap = { version = "4.6.4", features = ["derive"], optional = true }

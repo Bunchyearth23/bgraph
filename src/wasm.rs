@@ -89,3 +89,52 @@ pub unsafe extern "C" fn bgraph_render(pointer: *const u8, len: usize) -> *const
 pub extern "C" fn bgraph_result_len() -> usize {
     RESULT.lock().map(|r| r.len()).unwrap_or(0)
 }
+
+// ------------------------------------------------------------ Typst plugins
+
+/// Typst calls a plugin through a protocol of its own, and it is not the one
+/// above: the host writes the arguments into the module's memory itself and
+/// takes the result through a function it provides, so an exported function
+/// receives only *lengths* and returns only a status.
+///
+/// A second entry point rather than a second module. The four functions above
+/// are the general shape — a page, a Markdown preview, anything that can hold
+/// a pointer — and this is the shape one particular host insists on.
+///
+/// Behind its own feature, and it has to be: these are *imports*, so a module
+/// built with them cannot be instantiated by anything that does not supply
+/// them — the playground and the Markdown preview both pass an empty import
+/// object, and would simply fail to load. Two modules rather than one that
+/// only one host can start.
+#[cfg(all(target_arch = "wasm32", feature = "typst"))]
+mod typst {
+    #[link(wasm_import_module = "typst_env")]
+    unsafe extern "C" {
+        /// Typst writes the concatenated arguments here.
+        fn wasm_minimal_protocol_write_args_to_buffer(ptr: *mut u8);
+        /// And takes the answer back through this.
+        fn wasm_minimal_protocol_send_result_to_host(ptr: *const u8, len: usize);
+    }
+
+    /// Render `len` bytes of source. Returns 0 for a diagram, 1 for an error,
+    /// with the message sent back the same way — Typst shows the body either
+    /// way, so a failure explains itself in the page rather than leaving a
+    /// hole whose cause is three files away.
+    #[unsafe(no_mangle)]
+    pub extern "C" fn bgraph_typst_render(len: usize) -> i32 {
+        let mut source = vec![0u8; len];
+        unsafe { wasm_minimal_protocol_write_args_to_buffer(source.as_mut_ptr()) };
+
+        // Lossy rather than fatal: a panic crossing the boundary takes the
+        // document build down, which is never the right answer to bad bytes.
+        let text = String::from_utf8_lossy(&source);
+        let (status, answer) = match crate::render_source(&text) {
+            Ok(svg) => (0, svg),
+            Err(err) => (1, format!("error: {err:#}")),
+        };
+
+        let bytes = answer.into_bytes();
+        unsafe { wasm_minimal_protocol_send_result_to_host(bytes.as_ptr(), bytes.len()) };
+        status
+    }
+}

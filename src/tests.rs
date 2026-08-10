@@ -8321,3 +8321,43 @@ fn the_preview_renders_through_the_bundled_module_not_a_binary() {
         "there is no fallback for a fence it cannot draw"
     );
 }
+
+// ------------------------------------------------- the Typst plugin (I-023)
+
+#[test]
+fn the_typst_module_is_built_apart_from_the_general_one() {
+    // Typst's protocol works through *imports* the host supplies, so a module
+    // built with them cannot be instantiated by anything else — the
+    // playground and the Markdown preview both pass an empty import object
+    // and would simply fail to load it. Two modules, and the manifest has to
+    // keep them apart.
+    let manifest = include_str!("../Cargo.toml");
+    assert!(manifest.contains("typst = [\"wasm\"]"), "{manifest}");
+
+    let general = include_str!("../playground/build.sh");
+    let for_typst = include_str!("../typst/build.sh");
+    assert!(
+        !general.contains("typst"),
+        "the playground's module would carry imports nothing supplies"
+    );
+    assert!(
+        for_typst.contains("features all-archetypes,json,typst"),
+        "{for_typst}"
+    );
+}
+
+#[test]
+fn the_typst_package_calls_the_entry_point_that_exists() {
+    // Two files in two languages that have to agree on a symbol, and neither
+    // fails loudly — Typst would say "plugin function takes 2 arguments",
+    // which is what the first attempt said.
+    let package = include_str!("../typst/bgraph.typ");
+    let wasm = include_str!("wasm.rs");
+
+    assert!(package.contains("bgraph_typst_render"), "{package}");
+    assert!(wasm.contains("bgraph_typst_render"), "{wasm}");
+    assert!(
+        package.contains("plugin(\"bgraph.wasm\")"),
+        "the package loads a module its build script does not write"
+    );
+}
