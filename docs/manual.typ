@@ -711,6 +711,7 @@ bgraph watch diagram.bd
 bgraph watch docs/diagrams
 bgraph check diagram.bd
 bgraph diff old.bd new.bd
+bgraph explain diagram.bd api
 bgraph fmt diagram.bd
 bgraph completions fish
 bgraph init pie
@@ -769,6 +770,12 @@ one you stop trusting.
 the file declares, so the one box coloured on purpose survives it. A theme is
 a style file and nothing more: the same source, the same parser, one mechanism
 rather than two.
+
+`explain` answers "why is that box there". Because placement is declared, the
+answer is a statement in the file or a default that stood in for one — and
+both are named, along with which layer of the cascade settled each colour. It
+needs nothing from the solver: an explanation derived from the same text the
+author wrote cannot drift from it.
 
 `diff` draws two versions of a diagram as one picture: green for what
 appeared, amber with a ghost for what moved, and what is gone in a row

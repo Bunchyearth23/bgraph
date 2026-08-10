@@ -128,6 +128,13 @@ enum Command {
         /// bash | elvish | fish | powershell | zsh | man
         shell: String,
     },
+    /// Say why a box is where it is, and where each of its colours came from
+    Explain {
+        /// Input DSL file
+        input: PathBuf,
+        /// The box to explain
+        name: String,
+    },
     /// Draw two versions of a diagram as one picture: what appeared, what
     /// left, what moved
     Diff {
@@ -380,6 +387,15 @@ fn run() -> Result<i32> {
         #[cfg(feature = "completions")]
         Some(Command::Completions { shell }) => return completions(&shell),
         Some(Command::Init { genre, output }) => return init(genre, output),
+        Some(Command::Explain { input, name }) => {
+            let composed = bgraph::compose::load(&input)?;
+            let solved = layout::solve(&composed.diagram)?;
+            print!(
+                "{}",
+                bgraph::explain::explain(&composed.diagram, &solved, &name)?
+            );
+            return Ok(0);
+        }
         Some(Command::Diff {
             before,
             after,

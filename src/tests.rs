@@ -7933,3 +7933,98 @@ fn a_shape_whose_meaning_is_its_outline_is_left_alone() {
         "a diamond was drawn with the freehand bow"
     );
 }
+
+// ------------------------------------------------- `explain` (I-037)
+
+fn explained(source: &str, id: &str) -> String {
+    let diagram = parse_diagram(source).expect("it parses");
+    let solved = layout::solve(&diagram).expect("it draws");
+    crate::explain::explain(&diagram, &solved, id).expect("it explains")
+}
+
+#[test]
+fn explain_says_what_the_file_declared_and_what_filled_in() {
+    // `D-001` makes placement the author's job, so a declared layout deserves
+    // a declared explanation: every line is a statement in the file or a
+    // default that stood in for one, and both are named.
+    let out = explained(
+        r#"graph { gap: 60 }
+           node ui "Browser"
+           node api "API" right-of ui gap 90"#,
+        "api",
+    );
+    assert!(out.contains("right-of ui"), "{out}");
+    assert!(out.contains("gap 90"), "{out}");
+    assert!(out.contains("declared"), "{out}");
+    // The gap was declared, so the graph default must not be claimed.
+    assert!(!out.contains("gap 60"), "{out}");
+}
+
+#[test]
+fn explain_names_the_default_when_the_file_was_silent() {
+    let out = explained(
+        r#"graph { gap: 60 }
+           node ui "Browser"
+           node api "API" right-of ui"#,
+        "api",
+    );
+    assert!(out.contains("gap 60"), "{out}");
+    assert!(out.contains("default"), "{out}");
+}
+
+#[test]
+fn explain_names_the_rule_an_author_forgets() {
+    // An unplaced box flowing from the statement before it is the single
+    // most common surprise, and the hardest thing to see in the source.
+    let out = explained("node a \"A\"\nnode b \"B\"", "b");
+    assert!(out.contains("flows"), "{out}");
+    assert!(out.contains('a'), "{out}");
+}
+
+#[test]
+fn explain_says_when_a_cell_has_no_grid_to_sit_on() {
+    // A cell with no declared grid puts everything on the origin — a
+    // question nobody thinks to ask, which is exactly when to volunteer it.
+    let out = explained("node a \"A\" at (col 2, row 1)", "a");
+    assert!(out.contains("NOT DECLARED"), "{out}");
+}
+
+#[test]
+fn explain_attributes_each_colour_to_the_layer_that_set_it() {
+    let out = explained(
+        r#"style card { fill: #1e293b stroke: #38bdf8 }
+           style hot extends card { stroke: #f43f5e }
+           node a "A" .hot { fill: #000000 }"#,
+        "a",
+    );
+    assert!(out.contains("#f43f5e"), "{out}");
+    assert!(
+        out.contains("#000000") && out.contains("own block"),
+        "the inline block did not win: {out}"
+    );
+}
+
+#[test]
+fn explain_mentions_a_constraint_acting_on_the_box() {
+    // Easy to forget three screens away from the statement it acts on.
+    let out = explained(
+        r#"node a "A"
+           node b "B" right-of a
+           same-width a b"#,
+        "a",
+    );
+    assert!(out.contains("same-width"), "{out}");
+    assert!(out.contains('b'), "{out}");
+}
+
+#[test]
+fn explaining_an_unknown_box_lists_the_ones_there_are() {
+    let diagram = parse_diagram("node a \"A\"\nnode b \"B\"").unwrap();
+    let solved = layout::solve(&diagram).unwrap();
+    let message = format!(
+        "{:#}",
+        crate::explain::explain(&diagram, &solved, "ghost").expect_err("no such box")
+    );
+    assert!(message.contains("ghost"), "{message}");
+    assert!(message.contains('a') && message.contains('b'), "{message}");
+}

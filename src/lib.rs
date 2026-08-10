@@ -114,6 +114,8 @@ pub mod check;
 pub mod compose;
 #[allow(missing_docs)]
 pub mod diff;
+#[allow(missing_docs)]
+pub mod explain;
 pub mod parser;
 pub mod template;
 
