@@ -116,7 +116,7 @@ fn cut(font: &[u8], text: &str) -> Option<Vec<u8>> {
         outlines.extend_from_slice(font.get(glyf.offset + from..glyf.offset + to)?);
         // Every glyph starts on a word boundary in a well-formed font, and a
         // reader that assumes it will read garbage if this drifts.
-        while outlines.len() % 4 != 0 {
+        while !outlines.len().is_multiple_of(4) {
             outlines.push(0);
         }
     }
@@ -154,7 +154,7 @@ fn rebuild(font: &[u8], tables: &[Table], new_loca: &[u8], new_glyf: &[u8]) -> V
         let at = directory + body.len();
         entries.push((table.tag, at as u32, bytes.len() as u32));
         body.extend_from_slice(bytes);
-        while body.len() % 4 != 0 {
+        while !body.len().is_multiple_of(4) {
             body.push(0);
         }
     }
@@ -203,8 +203,7 @@ fn components(
 
     let mut out = Vec::new();
     let mut at = glyf.offset + from + 10;
-    loop {
-        let Some(flags) = be16(font, at) else { break };
+    while let Some(flags) = be16(font, at) {
         let Some(index) = be16(font, at + 2) else {
             break;
         };
