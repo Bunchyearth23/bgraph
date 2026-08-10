@@ -634,6 +634,7 @@ measuring — otherwise text that is genuinely unreadable gets reported as fine.
 ```
 bgraph diagram.bd -o diagram.svg
 bgraph diagram.bd -o diagram.pdf
+bgraph diagram.bd -o diagram.png
 bgraph watch diagram.bd
 bgraph watch docs/diagrams
 bgraph check diagram.bd
@@ -644,6 +645,11 @@ bgraph init pie
 
 The output extension picks the writer. A flag would be a second way of saying
 what the filename already says.
+
+PNG needs the `png` feature, and is the one output that does: everything else
+here is hand-rolled, but a raster means zlib and a rasteriser means text
+shaping and antialiasing. `--scale 2` doubles the diagram's own size — a scale
+rather than a pixel width, since the layout already decided the shape.
 
 `check` exits non-zero on an error. At a terminal it shows the offending line
 with a caret under it; redirected — or with `--ci` — it prints

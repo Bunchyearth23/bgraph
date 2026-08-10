@@ -18,6 +18,7 @@ time the diagram grows.
 
 ```
 bgraph diagram.bd -o diagram.svg    # render
+bgraph diagram.bd -o diagram.png    # …with the `png` feature; --scale 2 for twice the size
 bgraph watch diagram.bd             # show it, and reload when it changes
 bgraph watch diagram.svg            # …a picture works too; the extension decides
 bgraph watch diagram.bd --server    # …the browser preview rather than a window

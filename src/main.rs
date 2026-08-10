@@ -42,6 +42,11 @@ struct Cli {
     /// Print the filled source instead of rendering it
     #[arg(long)]
     emit: bool,
+
+    /// Multiply the diagram's own size when rasterising. PNG only — a vector
+    /// has no resolution to choose
+    #[arg(long, default_value_t = 1.0, value_name = "N")]
+    scale: f64,
 }
 
 #[derive(Subcommand, Debug)]
@@ -442,22 +447,37 @@ fn run() -> Result<i32> {
 
     // The output extension picks the writer. A flag would be a second way to
     // say what the filename already says, and the two could disagree.
-    let wants_pdf = cli
+    let extension = cli
         .output
         .extension()
-        .is_some_and(|e| e.eq_ignore_ascii_case("pdf"));
+        .map(|e| e.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
 
-    if wants_pdf {
-        #[cfg(feature = "pdf")]
-        {
+    match extension.as_str() {
+        "pdf" => {
+            #[cfg(feature = "pdf")]
             fs::write(&cli.output, bgraph::render_pdf::render(&layout))
                 .with_context(|| format!("cannot write {}", cli.output.display()))?;
+            #[cfg(not(feature = "pdf"))]
+            bail!("this build has no PDF writer — rebuild with the `pdf` feature");
         }
-        #[cfg(not(feature = "pdf"))]
-        bail!("this build has no PDF writer — rebuild with the `pdf` feature");
-    } else {
-        fs::write(&cli.output, render_svg::render(&layout))
-            .with_context(|| format!("cannot write {}", cli.output.display()))?;
+        "png" => {
+            #[cfg(feature = "png")]
+            {
+                let bytes = bgraph::render_png::render(&layout, cli.scale)?;
+                fs::write(&cli.output, bytes)
+                    .with_context(|| format!("cannot write {}", cli.output.display()))?;
+            }
+            #[cfg(not(feature = "png"))]
+            bail!("this build has no rasteriser — rebuild with the `png` feature");
+        }
+        _ => {
+            if cli.scale != 1.0 {
+                bail!("`--scale` is for a raster; an SVG and a PDF have no resolution to choose");
+            }
+            fs::write(&cli.output, render_svg::render(&layout))
+                .with_context(|| format!("cannot write {}", cli.output.display()))?;
+        }
     }
 
     println!(

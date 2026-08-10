@@ -104,7 +104,18 @@ csv = []
 # it and an unfair one for someone embedding the library, so it is opt-in:
 #
 #   cargo build --features window
-window = ["dep:minifb", "dep:resvg", "dep:tiny-skia"]
+window = ["dep:minifb", "png"]
+
+# PNG output. Off by default for the same reason the window is: this is the
+# one thing in the crate that cannot be hand-rolled — a raster means zlib, and
+# a rasteriser means text shaping, curve flattening and antialiasing — so it
+# is the one place a dependency is the honest answer rather than a shortcut.
+#
+# Its own feature rather than part of `window`, because someone rendering
+# images in CI has no display and wants no windowing library. The implication
+# runs one way: a window already needs the rasteriser, so `window` turns this
+# on and not the reverse.
+png = ["dep:resvg", "dep:tiny-skia"]
 
 # Shell completions and a man page, generated from the same `Cli` struct clap
 # parses with — so they cannot describe flags the binary does not have.

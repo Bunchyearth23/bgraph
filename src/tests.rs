@@ -6324,3 +6324,91 @@ fn sources_come_back_in_a_stable_order() {
         .collect();
     assert_eq!(names, ["alpha.bd", "mid.bd", "zebra.bd"]);
 }
+
+// ------------------------------------------------- PNG output (I-041)
+
+#[cfg(feature = "png")]
+#[test]
+fn the_raster_is_the_same_picture_as_the_vector() {
+    // One renderer, two encodings. A raster drawn by its own path would be a
+    // second renderer, and the two would drift the way a preview and an
+    // export always do when they are drawn separately.
+    let l = build("node a \"A\"\nnode b \"B\" right-of a\na -> b");
+    let (_, _, w, h) = crate::render_svg::canvas(&l);
+
+    let png = crate::render_png::render(&l, 1.0).expect("a raster");
+    assert_eq!(&png[1..4], b"PNG", "not a PNG");
+
+    // The IHDR width and height are big-endian at a fixed offset, which is
+    // enough to assert the size without decoding the image.
+    let width = u32::from_be_bytes([png[16], png[17], png[18], png[19]]);
+    let height = u32::from_be_bytes([png[20], png[21], png[22], png[23]]);
+    assert_eq!(width, w.round() as u32, "the raster is not the canvas wide");
+    assert_eq!(
+        height,
+        h.round() as u32,
+        "the raster is not the canvas tall"
+    );
+}
+
+#[cfg(feature = "png")]
+#[test]
+fn scale_multiplies_the_diagrams_own_size() {
+    let l = build("node a \"A\"");
+    let one = crate::render_png::render(&l, 1.0).unwrap();
+    let two = crate::render_png::render(&l, 2.0).unwrap();
+
+    let width = |png: &[u8]| u32::from_be_bytes([png[16], png[17], png[18], png[19]]);
+    // Each dimension rounds on its own, so twice the size is within a pixel
+    // rather than exactly double.
+    assert!(
+        width(&two).abs_diff(width(&one) * 2) <= 1,
+        "{} is not twice {}",
+        width(&two),
+        width(&one)
+    );
+}
+
+#[cfg(feature = "png")]
+#[test]
+fn a_nonsense_scale_does_not_bring_the_renderer_down() {
+    // `--scale 0` and `--scale -1` are things a person types. Neither may
+    // reach `Pixmap::new` as a zero or a negative.
+    let l = build("node a \"A\"");
+    for scale in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+        assert!(
+            crate::render_png::render(&l, scale).is_ok(),
+            "scale {scale} was not handled"
+        );
+    }
+}
+
+#[test]
+fn the_rasteriser_is_opt_in_and_the_window_implies_it() {
+    // `X-017` narrows here rather than retiring: raster becomes optional, not
+    // present. What must stay true is the direction of the implication — a
+    // window already needs the rasteriser, and someone rendering images in a
+    // build wants no windowing library.
+    let manifest = include_str!("../Cargo.toml");
+
+    let defaults = manifest
+        .split_once("default = [")
+        .and_then(|(_, tail)| tail.split_once(']'))
+        .expect("a default feature list")
+        .0;
+    assert!(!defaults.contains("png"), "the rasteriser is on by default");
+
+    let window = manifest
+        .lines()
+        .find(|l| l.starts_with("window = "))
+        .expect("a window feature");
+    assert!(
+        window.contains("\"png\""),
+        "the window does not imply the rasteriser: {window}"
+    );
+    assert!(
+        !window.contains("resvg"),
+        "the window names the rasteriser directly instead of going through \
+         `png`, so the two can drift: {window}"
+    );
+}

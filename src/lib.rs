@@ -130,6 +130,9 @@ pub mod props;
 #[allow(missing_docs)]
 #[cfg(feature = "pdf")]
 pub mod render_pdf;
+#[allow(missing_docs)]
+#[cfg(feature = "png")]
+pub mod render_png;
 pub mod render_svg;
 pub mod report;
 #[allow(missing_docs)]
