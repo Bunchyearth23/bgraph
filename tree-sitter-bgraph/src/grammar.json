@@ -67,6 +67,14 @@
         },
         {
           "type": "SYMBOL",
+          "name": "component_declaration"
+        },
+        {
+          "type": "SYMBOL",
+          "name": "use_declaration"
+        },
+        {
+          "type": "SYMBOL",
           "name": "type_declaration"
         },
         {
@@ -162,6 +170,92 @@
                   }
                 }
               ]
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
+    "component_declaration": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "component"
+        },
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "identifier"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "body",
+          "content": {
+            "type": "SYMBOL",
+            "name": "group_block"
+          }
+        }
+      ]
+    },
+    "use_declaration": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "use"
+        },
+        {
+          "type": "FIELD",
+          "name": "component",
+          "content": {
+            "type": "SYMBOL",
+            "name": "identifier"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": "as"
+        },
+        {
+          "type": "FIELD",
+          "name": "prefix",
+          "content": {
+            "type": "SYMBOL",
+            "name": "identifier"
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "placement",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_placement"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "bindings",
+              "content": {
+                "type": "SYMBOL",
+                "name": "block"
+              }
             },
             {
               "type": "BLANK"

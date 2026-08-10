@@ -185,6 +185,7 @@ impl State {
         // of the next would run together in a rendered diagnostic.
         self.text.push('\n');
 
+        expand(&mut diagram, &path)?;
         shift(&mut diagram, base);
         if let Some(prefix) = prefix {
             qualify(&mut diagram, prefix);
@@ -243,6 +244,210 @@ impl State {
         d.groups.extend(groups);
         d.edges.extend(other.edges);
         Ok(())
+    }
+}
+
+/// Place every `use`, and drop the `component` declarations that fed them.
+///
+/// A component is an include of a file you did not have to make. So this is
+/// the same two steps `include` takes — fill in the text, then prefix what it
+/// declares — and it reuses the same [`qualify`] pass, which is why two
+/// instances of one component cannot collide.
+///
+/// Spans inside an instance point at the `use` that placed it rather than at
+/// the component's own text: the component is written once and placed many
+/// times, so a diagnostic about *this* instance belongs where the instance is.
+fn expand(diagram: &mut Diagram, from: &Path) -> Result<()> {
+    let components = std::mem::take(&mut diagram.components);
+    let uses = std::mem::take(&mut diagram.uses);
+    if uses.is_empty() {
+        return Ok(());
+    }
+
+    for placing in &uses {
+        let Some(component) = components
+            .iter()
+            .find(|c| c.name.as_str() == placing.component.as_str())
+        else {
+            let known: Vec<&str> = components.iter().map(|c| c.name.as_str()).collect();
+            bail!(
+                "{}: unknown component `{}`{}",
+                from.display(),
+                placing.component.as_str(),
+                if known.is_empty() {
+                    String::new()
+                } else {
+                    format!(" — this file declares: {}", known.join(", "))
+                }
+            );
+        };
+
+        let mut values = crate::template::Bindings::new();
+        for binding in &placing.bindings {
+            // Every value written after the key, joined the way the language
+            // reads a list — so `size: 120 60` reaches the hole as `120 60`.
+            // A single string binds as text, so the engine escapes it for
+            // wherever the hole sits — inside a label it is escaped for a
+            // string, in a value position it is quoted. Anything else binds
+            // as written, joined the way the language reads a list, so
+            // `size: 120 60` reaches the hole as `120 60`.
+            let value = match binding.values.as_slice() {
+                [crate::ast::Value::Str(text)] => crate::template::Value::Text(text.clone()),
+                values => crate::template::Value::Raw(
+                    values.iter().map(written).collect::<Vec<_>>().join(" "),
+                ),
+            };
+            values.insert(binding.name.clone(), value);
+        }
+
+        let filled = crate::template::Template::parse(&component.body)
+            .and_then(|t| t.fill(&values))
+            .with_context(|| {
+                format!(
+                    "{}: placing component `{}` as `{}`",
+                    from.display(),
+                    component.name.as_str(),
+                    placing.prefix.as_str()
+                )
+            })?;
+
+        let mut instance = crate::parser::parse(&filled).map_err(|e| {
+            anyhow::anyhow!(
+                "{}: component `{}` does not parse once `{}`'s bindings are filled: {}",
+                from.display(),
+                component.name.as_str(),
+                placing.prefix.as_str(),
+                e.message
+            )
+        })?;
+
+        // Every span in the instance points at the `use`. The instance has no
+        // text of its own in any file, and a span into the component's body
+        // would send a reader to a line that describes every instance rather
+        // than the one that is wrong.
+        pin(&mut instance, placing.span);
+        qualify(&mut instance, placing.prefix.as_str());
+
+        // The instance is wrapped in a frame named after it. That is what
+        // makes an instance *placeable*: a group is already anchorable,
+        // already sized by what it holds, and already moves its subtree — so
+        // `use service as jobs right-of web` needs no placement vocabulary of
+        // its own, and `web` names the instance while `web.app` names a box
+        // inside it.
+        let members: Vec<Spanned<String>> = instance
+            .nodes
+            .iter()
+            .map(|n| n.id.clone())
+            .chain(instance.groups.iter().map(|g| g.id.clone()))
+            .collect();
+
+        let base = diagram.edges.len();
+        let mut groups = instance.groups;
+        for group in &mut groups {
+            for member in &mut group.edge_members {
+                *member += base;
+            }
+        }
+        diagram.groups.extend(groups);
+        diagram.edges.extend(instance.edges);
+        diagram.nodes.extend(instance.nodes);
+        diagram.styles.extend(instance.styles);
+
+        diagram.groups.push(crate::ast::GroupDecl {
+            activates: false,
+            id: placing.prefix.clone(),
+            label: None,
+            classes: Vec::new(),
+            placement: placing.placement.clone(),
+            props: Vec::new(),
+            members,
+            edge_members: Vec::new(),
+            span: placing.span,
+        });
+    }
+
+    Ok(())
+}
+
+/// Point every span in an instance at the `use` that placed it.
+///
+/// The instance has no text of its own in any file. A span into the
+/// component's body would send a reader to the line that describes *every*
+/// instance rather than to the one that is wrong.
+fn pin(d: &mut Diagram, at: Span) {
+    let s = |span: &mut Span| *span = at;
+    let sp = |x: &mut Spanned<String>| x.span = at;
+    let props = |ps: &mut Vec<Prop>| {
+        for p in ps {
+            p.span = at;
+            p.name_span = at;
+            p.values_span = at;
+        }
+    };
+
+    props(&mut d.graph);
+    for style in &mut d.styles {
+        sp(&mut style.name);
+        if let Some(e) = &mut style.extends {
+            sp(e);
+        }
+        props(&mut style.props);
+        s(&mut style.span);
+    }
+    for node in &mut d.nodes {
+        sp(&mut node.keyword);
+        sp(&mut node.id);
+        s(&mut node.positional_span);
+        for c in &mut node.classes {
+            sp(c);
+        }
+        for m in &mut node.members {
+            sp(m);
+        }
+        props(&mut node.props);
+        pin_placement(&mut node.placement, at);
+        s(&mut node.span);
+    }
+    for edge in &mut d.edges {
+        sp(&mut edge.from);
+        sp(&mut edge.to);
+        s(&mut edge.positional_span);
+        for c in &mut edge.classes {
+            sp(c);
+        }
+        props(&mut edge.props);
+        s(&mut edge.span);
+    }
+    for group in &mut d.groups {
+        sp(&mut group.id);
+        for c in &mut group.classes {
+            sp(c);
+        }
+        for m in &mut group.members {
+            sp(m);
+        }
+        props(&mut group.props);
+        pin_placement(&mut group.placement, at);
+        s(&mut group.span);
+    }
+}
+
+fn pin_placement(placement: &mut Option<crate::ast::Placement>, at: Span) {
+    use crate::ast::Placement;
+    if let Some(Placement::Rel { anchor, .. }) = placement {
+        anchor.span = at;
+    }
+}
+
+/// A value as it was written, for putting back into source text.
+fn written(value: &crate::ast::Value) -> String {
+    use crate::ast::Value;
+    match value {
+        Value::Num(n) => crate::charts::trim_number(*n),
+        Value::Str(s) => format!("{s:?}"),
+        Value::Word(w) => w.clone(),
+        Value::Color(c) => c.clone(),
+        other => format!("{other:?}"),
     }
 }
 

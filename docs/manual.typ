@@ -660,6 +660,29 @@ that composition exists.
 
 A circular include is an error naming the chain.
 
+*A component* is an include of a file you did not have to make. Declared once,
+placed under a name, prefixed the same way — so two placings cannot collide,
+and the prefixing that makes one safe makes the other safe too.
+
+```
+component service {
+  node app "{{label}}"
+  node db  "Database" below app gap 34
+}
+
+use service as web
+use service as jobs right-of web gap 90 { label: "Jobs" }
+```
+
+The body goes through the same template engine a file with holes does, so a
+binding is escaped for wherever its hole sits. An instance is a *frame*, which
+is what makes it placeable: a group is already anchorable and already sized by
+what it holds, so an instance needs no placement vocabulary of its own. `web`
+names the instance; `web.app` names a box inside it.
+
+No conditionals and no loops — past that it is a macro system, and a much
+larger promise than this makes.
+
 #v(0.3em)
 
 #diagram(

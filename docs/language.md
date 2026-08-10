@@ -54,6 +54,42 @@ The library keeps the split: `render_source` takes text and refuses an
 the semver promise both rest on it doing no I/O. `render_file` takes a path
 and resolves them.
 
+### Components
+
+A shape declared once and placed many times. A component *is* an include of a
+file you did not have to make: the same prefixing, so two placings cannot
+collide.
+
+```
+component service {
+  node app "{{label}}"
+  node db  "Database" below app gap 34
+  app -> db "reads"
+}
+
+use service as web
+use service as jobs right-of web gap 90 { label: "Jobs" }
+
+web.app -> jobs.app "enqueues"
+```
+
+The body goes through the same template engine a file with holes does, so a
+binding is escaped for wherever its hole sits — a label with a quote in it
+cannot become a statement. A component's holes belong to the component, not to
+the file: they are bound by each `use`, and a file with a component is not
+thereby a template.
+
+**An instance is a frame.** That is what makes it placeable: a group is
+already anchorable and already sized by what it holds, so `use service as jobs
+right-of web` needs no placement vocabulary of its own. `web` names the
+instance; `web.app` names a box inside it.
+
+Deliberately no conditionals and no loops. Past that it is a macro system, and
+a much larger promise than this makes — the library fills a table for the
+cases that need one.
+
+The whole example is in [`examples/components.bd`](../examples/components.bd).
+
 ### Named themes
 
 `--theme light`, `--theme dark`, `--theme print`. A theme **is** a style

@@ -77,7 +77,7 @@ pub fn parse(input: &str) -> std::result::Result<Diagram, ParseError> {
         .next()
         .expect("the file rule always yields one pair");
 
-    build(file).map_err(|err| ParseError {
+    build(file, input).map_err(|err| ParseError {
         message: format!("{err:#}"),
         span: Span { start: 0, end: 0 },
     })
@@ -186,7 +186,7 @@ fn error_span(err: &pest::error::Error<Rule>, input: &str) -> Span {
     }
 }
 
-fn build(file: Pair<Rule>) -> Result<Diagram> {
+fn build(file: Pair<Rule>, input: &str) -> Result<Diagram> {
     let mut diagram = Diagram::default();
 
     for pair in file.into_inner() {
@@ -211,6 +211,8 @@ fn build(file: Pair<Rule>) -> Result<Diagram> {
                 diagram.graph.extend(parse_block(block)?);
             }
             Rule::include_decl => diagram.includes.push(parse_include(pair)?),
+            Rule::component_decl => diagram.components.push(parse_component(pair, input)?),
+            Rule::use_decl => diagram.uses.push(parse_use(pair)?),
             Rule::style_decl => diagram.styles.push(parse_style(pair)?),
             Rule::item_decl => diagram.nodes.push(parse_item(pair)?),
             Rule::group_decl => parse_group(pair, &mut diagram)?,
@@ -243,6 +245,55 @@ fn spanned(pair: &Pair<Rule>) -> Spanned<String> {
         value: pair.as_str().to_string(),
         span: span_of(pair),
     }
+}
+
+fn parse_component(pair: Pair<Rule>, source: &str) -> Result<crate::ast::ComponentDecl> {
+    let span = span_of(&pair);
+    let mut inner = pair.into_inner();
+    let name = inner
+        .next()
+        .map(|p| spanned(&p))
+        .context("a component needs a name")?;
+    let block = inner.next().context("a component needs a block")?;
+    let block_span = span_of(&block);
+
+    // The body is kept as *text* rather than as statements: it is filled by
+    // the template engine before it is parsed, so a hole may stand anywhere,
+    // including in places a parsed form could not hold one.
+    let body = source
+        .get(block_span.start + 1..block_span.end.saturating_sub(1))
+        .unwrap_or_default()
+        .to_string();
+
+    Ok(crate::ast::ComponentDecl { name, body, span })
+}
+
+fn parse_use(pair: Pair<Rule>) -> Result<crate::ast::UseDecl> {
+    let span = span_of(&pair);
+    let mut inner = pair.into_inner();
+    let component = inner
+        .next()
+        .map(|p| spanned(&p))
+        .context("`use` needs a component")?;
+    let prefix = inner
+        .next()
+        .map(|p| spanned(&p))
+        .context("`use` needs `as <name>`")?;
+    let mut placement = None;
+    let mut bindings = Vec::new();
+    for rest in inner {
+        match rest.as_rule() {
+            Rule::block => bindings = parse_block(rest)?,
+            _ => placement = Some(parse_placement(rest)?),
+        }
+    }
+    Ok(crate::ast::UseDecl {
+        component,
+        prefix,
+        placement,
+        bindings,
+        span,
+    })
 }
 
 fn parse_include(pair: Pair<Rule>) -> Result<crate::ast::IncludeDecl> {

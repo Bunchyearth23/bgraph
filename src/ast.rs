@@ -48,6 +48,37 @@ pub struct Diagram {
     /// anything is checked, so by the time `check` runs there is one diagram
     /// and no such thing as a file boundary (`D-029`).
     pub includes: Vec<IncludeDecl>,
+    /// Fragments declared once and placed many times, and the placings.
+    /// Expanded by [`crate::compose`] alongside `include`, because a component
+    /// *is* an include of a file you did not have to make (`D-030`).
+    pub components: Vec<ComponentDecl>,
+    pub uses: Vec<UseDecl>,
+}
+
+/// `component service { … }` — the body kept as source text, because that is
+/// what the template engine fills and what the prefixing pass then parses.
+#[derive(Debug)]
+pub struct ComponentDecl {
+    pub name: Spanned<String>,
+    /// The block's contents, braces excluded, exactly as written.
+    pub body: String,
+    pub span: Span,
+}
+
+/// `use service as web { label: "Web" }`.
+#[derive(Debug)]
+pub struct UseDecl {
+    pub component: Spanned<String>,
+    /// The namespace this instance's names arrive under — always present,
+    /// because two instances of one component would otherwise declare the
+    /// same identifiers twice.
+    pub prefix: Spanned<String>,
+    /// Where the instance goes. It lands on the frame the expansion wraps
+    /// the instance in, so an instance is placed and anchored exactly as any
+    /// other group is — rather than needing a placement vocabulary of its own.
+    pub placement: Option<Placement>,
+    pub bindings: Vec<Prop>,
+    pub span: Span,
 }
 
 /// `include "shared.bds"`, or `include "core.bd" as core`.

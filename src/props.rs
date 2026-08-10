@@ -2290,6 +2290,17 @@ pub const KEYWORDS: &[(&str, &str)] = &[
          name must be unique across the set; a clash names both files.",
     ),
     (
+        "component",
+        "A fragment declared once and placed many times — `component service \
+         { … }`, then `use service as web`. Its holes are bound by each \
+         placing, and its names arrive under the placing's prefix.",
+    ),
+    (
+        "use",
+        "Place a component: `use service as web right-of jobs { label: \"Web\" }`. \
+         The instance is a frame, so it is anchored like any other group.",
+    ),
+    (
         "type",
         "Diagram archetype, declared once at the top of the file — `type pie`. \
          Defaults to `free`.",

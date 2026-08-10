@@ -5805,15 +5805,19 @@ fn every_example_still_works() {
             continue;
         }
 
-        let diagram = parse_diagram(&source).unwrap_or_else(|e| panic!("{name}: {e:#}"));
-        let errors: Vec<String> = crate::check::check(&diagram)
+        // Through the composer, because that is the pipeline: an example
+        // using `include` or a `component` is not a diagram until it has run.
+        // Parsing the text directly would have said `web.app` is an unknown
+        // node, which is true of the text and false of the diagram.
+        let composed = crate::compose::load(&path).unwrap_or_else(|e| panic!("{name}: {e:#}"));
+        let errors: Vec<String> = crate::check::check(&composed.diagram)
             .into_iter()
             .filter(|d| d.severity == crate::check::Severity::Error)
             .map(|d| d.message)
             .collect();
         assert!(errors.is_empty(), "{name}: {errors:?}");
 
-        let svg = crate::render_source(&source).unwrap_or_else(|e| panic!("{name}: {e:#}"));
+        let svg = crate::render_file(&path).unwrap_or_else(|e| panic!("{name}: {e:#}"));
         assert!(
             svg.starts_with("<svg") && svg.trim_end().ends_with("</svg>"),
             "{name}"
@@ -7024,4 +7028,107 @@ fn an_unknown_theme_names_the_ones_that_exist() {
     for name in ["neon", "light", "dark", "print"] {
         assert!(message.contains(name), "{message}");
     }
+}
+
+// ------------------------------------------------- components (I-030)
+
+fn compose_one(name: &str, source: &str) -> crate::compose::Composed {
+    let dir = scratch(name);
+    let file = dir.join("main.bd");
+    std::fs::write(&file, source).expect("a scratch file");
+    crate::compose::load(&file).expect("it should compose")
+}
+
+#[test]
+fn a_component_placed_twice_declares_two_of_everything() {
+    let composed = compose_one(
+        "component-twice",
+        "component service {\n  node app \"{{label}}\"\n  node db \"DB\" below app\n  app -> db\n}\n\
+         use service as web { label: \"Web\" }\n\
+         use service as jobs { label: \"Jobs\" }\n",
+    );
+    let ids: Vec<&str> = composed
+        .diagram
+        .nodes
+        .iter()
+        .map(|n| n.id.as_str())
+        .collect();
+    for expected in ["web.app", "web.db", "jobs.app", "jobs.db"] {
+        assert!(ids.contains(&expected), "{ids:?}");
+    }
+    assert_eq!(
+        composed.diagram.edges.len(),
+        2,
+        "each instance has its own edge"
+    );
+    crate::layout::solve(&composed.diagram).expect("and it draws");
+}
+
+#[test]
+fn an_instance_is_a_frame_so_it_can_be_placed() {
+    // What makes the feature usable rather than a curiosity: without this an
+    // author can name the boxes inside an instance but cannot say where the
+    // instance goes.
+    let composed = compose_one(
+        "component-placed",
+        "component service {\n  node app \"A\"\n}\n\
+         use service as web\n\
+         use service as jobs right-of web gap 90\n",
+    );
+    let frames: Vec<&str> = composed
+        .diagram
+        .groups
+        .iter()
+        .map(|g| g.id.as_str())
+        .collect();
+    assert_eq!(frames, ["web", "jobs"]);
+
+    let l = crate::layout::solve(&composed.diagram).expect("it draws");
+    let web = l.groups.iter().find(|g| g.id == "web").unwrap();
+    let jobs = l.groups.iter().find(|g| g.id == "jobs").unwrap();
+    assert!(
+        jobs.rect.x > web.rect.right(),
+        "the second instance did not land to the right of the first"
+    );
+}
+
+#[test]
+fn a_binding_lands_where_the_hole_is_and_is_escaped_for_it() {
+    // The component body goes through the template engine, so a label with a
+    // quote in it cannot become a statement.
+    let composed = compose_one(
+        "component-escape",
+        "component box {\n  node b \"{{label}}\"\n}\n\
+         use box as one { label: \"a \\\" quote\" }\n",
+    );
+    let l = crate::layout::solve(&composed.diagram).expect("it draws");
+    assert_eq!(l.nodes[0].lines, vec!["a \" quote"]);
+}
+
+#[test]
+fn a_components_holes_are_not_the_files_holes() {
+    // A component's holes are bound by each `use`, not by whoever renders the
+    // file. Counting them would make every file with a component a template
+    // that can never be satisfied.
+    let source = "component box {\n  node b \"{{label}}\"\n}\nuse box as one { label: \"A\" }\n";
+    let template = crate::Template::parse(source).expect("it parses");
+    assert!(
+        template.holes().is_empty(),
+        "the file claims holes that belong to a component: {:?}",
+        template.holes()
+    );
+}
+
+#[test]
+fn placing_an_unknown_component_says_which_exist() {
+    let dir = scratch("component-unknown");
+    let file = dir.join("main.bd");
+    std::fs::write(
+        &file,
+        "component service {\n  node a \"A\"\n}\nuse serivce as web\n",
+    )
+    .unwrap();
+    let message = format!("{:#}", crate::compose::load(&file).expect_err("a typo"));
+    assert!(message.contains("serivce"), "{message}");
+    assert!(message.contains("service"), "{message}");
 }

@@ -37,6 +37,8 @@ module.exports = grammar({
     _statement: ($) =>
       choice(
         $.include_declaration,
+        $.component_declaration,
+        $.use_declaration,
         $.type_declaration,
         $.graph_declaration,
         $.style_declaration,
@@ -55,6 +57,21 @@ module.exports = grammar({
     // come in under a prefix (`D-029`).
     include_declaration: ($) =>
       seq('include', field('path', $.string), optional(seq('as', field('prefix', $.identifier)))),
+
+    // A component is a file you did not have to make a file of: declared
+    // once, placed under a name, prefixed exactly as an included file is.
+    component_declaration: ($) =>
+      seq('component', field('name', $.identifier), field('body', $.group_block)),
+
+    use_declaration: ($) =>
+      seq(
+        'use',
+        field('component', $.identifier),
+        'as',
+        field('prefix', $.identifier),
+        optional(field('placement', $._placement)),
+        optional(field('bindings', $.block)),
+      ),
 
     // The archetype: `type pie { … }`. Absent means `free`.
     type_declaration: ($) =>

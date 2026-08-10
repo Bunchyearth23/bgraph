@@ -36,12 +36,19 @@ term = _{ (nl | ";" | ",")+ | &EOI }
 // an edge; PEG backtracking still lets a node actually named `type` have edges.
 // `edge_decl` precedes `item_decl` only for speed: `item_decl` would fail on
 // the arrow anyway and backtrack.
-stmt = _{ include_decl | type_decl | graph_decl | style_decl | group_decl | edge_decl | item_decl }
+stmt = _{ include_decl | component_decl | use_decl | type_decl | graph_decl | style_decl | group_decl | edge_decl | item_decl }
 
 // `include "shared.bds"` merges another file whole; with `as` its names come
 // in under a prefix. Resolved before parsing reaches `check`, so by the time
 // anything is validated there is one diagram (`D-029`).
 include_decl = { "include" ~ string ~ ("as" ~ ident)? }
+
+// A component is a file you did not have to make a file of. It is declared
+// once and placed under a name, exactly as an included file is — so a
+// component and an `include … as` are the same mechanism seen twice, and the
+// prefixing that makes one safe makes the other safe too (`D-030`).
+component_decl = { "component" ~ ident ~ group_block }
+use_decl       = { "use" ~ ident ~ "as" ~ ident ~ placement? ~ block? }
 
 type_decl  = { "type" ~ ident ~ block? }
 

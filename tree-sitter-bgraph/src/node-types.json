@@ -71,6 +71,32 @@
     }
   },
   {
+    "type": "component_declaration",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "group_block",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "direction",
     "named": true,
     "fields": {}
@@ -224,6 +250,10 @@
       "required": false,
       "types": [
         {
+          "type": "component_declaration",
+          "named": true
+        },
+        {
           "type": "edge_declaration",
           "named": true
         },
@@ -253,6 +283,10 @@
         },
         {
           "type": "type_declaration",
+          "named": true
+        },
+        {
+          "type": "use_declaration",
           "named": true
         }
       ]
@@ -615,6 +649,10 @@
       "required": false,
       "types": [
         {
+          "type": "component_declaration",
+          "named": true
+        },
+        {
           "type": "edge_declaration",
           "named": true
         },
@@ -640,6 +678,10 @@
         },
         {
           "type": "type_declaration",
+          "named": true
+        },
+        {
+          "type": "use_declaration",
           "named": true
         }
       ]
@@ -696,6 +738,56 @@
         ]
       },
       "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "use_declaration",
+    "named": true,
+    "fields": {
+      "bindings": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "component": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "placement": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "absolute_position",
+            "named": true
+          },
+          {
+            "type": "relative_position",
+            "named": true
+          }
+        ]
+      },
+      "prefix": {
         "multiple": false,
         "required": true,
         "types": [
@@ -781,6 +873,10 @@
     "extra": true
   },
   {
+    "type": "component",
+    "named": false
+  },
+  {
     "type": "date",
     "named": true
   },
@@ -862,6 +958,10 @@
   },
   {
     "type": "type",
+    "named": false
+  },
+  {
+    "type": "use",
     "named": false
   },
   {
