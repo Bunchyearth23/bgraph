@@ -91,6 +91,41 @@ enum Command {
         /// bash | elvish | fish | powershell | zsh | man
         shell: String,
     },
+    /// Write a working file for a genre; omit the genre to list them
+    Init {
+        /// The archetype: pie, gantt, er, sequence, … — `free` for the
+        /// plain node-and-edge graph
+        genre: Option<String>,
+
+        /// Output file; stdout when omitted
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+}
+
+/// A working file for a genre, or the list of genres.
+///
+/// The list is the no-argument form rather than a separate command: someone
+/// who does not know which genre they want is exactly the person typing
+/// `bgraph init`, and sending them to `--help` for it would be a detour.
+fn init(genre: Option<String>, output: Option<PathBuf>) -> Result<i32> {
+    let Some(genre) = genre else {
+        for name in bgraph::init::genres() {
+            println!("{name}");
+        }
+        return Ok(0);
+    };
+
+    let source = bgraph::init::skeleton(&genre)?;
+    match output {
+        Some(path) => {
+            fs::write(&path, &source)
+                .with_context(|| format!("cannot write {}", path.display()))?;
+            println!("{} written for `{genre}`", path.display());
+        }
+        None => print!("{source}"),
+    }
+    Ok(0)
 }
 
 /// Completions and the man page, both written from the `Cli` struct above
@@ -211,6 +246,7 @@ fn run() -> Result<i32> {
         Some(Command::Fmt { inputs, check }) => return format_files(&inputs, check),
         #[cfg(feature = "completions")]
         Some(Command::Completions { shell }) => return completions(&shell),
+        Some(Command::Init { genre, output }) => return init(genre, output),
         Some(Command::Docs { output }) => {
             let manual = bgraph::docgen::reference();
             match output {

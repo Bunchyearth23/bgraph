@@ -6065,3 +6065,70 @@ fn the_generated_reference_lists_the_completions_command() {
         "the reference does not mention `completions`"
     );
 }
+
+// ------------------------------------------------- `bgraph init` (I-049)
+
+#[test]
+fn every_genre_starts_from_a_file_that_renders() {
+    // The promise of the command: what comes out is not a sketch to repair
+    // but a diagram. Anything less and the first thing a newcomer meets is
+    // a diagnostic.
+    for def in crate::props::ARCHETYPES {
+        let source = crate::init::skeleton(def.name)
+            .unwrap_or_else(|e| panic!("no skeleton for `{}`: {e:#}", def.name));
+
+        let diagram = parse_diagram(&source)
+            .unwrap_or_else(|e| panic!("`{}` does not parse: {e:#}", def.name));
+
+        let errors: Vec<_> = crate::check::check(&diagram)
+            .into_iter()
+            .filter(|d| d.severity == crate::check::Severity::Error)
+            .collect();
+        assert!(
+            errors.is_empty(),
+            "`{}` starts with an error: {errors:?}",
+            def.name
+        );
+
+        layout::solve(&diagram).unwrap_or_else(|e| panic!("`{}` does not draw: {e:#}", def.name));
+    }
+}
+
+#[test]
+fn the_skeleton_states_the_genres_own_shape() {
+    // The header is generated from the archetype tables rather than written
+    // per genre, so it cannot describe a keyword that was renamed. Asserted
+    // over every genre, because one hand-written header would pass a test
+    // that named only `pie`.
+    for def in crate::props::ARCHETYPES {
+        let source = crate::init::skeleton(def.name).unwrap();
+        let header: String = source.lines().take_while(|l| l.starts_with("//")).collect();
+
+        for item in def.items() {
+            assert!(
+                header.contains(&format!("{item} <id>")),
+                "`{}` never shows how to write a `{item}`",
+                def.name
+            );
+        }
+        for slot in def.slots {
+            assert!(
+                header.contains(&format!("<{}>", slot.prop)),
+                "`{}` never shows its `{}` slot",
+                def.name,
+                slot.prop
+            );
+        }
+    }
+}
+
+#[test]
+fn an_unknown_genre_names_the_ones_that_exist() {
+    // The person typing a wrong genre is the person who does not know the
+    // list, so the error is the list.
+    let e = crate::init::skeleton("piechart").expect_err("`piechart` is not a genre");
+    let message = format!("{e:#}");
+    assert!(message.contains("piechart"), "{message}");
+    assert!(message.contains("pie"), "{message}");
+    assert!(message.contains("gantt"), "{message}");
+}

@@ -410,6 +410,7 @@ bgraph report.bd --rows r=sales.csv # one hole from the rows of a CSV
 bgraph watch report.bd --data q3.json   # live preview, data re-read on save
 bgraph fmt diagram.bd               # reformat to the canonical shape
 bgraph fmt --check examples/*.bd    # …or report what would change, and exit non-zero
+bgraph init pie                     # a working file for a genre; no genre lists them
 bgraph completions fish             # a completion script; bash|zsh|fish|elvish|powershell
 bgraph completions man              # …or the man page, from the same flag definitions
 bgraph docs -o docs/reference.md    # regenerate the reference manual

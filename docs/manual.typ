@@ -638,6 +638,7 @@ bgraph watch diagram.bd
 bgraph check diagram.bd
 bgraph fmt diagram.bd
 bgraph completions fish
+bgraph init pie
 ```
 
 The output extension picks the writer. A flag would be a second way of saying
@@ -651,6 +652,11 @@ lines. It leaves columns lined up by hand exactly as written — indentation is
 structural and so its business, alignment is taste and is not. `--check`
 reports instead of writing, and exits non-zero, so one command serves a person
 and a build.
+
+`init` writes a working file for a genre — the archetype's shape stated from
+the compiler's own tables, over the genre's example — so the first thing you
+meet is a diagram rather than a diagnostic. With no genre it lists them, which
+is what someone who does not know which one they want is really asking.
 
 `completions` writes a shell script — or the man page, with `completions man` —
 generated from the same flag definitions the binary parses with, so neither can

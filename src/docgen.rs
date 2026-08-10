@@ -95,7 +95,7 @@ fn graph_settings(m: &mut String) {
 /// that does not exist; and `every_example_still_works` renders each one, so
 /// it cannot show one that no longer draws. Tables tell you what a property
 /// means — this is what you copy to start.
-const EXAMPLES: &[(&str, &str)] = &[
+pub(crate) const EXAMPLES: &[(&str, &str)] = &[
     ("free", include_str!("../examples/groups.bd")),
     ("pie", include_str!("../examples/pie.bd")),
     ("packet", include_str!("../examples/packet.bd")),
@@ -347,6 +347,7 @@ bgraph report.bd --set year=2026    # …or bind a scalar on the command line
 bgraph report.bd --rows r=sales.csv # …or one hole from the rows of a CSV
 bgraph watch report.bd --data q3.json  # live preview of a filled template
 bgraph fmt diagram.bd               # reformat; --check reports instead
+bgraph init pie                     # a working file for a genre; no genre lists them
 bgraph completions fish             # a completion script; bash|zsh|fish|elvish|powershell
 bgraph completions man              # …or the man page, from the same flags
 bgraph docs -o docs/reference.md    # regenerate this file

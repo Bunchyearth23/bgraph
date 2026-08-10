@@ -140,6 +140,9 @@ pub mod style;
 pub mod docgen;
 #[allow(missing_docs)]
 #[doc(hidden)]
+pub mod init;
+#[allow(missing_docs)]
+#[doc(hidden)]
 pub mod lsp;
 #[allow(missing_docs)]
 #[doc(hidden)]
