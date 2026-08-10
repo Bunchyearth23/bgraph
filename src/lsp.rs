@@ -783,16 +783,17 @@ impl Server {
         {
             let r = placed.rect;
             let s = &placed.style;
-            let mut facts = vec![format!("x {:.0}  y {:.0}   {:.0} × {:.0}", r.x, r.y, r.w, r.h)];
+            let mut facts = vec![format!(
+                "x {:.0}  y {:.0}   {:.0} × {:.0}",
+                r.x, r.y, r.w, r.h
+            )];
             if let Some(fill) = &s.fill {
                 facts.push(format!("fill    {fill}"));
             }
             if let Some(stroke) = &s.stroke {
                 facts.push(format!(
                     "stroke  {stroke}{}",
-                    s.stroke_width
-                        .map(|w| format!("  {w}"))
-                        .unwrap_or_default()
+                    s.stroke_width.map(|w| format!("  {w}")).unwrap_or_default()
                 ));
             }
             if let Some(shape) = s.shape {
@@ -1547,7 +1548,12 @@ mod tests {
         // And the span is the line, not the whole file.
         let d = found
             .iter()
-            .find(|d| d["message"].as_str().unwrap_or_default().contains("repeats over"))
+            .find(|d| {
+                d["message"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .contains("repeats over")
+            })
             .unwrap();
         assert_eq!(d["range"]["start"]["line"].as_u64().unwrap(), 1);
     }
@@ -1558,10 +1564,7 @@ mod tests {
         // misspelling one silently produces a parameter nobody binds.
         let source = "type pie { title: \"{{quarter}}\" }\nslice {{r.id}} \"x\" 1\nslice {{";
         let items = server(source).items_for(source, "slice {{", source.len());
-        let labels: Vec<&str> = items
-            .iter()
-            .filter_map(|i| i["label"].as_str())
-            .collect();
+        let labels: Vec<&str> = items.iter().filter_map(|i| i["label"].as_str()).collect();
         assert!(labels.contains(&"r.id"), "{labels:?}");
         assert!(labels.contains(&"quarter"), "{labels:?}");
     }
@@ -1622,7 +1625,8 @@ mod tests {
     fn every_colour_gets_a_swatch() {
         // `#` is only ever a colour (`D-004`), which is what makes a lexical
         // scan of the file safe.
-        let source = "graph { background: #0b1120 }\nnode a { fill: #38bdf880 }\n// #not-a-color-here\n";
+        let source =
+            "graph { background: #0b1120 }\nnode a { fill: #38bdf880 }\n// #not-a-color-here\n";
         let colours = server(source).colours(&json!({
             "textDocument": { "uri": "file:///t.bd" }
         }));
@@ -1916,8 +1920,14 @@ mod block_vocabulary_tests {
         assert!(!machine.contains(&"person".to_string()), "{machine:?}");
 
         let architecture = words_after_kind("type block\nblock a \"A\" {\n  kind: ");
-        assert!(architecture.contains(&"person".to_string()), "{architecture:?}");
-        assert!(!architecture.contains(&"initial".to_string()), "{architecture:?}");
+        assert!(
+            architecture.contains(&"person".to_string()),
+            "{architecture:?}"
+        );
+        assert!(
+            !architecture.contains(&"initial".to_string()),
+            "{architecture:?}"
+        );
     }
 
     #[test]
@@ -1934,7 +1944,10 @@ mod block_vocabulary_tests {
         };
 
         let architecture = names("type block\nblock a \"A\" {\n  ", "  ");
-        assert!(architecture.contains(&"tech".to_string()), "{architecture:?}");
+        assert!(
+            architecture.contains(&"tech".to_string()),
+            "{architecture:?}"
+        );
 
         let free = names("node a \"A\" {\n  ", "  ");
         assert!(!free.contains(&"tech".to_string()), "{free:?}");
@@ -1971,7 +1984,12 @@ mod archetype_completion_tests {
             ("type gantt\ntask t \"T\" {\n  ", "task", "start", "value"),
             ("type packet\nfield f \"F\" {\n  ", "field", "bits", "start"),
             ("type bar\nseries s {\n  ", "series", "points", "wave"),
-            ("type timeline\nevent e \"E\" {\n  ", "event", "date", "start"),
+            (
+                "type timeline\nevent e \"E\" {\n  ",
+                "event",
+                "date",
+                "start",
+            ),
             ("type block\nblock b \"B\" {\n  ", "block", "tech", "wave"),
         ] {
             let names = offered(source, "  ");

@@ -386,7 +386,6 @@ pub fn item_table(def: &ArchetypeDef) -> Vec<&'static PropDef> {
         .collect()
 }
 
-
 // The data each genre reads, kept with the genre. Off the shared table on
 // purpose: `wave` means nothing to a pie, and offering it there is the noise
 // that made completion get in the way (`D-019`).
@@ -1440,12 +1439,10 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         slots: &[],
         members: true,
         alt_items: &[],
-        edge_slots: &[
-            Slot {
-                prop: "wire",
-                arity: 2,
-            },
-        ],
+        edge_slots: &[Slot {
+            prop: "wire",
+            arity: 2,
+        }],
     },
     #[cfg(feature = "venn")]
     ArchetypeDef {
@@ -1500,7 +1497,10 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
               a rack with room, not a rack that does not add up.",
         props: RACK_PROPS,
         item_props: RACK_ITEM_PROPS,
-        slots: &[Slot { prop: "u", arity: 2 }],
+        slots: &[Slot {
+            prop: "u",
+            arity: 2,
+        }],
         members: false,
         alt_items: &[],
         edge_slots: &[],

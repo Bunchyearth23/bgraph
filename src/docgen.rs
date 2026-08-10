@@ -111,10 +111,7 @@ const EXAMPLES: &[(&str, &str)] = &[
     ("timeline", include_str!("../examples/timeline.bd")),
     ("block", include_str!("../examples/block.bd")),
     ("er", include_str!("../examples/er.bd")),
-    (
-        "requirements",
-        include_str!("../examples/requirements.bd"),
-    ),
+    ("requirements", include_str!("../examples/requirements.bd")),
     ("class", include_str!("../examples/class.bd")),
     ("kanban", include_str!("../examples/kanban.bd")),
     ("journey", include_str!("../examples/journey.bd")),
@@ -210,7 +207,11 @@ fn archetypes(m: &mut String) {
             let _ = write!(
                 m,
                 "\n<details>\n<summary>A complete file — <code>examples/{}.bd</code></summary>\n\n```\n{}\n```\n\n</details>\n",
-                if def.name == "free" { "groups" } else { def.name },
+                if def.name == "free" {
+                    "groups"
+                } else {
+                    def.name
+                },
                 source.trim_end()
             );
         }

@@ -659,7 +659,10 @@ fn the_manual_names_every_genre_and_its_word() {
     // And the count in the prose, which is the sentence a reader trusts.
     let genres = crate::props::ARCHETYPES.len() - 1;
     assert_eq!(genres, 28, "the manual says twenty-eight genres and `free`");
-    assert!(manual.contains("Twenty-eight genres and `free`"), "the prose count");
+    assert!(
+        manual.contains("Twenty-eight genres and `free`"),
+        "the prose count"
+    );
 }
 
 // ---------------------------------------------------------------------- W-058
@@ -695,7 +698,10 @@ fn a_template_reports_what_only_a_render_used_to_catch() {
     let found = crate::template::lint(two);
     assert_eq!(found.len(), 1, "{found:?}");
     assert!(found[0].1.contains("repeats over"), "{found:?}");
-    assert!(found[0].1.contains("`a`") && found[0].1.contains("`b`"), "{found:?}");
+    assert!(
+        found[0].1.contains("`a`") && found[0].1.contains("`b`"),
+        "{found:?}"
+    );
 
     let open = "node a \"{{never closed\n";
     let found = crate::template::lint(open);
@@ -737,8 +743,10 @@ fn json_binds_what_set_cannot() {
     }"#;
     let bound = Bindings::from_json(data).expect("reads");
 
-    let t = Template::parse("type pie { title: \"{{quarter}}\" }\nslice {{r.id}} \"{{r.name}}\" {{r.value}}")
-        .expect("parses");
+    let t = Template::parse(
+        "type pie { title: \"{{quarter}}\" }\nslice {{r.id}} \"{{r.name}}\" {{r.value}}",
+    )
+    .expect("parses");
     let filled = t.fill(&bound).expect("fills");
 
     assert_eq!(
@@ -753,8 +761,8 @@ fn json_binds_what_set_cannot() {
 fn an_identifier_hole_is_written_bare_and_a_value_hole_is_quoted() {
     // The two cannot share a rule. A quoted name does not parse; a bare value
     // becomes a second statement. The position on the line is what decides.
-    let bound = Bindings::from_json(r#"{ "r": [{ "id": "north", "who": "North" }] }"#)
-        .expect("reads");
+    let bound =
+        Bindings::from_json(r#"{ "r": [{ "id": "north", "who": "North" }] }"#).expect("reads");
 
     // `{{r.id}}` is the second word — an identifier. `{{r.who}}` is data.
     let t = Template::parse("node {{r.id}} \"x\" .cls\nnode b\n{{r.id}} -> b \"{{r.who}}\"")
@@ -762,7 +770,10 @@ fn an_identifier_hole_is_written_bare_and_a_value_hole_is_quoted() {
     let filled = t.fill(&bound).expect("fills");
 
     assert!(filled.starts_with("node north \"x\""), "{filled}");
-    assert!(filled.contains("north -> b \"North\""), "the head of an edge is a name too: {filled}");
+    assert!(
+        filled.contains("north -> b \"North\""),
+        "the head of an edge is a name too: {filled}"
+    );
 }
 
 #[cfg(feature = "json")]
@@ -778,7 +789,11 @@ fn a_property_key_does_not_make_the_next_word_a_name() {
     // whether the previous word is one.
     let bound = Bindings::from_json(r#"{ "v": "text" }"#).expect("reads");
     let t = Template::parse("node slice {{v}}").expect("parses");
-    assert!(t.fill(&bound).expect("fills").contains("node slice \"text\""));
+    assert!(
+        t.fill(&bound)
+            .expect("fills")
+            .contains("node slice \"text\"")
+    );
 }
 
 #[cfg(feature = "json")]
@@ -801,7 +816,10 @@ fn json_refuses_what_it_cannot_read_unambiguously() {
     let cases = [
         (r#"[1, 2]"#, "must be an object"),
         (r#"{ "x": null }"#, "is null"),
-        (r#"{ "x": [1, { "a": 2 }] }"#, "mixes objects and plain values"),
+        (
+            r#"{ "x": [1, { "a": 2 }] }"#,
+            "mixes objects and plain values",
+        ),
         (r#"{ "x": { "a": 1 } }"#, "is an object"),
         (r#"{ "x": [{ "a": [{ "b": 1 }] }] }"#, "one line deep"),
     ];
@@ -813,7 +831,10 @@ fn json_refuses_what_it_cannot_read_unambiguously() {
     // And the shapes it does read.
     let ok = Bindings::from_json(r#"{ "a": "x", "b": 2, "c": true, "d": [1, 2], "e": [] }"#)
         .expect("reads");
-    assert_eq!(ok.get("c"), Some(&crate::template::Value::Text("true".into())));
+    assert_eq!(
+        ok.get("c"),
+        Some(&crate::template::Value::Text("true".into()))
+    );
 }
 
 // ---------------------------------------------------------------------- W-042
@@ -837,7 +858,10 @@ fn a_pdf_is_a_pdf() {
         .and_then(|(_, tail)| tail.split_whitespace().next())
         .and_then(|n| n.parse::<usize>().ok())
         .expect("startxref");
-    assert!(text[start..].starts_with("xref"), "startxref points at the table");
+    assert!(
+        text[start..].starts_with("xref"),
+        "startxref points at the table"
+    );
 
     let offsets: Vec<usize> = text
         .lines()
@@ -893,8 +917,8 @@ fn a_pdf_draws_the_edges_the_svg_draws() {
     // wrong about every edge in the default archetype.
     let source = "node a \"A\"\nnode b \"B\" right-of a gap 60\nnode c \"C\" below a\n\
                   a -> b \"carries\"\na ..> c { router: ortho }";
-    let pdf = String::from_utf8_lossy(&crate::render_source_pdf(source).expect("renders"))
-        .to_string();
+    let pdf =
+        String::from_utf8_lossy(&crate::render_source_pdf(source).expect("renders")).to_string();
 
     assert!(pdf.contains("(carries) Tj"), "the edge label is drawn");
 
@@ -902,7 +926,10 @@ fn a_pdf_draws_the_edges_the_svg_draws() {
     // straight centre-to-centre line would have exactly two.
     let moves = pdf.matches(" m\n").count();
     let lines = pdf.matches(" l\n").count();
-    assert!(lines > moves, "paths have interior points: {moves} moves, {lines} lines");
+    assert!(
+        lines > moves,
+        "paths have interior points: {moves} moves, {lines} lines"
+    );
 
     // And an arrowhead is a filled triangle at the end of a line.
     assert!(pdf.contains("f\n"), "a head is filled");
@@ -938,8 +965,7 @@ fn every_example_also_renders_as_a_pdf() {
             continue;
         }
         let name = path.file_name().unwrap().to_string_lossy().to_string();
-        let pdf = crate::render_source_pdf(&source)
-            .unwrap_or_else(|e| panic!("{name}: {e:#}"));
+        let pdf = crate::render_source_pdf(&source).unwrap_or_else(|e| panic!("{name}: {e:#}"));
         assert!(pdf.starts_with(b"%PDF"), "{name}");
         seen += 1;
     }
@@ -1010,7 +1036,11 @@ fn the_packaging_script_takes_every_fact_from_the_manifest() {
 
     // The archive layout VS Code requires, so a rename cannot quietly produce
     // a file no editor will open.
-    for part in ["[Content_Types].xml", "extension.vsixmanifest", "extension/package.json"] {
+    for part in [
+        "[Content_Types].xml",
+        "extension.vsixmanifest",
+        "extension/package.json",
+    ] {
         assert!(script.contains(part), "the archive is missing `{part}`");
     }
 }
@@ -1045,10 +1075,7 @@ fn text_is_measured_per_character_not_by_counting_them() {
     // can be fixed without the font file.
     let thin = crate::layout::advance("llllllllll", 14.0);
     let wide = crate::layout::advance("WWWWWWWWWW", 14.0);
-    assert!(
-        wide / thin > 3.5,
-        "ten Ws against ten ls: {wide} vs {thin}"
-    );
+    assert!(wide / thin > 3.5, "ten Ws against ten ls: {wide} vs {thin}");
 
     // A space is not free and not full width either.
     let with = crate::layout::advance("a a", 14.0);
@@ -1100,7 +1127,10 @@ fn a_branch_is_a_rail_and_the_rails_are_declared_order() {
     let l = build(HISTORY);
     let y = |i: usize| l.nodes[i].rect.y;
     assert_eq!(y(0), y(2), "c1 and c2 share the main rail");
-    assert!(y(1) > y(0), "side sits below main, as `branches` lists them");
+    assert!(
+        y(1) > y(0),
+        "side sits below main, as `branches` lists them"
+    );
 
     // A branch nobody declared still gets a rail, at the bottom.
     let l = build(
@@ -1120,18 +1150,11 @@ fn a_merge_is_two_parents_and_two_lines() {
 fn a_history_written_backwards_is_refused() {
     // The layout numbers steps in declaration order, so a parent written
     // after its child would be measured against a depth that does not exist.
-    let e = err(
-        "type gitgraph\ncommit b \"b\" \"main\"\ncommit a \"a\" \"main\"\na -> b\n",
-    );
+    let e = err("type gitgraph\ncommit b \"b\" \"main\"\ncommit a \"a\" \"main\"\na -> b\n");
     assert!(e.contains("declared after it"), "{e}");
 
-    let d = diags(
-        "type gitgraph\ncommit a \"a\" \"main\"\ncommit b \"b\" \"main\"\n",
-    );
-    assert!(
-        d.iter().any(|x| x.message.contains("no parent")),
-        "{d:?}"
-    );
+    let d = diags("type gitgraph\ncommit a \"a\" \"main\"\ncommit b \"b\" \"main\"\n");
+    assert!(d.iter().any(|x| x.message.contains("no parent")), "{d:?}");
 }
 
 // ---------------------------------------------------------------------- W-041
@@ -1233,7 +1256,9 @@ fn a_wire_lands_on_the_pin_it_names() {
     // What `X-016` was about. The wire used to join the two *boxes* and state
     // its pins in a label; now it leaves the pin row it names and arrives at
     // the one at the other end, which is what a loom drawing is for.
-    let l = build(&format!("{LOOM}j1 -> j2 \"power\" 1 2\nj1 -> j2 \"ground\" 2 1"));
+    let l = build(&format!(
+        "{LOOM}j1 -> j2 \"power\" 1 2\nj1 -> j2 \"ground\" 2 1"
+    ));
 
     assert!(l.edges.is_empty(), "wires are not routed as ordinary edges");
     assert_eq!(l.polylines.len(), 2, "one polyline per wire");
@@ -1247,7 +1272,10 @@ fn a_wire_lands_on_the_pin_it_names() {
 
     // Pin 1 is above pin 2 in both connectors, and the two wires cross —
     // which is only visible because each one starts and ends on a row.
-    assert!(a_from < b_from, "pin 1 leaves above pin 2: {a_from} {b_from}");
+    assert!(
+        a_from < b_from,
+        "pin 1 leaves above pin 2: {a_from} {b_from}"
+    );
     assert!(a_to > b_to, "and arrives below it: {a_to} {b_to}");
 }
 
@@ -1330,7 +1358,10 @@ fn a_venn_refuses_what_no_arrangement_can_show() {
 
     let e = err("type venn\nset a \"A\" 1\nset b \"B\" 1\nset c \"C\" 1\nset d \"D\" 1");
     assert!(e.contains("cannot be drawn as circles"), "{e}");
-    assert!(e.contains("upset"), "the message names the honest alternative: {e}");
+    assert!(
+        e.contains("upset"),
+        "the message names the honest alternative: {e}"
+    );
 
     // An overlap bigger than a set is a counting mistake, not a drawing one.
     let e = err("type venn\nset a \"A\" 10\nset b \"B\" 100\na -> b 50");
@@ -1345,10 +1376,7 @@ fn three_sets_say_that_their_areas_are_indicative() {
     // Three circles cannot honour all seven regions. Saying so beats
     // pretending, and the numbers stay exact.
     let d = diags("type venn\nset a \"A\" 5\nset b \"B\" 5\nset c \"C\" 5\na -> b 1");
-    assert!(
-        d.iter().any(|x| x.message.contains("indicative")),
-        "{d:?}"
-    );
+    assert!(d.iter().any(|x| x.message.contains("indicative")), "{d:?}");
 }
 
 // ---------------------------------------------------------------------- W-043
@@ -1392,7 +1420,8 @@ fn an_unreachable_host_is_reported() {
          host lost \"Lost\" server below a\na -> b\n",
     );
     assert!(
-        d.iter().any(|x| x.message.contains("on no link and in no segment")),
+        d.iter()
+            .any(|x| x.message.contains("on no link and in no segment")),
         "{d:?}"
     );
 
@@ -1455,10 +1484,7 @@ fn an_activation_is_not_a_frame_anywhere() {
     // an edge into a frame — which is what it read as until `frame_names`
     // started telling the two apart.
     let d = diags(CALL);
-    assert!(
-        !d.iter().any(|x| x.message.contains("is a group")),
-        "{d:?}"
-    );
+    assert!(!d.iter().any(|x| x.message.contains("is a group")), "{d:?}");
 
     let d = diags("type sequence\nparticipant a \"A\"\nparticipant b \"B\"\nactivate a {\n}");
     assert!(
@@ -1547,10 +1573,7 @@ fn empty_units_are_room_not_a_mistake() {
     // A packet with unassigned bits does not add up; a rack with empty units
     // has space. The same shape of gap, two different meanings.
     let d = diags("type rack { units: 10 }\ndevice a \"A\" 1 2\ndevice b \"B\" 7 8");
-    assert!(
-        !d.iter().any(|x| x.message.contains("unassigned")),
-        "{d:?}"
-    );
+    assert!(!d.iter().any(|x| x.message.contains("unassigned")), "{d:?}");
 }
 
 // ---------------------------------------------------------------------- W-046
@@ -1578,10 +1601,7 @@ fn a_radar_places_its_axes_clockwise_from_the_top() {
     // centre; 50 on the second and fourth sit either side of it.
     assert!(n.1 < s.1, "the first axis points up: {n:?} vs {s:?}");
     assert!(e.0 > w.0, "the second is to the right of the fourth");
-    assert!(
-        (e.1 - w.1).abs() < 0.5,
-        "and level with it: {e:?} {w:?}"
-    );
+    assert!((e.1 - w.1).abs() < 0.5, "and level with it: {e:?} {w:?}");
 }
 
 #[test]
@@ -1603,7 +1623,8 @@ fn a_radar_draws_one_closed_polygon_per_series() {
 fn a_radar_starts_its_rings_at_zero() {
     // Starting them at the smallest value would exaggerate every difference,
     // which is the classic way this chart misleads.
-    let l = build("type radar { categories: \"a\" \"b\" \"c\" legend: off }\nseries s \"S\" 90 95 100");
+    let l =
+        build("type radar { categories: \"a\" \"b\" \"c\" legend: off }\nseries s \"S\" 90 95 100");
     let ticks: Vec<&str> = l
         .annotations
         .iter()
@@ -1613,12 +1634,9 @@ fn a_radar_starts_its_rings_at_zero() {
     // No numeric ring labels are drawn, so the proof is geometric: the marks
     // must not all sit on the rim.
     assert!(ticks.is_empty());
-    let l2 = build("type radar { categories: \"a\" \"b\" \"c\" legend: off }\nseries s \"S\" 0 50 100");
-    let spread = l2
-        .nodes
-        .iter()
-        .map(|n| n.rect.x)
-        .fold(0.0_f64, f64::max)
+    let l2 =
+        build("type radar { categories: \"a\" \"b\" \"c\" legend: off }\nseries s \"S\" 0 50 100");
+    let spread = l2.nodes.iter().map(|n| n.rect.x).fold(0.0_f64, f64::max)
         - l2.nodes.iter().map(|n| n.rect.x).fold(f64::MAX, f64::min);
     assert!(spread > 1.0, "the scale spans the data, not a sliver");
 }
@@ -1629,13 +1647,13 @@ fn a_radar_reports_the_shapes_it_cannot_honestly_draw() {
     assert!(e.contains("needs `categories`"), "{e}");
 
     let d = diags("type radar { categories: \"a\" \"b\" }\nseries s \"S\" 1 2");
-    assert!(d.iter().any(|x| x.message.contains("enclose no area")), "{d:?}");
-
-    let d = diags("type radar { categories: \"a\" \"b\" \"c\" }\nseries s \"S\" 1 2");
     assert!(
-        d.iter().any(|x| x.message.contains("for 3 axes")),
+        d.iter().any(|x| x.message.contains("enclose no area")),
         "{d:?}"
     );
+
+    let d = diags("type radar { categories: \"a\" \"b\" \"c\" }\nseries s \"S\" 1 2");
+    assert!(d.iter().any(|x| x.message.contains("for 3 axes")), "{d:?}");
 
     let e = err("type radar { categories: \"a\" \"b\" \"c\" }\nseries s \"S\"");
     assert!(e.contains("has no numbers"), "{e}");
@@ -1771,12 +1789,10 @@ fn cards_stack_inside_their_column() {
 fn a_column_over_its_limit_says_so() {
     // The one thing a board is kept for. Without this the genre is a `free`
     // diagram with boxes in rows.
-    let d = diags(
-        "type kanban\ngroup doing \"Doing\" {\n  limit: 2\n  card a\n  card b\n  card c\n}",
-    );
+    let d =
+        diags("type kanban\ngroup doing \"Doing\" {\n  limit: 2\n  card a\n  card b\n  card c\n}");
     assert!(
-        d.iter()
-            .any(|x| x.message.contains("over its limit of 2")),
+        d.iter().any(|x| x.message.contains("over its limit of 2")),
         "{d:?}"
     );
 
@@ -1901,7 +1917,9 @@ fn positional_edge_data_is_validated_like_any_other_property() {
 #[test]
 fn an_unknown_link_is_a_hard_error() {
     // D-005: a silent no-op would hide the typo in a file you cannot compile.
-    let e = err("type requirements\nrequirement a {\n  - A\n}\nrequirement b {\n  - B\n}\na -> b implies");
+    let e = err(
+        "type requirements\nrequirement a {\n  - A\n}\nrequirement b {\n  - B\n}\na -> b implies",
+    );
     assert!(e.contains("implies"), "{e}");
 }
 
@@ -1909,7 +1927,8 @@ fn an_unknown_link_is_a_hard_error() {
 fn a_requirements_view_says_what_it_cannot_check() {
     // Both halves of this genre can be silently empty, and both are the
     // failure it exists to make visible.
-    let d = diags("type requirements\nrequirement a {\n  - A\n}\nrequirement b {\n  - B\n}\na -> b");
+    let d =
+        diags("type requirements\nrequirement a {\n  - A\n}\nrequirement b {\n  - B\n}\na -> b");
     assert!(
         d.iter().any(|x| x.message.contains("what it asserts")),
         "a link with no kind: {d:?}"
@@ -2025,7 +2044,10 @@ fn chart_data_outside_its_archetype_is_named_with_the_genre_that_reads_it() {
     // the genre that reads it, so writing one elsewhere is an unknown
     // property, and the message says whose it is.
     let e = err("node a { value: 5 }");
-    assert!(e.contains("`type pie`") && e.contains("`type treemap`"), "{e}");
+    assert!(
+        e.contains("`type pie`") && e.contains("`type treemap`"),
+        "{e}"
+    );
 
     let e = err("node a { bits: 0 7 }");
     assert!(e.contains("`type packet`"), "{e}");
@@ -2290,14 +2312,13 @@ fn the_tree_sitter_grammar_agrees_with_pest() {
     // the whole guard rather than the one entry. Sweep the directory: a list
     // written by hand is a list that stops being true.
     let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/examples");
-    let mut examples: Vec<std::path::PathBuf> =
-        std::fs::read_dir(dir)
-            .unwrap_or_else(|e| panic!("cannot read {dir}: {e}"))
-            .filter_map(|entry| {
-                let path = entry.expect("readable entry").path();
-                (path.extension().is_some_and(|e| e == "bd")).then_some(path)
-            })
-            .collect();
+    let mut examples: Vec<std::path::PathBuf> = std::fs::read_dir(dir)
+        .unwrap_or_else(|e| panic!("cannot read {dir}: {e}"))
+        .filter_map(|entry| {
+            let path = entry.expect("readable entry").path();
+            (path.extension().is_some_and(|e| e == "bd")).then_some(path)
+        })
+        .collect();
     examples.sort();
     assert!(
         examples.len() >= 16,
@@ -4529,13 +4550,19 @@ fn hostile_corpus() -> Vec<(&'static str, String)> {
         ("bare type", "type".into()),
         ("unknown type", "type nonsense\nnode a".into()),
         ("type with no items", "type pie".into()),
-        ("pie of zeros", "type pie\nslice a \"A\" 0\nslice b \"B\" 0".into()),
+        (
+            "pie of zeros",
+            "type pie\nslice a \"A\" 0\nslice b \"B\" 0".into(),
+        ),
         ("pie of one", "type pie\nslice a \"A\" 1".into()),
         (
             "negative slice",
             "type pie\nslice a \"A\" -5\nslice b \"B\" 3".into(),
         ),
-        ("zero radius", "type pie { radius: 0 }\nslice a \"A\" 1".into()),
+        (
+            "zero radius",
+            "type pie { radius: 0 }\nslice a \"A\" 1".into(),
+        ),
         ("treemap of zeros", "type treemap\nbox a \"A\" 0".into()),
         (
             "treemap gap past its box",
@@ -4546,10 +4573,7 @@ fn hostile_corpus() -> Vec<(&'static str, String)> {
             "type xy { y-axis: 5 5 }\nseries s 5 5 5".into(),
         ),
         ("empty series", "type xy\nseries s".into()),
-        (
-            "one point",
-            "type xy { x-axis: 0 0 }\nseries s 1".into(),
-        ),
+        ("one point", "type xy { x-axis: 0 0 }\nseries s 1".into()),
         ("bar with no categories", "type bar\nseries s 1 2 3".into()),
         (
             "more points than categories",
@@ -4560,9 +4584,15 @@ fn hostile_corpus() -> Vec<(&'static str, String)> {
             "wave of repeats only",
             "type wave\nsignal s \"S\" \"....\"".into(),
         ),
-        ("wave period zero", "type wave { period: 0 }\nsignal s \"S\" \"01\"".into()),
+        (
+            "wave period zero",
+            "type wave { period: 0 }\nsignal s \"S\" \"01\"".into(),
+        ),
         ("sankey with no flow", "type sankey\nnode a\nnode b".into()),
-        ("sankey zero flow", "type sankey\nnode a\nnode b\na -> b 0".into()),
+        (
+            "sankey zero flow",
+            "type sankey\nnode a\nnode b\na -> b 0".into(),
+        ),
         (
             "sankey cycle",
             "type sankey\nnode a\nnode b\na -> b 1\nb -> a 1".into(),
@@ -4584,7 +4614,10 @@ fn hostile_corpus() -> Vec<(&'static str, String)> {
         ("packet zero bits", "type packet\nfield a \"A\" 0 0".into()),
         ("er with no relations", "type er\nentity a \"A\"".into()),
         ("timeline with no events", "type timeline".into()),
-        ("timeline of one day", "type timeline\nevent a \"A\" 2026-03-01".into()),
+        (
+            "timeline of one day",
+            "type timeline\nevent a \"A\" 2026-03-01".into(),
+        ),
         (
             "timeline of the same day",
             "type timeline\nevent a \"A\" 2026-03-01\nevent b \"B\" 2026-03-01".into(),
@@ -4605,12 +4638,15 @@ fn hostile_corpus() -> Vec<(&'static str, String)> {
             "er cardinality on a free graph",
             "node a\nnode b\na -> b { from-card: many }".into(),
         ),
+        ("packet backwards", "type packet\nfield a \"A\" 31 0".into()),
         (
-            "packet backwards",
-            "type packet\nfield a \"A\" 31 0".into(),
+            "quadrant off scale",
+            "type quadrant\npoint a \"A\" 1e9 -1e9".into(),
         ),
-        ("quadrant off scale", "type quadrant\npoint a \"A\" 1e9 -1e9".into()),
-        ("anchor cycle", "node a right-of b\nnode b right-of a".into()),
+        (
+            "anchor cycle",
+            "node a right-of b\nnode b right-of a".into(),
+        ),
         ("self anchor", "node a right-of a".into()),
         ("unknown anchor", "node a right-of nowhere".into()),
         ("duplicate ids", "node a\nnode a".into()),
@@ -4624,13 +4660,19 @@ fn hostile_corpus() -> Vec<(&'static str, String)> {
         ("unknown class", "node a .nonexistent".into()),
         ("style of nothing", "style".into()),
         ("empty group", "group g { }".into()),
-        ("group holding itself", "group g { group g { node a } }".into()),
+        (
+            "group holding itself",
+            "group g { group g { node a } }".into(),
+        ),
         ("unterminated string", "node a \"never closed".into()),
         ("lone backslash", "node a \"\\".into()),
         ("nul byte", "node a \"\0\"".into()),
         ("bom", "\u{feff}node a".into()),
         ("rtl label", "node a \"\u{202e}reversed\"".into()),
-        ("combining marks", "node a \"e\u{301}\u{301}\u{301}\u{301}\"".into()),
+        (
+            "combining marks",
+            "node a \"e\u{301}\u{301}\u{301}\u{301}\"".into(),
+        ),
         ("unpaired brace in label", "node a \"a { b\"".into()),
         ("empty hole", "node a \"{{}}\"".into()),
         ("hole as a keyword", "{{kind}} a".into()),
@@ -4638,8 +4680,14 @@ fn hostile_corpus() -> Vec<(&'static str, String)> {
     ];
 
     // Sizes chosen to sit either side of every bound that exists.
-    cases.push(("very long label", format!("node a \"{}\"", "x".repeat(100_000))));
-    cases.push(("very long identifier", format!("node {}", "a".repeat(100_000))));
+    cases.push((
+        "very long label",
+        format!("node a \"{}\"", "x".repeat(100_000)),
+    ));
+    cases.push((
+        "very long identifier",
+        format!("node {}", "a".repeat(100_000)),
+    ));
     cases.push((
         "many nodes",
         (0..5_000).map(|i| format!("node n{i}\n")).collect(),
@@ -4813,7 +4861,9 @@ fn cardinality_can_be_written_as_a_property_instead() {
 fn a_cardinality_replaces_the_arrowhead_at_that_end() {
     // Both would land on the same point and fight; the foot already says
     // which way the relation reads.
-    let svg = render_svg::render(&build(&format!("{ER}customer -> order \"places\" one many")));
+    let svg = render_svg::render(&build(&format!(
+        "{ER}customer -> order \"places\" one many"
+    )));
     assert!(!svg.contains("h-solid-"), "no arrowhead survives: {svg}");
 
     // The other end keeps its arrow when only one cardinality is given.
@@ -4862,7 +4912,11 @@ fn a_column_drops_the_member_marker_but_a_class_member_keeps_it() {
     assert!(
         class.annotations.iter().any(|a| a.text == "- id: Uuid"),
         "{:?}",
-        class.annotations.iter().map(|a| &a.text).collect::<Vec<_>>()
+        class
+            .annotations
+            .iter()
+            .map(|a| &a.text)
+            .collect::<Vec<_>>()
     );
 }
 
@@ -4945,7 +4999,9 @@ fn a_block_draws_its_name_technology_and_description_as_separate_lines() {
 #[test]
 fn a_relation_carries_its_protocol_on_its_own_line() {
     // Declared and never drawn would be worse than refused.
-    let l = build("type block\nblock a \"A\"\nblock b \"B\" right-of a\na -> b \"calls\" { tech: \"gRPC\" }");
+    let l = build(
+        "type block\nblock a \"A\"\nblock b \"B\" right-of a\na -> b \"calls\" { tech: \"gRPC\" }",
+    );
     assert_eq!(l.edges[0].label.as_deref(), Some("calls\n[gRPC]"));
 }
 
@@ -5005,8 +5061,14 @@ fn a_non_rectangular_block_is_given_the_room_its_shape_takes() {
     let hex = build("type block\nblock a \"Metrics\" queue { tech: \"Prometheus\" }");
     let cyl = build("type block\nblock a \"Metrics\" database { tech: \"Prometheus\" }");
 
-    assert!(hex.nodes[0].rect.w > rect.nodes[0].rect.w, "the hexagon's slanted sides eat width");
-    assert!(cyl.nodes[0].rect.h > rect.nodes[0].rect.h, "the cylinder's caps eat height");
+    assert!(
+        hex.nodes[0].rect.w > rect.nodes[0].rect.w,
+        "the hexagon's slanted sides eat width"
+    );
+    assert!(
+        cyl.nodes[0].rect.h > rect.nodes[0].rect.h,
+        "the cylinder's caps eat height"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -5081,9 +5143,8 @@ fn an_event_without_a_date_is_refused() {
 fn the_axis_step_coarsens_until_the_labels_fit() {
     // Ten years at a quarterly step is forty labels in 800px — a smear. The
     // step is chosen against the page, not against the calendar alone.
-    let decade = build(
-        "type timeline { size: 800 30 }\nevent a \"A\" 2015-01-01\nevent b \"B\" 2025-01-01",
-    );
+    let decade =
+        build("type timeline { size: 800 30 }\nevent a \"A\" 2015-01-01\nevent b \"B\" 2025-01-01");
     let axis: Vec<&str> = decade
         .annotations
         .iter()
@@ -5091,11 +5152,13 @@ fn the_axis_step_coarsens_until_the_labels_fit() {
         .map(|a| a.text.as_str())
         .collect();
     assert!(axis.len() <= 14, "{} labels: {axis:?}", axis.len());
-    assert!(axis.iter().all(|t| t.len() == 4), "years, not days: {axis:?}");
-
-    let week = build(
-        "type timeline { size: 800 30 }\nevent a \"A\" 2026-03-01\nevent b \"B\" 2026-03-08",
+    assert!(
+        axis.iter().all(|t| t.len() == 4),
+        "years, not days: {axis:?}"
     );
+
+    let week =
+        build("type timeline { size: 800 30 }\nevent a \"A\" 2026-03-01\nevent b \"B\" 2026-03-08");
     assert!(
         week.annotations
             .iter()
@@ -5202,8 +5265,7 @@ fn region(id: &str, name: &str, revenue: i64) -> Bindings {
 
 #[test]
 fn a_line_with_a_row_hole_is_written_once_per_row() {
-    let t = Template::parse("type pie\nslice {{r.id}} \"{{r.name}}\" {{r.value}}")
-        .expect("parses");
+    let t = Template::parse("type pie\nslice {{r.id}} \"{{r.name}}\" {{r.value}}").expect("parses");
     let filled = t
         .fill(&Bindings::new().rows(
             "r",
@@ -5220,8 +5282,7 @@ fn a_line_with_a_row_hole_is_written_once_per_row() {
         ))
         .expect("fills");
     assert_eq!(
-        filled,
-        "type pie\nslice a \"A\" 1\nslice b \"B\" 2",
+        filled, "type pie\nslice a \"A\" 1\nslice b \"B\" 2",
         "{filled}"
     );
 }
@@ -5249,9 +5310,11 @@ fn a_variable_number_of_slices_renders() {
 #[test]
 fn no_rows_means_no_line() {
     // A chart of nothing draws nothing, which beats a line full of holes.
-    let t = Template::parse("type pie\nslice a \"A\" 1\nslice {{r.id}} \"x\" {{r.v}}")
-        .expect("parses");
-    let filled = t.fill(&Bindings::new().rows("r", Vec::new())).expect("fills");
+    let t =
+        Template::parse("type pie\nslice a \"A\" 1\nslice {{r.id}} \"x\" {{r.v}}").expect("parses");
+    let filled = t
+        .fill(&Bindings::new().rows("r", Vec::new()))
+        .expect("fills");
     assert_eq!(filled, "type pie\nslice a \"A\" 1\n", "{filled}");
 }
 
@@ -5260,22 +5323,17 @@ fn a_row_hole_and_an_ordinary_hole_share_a_line() {
     let t = Template::parse("type bar { categories: {{cats}} }\nseries {{s.id}} {{s.points}}")
         .expect("parses");
     let filled = t
-        .fill(
-            &Bindings::new()
-                .set("cats", vec!["q1", "q2"])
-                .rows(
-                    "s",
-                    vec![
+        .fill(&Bindings::new().set("cats", vec!["q1", "q2"]).rows(
+            "s",
+            vec![
                         Bindings::new()
                             .set("id", Bound::Raw("north".into()))
                             .set("points", vec![1i64, 2]),
                     ],
-                ),
-        )
+        ))
         .expect("fills");
     assert_eq!(
-        filled,
-        "type bar { categories: \"q1\" \"q2\" }\nseries north 1 2",
+        filled, "type bar { categories: \"q1\" \"q2\" }\nseries north 1 2",
         "{filled}"
     );
 }
@@ -5285,8 +5343,8 @@ fn one_line_cannot_repeat_over_two_lists() {
     // How many times would it be written? There is no answer a reader could
     // predict. And the ambiguity is in the *template*, not in the binding, so
     // it is caught when the template is read rather than at the first render.
-    let e = Template::parse("type pie\nslice {{a.id}} \"{{b.name}}\" 1")
-        .expect_err("should refuse");
+    let e =
+        Template::parse("type pie\nslice {{a.id}} \"{{b.name}}\" 1").expect_err("should refuse");
     assert!(format!("{e:#}").contains("one list"), "{e:#}");
 }
 
@@ -5358,10 +5416,16 @@ fn every_example_still_works() {
         assert!(errors.is_empty(), "{name}: {errors:?}");
 
         let svg = crate::render_source(&source).unwrap_or_else(|e| panic!("{name}: {e:#}"));
-        assert!(svg.starts_with("<svg") && svg.trim_end().ends_with("</svg>"), "{name}");
+        assert!(
+            svg.starts_with("<svg") && svg.trim_end().ends_with("</svg>"),
+            "{name}"
+        );
     }
 
-    assert!(seen >= 16, "only {seen} examples found — the sweep is not finding them");
+    assert!(
+        seen >= 16,
+        "only {seen} examples found — the sweep is not finding them"
+    );
 }
 
 #[test]
@@ -5395,7 +5459,10 @@ fn every_diagram_in_the_documentation_still_works() {
                 .filter(|d| d.severity == crate::check::Severity::Error)
                 .map(|d| d.message)
                 .collect();
-            assert!(errors.is_empty(), "{name} block {i}: {errors:?}\n---\n{source}");
+            assert!(
+                errors.is_empty(),
+                "{name} block {i}: {errors:?}\n---\n{source}"
+            );
         }
     }
 
@@ -5439,8 +5506,20 @@ fn the_highlighter_captures_every_kind_of_value() {
     // Every named node type that carries text a reader looks at. Structural
     // nodes are captured through their fields, not by name.
     for node in [
-        "string", "number", "color", "date", "duration", "placeholder", "member", "identifier",
-        "comment", "arrow", "item_keyword", "property_name", "alignment", "direction",
+        "string",
+        "number",
+        "color",
+        "date",
+        "duration",
+        "placeholder",
+        "member",
+        "identifier",
+        "comment",
+        "arrow",
+        "item_keyword",
+        "property_name",
+        "alignment",
+        "direction",
     ] {
         assert!(
             highlights.contains(&format!("({node}")),

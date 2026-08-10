@@ -251,7 +251,9 @@ fn from_json_value(name: &str, value: &serde_json::Value, top: bool) -> Result<V
                 }
                 let mut rows = Vec::with_capacity(items.len());
                 for item in items {
-                    let J::Object(fields) = item else { unreachable!() };
+                    let J::Object(fields) = item else {
+                        unreachable!()
+                    };
                     let mut row = Bindings::new();
                     for (field, value) in fields {
                         row.insert(field.clone(), from_json_value(field, value, false)?);

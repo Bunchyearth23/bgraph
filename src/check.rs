@@ -240,7 +240,14 @@ fn check_styles(diagram: &Diagram, def: &'static props::ArchetypeDef, out: &mut 
             "edge" => Some(Ctx::Edge),
             _ => None,
         };
-        check_props_refined(&style.props, ctx, def.item_props, props::PROPS, "property", out);
+        check_props_refined(
+            &style.props,
+            ctx,
+            def.item_props,
+            props::PROPS,
+            "property",
+            out,
+        );
     }
 
     check_extends_cycles(diagram, out);
@@ -351,7 +358,13 @@ fn anchor_names(diagram: &Diagram) -> HashSet<&str> {
         .nodes
         .iter()
         .map(|n| n.id.as_str())
-        .chain(diagram.groups.iter().filter(|g| !g.activates).map(|g| g.id.as_str()))
+        .chain(
+            diagram
+                .groups
+                .iter()
+                .filter(|g| !g.activates)
+                .map(|g| g.id.as_str()),
+        )
         .collect()
 }
 
@@ -368,7 +381,12 @@ fn placements(diagram: &Diagram) -> impl Iterator<Item = (&Spanned<String>, &Pla
         )
 }
 
-fn check_groups(diagram: &Diagram, def: &'static props::ArchetypeDef, nodes: &HashMap<&str, usize>, out: &mut Vec<Diag>) {
+fn check_groups(
+    diagram: &Diagram,
+    def: &'static props::ArchetypeDef,
+    nodes: &HashMap<&str, usize>,
+    out: &mut Vec<Diag>,
+) {
     let known_styles = style_names(diagram);
     let mut seen: HashSet<&str> = HashSet::new();
 
@@ -569,7 +587,12 @@ fn check_positional(node: &NodeDecl, def: &'static props::ArchetypeDef, out: &mu
     }
 }
 
-fn check_edges(diagram: &Diagram, def: &'static props::ArchetypeDef, nodes: &HashMap<&str, usize>, out: &mut Vec<Diag>) {
+fn check_edges(
+    diagram: &Diagram,
+    def: &'static props::ArchetypeDef,
+    nodes: &HashMap<&str, usize>,
+    out: &mut Vec<Diag>,
+) {
     let known_styles = style_names(diagram);
 
     let groups = frame_names(diagram);
@@ -681,9 +704,7 @@ fn awaits_binding(node: &NodeDecl, def: &'static props::ArchetypeDef, name: &str
 pub fn base_style(archetype: &str) -> crate::style::Style {
     match archetype {
         "free" | "packet" | "bytefield" | "rack" | "network" | "orgchart" | "mindmap"
-        | "treeview" | "harness" => {
-            crate::style::Style::node_defaults()
-        }
+        | "treeview" | "harness" => crate::style::Style::node_defaults(),
         _ => crate::charts::chart_defaults(),
     }
 }
@@ -716,12 +737,7 @@ fn resolved_nodes(diagram: &Diagram, base: crate::style::Style) -> Vec<crate::st
         .iter()
         .map(|node| {
             registry
-                .resolve(
-                    base.clone(),
-                    def.item,
-                    &node.classes,
-                    &node.props_for(def),
-                )
+                .resolve(base.clone(), def.item, &node.classes, &node.props_for(def))
                 .unwrap_or_default()
         })
         .collect()
@@ -1265,10 +1281,9 @@ fn check_gitgraph(diagram: &Diagram, out: &mut Vec<Diag>) {
 
     let mut parents: HashMap<&str, usize> = HashMap::new();
     for edge in &diagram.edges {
-        let (Some(&parent), Some(&child)) = (
-            order.get(edge.from.as_str()),
-            order.get(edge.to.as_str()),
-        ) else {
+        let (Some(&parent), Some(&child)) =
+            (order.get(edge.from.as_str()), order.get(edge.to.as_str()))
+        else {
             continue;
         };
         // The layout walks commits in declaration order to number the steps,
@@ -1358,8 +1373,7 @@ fn check_tree(diagram: &Diagram, out: &mut Vec<Diag>) {
                 .as_ref()
                 .map(|a| a.span)
                 .unwrap_or_default(),
-            "every item has a parent, so the hierarchy is a cycle and has no root"
-                .to_string(),
+            "every item has a parent, so the hierarchy is a cycle and has no root".to_string(),
         ));
     } else if roots.len() > 1 && diagram.nodes.len() > 1 {
         out.push(Diag::warn(
@@ -1616,7 +1630,10 @@ fn check_rack(diagram: &Diagram, out: &mut Vec<Diag>) {
                 if low < 1 {
                     out.push(Diag::error(
                         node.id.span,
-                        format!("`{}` starts below U1; a rack counts from 1", node.id.as_str()),
+                        format!(
+                            "`{}` starts below U1; a rack counts from 1",
+                            node.id.as_str()
+                        ),
                     ));
                 } else if high > units {
                     out.push(Diag::error(
@@ -2285,7 +2302,13 @@ fn check_treemap(diagram: &Diagram, out: &mut Vec<Diag>) {
         .nodes
         .iter()
         .map(|n| n.id.as_str())
-        .chain(diagram.groups.iter().filter(|g| !g.activates).map(|g| g.id.as_str()))
+        .chain(
+            diagram
+                .groups
+                .iter()
+                .filter(|g| !g.activates)
+                .map(|g| g.id.as_str()),
+        )
         .filter(|name| !owned.contains(name))
         .count();
 
@@ -2392,8 +2415,8 @@ fn check_props_refined(
     out: &mut Vec<Diag>,
 ) {
     for prop in entries {
-        let Some(def) = props::lookup(&prop.name, refinements)
-            .or_else(|| props::lookup(&prop.name, table))
+        let Some(def) =
+            props::lookup(&prop.name, refinements).or_else(|| props::lookup(&prop.name, table))
         else {
             // A property that exists, but in another genre, is a different
             // mistake from a typo — and the reader can only fix it if told

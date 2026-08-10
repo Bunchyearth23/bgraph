@@ -4,10 +4,10 @@
 //! editor extension ships is a mirror of it, and a test holds the two to the
 //! same corpus.
 
+use crate::ast::*;
 use anyhow::{Context, Result, bail};
 use pest::Parser;
 use pest::iterators::Pair;
-use crate::ast::*;
 
 // The generated grammar, and the `Rule` enum that comes with it. Private: the
 // shape of a pest parse tree is not something a caller should be able to

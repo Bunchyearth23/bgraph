@@ -71,7 +71,11 @@ pub fn render(layout: &Layout) -> Vec<u8> {
             continue;
         }
         let points: Vec<(f64, f64)> = route.points.iter().map(|p| shift(*p, dx, dy)).collect();
-        let stroke = edge.style.stroke.clone().unwrap_or_else(|| "#64748b".into());
+        let stroke = edge
+            .style
+            .stroke
+            .clone()
+            .unwrap_or_else(|| "#64748b".into());
         let width = edge.style.stroke_width.unwrap_or(1.5);
 
         c.stroke_colour(&stroke);
@@ -124,19 +128,11 @@ pub fn render(layout: &Layout) -> Vec<u8> {
             );
         }
         let size = edge.style.font_size.unwrap_or(11.0);
-        c.fill_colour(
-            edge.style
-                .font_color
-                .as_deref()
-                .unwrap_or("#475569"),
-        );
+        c.fill_colour(edge.style.font_color.as_deref().unwrap_or("#475569"));
         for (i, line) in text.split('\n').enumerate() {
             c.show(
                 line,
-                (
-                    plate.cx(),
-                    plate.y + size * (0.95 + i as f64 * 1.25),
-                ),
+                (plate.cx(), plate.y + size * (0.95 + i as f64 * 1.25)),
                 size,
                 Anchor::Middle,
                 "400",
@@ -219,17 +215,16 @@ impl Content {
             return None;
         }
         let part = |i: usize| u8::from_str_radix(&hex[i..i + 2], 16).ok().map(f64::from);
-        Some((
-            part(0)? / 255.0,
-            part(2)? / 255.0,
-            part(4)? / 255.0,
-            alpha,
-        ))
+        Some((part(0)? / 255.0, part(2)? / 255.0, part(4)? / 255.0, alpha))
     }
 
     fn alpha(&mut self, value: Option<f64>, stroking: bool) {
         let a = value.unwrap_or(1.0);
-        let name = format!("GS{}{}", if stroking { "S" } else { "F" }, (a * 1000.0) as u32);
+        let name = format!(
+            "GS{}{}",
+            if stroking { "S" } else { "F" },
+            (a * 1000.0) as u32
+        );
         self.alphas.insert(name.clone(), a);
         let _ = writeln!(self.body, "/{name} gs");
     }
@@ -394,13 +389,25 @@ impl Content {
         let first = at(start, radius);
         let _ = writeln!(self.body, "{} {} m", num(first.0), num(first.1));
         for i in 0..steps {
-            self.arc(cx, cy, radius, start + step * i as f64, start + step * (i + 1) as f64);
+            self.arc(
+                cx,
+                cy,
+                radius,
+                start + step * i as f64,
+                start + step * (i + 1) as f64,
+            );
         }
         if inner > 0.0 {
             let back = at(end, inner);
             let _ = writeln!(self.body, "{} {} l", num(back.0), num(back.1));
             for i in (0..steps).rev() {
-                self.arc(cx, cy, inner, start + step * (i + 1) as f64, start + step * i as f64);
+                self.arc(
+                    cx,
+                    cy,
+                    inner,
+                    start + step * (i + 1) as f64,
+                    start + step * i as f64,
+                );
             }
         } else {
             let _ = writeln!(self.body, "{} {} l", num(cx), num(cy));
@@ -442,12 +449,8 @@ impl Content {
         let (px, py) = (-uy, ux);
         let size = (width * 4.0).max(7.0);
         // Back along the line from the tip, and out to each side.
-        let at = |back: f64, side: f64| {
-            (
-                to.0 - ux * back + px * side,
-                to.1 - uy * back + py * side,
-            )
-        };
+        let at =
+            |back: f64, side: f64| (to.0 - ux * back + px * side, to.1 - uy * back + py * side);
 
         self.stroke_colour(colour);
         self.fill_colour(colour);
@@ -506,7 +509,10 @@ impl Content {
                     });
                     let _ = writeln!(self.body, "S");
                 } else if head == Head::OneMany {
-                    self.path(&[at(size * 1.7, size * 0.5), at(size * 1.7, -size * 0.5)], false);
+                    self.path(
+                        &[at(size * 1.7, size * 0.5), at(size * 1.7, -size * 0.5)],
+                        false,
+                    );
                     let _ = writeln!(self.body, "S");
                 }
             }
@@ -587,7 +593,11 @@ fn assemble(body: &str, alphas: &BTreeMap<String, f64>, width: f64, height: f64)
     for (name, alpha) in alphas {
         let stroking = name.starts_with("GSS");
         let key = if stroking { "CA" } else { "ca" };
-        let _ = write!(states, "/{name} << /Type /ExtGState /{key} {} >> ", num(*alpha));
+        let _ = write!(
+            states,
+            "/{name} << /Type /ExtGState /{key} {} >> ",
+            num(*alpha)
+        );
     }
 
     let objects = [

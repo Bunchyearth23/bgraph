@@ -468,11 +468,7 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
     // Declaration order is a valid topological order for any graph `check`
     // accepts, since it refuses a parent declared after its child.
     for i in 0..commits.len() {
-        step[i] = parents[i]
-            .iter()
-            .map(|p| step[*p] + 1)
-            .max()
-            .unwrap_or(0);
+        step[i] = parents[i].iter().map(|p| step[*p] + 1).max().unwrap_or(0);
     }
 
     let title_h = if title.is_some() {
@@ -488,10 +484,7 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
     const DOT: f64 = 13.0;
 
     let at = |i: usize| -> (f64, f64) {
-        let rail = rail_of
-            .get(commits[i].2.as_str())
-            .copied()
-            .unwrap_or(0);
+        let rail = rail_of.get(commits[i].2.as_str()).copied().unwrap_or(0);
         (
             gutter + step[i] as f64 * along + DOT / 2.0,
             title_h + 18.0 + rail as f64 * between,
@@ -534,10 +527,7 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         for parent in ps {
             let (px, py) = at(*parent);
             let (cx, cy) = at(child);
-            let rail = rail_of
-                .get(commits[child].2.as_str())
-                .copied()
-                .unwrap_or(0);
+            let rail = rail_of.get(commits[child].2.as_str()).copied().unwrap_or(0);
             let colour = palette[rail.min(palette.len() - 1)].to_string();
             // An elbow when the rails differ: a straight diagonal across three
             // rails reads as touching every one it crosses.
@@ -784,7 +774,12 @@ pub fn tree(
         TreeKind::Org => {}
         TreeKind::View => {
             // Depth is the indent, order is pre-order, one row each.
-            fn walk(i: usize, depth: usize, children: &[Vec<usize>], order: &mut Vec<(usize, usize)>) {
+            fn walk(
+                i: usize,
+                depth: usize,
+                children: &[Vec<usize>],
+                order: &mut Vec<(usize, usize)>,
+            ) {
                 order.push((i, depth));
                 for k in &children[i] {
                     walk(*k, depth + 1, children, order);
@@ -990,10 +985,8 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         .collect();
     let mut shared: HashMap<(usize, usize), f64> = HashMap::new();
     for edge in &diagram.edges {
-        let (Some(&a), Some(&b)) = (
-            index.get(edge.from.as_str()),
-            index.get(edge.to.as_str()),
-        ) else {
+        let (Some(&a), Some(&b)) = (index.get(edge.from.as_str()), index.get(edge.to.as_str()))
+        else {
             continue;
         };
         let style = registry.resolve(
@@ -1326,11 +1319,9 @@ pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
     // author says otherwise — starting the rings at the smallest value would
     // exaggerate every difference.
     let scale = match setting(cfg, "range") {
-        Some(v) if v.len() == 2 => nice_scale(
-            v[0].as_num().unwrap_or(0.0),
-            v[1].as_num().unwrap_or(hi),
-            4,
-        ),
+        Some(v) if v.len() == 2 => {
+            nice_scale(v[0].as_num().unwrap_or(0.0), v[1].as_num().unwrap_or(hi), 4)
+        }
         _ => nice_scale(lo.min(0.0), hi, 4),
     };
 
@@ -1348,7 +1339,9 @@ pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
     let cx = margin + radius;
     let cy = title_h + margin.min(28.0) + radius;
 
-    let n = axes.len().max(series.iter().map(|(_, p, _, _)| p.len()).max().unwrap_or(0));
+    let n = axes
+        .len()
+        .max(series.iter().map(|(_, p, _, _)| p.len()).max().unwrap_or(0));
     // Clockwise from the top: the order the axes are written is the order they
     // are read, and twelve o'clock is where a reader starts.
     let angle = |i: usize| -> f64 {
@@ -1410,7 +1403,10 @@ pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
 
         if let Some(name) = axes.get(i) {
             let a = angle(i);
-            let (lx, ly) = (cx + (radius + 10.0) * a.cos(), cy + (radius + 10.0) * a.sin());
+            let (lx, ly) = (
+                cx + (radius + 10.0) * a.cos(),
+                cy + (radius + 10.0) * a.sin(),
+            );
             // The label sits outside its spoke and leans away from the centre,
             // or the names on the left overlap the shape.
             let anchor = if a.cos() > 0.2 {
@@ -1434,7 +1430,11 @@ pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
     }
 
     for (_, points, colour, style) in &series {
-        let shape: Vec<(f64, f64)> = points.iter().enumerate().map(|(i, v)| point(i, *v)).collect();
+        let shape: Vec<(f64, f64)> = points
+            .iter()
+            .enumerate()
+            .map(|(i, v)| point(i, *v))
+            .collect();
         if shape.len() < 2 {
             continue;
         }
@@ -1528,10 +1528,7 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
         })
         .unwrap_or_default();
     let (lo, hi) = match setting(cfg, "range") {
-        Some(v) if v.len() == 2 => (
-            v[0].as_num().unwrap_or(1.0),
-            v[1].as_num().unwrap_or(5.0),
-        ),
+        Some(v) if v.len() == 2 => (v[0].as_num().unwrap_or(1.0), v[1].as_num().unwrap_or(5.0)),
         _ => (1.0, 5.0),
     };
 
@@ -1697,8 +1694,12 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
         };
         let x0 = plot.x + at(*first) * plot.w;
         let x1 = plot.x + at(*last) * plot.w;
-        let style =
-            registry.resolve(Style::group_defaults(), "group", &group.classes, &group.props)?;
+        let style = registry.resolve(
+            Style::group_defaults(),
+            "group",
+            &group.classes,
+            &group.props,
+        )?;
         groups.push(PlacedGroup {
             lines: vec![
                 group
@@ -1834,7 +1835,11 @@ pub fn kanban(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             held += 1;
         }
 
-        let bottom = if held == 0 { top + PAD * 3.0 } else { y - CARD_GAP + PAD };
+        let bottom = if held == 0 {
+            top + PAD * 3.0
+        } else {
+            y - CARD_GAP + PAD
+        };
         tallest = tallest.max(bottom);
 
         let name = group
@@ -1843,8 +1848,12 @@ pub fn kanban(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             .unwrap_or_else(|| group.id.value.clone());
         // The count against the limit, in the header — the number the board is
         // kept for, where a reader is already looking.
-        let frame =
-            registry.resolve(Style::group_defaults(), "group", &group.classes, &group.props)?;
+        let frame = registry.resolve(
+            Style::group_defaults(),
+            "group",
+            &group.classes,
+            &group.props,
+        )?;
         let limit = frame.limit;
         annotations.push(Annotation {
             text: match limit {
@@ -4170,10 +4179,8 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
     // the lifeline rather than a `Guide`, because guides draw *beneath*
     // everything and this has to sit on top of the line it covers.
     for group in diagram.groups.iter().filter(|g| g.activates) {
-        let (Some(&first), Some(&last)) = (
-            group.edge_members.first(),
-            group.edge_members.last(),
-        ) else {
+        let (Some(&first), Some(&last)) = (group.edge_members.first(), group.edge_members.last())
+        else {
             continue;
         };
         let Some(&col) = index.get(group.id.as_str()) else {
@@ -4674,9 +4681,9 @@ pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
     // the only tie-break a reader can predict.
     events.sort_by_key(|e| e.1);
 
-    let (first, last) = events
-        .iter()
-        .fold((i64::MAX, i64::MIN), |(lo, hi), e| (lo.min(e.1), hi.max(e.1)));
+    let (first, last) = events.iter().fold((i64::MAX, i64::MIN), |(lo, hi), e| {
+        (lo.min(e.1), hi.max(e.1))
+    });
     let (first, last) = if events.is_empty() {
         (0, 1)
     } else {
@@ -4710,7 +4717,11 @@ pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         placed.push((side, row));
     }
 
-    let title_h = if title.is_some() { TITLE_SIZE * 2.0 } else { 0.0 };
+    let title_h = if title.is_some() {
+        TITLE_SIZE * 2.0
+    } else {
+        0.0
+    };
     const STEM: f64 = 14.0;
     const AXIS_H: f64 = 22.0;
     // A label is two lines — the name, then the date under it — so the space
