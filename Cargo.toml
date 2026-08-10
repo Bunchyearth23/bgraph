@@ -2,7 +2,7 @@
 name = "bgraph"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.87"
+rust-version = "1.88"
 description = "Stylable diagrams from a layout-first DSL — you place the boxes, it draws the SVG."
 repository = "https://github.com/Bunchyearth23/bgraph"
 readme = "README.md"
