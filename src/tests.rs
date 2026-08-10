@@ -633,6 +633,74 @@ fn a_packet_field_needs_bits() {
     assert!(err("type packet\nnode a \"A\"").contains("has no `bits`"));
 }
 
+// ---------------------------------------------------------------------- W-047
+
+#[cfg(test)]
+const CALL: &str = "type sequence { column: 120 row: 40 }\n\
+     participant a \"A\"\n\
+     participant b \"B\"\n\
+     a -> b \"before\"\n\
+     activate b {\n  b -> a \"work\"\n  a --> b \"done\"\n}\n\
+     b --> a \"after\"\n";
+
+#[test]
+fn an_activation_bar_spans_the_messages_its_block_holds() {
+    // D-024: the bar is a group whose `edge_members` are the messages, so its
+    // extent is a row span — exactly what a sequence frame already measures.
+    let l = build(CALL);
+
+    // Two participants plus the bar.
+    assert_eq!(l.nodes.len(), 3, "{:?}", l.nodes.len());
+    let bar = &l.nodes[2].rect;
+    assert!(bar.w < 20.0, "a bar is thin: {bar:?}");
+
+    // It starts around the first message inside and ends around the last,
+    // never covering the messages outside the block.
+    assert!(bar.h > 40.0, "it spans two rows: {bar:?}");
+    assert!(bar.h < 40.0 * 3.0, "and not the whole exchange: {bar:?}");
+}
+
+#[test]
+fn an_activation_names_a_participant_rather_than_declaring_one() {
+    // The reason `activate` needed its own word: a group id and an item id
+    // share one namespace, so the duplicate-id rule is precisely what this
+    // must not trip.
+    let l = build(CALL);
+    assert_eq!(l.nodes[1].lines, vec!["B"], "B is still a participant");
+
+    let e = err("type sequence\nparticipant a \"A\"\nactivate nobody {\n  a -> a \"x\"\n}");
+    assert!(e.contains("names no participant"), "{e}");
+}
+
+#[test]
+fn an_activation_is_not_a_frame_anywhere() {
+    // An edge touching the activated participant is an ordinary message, not
+    // an edge into a frame — which is what it read as until `frame_names`
+    // started telling the two apart.
+    let d = diags(CALL);
+    assert!(
+        !d.iter().any(|x| x.message.contains("is a group")),
+        "{d:?}"
+    );
+
+    let d = diags("type sequence\nparticipant a \"A\"\nparticipant b \"B\"\nactivate a {\n}");
+    assert!(
+        d.iter().any(|x| x.message.contains("spans no messages")),
+        "an empty bar has no length: {d:?}"
+    );
+}
+
+#[test]
+fn an_ordinary_frame_still_frames() {
+    // `activate` must not have taken `group` with it.
+    let l = build(
+        "type sequence\nparticipant a \"A\"\nparticipant b \"B\"\n\
+         group retry \"retry\" {\n  a -> b \"try\"\n}\n",
+    );
+    assert_eq!(l.groups.len(), 1);
+    assert_eq!(l.groups[0].lines, vec!["retry"]);
+}
+
 // ---------------------------------------------------------------------- W-044
 
 #[test]

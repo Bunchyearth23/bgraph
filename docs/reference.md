@@ -37,6 +37,7 @@ type <archetype> { … }      // the genre of diagram; optional, defaults to fre
 graph { … }                 // diagram-wide settings
 style <name> [extends <name>] { … }
 group <id> ["<label>"] [.class …] [<placement>] { … }
+activate <id> { … }         // type sequence: a bar down an existing lifeline
 <keyword> <id> ["<label>"] <data…> [.class …] [<placement>] { … }
 <id> <arrow> <id> ["<label>"] [.class …] { … }
 ```
@@ -703,8 +704,12 @@ participant bank    "Bank"
 participant db      "Postgres"
 
 browser -> api  "POST /checkout"
-api     -> db   "reserve stock"
-db      --> api "ok"
+
+// The box down `api`'s lifeline while the call is outstanding (W-047).
+activate api {
+  api -> db   "reserve stock"
+  db  --> api "ok"
+}
 
 group retry "retry up to 3×" {
   api  -> bank "authorise"

@@ -37,7 +37,11 @@ type_decl  = { "type" ~ ident ~ block? }
 // A container. Its block holds properties *and* statements, so a group nests.
 // Its rectangle is derived from its members, not declared.
 // No positional data: a group has no slots, it is a frame.
-group_decl  = { "group" ~ ident ~ string? ~ class_ref* ~ placement? ~ group_block }
+// `activate` is the same declaration under another word: its identifier names
+// an *existing* item rather than declaring a new one, because a bar belongs to
+// a participant that is already on the diagram (`D-024`).
+group_kw    = { "group" | "activate" }
+group_decl  = { group_kw ~ ident ~ string? ~ class_ref* ~ placement? ~ group_block }
 // Entries are separated, for the same reason statements are: without it
 // `padding: 22 node a` cannot be told from a property with three values.
 group_block = { "{" ~ sep ~ ((prop | stmt) ~ inner_term)* ~ "}" }
@@ -66,7 +70,7 @@ edge_decl  = { !(keyword) ~ ident ~ arrow ~ ident ~ string? ~ (pos_value | class
 // Atomic: a non-atomic rule would let implicit whitespace slip between the
 // word and the boundary test, so `style -> a` would read the `-` as part
 // of an identifier and the guard would never fire.
-keyword    = @{ ("type" | "graph" | "style" | "node" | "group") ~ !(ASCII_ALPHANUMERIC | "_" | "-") }
+keyword    = @{ ("type" | "graph" | "style" | "node" | "group" | "activate") ~ !(ASCII_ALPHANUMERIC | "_" | "-") }
 
 class_ref = { "." ~ ident }
 arrow     = @{ "<->" | "<-" | "-->" | "..>" | "--" | "->" | ".." }

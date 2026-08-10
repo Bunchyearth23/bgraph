@@ -272,9 +272,11 @@ fn parse_group(pair: Pair<Rule>, diagram: &mut Diagram) -> Result<()> {
     let mut props = Vec::new();
     let mut members = Vec::new();
     let mut edge_members = Vec::new();
+    let mut activates = false;
 
     for part in pair.into_inner() {
         match part.as_rule() {
+            Rule::group_kw => activates = part.as_str() == "activate",
             Rule::ident if id.is_none() => id = Some(spanned(&part)),
             Rule::string if label.is_none() => label = Some(unescape(part)),
             Rule::class_ref => classes.push(class_name(part)),
@@ -289,8 +291,12 @@ fn parse_group(pair: Pair<Rule>, diagram: &mut Diagram) -> Result<()> {
                             diagram.nodes.push(node);
                         }
                         Rule::group_decl => {
-                            let name = group_name(&inner)?;
-                            members.push(name);
+                            // An `activate` block names a participant that is
+                            // already declared; listing it as a member would
+                            // put the same id in two places.
+                            if !is_activation(&inner) {
+                                members.push(group_name(&inner)?);
+                            }
                             parse_group(inner, diagram)?;
                         }
                         Rule::edge_decl => {
@@ -307,6 +313,7 @@ fn parse_group(pair: Pair<Rule>, diagram: &mut Diagram) -> Result<()> {
     }
 
     diagram.groups.push(GroupDecl {
+        activates,
         id: id.expect("a group declaration always names the group"),
         label,
         classes,
@@ -318,6 +325,12 @@ fn parse_group(pair: Pair<Rule>, diagram: &mut Diagram) -> Result<()> {
     });
 
     Ok(())
+}
+
+fn is_activation(pair: &Pair<Rule>) -> bool {
+    pair.clone()
+        .into_inner()
+        .any(|p| p.as_rule() == Rule::group_kw && p.as_str() == "activate")
 }
 
 fn group_name(pair: &Pair<Rule>) -> Result<Spanned<String>> {

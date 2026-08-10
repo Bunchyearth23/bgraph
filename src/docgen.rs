@@ -348,6 +348,7 @@ type <archetype> { … }      // the genre of diagram; optional, defaults to fre
 graph { … }                 // diagram-wide settings
 style <name> [extends <name>] { … }
 group <id> ["<label>"] [.class …] [<placement>] { … }
+activate <id> { … }         // type sequence: a bar down an existing lifeline
 <keyword> <id> ["<label>"] <data…> [.class …] [<placement>] { … }
 <id> <arrow> <id> ["<label>"] [.class …] { … }
 ```

@@ -7,8 +7,10 @@
   name: (identifier) @name
   label: (string)? @context) @item
 
+; `group` and `activate` are the same declaration under two words, so the
+; outline captures the keyword field rather than the literal.
 (group_declaration
-  "group" @context
+  keyword: _ @context
   name: (identifier) @name
   label: (string)? @context) @item
 

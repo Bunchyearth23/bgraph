@@ -3415,8 +3415,46 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         });
     }
 
+    // An activation bar: the box down a participant's lifeline for as long as
+    // a call is outstanding (`D-024`). It is a thin `PlacedNode` pushed after
+    // the lifeline rather than a `Guide`, because guides draw *beneath*
+    // everything and this has to sit on top of the line it covers.
+    for group in diagram.groups.iter().filter(|g| g.activates) {
+        let (Some(&first), Some(&last)) = (
+            group.edge_members.first(),
+            group.edge_members.last(),
+        ) else {
+            continue;
+        };
+        let Some(&col) = index.get(group.id.as_str()) else {
+            continue;
+        };
+        let style = registry.resolve(
+            Style::node_defaults(),
+            def.item,
+            &group.classes,
+            &group.props,
+        )?;
+        const BAR_W: f64 = 10.0;
+        let top = first_row + first as f64 * row - row * 0.5;
+        let height = (last - first) as f64 * row + row * 0.9;
+        nodes.push(PlacedNode {
+            lines: Vec::new(),
+            rect: Rect {
+                x: centre(col) - BAR_W / 2.0,
+                y: top,
+                w: BAR_W,
+                h: height,
+            },
+            style: Style {
+                radius: Some(2.0),
+                ..style
+            },
+        });
+    }
+
     // A group frames the rows of the messages it holds.
-    for group in &diagram.groups {
+    for group in diagram.groups.iter().filter(|g| !g.activates) {
         let rows_inside: Vec<usize> = group.edge_members.clone();
         let Some(&first) = rows_inside.first() else {
             continue;

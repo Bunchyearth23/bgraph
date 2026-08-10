@@ -48,6 +48,10 @@ pub struct Diagram {
 
 #[derive(Debug)]
 pub struct GroupDecl {
+    /// Whether this is an ordinary frame or an activation bar. `activate`'s
+    /// identifier names an **existing** item rather than declaring one, which
+    /// is the whole reason the two words are distinguishable here (`D-024`).
+    pub activates: bool,
     pub id: Spanned<String>,
     pub label: Option<String>,
     pub classes: Vec<Spanned<String>>,

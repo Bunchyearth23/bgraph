@@ -183,6 +183,18 @@ pub fn first_error(diagram: &Diagram) -> Option<Diag> {
         .find(|d| d.severity == Severity::Error)
 }
 
+/// The ids that name a **frame**. An `activate` block's identifier names a
+/// participant instead, so it must not read as a group anywhere — an edge
+/// touching it is an ordinary message, not an edge into a frame (`D-024`).
+fn frame_names(diagram: &Diagram) -> HashSet<&str> {
+    diagram
+        .groups
+        .iter()
+        .filter(|g| !g.activates)
+        .map(|g| g.id.as_str())
+        .collect()
+}
+
 fn style_names(diagram: &Diagram) -> HashSet<&str> {
     diagram.styles.iter().map(|s| s.name.as_str()).collect()
 }
@@ -329,7 +341,7 @@ fn anchor_names(diagram: &Diagram) -> HashSet<&str> {
         .nodes
         .iter()
         .map(|n| n.id.as_str())
-        .chain(diagram.groups.iter().map(|g| g.id.as_str()))
+        .chain(diagram.groups.iter().filter(|g| !g.activates).map(|g| g.id.as_str()))
         .collect()
 }
 
@@ -351,6 +363,30 @@ fn check_groups(diagram: &Diagram, def: &'static props::ArchetypeDef, nodes: &Ha
     let mut seen: HashSet<&str> = HashSet::new();
 
     for group in &diagram.groups {
+        // `activate api` names a participant that already exists, so the
+        // duplicate-id rule is exactly what it must *not* trip (`D-024`).
+        if group.activates {
+            if !nodes.contains_key(group.id.as_str()) {
+                out.push(Diag::error(
+                    group.id.span,
+                    format!(
+                        "`activate {}` names no participant — a bar belongs to one \
+                         that is already on the diagram",
+                        group.id.as_str()
+                    ),
+                ));
+            }
+            if group.edge_members.is_empty() {
+                out.push(Diag::warn(
+                    group.span,
+                    format!(
+                        "`activate {}` spans no messages, so the bar has no length",
+                        group.id.as_str()
+                    ),
+                ));
+            }
+            continue;
+        }
         if nodes.contains_key(group.id.as_str()) || !seen.insert(group.id.as_str()) {
             out.push(Diag::error(
                 group.id.span,
@@ -403,7 +439,7 @@ fn check_groups(diagram: &Diagram, def: &'static props::ArchetypeDef, nodes: &Ha
     }
 
     // An edge to a frame has no obvious endpoint; say so rather than guess.
-    let groups: HashSet<&str> = diagram.groups.iter().map(|g| g.id.as_str()).collect();
+    let groups = frame_names(diagram);
     for edge in &diagram.edges {
         for endpoint in [&edge.from, &edge.to] {
             if groups.contains(endpoint.as_str()) {
@@ -526,7 +562,7 @@ fn check_positional(node: &NodeDecl, def: &'static props::ArchetypeDef, out: &mu
 fn check_edges(diagram: &Diagram, def: &'static props::ArchetypeDef, nodes: &HashMap<&str, usize>, out: &mut Vec<Diag>) {
     let known_styles = style_names(diagram);
 
-    let groups: HashSet<&str> = diagram.groups.iter().map(|g| g.id.as_str()).collect();
+    let groups = frame_names(diagram);
     for edge in &diagram.edges {
         for endpoint in [&edge.from, &edge.to] {
             if !nodes.contains_key(endpoint.as_str()) && !groups.contains(endpoint.as_str()) {
@@ -1894,7 +1930,7 @@ fn check_treemap(diagram: &Diagram, out: &mut Vec<Diag>) {
         .nodes
         .iter()
         .map(|n| n.id.as_str())
-        .chain(diagram.groups.iter().map(|g| g.id.as_str()))
+        .chain(diagram.groups.iter().filter(|g| !g.activates).map(|g| g.id.as_str()))
         .filter(|name| !owned.contains(name))
         .count();
 

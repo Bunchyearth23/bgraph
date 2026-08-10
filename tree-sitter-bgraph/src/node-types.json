@@ -270,6 +270,20 @@
           }
         ]
       },
+      "keyword": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "activate",
+            "named": false
+          },
+          {
+            "type": "group",
+            "named": false
+          }
+        ]
+      },
       "label": {
         "multiple": false,
         "required": false,
@@ -669,6 +683,10 @@
   },
   {
     "type": "above",
+    "named": false
+  },
+  {
+    "type": "activate",
     "named": false
   },
   {

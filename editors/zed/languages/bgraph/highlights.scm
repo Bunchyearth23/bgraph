@@ -8,6 +8,7 @@
   "graph"
   "style"
   "group"
+  "activate"
   "extends"
   "at"
   "gap"

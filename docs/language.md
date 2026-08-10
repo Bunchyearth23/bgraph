@@ -113,6 +113,29 @@ slices — a bar or a single number reads better — and when it has more than
 eight, which exhausts the palette; merge the tail into an `Other` slice
 rather than repeating a hue.
 
+### Activation bars in `type sequence`
+
+The box down a participant's lifeline, for as long as a call is outstanding:
+
+```bgraph
+type sequence
+participant browser "Browser"
+participant api "API"
+
+browser -> api "POST /checkout"
+activate api {
+  api -> browser "202 Accepted"
+}
+```
+
+`activate` is `group` under another word. Its block holds the messages the bar
+spans, exactly as a `loop` frame's does — and its identifier names a
+participant that is **already declared**, rather than declaring a new one.
+
+The bar is not inferred from a call and its reply. "The matching reply" is a
+guess the moment two calls are in flight, and a guess about which one closed
+is worse than writing a block.
+
 ### `type packet`
 
 Its elements are `field`s, and the inclusive bit range comes straight after

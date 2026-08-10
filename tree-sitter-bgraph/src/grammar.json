@@ -178,8 +178,21 @@
       "type": "SEQ",
       "members": [
         {
-          "type": "STRING",
-          "value": "group"
+          "type": "FIELD",
+          "name": "keyword",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "group"
+              },
+              {
+                "type": "STRING",
+                "value": "activate"
+              }
+            ]
+          }
         },
         {
           "type": "FIELD",

@@ -58,9 +58,11 @@ module.exports = grammar({
 
     // A container. Its block holds properties *and* statements, so a group
     // nests. Its rectangle is derived from its members, never declared.
+    // `activate` is the same declaration under another word: its identifier
+    // names an existing item rather than declaring one (D-024).
     group_declaration: ($) =>
       seq(
-        'group',
+        field('keyword', choice('group', 'activate')),
         field('name', $.identifier),
         optional(field('label', $.string)),
         // No positional data: a group has no slots, it is a frame.

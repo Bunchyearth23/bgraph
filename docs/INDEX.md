@@ -25,7 +25,7 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**Nine chantiers are planned. No question is open and nothing is blocked.**
+**Eight chantiers are planned. No question is open and nothing is blocked.**
 Twenty-two archetypes ship and the library is embeddable. The parked ideas were
 reviewed on 2026-08-10 and every one of them moved: what was worth building
 became a work item, what was not was discarded, and the one language question
@@ -39,7 +39,6 @@ Roughly by cost. Nothing here has started.
 
 | id | state | title | notes |
 |---|---|---|---|
-| `W-047` | planned | Activation bars for `type sequence` | The box down a lifeline while a call is outstanding. Completes a shipped archetype rather than adding one. Design settled by `D-024`: `activate api { … }` is a group whose `edge_members` are the messages it spans, drawn as a bar rather than a frame. Was `I-016`. |
 | `W-038` | planned | A VS Code extension, beside the Zed one | Same three pieces the Zed extension already has — the tree-sitter grammar, `bgraph-lsp`, and the highlight queries — repackaged for a second editor. VS Code takes a TextMate grammar or a WASM tree-sitter build rather than Zed's git-pinned one, and speaks LSP over a client the extension launches itself, so `src/lsp.rs` is reused unchanged. `X-009` applies here too: the queries are part of the grammar's public surface, and a stale one breaks the language rather than degrading. |
 | `W-040` | planned | Real font metrics instead of the estimate | **The only planned item that closes an open risk** — `X-005`. Every auto-sized box, every edge-label plate and every `check_contrast` measurement rests on `0.56 × font-size` per character today. Was `I-008`. |
 | `W-043` | planned | `type network` — topology: hosts, links, segments | `free` with its own vocabulary, shapes and diagnostics — the nwdiag territory. `W-022` is the precedent: an archetype may supply words and shapes without taking over placement. Was part of `I-010`. |
@@ -103,6 +102,7 @@ not copies.
 
 | id | date | title | commit |
 |---|---|---|---|
+| `W-047` | 2026-08-10 | Activation bars for `type sequence`, per `D-024`. `activate` is `group` under a second word, in both grammars — its identifier **references** a participant instead of declaring one, which is the only reason it needed its own word: a group id and an item id share one namespace. `frame_names` keeps an activation out of the frame namespace everywhere, so a message touching that participant stays a message | this commit |
 | `W-044` | 2026-08-10 | `type rack` — a rack elevation: a numbered frame, devices occupying inclusive spans of units, counted from **1 at the bottom** as a rack is labelled. Overlaps and devices past the top of the frame are errors; empty units are silent, because a rack with gaps has room where a packet with gaps does not add up | this commit |
 | `W-046` | 2026-08-10 | `type radar` — axes radiating from a centre, one closed polygon per series. Reuses `bar`'s `categories` and `series` verbatim rather than inventing a synonym for the same idea. Every axis shares one scale and the rings start at zero: a per-axis scale, or rings starting at the smallest value, is how this chart is normally made to lie | this commit |
 | `W-052` | 2026-08-10 | `type journey` — steps in the order they are taken, one line per actor. Scores are positional against `actors`, exactly as `bar`'s points are against `categories`; `group`s become the sections banded above the steps they hold. The axis is labelled at every whole score rather than by `nice_scale`, because a satisfaction score has no meaning between two of them | this commit |

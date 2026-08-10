@@ -1,0 +1,7 @@
+type sequence
+participant a "A"
+participant b "B"
+activate a {
+  a -> b "call"
+  b --> a "reply"
+}
