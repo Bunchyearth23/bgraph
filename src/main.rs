@@ -53,6 +53,11 @@ struct Cli {
     #[arg(long, value_name = "NAME")]
     theme: Option<String>,
 
+    /// Carry a font inside the SVG, so its text is exact on a machine that
+    /// does not have it. The file grows by the size of the font
+    #[arg(long, value_name = "FILE")]
+    embed_font: Option<PathBuf>,
+
     /// Tile a large diagram across sheets: a4, a3, letter, or WIDTHxHEIGHT in
     /// points. PDF only — an SVG has no pages
     #[arg(long, value_name = "SIZE")]
@@ -584,7 +589,18 @@ fn run() -> Result<i32> {
     if let Some(theme) = &cli.theme {
         bgraph::themes::apply(&mut composed.diagram, theme)?;
     }
-    let layout = layout::solve(&composed.diagram)?;
+    let mut layout = layout::solve(&composed.diagram)?;
+    if let Some(path) = &cli.embed_font {
+        let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+        // Named after the file, because that is what the diagram's own
+        // `font:` will be asking for — a family invented here would be one
+        // nothing referred to.
+        let family = path
+            .file_stem()
+            .map(|s| s.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "embedded".into());
+        layout.opts.embed_font = Some((family, std::sync::Arc::new(bytes)));
+    }
 
     // The output extension picks the writer. A flag would be a second way to
     // say what the filename already says, and the two could disagree.

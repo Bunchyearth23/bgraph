@@ -8108,3 +8108,69 @@ fn a_brace_inside_a_label_is_not_a_block() {
     let (_, after) = frozen("node a \"A\"\nnode b \"a { brace\"\n");
     assert!(after.contains("\"a { brace\" right-of a"), "{after}");
 }
+
+// ------------------------------------------------- embedded font (I-058)
+
+#[test]
+fn base64_round_trips_through_a_decoder() {
+    // Written out rather than pulled in, so it is worth proving against the
+    // real rules: padded to a multiple of four, and the tail correct for a
+    // length of one, two and three over.
+    fn decode(text: &str) -> Vec<u8> {
+        const A: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let bits: Vec<u32> = text
+            .bytes()
+            .filter(|b| *b != b'=')
+            .map(|b| A.iter().position(|a| *a == b).expect("in the alphabet") as u32)
+            .collect();
+        let mut out = Vec::new();
+        for chunk in bits.chunks(4) {
+            let mut n = 0u32;
+            for (i, v) in chunk.iter().enumerate() {
+                n |= v << (18 - 6 * i);
+            }
+            let bytes = [(n >> 16) as u8, (n >> 8) as u8, n as u8];
+            out.extend_from_slice(&bytes[..chunk.len() - 1]);
+        }
+        out
+    }
+
+    for original in [
+        vec![],
+        vec![0x00],
+        vec![0x00, 0x01],
+        vec![0x00, 0x01, 0x00],
+        b"the quick brown fox".to_vec(),
+        (0..=255u8).collect::<Vec<u8>>(),
+    ] {
+        let encoded = crate::render_svg::base64_for_test(&original);
+        assert_eq!(encoded.len() % 4, 0, "not padded: {encoded}");
+        assert_eq!(decode(&encoded), original, "{encoded}");
+    }
+}
+
+#[test]
+fn an_embedded_font_becomes_a_font_face_the_diagram_can_ask_for() {
+    let l = {
+        let mut l = build(r#"node a "A" { font: 14 "Whatever" }"#);
+        // A TrueType magic number and nothing else: this is about the wiring,
+        // not about the font.
+        l.opts.embed_font = Some((
+            "Whatever".into(),
+            std::sync::Arc::new(vec![0x00, 0x01, 0x00, 0x00]),
+        ));
+        l
+    };
+    let svg = crate::render_svg::render(&l);
+    assert!(svg.contains("@font-face"), "{svg}");
+    assert!(svg.contains(r#"font-family:"Whatever""#), "{svg}");
+    assert!(svg.contains("data:font/ttf;base64,AAEAAA"), "{svg}");
+}
+
+#[test]
+fn a_diagram_with_no_embedded_font_carries_no_style_block() {
+    // Off unless asked for: the file grows by the size of the font, and that
+    // is a price only the person handing the file over should pay.
+    let svg = crate::render_source(r#"node a "A""#).unwrap();
+    assert!(!svg.contains("@font-face"), "{svg}");
+}

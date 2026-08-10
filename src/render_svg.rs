@@ -161,6 +161,19 @@ pub fn render(layout: &Layout) -> String {
     }
 
     let mut defs = String::new();
+    // The font, when one was handed in. An `@font-face` in `<defs><style>` is
+    // what makes an SVG's text *exact* everywhere rather than approximately
+    // right — it is the practical half of `X-005`, which is that this crate
+    // measures text with an advance table and a viewer may not have the font
+    // that table describes. Carrying the font removes the "may not".
+    if let Some((family, bytes)) = &layout.opts.embed_font {
+        let _ = write!(
+            defs,
+            r#"<style>@font-face{{font-family:"{}";src:url("data:font/ttf;base64,{}");}}</style>"#,
+            esc(family),
+            base64(bytes)
+        );
+    }
     for (id, (head, color)) in &markers {
         defs.push_str(&marker_def(id, *head, color, &layout.opts.background));
     }
@@ -1169,6 +1182,46 @@ pub fn split_alpha(color: &str) -> (String, Option<f64>) {
         .filter(|a| *a < 1.0);
 
     (format!("#{rgb}"), alpha)
+}
+
+/// Base64, written out rather than pulled in.
+///
+/// Twenty lines against a dependency, in a crate whose whole shape is that
+/// the SVG writer, the PDF writer and the HTTP preview are all hand-rolled.
+/// There is no decoder here because nothing in this crate reads one back.
+#[cfg(test)]
+pub(crate) fn base64_for_test(bytes: &[u8]) -> String {
+    base64(bytes)
+}
+
+fn base64(bytes: &[u8]) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+
+    for chunk in bytes.chunks(3) {
+        let b = [
+            chunk[0],
+            *chunk.get(1).unwrap_or(&0),
+            *chunk.get(2).unwrap_or(&0),
+        ];
+        let n = (b[0] as u32) << 16 | (b[1] as u32) << 8 | b[2] as u32;
+        out.push(ALPHABET[(n >> 18 & 63) as usize] as char);
+        out.push(ALPHABET[(n >> 12 & 63) as usize] as char);
+        // The tail is padded rather than truncated: a decoder is entitled to
+        // a multiple of four, and a browser that gets three characters simply
+        // drops the font with no message.
+        out.push(if chunk.len() > 1 {
+            ALPHABET[(n >> 6 & 63) as usize] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            ALPHABET[(n & 63) as usize] as char
+        } else {
+            '='
+        });
+    }
+    out
 }
 
 fn esc(s: &str) -> String {

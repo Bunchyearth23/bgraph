@@ -728,6 +728,13 @@ coordinate space the SVG uses, so a rectangle here is the rectangle in the file
 beside it. The *shape* of that document is promised; the *values* are not, and
 move whenever the drawing improves, exactly as the SVG does.
 
+`--embed-font` carries a font inside the SVG, so its text is exact on a
+machine that does not have it — the practical half of the risk that this crate
+measures text with an advance table a viewer may not share. It carries the
+*whole* font today, not a subset: a typical weight takes a small SVG past a
+hundred kilobytes, which is a price worth paying for a hand-off and not for a
+repository.
+
 `--page a4` tiles a diagram larger than a sheet across several, with an
 overlap at each seam so a box cut in half is readable on both. PDF only — an
 SVG has no pages, and pretending otherwise would be inventing a concept the

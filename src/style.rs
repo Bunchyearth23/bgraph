@@ -686,6 +686,11 @@ pub struct GraphOpts {
     pub description: Option<String>,
     /// Column and row step for `at (col 3, row 2)`, when one is declared.
     pub grid: Option<(f64, f64)>,
+    /// A font to carry inside the SVG: the family it should be called, and
+    /// its bytes. Set from the command line rather than from the file,
+    /// because it is a choice about the *output* — the same diagram is
+    /// embedded for a hand-off and left light for a repository.
+    pub embed_font: Option<(String, std::sync::Arc<Vec<u8>>)>,
     /// Draw as if by hand. A sketched architecture says "this is a proposal"
     /// where a crisp one says "this is decided", which is information rather
     /// than ornament.
@@ -704,6 +709,7 @@ impl Default for GraphOpts {
             title: None,
             description: None,
             grid: None,
+            embed_font: None,
             sketch: false,
         }
     }
