@@ -45,6 +45,7 @@ all-archetypes = [
     "journey",
     "radar",
     "rack",
+    "network",
     "class",
     "state",
 ]
@@ -67,6 +68,7 @@ kanban = []
 journey = []
 radar = []
 rack = []
+network = []
 class = []
 state = []
 

@@ -385,6 +385,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     let item = crate::check::archetype_of(diagram);
     let machine = item.name == "state";
     let architecture = item.name == "block";
+    let topology = item.name == "network";
     let dark = opts
         .background
         .as_deref()
@@ -396,6 +397,14 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     // A base that leaves `shape` unset, so a declared one is distinguishable
     // from the default and a state can fall back to a rounded box.
     let node_base = if machine {
+        Style {
+            shape: None,
+            ..Style::node_defaults()
+        }
+    } else if topology {
+        // Only `shape` is left unset: a topology's colours usually already
+        // mean something to its author (environment, tenancy, trust zone), so
+        // the archetype chooses the outline and keeps out of the palette.
         Style {
             shape: None,
             ..Style::node_defaults()
@@ -455,6 +464,19 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             }
         }
 
+        // The role picks the outline and nothing else.
+        if topology {
+            use crate::style::NetRole as R;
+            style.shape = style.shape.or(Some(match style.role {
+                Some(R::Router) => Shape::Diamond,
+                Some(R::Switch) | Some(R::Firewall) => Shape::Hexagon,
+                Some(R::Storage) => Shape::Cylinder,
+                Some(R::Client) => Shape::Stadium,
+                Some(R::Cloud) => Shape::Ellipse,
+                Some(R::Server) | None => Shape::Rect,
+            }));
+        }
+
         if architecture {
             let look = block_look(style.block_kind, dark);
             style.fill = style.fill.or(Some(look.fill.into()));
@@ -466,7 +488,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             }
         }
 
-        let lines: Vec<String> = if mark {
+        let mut lines: Vec<String> = if mark {
             Vec::new()
         } else {
             node.label
@@ -476,6 +498,13 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                 .map(|l| l.trim().to_string())
                 .collect()
         };
+
+        // The address goes on its own line under the name, and the box is
+        // sized from it like any other line — declared and not drawn would be
+        // worse than refused.
+        if topology && let Some(addr) = &style.addr {
+            lines.push(addr.clone());
+        }
 
         // A block is sized by every line it will draw, at the size each one
         // is drawn at — a description in 11px does not need a 14px column.
@@ -584,6 +613,14 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             label = Some(match label {
                 Some(text) if !text.is_empty() => format!("{text}\n«{link}»"),
                 _ => format!("«{link}»"),
+            });
+        }
+        // What a link runs at, bracketed under its label — the same shape the
+        // C4 view uses for a protocol, because it is the same kind of fact.
+        if topology && let Some(speed) = &style.speed {
+            label = Some(match label {
+                Some(text) if !text.is_empty() => format!("{text}\n[{speed}]"),
+                _ => format!("[{speed}]"),
             });
         }
         if let Some(guard) = &style.guard {

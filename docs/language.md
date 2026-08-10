@@ -31,6 +31,7 @@ type kanban     // group todo "To do" { card a "A" }
 type journey    // step pay "Pay" 2 4        — one score per actor
 type radar      // series a "A" 92 48 70     — one per axis
 type rack       // device srv "Compute" 38 41 — U38 to U41
+type network    // host fw "Firewall" firewall
 type bytefield  // field a "A" 0 3        — bytes
 type treemap    // box a "A" 42
 type quadrant   // point a "A" 0.8 0.2

@@ -120,6 +120,7 @@ const EXAMPLES: &[(&str, &str)] = &[
     ("journey", include_str!("../examples/journey.bd")),
     ("radar", include_str!("../examples/radar.bd")),
     ("rack", include_str!("../examples/rack.bd")),
+    ("network", include_str!("../examples/network.bd")),
     ("state", include_str!("../examples/state.bd")),
 ];
 

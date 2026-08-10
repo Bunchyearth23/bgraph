@@ -98,6 +98,8 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "radar" => check_radar(diagram, &mut out),
         #[cfg(feature = "rack")]
         "rack" => check_rack(diagram, &mut out),
+        #[cfg(feature = "network")]
+        "network" => check_network(diagram, &mut out),
         #[cfg(feature = "block")]
         "block" => check_block(diagram, &mut out),
         #[cfg(feature = "gantt")]
@@ -670,7 +672,9 @@ fn awaits_binding(node: &NodeDecl, def: &'static props::ArchetypeDef, name: &str
 /// boxes; the chart archetypes draw marks and take no box defaults.
 pub fn base_style(archetype: &str) -> crate::style::Style {
     match archetype {
-        "free" | "packet" | "bytefield" | "rack" => crate::style::Style::node_defaults(),
+        "free" | "packet" | "bytefield" | "rack" | "network" => {
+            crate::style::Style::node_defaults()
+        }
         _ => crate::charts::chart_defaults(),
     }
 }
@@ -1223,6 +1227,44 @@ fn check_block(diagram: &Diagram, out: &mut Vec<Diag>) {
             out.push(Diag::warn(
                 member.span,
                 "a block carries a `description`, not members".to_string(),
+            ));
+        }
+    }
+}
+
+/// A topology draws boxes and lines like `free`, so what is worth reporting is
+/// what a *network* diagram gets wrong: a host nothing connects to, which is
+/// either a mistake or a fact the diagram is failing to state.
+#[cfg(feature = "network")]
+fn check_network(diagram: &Diagram, out: &mut Vec<Diag>) {
+    check_cycles_free(diagram, out);
+
+    let mut linked: HashSet<&str> = HashSet::new();
+    for edge in &diagram.edges {
+        linked.insert(edge.from.as_str());
+        linked.insert(edge.to.as_str());
+    }
+    // A host inside a segment is attached by being there, so a group's members
+    // are connected whether or not a line is drawn to them.
+    for group in &diagram.groups {
+        for member in &group.members {
+            linked.insert(member.as_str());
+        }
+    }
+
+    if diagram.edges.is_empty() && diagram.groups.is_empty() {
+        return;
+    }
+
+    for node in &diagram.nodes {
+        if !linked.contains(node.id.as_str()) {
+            out.push(Diag::warn(
+                node.id.span,
+                format!(
+                    "`{}` is on no link and in no segment — an unreachable host is \
+                     either a mistake or a fact worth drawing",
+                    node.id.as_str()
+                ),
             ));
         }
     }

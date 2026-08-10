@@ -25,8 +25,8 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**Eight chantiers are planned. No question is open and nothing is blocked.**
-Twenty-two archetypes ship and the library is embeddable. The parked ideas were
+**Seven chantiers are planned. No question is open and nothing is blocked.**
+Twenty-four archetypes ship and the library is embeddable. The parked ideas were
 reviewed on 2026-08-10 and every one of them moved: what was worth building
 became a work item, what was not was discarded, and the one language question
 the review raised was answered the same day (`D-023`). One idea is still parked,
@@ -41,7 +41,6 @@ Roughly by cost. Nothing here has started.
 |---|---|---|---|
 | `W-038` | planned | A VS Code extension, beside the Zed one | Same three pieces the Zed extension already has — the tree-sitter grammar, `bgraph-lsp`, and the highlight queries — repackaged for a second editor. VS Code takes a TextMate grammar or a WASM tree-sitter build rather than Zed's git-pinned one, and speaks LSP over a client the extension launches itself, so `src/lsp.rs` is reused unchanged. `X-009` applies here too: the queries are part of the grammar's public surface, and a stale one breaks the language rather than degrading. |
 | `W-040` | planned | Real font metrics instead of the estimate | **The only planned item that closes an open risk** — `X-005`. Every auto-sized box, every edge-label plate and every `check_contrast` measurement rests on `0.56 × font-size` per character today. Was `I-008`. |
-| `W-043` | planned | `type network` — topology: hosts, links, segments | `free` with its own vocabulary, shapes and diagnostics — the nwdiag territory. `W-022` is the precedent: an archetype may supply words and shapes without taking over placement. Was part of `I-010`. |
 | `W-041` | planned | A tree layout engine — mindmap, treeview, org chart | Three genres for one engine, which is what makes it worth the cost. Hierarchy from group nesting already exists; `W-020` consumes it. Was `I-011`. |
 | `W-053` | planned | `type venn` — overlapping sets | Circle geometry, not vocabulary: sizing circles so the overlaps carry the right areas, and fitting a label inside an intersection. Shares nothing with `W-012`, which is why it was split out of `I-012` as `I-018` before being promoted. |
 | `W-045` | planned | `type harness` — wiring harnesses: connectors, pins, cable runs | The WireViz territory, and the least like anything shipped: a pin-to-pin mapping is not a node-and-edge graph wearing a costume. Addressing settled by `D-025`: a pin is a member line, a wire carries its pins as positional data, and no grammar moves. Was part of `I-010`. |
@@ -102,6 +101,7 @@ not copies.
 
 | id | date | title | commit |
 |---|---|---|---|
+| `W-043` | 2026-08-10 | `type network` — topology on the free path, per the `W-022` precedent: the archetype supplies the vocabulary, the shapes and the diagnostics, and the anchors still place. A `role` picks the outline and deliberately **not** the fill; `addr` is a line of the box, `speed` a line of the link; a `group` is a segment, and a host on no link and in no segment is reported | this commit |
 | `W-047` | 2026-08-10 | Activation bars for `type sequence`, per `D-024`. `activate` is `group` under a second word, in both grammars — its identifier **references** a participant instead of declaring one, which is the only reason it needed its own word: a group id and an item id share one namespace. `frame_names` keeps an activation out of the frame namespace everywhere, so a message touching that participant stays a message | this commit |
 | `W-044` | 2026-08-10 | `type rack` — a rack elevation: a numbered frame, devices occupying inclusive spans of units, counted from **1 at the bottom** as a rack is labelled. Overlaps and devices past the top of the frame are errors; empty units are silent, because a rack with gaps has room where a packet with gaps does not add up | this commit |
 | `W-046` | 2026-08-10 | `type radar` — axes radiating from a centre, one closed polygon per series. Reuses `bar`'s `categories` and `series` verbatim rather than inventing a synonym for the same idea. Every axis shares one scale and the rings start at zero: a per-axis scale, or rings starting at the smallest value, is how this chart is normally made to lie | this commit |

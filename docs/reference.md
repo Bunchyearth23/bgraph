@@ -1087,6 +1087,62 @@ field urg   "Urgent pointer"      144 159
 
 </details>
 
+### `type network`
+
+Network topology: hosts, links and the segments that hold them. Placed by anchors exactly as in `free` — the archetype supplies the vocabulary, the shapes and the diagnostics, and a `group` is a segment or a zone.
+
+```
+host <id> ["label"] <role>
+```
+
+```
+<from> -> <to> ["label"] <speed>
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+
+On a `host` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `role` | node | `role: <server\|switch\|router\|firewall\|storage\|client\|cloud>` | What the box is. Chooses the shape — a reader tells a router from a storage array before reading the label. Usually written positionally — `host fw "Edge firewall" firewall`. |
+| `addr` | node | `addr: "<address>"` | An address, drawn on its own line under the name. Kept as text: a diagram has no business validating a CIDR block. |
+| `speed` | edge | `speed: "<rate>"` | What the link runs at, drawn in brackets under its label. Usually written positionally — `sw -> srv "uplink" "10 GbE"`. |
+
+<details>
+<summary>A complete file — <code>examples/network.bd</code></summary>
+
+```
+// Topology: hosts, links and the segments that hold them. The role picks the
+// shape; placement stays declared, as in `free` (W-043).
+type network { title: "Capture site — edge to core" }
+graph { background: #0b1120 padding: 30 gap: 70 }
+
+style host  { fill: #1e293b stroke: #334155 1.2 font: 12 #e2e8f0 radius: 5 }
+style edge  { stroke: #64748b 1.3 font: 10 #94a3b8 head: none }
+style group { stroke: #334155 1 fill: #0f172a80 radius: 8 dash: dashed font: 11 #94a3b8 }
+
+host net "Internet" cloud at (0, 0)
+host fw  "Edge firewall" firewall below net gap 60 { addr: "203.0.113.1" }
+host tor "Top-of-rack" switch below fw gap 60 { addr: "10.0.0.1" }
+
+group core "Core segment — 10.0.0.0/24" {
+  host proc01 "snds-p01-proc01" server right-of tor gap 90 { addr: "10.0.0.11" }
+  host proc02 "snds-p01-proc02" server below proc01 gap 40 { addr: "10.0.0.12" }
+  host shelf  "Storage shelf"   storage below proc02 gap 40 { addr: "10.0.0.20" }
+}
+
+net -> fw  "uplink" "1 GbE"
+fw  -> tor "trunk"  "10 GbE"
+tor -> proc01 "" "10 GbE"
+tor -> proc02 "" "10 GbE"
+tor -> shelf  "" "10 GbE"
+```
+
+</details>
+
 ### `type rack`
 
 A rack elevation. Units are numbered from 1 at the **bottom**, as a rack is, and a device occupies an inclusive span of them. Empty units are left empty: unlike a packet, a rack with gaps is a rack with room, not a rack that does not add up.

@@ -563,6 +563,52 @@ pub const STATE_ITEM_PROPS: &[PropDef] = &[
 
 /// The SysML relation vocabulary, verb stems. Read tail-to-head:
 /// `r2 -> r1 derive` is r2 derives from r1.
+/// What a box on a topology *is*. Drives the shape, so a reader tells a
+/// router from a storage array before reading the label.
+pub const NET_ROLES: &[&str] = &[
+    "server", "switch", "router", "firewall", "storage", "client", "cloud",
+];
+
+pub const NETWORK_PROPS: &[PropDef] = &[PropDef {
+    name: "title",
+    alias: false,
+    ctx: Ctx::Both,
+    words: &[],
+    syntax: "title: <text>",
+    doc: "Heading drawn above the diagram.",
+}];
+
+pub const NETWORK_ITEM_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "role",
+        alias: false,
+        ctx: Ctx::Node,
+        words: NET_ROLES,
+        syntax: "role: <server|switch|router|firewall|storage|client|cloud>",
+        doc: "What the box is. Chooses the shape — a reader tells a router \
+              from a storage array before reading the label. Usually written \
+              positionally — `host fw \"Edge firewall\" firewall`.",
+    },
+    PropDef {
+        name: "addr",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "addr: \"<address>\"",
+        doc: "An address, drawn on its own line under the name. Kept as text: \
+              a diagram has no business validating a CIDR block.",
+    },
+    PropDef {
+        name: "speed",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: &[],
+        syntax: "speed: \"<rate>\"",
+        doc: "What the link runs at, drawn in brackets under its label. \
+              Usually written positionally — `sw -> srv \"uplink\" \"10 GbE\"`.",
+    },
+];
+
 pub const RACK_PROPS: &[PropDef] = &[
     PropDef {
         name: "title",
@@ -1166,6 +1212,27 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         members: false,
         alt_items: &[],
         edge_slots: &[],
+    },
+    #[cfg(feature = "network")]
+    ArchetypeDef {
+        name: "network",
+        item: "host",
+        doc: "Network topology: hosts, links and the segments that hold them. \
+              Placed by anchors exactly as in `free` — the archetype supplies \
+              the vocabulary, the shapes and the diagnostics, and a `group` is \
+              a segment or a zone.",
+        props: NETWORK_PROPS,
+        item_props: NETWORK_ITEM_PROPS,
+        slots: &[Slot {
+            prop: "role",
+            arity: 1,
+        }],
+        members: false,
+        alt_items: &[],
+        edge_slots: &[Slot {
+            prop: "speed",
+            arity: 1,
+        }],
     },
     #[cfg(feature = "rack")]
     ArchetypeDef {

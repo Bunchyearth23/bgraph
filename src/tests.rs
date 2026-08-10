@@ -633,6 +633,65 @@ fn a_packet_field_needs_bits() {
     assert!(err("type packet\nnode a \"A\"").contains("has no `bits`"));
 }
 
+// ---------------------------------------------------------------------- W-043
+
+#[test]
+fn a_role_picks_the_outline_and_leaves_the_palette_alone() {
+    // A topology's colours usually already mean something to its author —
+    // environment, tenancy, trust zone — so the archetype chooses the shape
+    // and keeps out of the fill.
+    let l = build(
+        "type network\n\
+         host r \"R\" router\n\
+         host s \"S\" storage right-of r\n\
+         host c \"C\" cloud right-of s\n",
+    );
+    assert_eq!(l.nodes[0].style.shape, Some(Shape::Diamond));
+    assert_eq!(l.nodes[1].style.shape, Some(Shape::Cylinder));
+    assert_eq!(l.nodes[2].style.shape, Some(Shape::Ellipse));
+
+    // A declared shape still wins over the role's.
+    let l = build("type network\nhost r \"R\" router { shape: rect }");
+    assert_eq!(l.nodes[0].style.shape, Some(Shape::Rect));
+}
+
+#[test]
+fn an_address_is_a_line_of_the_box_and_a_speed_a_line_of_the_link() {
+    // Declared and never drawn would be worse than refused.
+    let l = build(
+        "type network\nhost a \"A\" server { addr: \"10.0.0.1\" }\n\
+         host b \"B\" server right-of a\na -> b \"trunk\" \"10 GbE\"\n",
+    );
+    assert_eq!(l.nodes[0].lines, vec!["A", "10.0.0.1"]);
+    assert_eq!(l.edges[0].label.as_deref(), Some("trunk\n[10 GbE]"));
+}
+
+#[test]
+fn an_unreachable_host_is_reported() {
+    // Either a mistake or a fact the diagram is failing to state.
+    let d = diags(
+        "type network\nhost a \"A\" server\nhost b \"B\" server right-of a\n\
+         host lost \"Lost\" server below a\na -> b\n",
+    );
+    assert!(
+        d.iter().any(|x| x.message.contains("on no link and in no segment")),
+        "{d:?}"
+    );
+
+    // A host inside a segment is attached by being there.
+    let d = diags(
+        "type network\ngroup dmz \"DMZ\" {\n  host a \"A\" server\n}\n\
+         host b \"B\" server right-of a\na -> b\n",
+    );
+    assert!(!d.iter().any(|x| x.message.contains("on no link")), "{d:?}");
+}
+
+#[test]
+fn an_unknown_role_is_a_hard_error() {
+    let e = err("type network\nhost a \"A\" toaster");
+    assert!(e.contains("toaster"), "{e}");
+}
+
 // ---------------------------------------------------------------------- W-047
 
 #[cfg(test)]
@@ -1272,6 +1331,9 @@ fn each_data_property_belongs_to_exactly_the_genres_that_read_it() {
         ("bits", &["packet"]),
         ("bytes", &["bytefield"]),
         ("u", &["rack"]),
+        ("role", &["network"]),
+        ("addr", &["network"]),
+        ("speed", &["network"]),
         ("x", &["quadrant"]),
         ("y", &["quadrant"]),
         ("wave", &["wave"]),

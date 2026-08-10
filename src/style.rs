@@ -48,6 +48,20 @@ pub enum StateKind {
     Choice,
 }
 
+/// What a box on a topology is. Drives the shape only — a topology's colour
+/// belongs to the author, since a network diagram's palette usually means
+/// something already (environment, tenancy, trust zone).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NetRole {
+    Server,
+    Switch,
+    Router,
+    Firewall,
+    Storage,
+    Client,
+    Cloud,
+}
+
 /// What an element is in an architecture view. Drives shape and colour, so a
 /// reader tells a person from a datastore before reading the label.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -155,6 +169,11 @@ pub struct Style {
     pub verify: Option<String>,
     /// `type requirements` — what a relation asserts, read tail to head.
     pub link: Option<String>,
+    /// `type network` — what the box is, and its address line.
+    pub role: Option<NetRole>,
+    pub addr: Option<String>,
+    /// `type network` — what a link runs at.
+    pub speed: Option<String>,
     /// `type rack` — the inclusive span of rack units a device occupies,
     /// counted from 1 at the bottom.
     pub u: Option<(u32, u32)>,
@@ -228,6 +247,9 @@ impl Style {
             risk,
             verify,
             link,
+            role,
+            addr,
+            speed,
             u,
             scores,
             limit,
@@ -431,6 +453,21 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
         "link" => style.link = first.and_then(|x| x.as_word()).map(String::from),
         "limit" => style.limit = first.and_then(|x| x.as_num()),
         "scores" => style.scores = Some(v.iter().filter_map(|x| x.as_num()).collect()),
+        "role" => {
+            let word = first.and_then(|x| x.as_word()).unwrap_or_default();
+            style.role = Some(match word {
+                "server" => NetRole::Server,
+                "switch" => NetRole::Switch,
+                "router" => NetRole::Router,
+                "firewall" => NetRole::Firewall,
+                "storage" => NetRole::Storage,
+                "client" => NetRole::Client,
+                "cloud" => NetRole::Cloud,
+                other => bail!("unknown role `{other}`"),
+            });
+        }
+        "addr" => style.addr = first.and_then(|x| x.as_text()).map(String::from),
+        "speed" => style.speed = first.and_then(|x| x.as_text()).map(String::from),
         "u" => {
             let a = first.and_then(|x| x.as_num()).unwrap_or(1.0).max(0.0) as u32;
             let b = v
