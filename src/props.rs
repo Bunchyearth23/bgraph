@@ -72,6 +72,25 @@ pub const CARDINALITIES: &[&str] = &[
 
 pub const PROPS: &[PropDef] = &[
     PropDef {
+        name: "description",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "description: <text>",
+        doc: "What this is, in a sentence. Emitted as an SVG `<title>` in every \
+              genre — a tooltip to a reader with a mouse, a label to one with a \
+              screen reader — and additionally *drawn* under the technology \
+              line in `type block`, which has room for it.",
+    },
+    PropDef {
+        name: "desc",
+        alias: true,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "desc: <text>",
+        doc: "Alias for `description`.",
+    },
+    PropDef {
         name: "fill",
         alias: false,
         ctx: Ctx::Node,
@@ -303,6 +322,15 @@ pub const PROPS: &[PropDef] = &[
 ];
 
 pub const GRAPH_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "description",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "description: <text>",
+        doc: "What the diagram is, in a sentence, for a reader who cannot see \
+              it. Becomes `aria-label` on the SVG root, beside `role=\"img\"`.",
+    },
     PropDef {
         name: "title",
         alias: false,
@@ -1812,23 +1840,11 @@ pub const BLOCK_ITEM_PROPS: &[PropDef] = &[
         syntax: "technology: <text>",
         doc: "Alias of `tech`.",
     },
-    PropDef {
-        name: "description",
-        alias: false,
-        ctx: Ctx::Node,
-        words: &[],
-        syntax: "description: <text>",
-        doc: "A sentence under the technology line, smaller and lighter. \
-              Wrapped at a fixed column, and the box is sized around it.",
-    },
-    PropDef {
-        name: "desc",
-        alias: true,
-        ctx: Ctx::Node,
-        words: &[],
-        syntax: "desc: <text>",
-        doc: "Alias of `description`.",
-    },
+    // `description` and `desc` used to live here. They are on the shared
+    // table now, because every genre emits one as an SVG `<title>` — `block`
+    // is simply the genre that also *draws* it, under the technology line,
+    // sizing the box around it. One property, one meaning (`D-015`), and
+    // `D-022` forbids it appearing in both tables.
 ];
 
 pub const ER_PROPS: &[PropDef] = &[PropDef {
@@ -2311,10 +2327,7 @@ pub const KEYWORDS: &[(&str, &str)] = &[
          because shrinking to match a narrower neighbour clips the label. \
          Applied before placement, so nothing is pushed on top of anything.",
     ),
-    (
-        "same-height",
-        "The same, for height.",
-    ),
+    ("same-height", "The same, for height."),
     (
         "component",
         "A fragment declared once and placed many times — `component service \

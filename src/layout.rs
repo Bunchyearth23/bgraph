@@ -384,7 +384,21 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         bail!("{}", diag.message);
     }
 
-    let opts = GraphOpts::from_props(&diagram.graph)?;
+    let mut opts = GraphOpts::from_props(&diagram.graph)?;
+    // A chart's own `title` is the diagram's name too, and the SVG's
+    // `aria-label` is built from `opts`. Lifted here, once, rather than in
+    // each of the eighteen chart functions — a screen reader on a pie chart
+    // is exactly the reader who needs the name most.
+    if opts.title.is_none()
+        && let Some(title) = diagram
+            .archetype_props
+            .iter()
+            .find(|p| p.name == "title")
+            .and_then(|p| p.values.first())
+            .and_then(|v| v.as_text())
+    {
+        opts.title = Some(title.to_string());
+    }
     let registry = Registry::build(&diagram.styles)?;
 
     // The archetype decides what the statements mean.
@@ -1133,7 +1147,10 @@ pub struct Solved {
 /// A name the constraint cannot resolve is simply skipped: `check` has
 /// already reported it, and reporting it twice would say there are two
 /// mistakes.
-fn members_of(constraint: &crate::ast::ConstraintDecl, index: &HashMap<&str, Entity>) -> Vec<usize> {
+fn members_of(
+    constraint: &crate::ast::ConstraintDecl,
+    index: &HashMap<&str, Entity>,
+) -> Vec<usize> {
     constraint
         .members
         .iter()

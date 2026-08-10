@@ -57,9 +57,12 @@ fn to_value(layout: &Layout) -> Value {
         "version": VERSION,
         "canvas": { "width": width, "height": height },
         "background": layout.opts.background,
+        "title": layout.opts.title,
+        "description": layout.opts.description,
         "groups": layout.groups.iter().map(|g| json!({
             "id": g.id,
             "label": g.lines,
+            "description": g.style.description,
             "rect": at(&g.rect),
         })).collect::<Vec<_>>(),
         "nodes": layout.nodes.iter().map(|n| json!({
@@ -69,6 +72,10 @@ fn to_value(layout: &Layout) -> Value {
             "id": n.id,
             "label": n.lines,
             "rect": at(&n.rect),
+            // What the box *is*, when the file said. The same sentence the
+            // SVG carries as a `<title>` — a consumer building an index or a
+            // caption should not have to parse the picture for it.
+            "description": n.style.description,
             "fill": n.style.fill,
             "stroke": n.style.stroke,
         })).collect::<Vec<_>>(),

@@ -2435,7 +2435,9 @@ fn each_data_property_belongs_to_exactly_the_genres_that_read_it() {
         ("to-card", &["er"]),
         ("date", &["timeline"]),
         ("tech", &["block"]),
-        ("description", &["block"]),
+        // `description` used to be here. It is shared now: every genre emits
+        // one as an SVG `<title>`, and `block` is simply the genre that also
+        // draws it. One property, one meaning — the case `D-015` is for.
         ("kind", &["block", "state"]),
     ] {
         let mut found = crate::props::genres_reading(prop);
@@ -7261,4 +7263,69 @@ fn constraints_survive_composition() {
         l.nodes[0].rect.w > 100.0,
         "the constraint was lost on the way"
     );
+}
+
+// ------------------------------------------------- accessibility (I-040)
+
+#[test]
+fn a_described_box_carries_its_description_into_the_svg() {
+    // `<title>` on the shape rather than a wrapping group: valid on any SVG
+    // element, shown as a tooltip by a browser, read by a screen reader. One
+    // line serves the reader with a mouse and the reader without sight, which
+    // is why `I-040` was widened past accessibility.
+    let svg = crate::render_source(
+        r#"node cart "Cart" { description: "What the customer has chosen." }"#,
+    )
+    .unwrap();
+    assert!(
+        svg.contains("<title>What the customer has chosen.</title>"),
+        "{svg}"
+    );
+}
+
+#[test]
+fn a_description_is_escaped_like_every_other_text() {
+    let svg = crate::render_source(r#"node a "A" { description: "R&D <ops>" }"#).unwrap();
+    assert!(svg.contains("R&amp;D &lt;ops&gt;"), "{svg}");
+    assert!(!svg.contains("<ops>"), "unescaped markup reached the file");
+}
+
+#[test]
+fn the_root_says_what_the_diagram_is() {
+    // Without `role="img"` and a label an SVG is announced as a group of
+    // anonymous shapes, or skipped entirely.
+    let svg = crate::render_source(
+        r#"graph { description: "How an order reaches the warehouse." }
+           node a "A""#,
+    )
+    .unwrap();
+    assert!(svg.contains(r#"role="img""#), "{svg}");
+    assert!(
+        svg.contains(r#"aria-label="How an order reaches the warehouse.""#),
+        "{svg}"
+    );
+}
+
+#[test]
+fn the_label_falls_back_to_the_title_rather_than_asking_twice() {
+    let svg = crate::render_source("graph { title: \"Checkout\" }\nnode a \"A\"").unwrap();
+    assert!(svg.contains(r#"aria-label="Checkout""#), "{svg}");
+}
+
+#[test]
+fn a_chart_is_labelled_by_its_own_title() {
+    // A screen reader on a pie chart is the reader who needs the name most,
+    // and a chart names itself in its own settings rather than in `graph`.
+    let svg =
+        crate::render_source("type pie { title: \"Traffic sources\" }\nslice a \"A\" 40").unwrap();
+    assert!(svg.contains(r#"aria-label="Traffic sources""#), "{svg}");
+}
+
+#[test]
+fn an_undescribed_diagram_gains_no_empty_attributes() {
+    // A `role="img"` with nothing to say is worse than none: it promises a
+    // screen reader a label and then gives it an empty string.
+    let svg = crate::render_source("node a \"A\"").unwrap();
+    assert!(!svg.contains("role="), "{svg}");
+    assert!(!svg.contains("<title>"), "{svg}");
 }

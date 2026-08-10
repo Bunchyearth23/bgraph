@@ -161,7 +161,18 @@ pub struct Style {
     pub block_kind: Option<BlockKind>,
     /// `type block` — the technology line, drawn in brackets under the name.
     pub tech: Option<String>,
-    /// `type block` — a sentence under the technology line.
+    /// What this is, in a sentence.
+    ///
+    /// One property, one meaning. `type block` draws it under the technology
+    /// line because that genre has room for it; **every** genre emits it as an
+    /// SVG `<title>`, which is a tooltip to a reader with a mouse and a label
+    /// to one with a screen reader. Inventing a second word for the second use
+    /// would have been two names for one idea, which is what `D-015` is for.
+    ///
+    /// It lives on `Style` rather than on the placed box because `Style` is
+    /// the one thing already resolved per item and carried to the renderer —
+    /// a second value would have to be threaded through all thirty places a
+    /// placed box is built.
     pub description: Option<String>,
     /// `type requirements` — how likely it is to go unmet, and how it will be
     /// shown to be met. Kept as words: both are drawn, neither is computed.
@@ -663,6 +674,9 @@ pub struct GraphOpts {
     /// own in their settings and that one wins; this is what every other
     /// genre — `free`, `class`, `er`, `harness` — had no way to say at all.
     pub title: Option<String>,
+    /// What the diagram is, for a screen reader. Becomes `aria-label` on the
+    /// SVG root alongside `role="img"`.
+    pub description: Option<String>,
     /// Column and row step for `at (col 3, row 2)`, when one is declared.
     pub grid: Option<(f64, f64)>,
 }
@@ -677,6 +691,7 @@ impl Default for GraphOpts {
             background: Some("#ffffff".into()),
             flow: RelDir::RightOf,
             title: None,
+            description: None,
             grid: None,
         }
     }
@@ -690,6 +705,9 @@ impl GraphOpts {
             let first = prop.values.first();
             match prop.name.as_str() {
                 "title" => opts.title = first.and_then(|x| x.as_text()).map(String::from),
+                "description" | "desc" => {
+                    opts.description = first.and_then(|x| x.as_text()).map(String::from)
+                }
                 "grid" => {
                     let numbers: Vec<f64> = prop.values.iter().filter_map(|v| v.as_num()).collect();
                     opts.grid = match numbers.as_slice() {

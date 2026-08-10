@@ -203,6 +203,8 @@ Aliases are marked. They behave identically to the property they alias; the edit
 
 | Property | Applies to | Syntax | Meaning |
 |---|---|---|---|
+| `description` | both | `description: <text>` | What this is, in a sentence. Emitted as an SVG `<title>` in every genre — a tooltip to a reader with a mouse, a label to one with a screen reader — and additionally *drawn* under the technology line in `type block`, which has room for it. |
+| `desc` *(alias)* | both | `desc: <text>` | Alias for `description`. |
 | `fill` | node | `fill: <color>` | Interior color of the shape. |
 | `background` *(alias)* | node | `background: <color>` | Alias of `fill`. |
 | `stroke` | both | `stroke: <color> <width> <solid\|dashed\|dotted>` | Outline. Accepts a color, a width and a dash pattern in any order; omit whichever you don't need. |
@@ -238,6 +240,7 @@ Declared once, in `graph { … }`. These are diagram-wide and are not part of th
 
 | Setting | Syntax | Meaning |
 |---|---|---|
+| `description` | `description: <text>` | What the diagram is, in a sentence, for a reader who cannot see it. Becomes `aria-label` on the SVG root, beside `role="img"`. |
 | `title` | `title: <text>` | Heading drawn above the diagram. Every genre accepts it here — the chart archetypes also take a `title` in their own settings, and that one wins where both are given. |
 | `padding` | `padding: <number>` | Margin between the drawing and the canvas edge. |
 | `grid` | `grid: <number> <number>` | Column and row step for `at (col 3, row 2)`. One number sets both. A coordinate system, not a solver: nothing is snapped to it, and a box placed in pixels is unaffected. |
@@ -520,8 +523,6 @@ On a `block` — these are its own, and are not offered elsewhere:
 | `kind` | node | `kind: <person\|system\|container\|component\|database\|queue\|external>` | What this element is. Usually written positionally — `block api "API" container`. `external` draws a dashed, muted box for something outside the system being described. |
 | `tech` | both | `tech: <text>` | The technology, drawn in brackets under the name — `[Container: Rust]`. On an edge it reads as the protocol: `web -> api "reads" { tech: "HTTPS/JSON" }`. |
 | `technology` *(alias)* | both | `technology: <text>` | Alias of `tech`. |
-| `description` | node | `description: <text>` | A sentence under the technology line, smaller and lighter. Wrapped at a fixed column, and the box is sized around it. |
-| `desc` *(alias)* | node | `desc: <text>` | Alias of `description`. |
 
 <details>
 <summary>A complete file — <code>examples/block.bd</code></summary>

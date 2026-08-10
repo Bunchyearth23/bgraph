@@ -71,7 +71,10 @@ pub fn render(layout: &Layout) -> String {
         body.push_str(&free_polyline(shape));
     }
     for group in &layout.groups {
-        body.push_str(&group_frame(group, &layout.opts.background));
+        body.push_str(&described(
+            &group_frame(group, &layout.opts.background),
+            group.style.description.as_deref(),
+        ));
     }
 
     for (edge, route) in layout.edges.iter().zip(&routed) {
@@ -144,7 +147,10 @@ pub fn render(layout: &Layout) -> String {
         if node.style.shadow == Some(true) {
             needs_shadow = true;
         }
-        body.push_str(&node_shape(node));
+        body.push_str(&described(
+            &node_shape(node),
+            node.style.description.as_deref(),
+        ));
         body.push_str(&node_label(node));
     }
 
@@ -162,8 +168,21 @@ pub fn render(layout: &Layout) -> String {
         );
     }
 
+    // `role="img"` plus a label is what makes an SVG readable to a screen
+    // reader at all: without them it is announced as a group of anonymous
+    // shapes, or skipped. The label is what the file already says — the
+    // diagram's own description, or failing that its title — rather than
+    // something to be written twice.
+    let label = layout
+        .opts
+        .description
+        .as_deref()
+        .or(layout.opts.title.as_deref())
+        .map(|text| format!(r#" role="img" aria-label="{}""#, esc(text)))
+        .unwrap_or_default();
+
     let mut svg = format!(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}">"#,
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}"{label}>"#,
         w = n(width),
         h = n(height)
     );
@@ -617,6 +636,33 @@ fn group_frame(group: &PlacedGroup, background: &Option<String>) -> String {
 }
 
 // ---------------------------------------------------------------- shapes
+
+/// A shape with its description attached, when it has one.
+///
+/// `<title>` as a child of the shape rather than a wrapping group: it is valid
+/// on any SVG element, it is what a browser shows as a tooltip, and it is what
+/// a screen reader reads — so one line serves the sighted reader with a mouse
+/// and the reader without sight, which is the whole reason `I-040` was widened
+/// past accessibility.
+fn described(shape: &str, description: Option<&str>) -> String {
+    let Some(text) = description.filter(|t| !t.is_empty()) else {
+        return shape.to_string();
+    };
+    // The shapes are written self-closing, so the tag is reopened to hold the
+    // title. Done here rather than in each of the eight shape branches, which
+    // would be eight places to forget.
+    let Some(stripped) = shape.strip_suffix("/>") else {
+        return shape.to_string();
+    };
+    let tag = stripped
+        .split_once(|c: char| c.is_whitespace())
+        .map(|(head, _)| head.trim_start_matches('<'))
+        .unwrap_or_default();
+    if tag.is_empty() {
+        return shape.to_string();
+    }
+    format!("{stripped}><title>{}</title></{tag}>", esc(text))
+}
 
 fn node_shape(node: &PlacedNode) -> String {
     let r = &node.rect;

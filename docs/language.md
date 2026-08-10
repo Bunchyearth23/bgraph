@@ -90,6 +90,26 @@ cases that need one.
 
 The whole example is in [`examples/components.bd`](../examples/components.bd).
 
+### Saying what something is
+
+`description` is one property with one meaning: what this is, in a sentence.
+
+```bgraph
+graph { description: "How an order reaches the warehouse." }
+
+node cart "Cart" { description: "What the customer has chosen but not paid for." }
+```
+
+Every genre emits it as an SVG `<title>` — a tooltip to a reader with a mouse,
+a label to one with a screen reader — and it also reaches the JSON export.
+`type block` additionally *draws* it, under the technology line, because that
+genre has room for it.
+
+At the diagram level it becomes `aria-label` on the SVG root, beside
+`role="img"`. Without those an SVG is announced as a group of anonymous shapes
+or skipped entirely. A chart's own `title` serves as the label when no
+`description` is given, so a pie chart names itself without being told twice.
+
 ### Named themes
 
 `--theme light`, `--theme dark`, `--theme print`. A theme **is** a style
