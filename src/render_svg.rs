@@ -12,9 +12,15 @@ use crate::layout::{
 use crate::style::{Head, Router, Shape, Style};
 
 /// An edge after routing, with its label already placed.
-struct Routed {
-    points: Vec<(f64, f64)>,
-    label: Option<(String, Rect)>,
+/// An edge, once it knows where it runs and where its label sits.
+///
+/// Shared with the PDF writer for the same reason [`canvas`] is: routing,
+/// endpoint clipping and label avoidance are the difference between a line
+/// between two centres and a drawn edge, and a second implementation of them
+/// would be a second answer.
+pub(crate) struct Routed {
+    pub points: Vec<(f64, f64)>,
+    pub label: Option<(String, Rect)>,
 }
 
 /// The page: how much to shift the geometry, and how big the surface is.
@@ -177,7 +183,7 @@ pub fn render(layout: &Layout) -> String {
     svg
 }
 
-fn route_all(layout: &Layout) -> Vec<Routed> {
+pub(crate) fn route_all(layout: &Layout) -> Vec<Routed> {
     let mut routed: Vec<Routed> = layout
         .edges
         .iter()

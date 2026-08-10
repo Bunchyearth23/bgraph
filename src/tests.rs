@@ -887,6 +887,29 @@ fn the_page_and_the_viewbox_are_the_same_surface() {
 
 #[cfg(feature = "pdf")]
 #[test]
+fn a_pdf_draws_the_edges_the_svg_draws() {
+    // The first version joined two centres with a bare line: no label, no
+    // arrowhead, no routing, no clipping. It validated, it opened, and it was
+    // wrong about every edge in the default archetype.
+    let source = "node a \"A\"\nnode b \"B\" right-of a gap 60\nnode c \"C\" below a\n\
+                  a -> b \"carries\"\na ..> c { router: ortho }";
+    let pdf = String::from_utf8_lossy(&crate::render_source_pdf(source).expect("renders"))
+        .to_string();
+
+    assert!(pdf.contains("(carries) Tj"), "the edge label is drawn");
+
+    // An `ortho` edge is an elbow, so its path has an interior point — a
+    // straight centre-to-centre line would have exactly two.
+    let moves = pdf.matches(" m\n").count();
+    let lines = pdf.matches(" l\n").count();
+    assert!(lines > moves, "paths have interior points: {moves} moves, {lines} lines");
+
+    // And an arrowhead is a filled triangle at the end of a line.
+    assert!(pdf.contains("f\n"), "a head is filled");
+}
+
+#[cfg(feature = "pdf")]
+#[test]
 fn pdf_text_is_measured_exactly_rather_than_estimated() {
     // The one place `X-005` does not apply: a PDF viewer must have Helvetica,
     // and the advance table `W-040` added is Helvetica's — so the centring

@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 use std::fmt::Write;
 
 use crate::layout::{Anchor, Chart, Layout, Rect};
-use crate::style::Shape;
+use crate::style::{Head, Shape};
 
 /// A PDF page of the whole diagram, as bytes ready to write to a file.
 pub fn render(layout: &Layout) -> Vec<u8> {
@@ -62,15 +62,86 @@ pub fn render(layout: &Layout) -> Vec<u8> {
         }
     }
 
-    for edge in &layout.edges {
-        let (from, to) = (&layout.nodes[edge.from].rect, &layout.nodes[edge.to].rect);
-        c.stroke_colour(edge.style.stroke.as_deref().unwrap_or("#1f2937"));
-        c.width(edge.style.stroke_width.unwrap_or(1.5));
-        c.dash(edge.style.dash.as_deref(), edge.style.stroke_width.unwrap_or(1.5));
-        c.line(
-            shift((from.cx(), from.cy()), dx, dy),
-            shift((to.cx(), to.cy()), dx, dy),
+    // The *routed* edges, not two centres joined: routing, endpoint clipping
+    // and label placement are what make a line an edge, and the SVG writer
+    // already computes all three.
+    let routed = crate::render_svg::route_all(layout);
+    for (edge, route) in layout.edges.iter().zip(&routed) {
+        if route.points.len() < 2 {
+            continue;
+        }
+        let points: Vec<(f64, f64)> = route.points.iter().map(|p| shift(*p, dx, dy)).collect();
+        let stroke = edge.style.stroke.clone().unwrap_or_else(|| "#64748b".into());
+        let width = edge.style.stroke_width.unwrap_or(1.5);
+
+        c.stroke_colour(&stroke);
+        c.width(width);
+        c.dash(edge.style.dash.as_deref(), width);
+        c.path(&points, false);
+        let _ = writeln!(c.body, "S");
+        c.dash(None, width);
+
+        // Each end is decided on its own, exactly as in the SVG: a declared
+        // cardinality replaces the arrowhead there.
+        let head = edge.style.head.unwrap_or(Head::Solid);
+        let end = edge
+            .style
+            .to_card
+            .or_else(|| edge.arrow.head_end.then_some(head));
+        let start = edge
+            .style
+            .from_card
+            .or_else(|| edge.arrow.head_start.then_some(head));
+
+        if let Some(h) = end.filter(|h| *h != Head::None) {
+            let n = points.len();
+            c.head(h, points[n - 2], points[n - 1], &stroke, width);
+        }
+        if let Some(h) = start.filter(|h| *h != Head::None) {
+            c.head(h, points[1], points[0], &stroke, width);
+        }
+    }
+
+    // Labels after the lines, so no edge is drawn over a plate.
+    for (edge, route) in layout.edges.iter().zip(&routed) {
+        let Some((text, rect)) = &route.label else {
+            continue;
+        };
+        let plate = offset(*rect, dx, dy);
+        // The plate is the background showing through, which is what keeps a
+        // label readable where it crosses a line.
+        if let Some(background) = &layout.opts.background
+            && background != "none"
+        {
+            c.fill_colour(background);
+            let _ = writeln!(
+                c.body,
+                "{} {} {} {} re f",
+                num(plate.x),
+                num(c.y(plate.bottom())),
+                num(plate.w),
+                num(plate.h)
+            );
+        }
+        let size = edge.style.font_size.unwrap_or(11.0);
+        c.fill_colour(
+            edge.style
+                .font_color
+                .as_deref()
+                .unwrap_or("#475569"),
         );
+        for (i, line) in text.split('\n').enumerate() {
+            c.show(
+                line,
+                (
+                    plate.cx(),
+                    plate.y + size * (0.95 + i as f64 * 1.25),
+                ),
+                size,
+                Anchor::Middle,
+                "400",
+            );
+        }
     }
 
     for node in &layout.nodes {
@@ -356,6 +427,91 @@ impl Content {
             num(p1.0),
             num(p1.1)
         );
+    }
+
+    /// A mark at the end of a line. The arrow forms are drawn; a crow's-foot
+    /// cardinality is drawn as the three strokes it is, because a filled
+    /// triangle there would read as direction rather than as *many*.
+    fn head(&mut self, head: Head, from: (f64, f64), to: (f64, f64), colour: &str, width: f64) {
+        let (dxa, dya) = (to.0 - from.0, to.1 - from.1);
+        let len = (dxa * dxa + dya * dya).sqrt();
+        if len < 0.001 {
+            return;
+        }
+        let (ux, uy) = (dxa / len, dya / len);
+        let (px, py) = (-uy, ux);
+        let size = (width * 4.0).max(7.0);
+        // Back along the line from the tip, and out to each side.
+        let at = |back: f64, side: f64| {
+            (
+                to.0 - ux * back + px * side,
+                to.1 - uy * back + py * side,
+            )
+        };
+
+        self.stroke_colour(colour);
+        self.fill_colour(colour);
+        self.width(width);
+
+        match head {
+            Head::Solid => {
+                self.path(&[to, at(size, size * 0.42), at(size, -size * 0.42)], true);
+                let _ = writeln!(self.body, "f");
+            }
+            Head::Open => {
+                self.path(&[at(size, size * 0.42), to, at(size, -size * 0.42)], false);
+                let _ = writeln!(self.body, "S");
+            }
+            Head::Dot => {
+                let r = size * 0.32;
+                let centre = at(r, 0.0);
+                self.ellipse(&Rect {
+                    x: centre.0 - r,
+                    y: centre.1 - r,
+                    w: r * 2.0,
+                    h: r * 2.0,
+                });
+                let _ = writeln!(self.body, "f");
+            }
+            // Cardinality: a bar, a foot, or a circle, in the combinations the
+            // crow's-foot notation gives them.
+            Head::One | Head::ZeroOne => {
+                self.path(&[at(size, size * 0.5), at(size, -size * 0.5)], false);
+                let _ = writeln!(self.body, "S");
+                if head == Head::ZeroOne {
+                    let r = size * 0.28;
+                    let centre = at(size * 1.9, 0.0);
+                    self.ellipse(&Rect {
+                        x: centre.0 - r,
+                        y: centre.1 - r,
+                        w: r * 2.0,
+                        h: r * 2.0,
+                    });
+                    let _ = writeln!(self.body, "S");
+                }
+            }
+            Head::Many | Head::ZeroMany | Head::OneMany => {
+                for side in [size * 0.5, 0.0, -size * 0.5] {
+                    self.path(&[to, at(size, side)], false);
+                    let _ = writeln!(self.body, "S");
+                }
+                if head == Head::ZeroMany {
+                    let r = size * 0.28;
+                    let centre = at(size * 1.9, 0.0);
+                    self.ellipse(&Rect {
+                        x: centre.0 - r,
+                        y: centre.1 - r,
+                        w: r * 2.0,
+                        h: r * 2.0,
+                    });
+                    let _ = writeln!(self.body, "S");
+                } else if head == Head::OneMany {
+                    self.path(&[at(size * 1.7, size * 0.5), at(size * 1.7, -size * 0.5)], false);
+                    let _ = writeln!(self.body, "S");
+                }
+            }
+            Head::None => {}
+        }
     }
 
     fn text_lines(&mut self, lines: &[String], r: &Rect, style: &crate::style::Style) {
