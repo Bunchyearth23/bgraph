@@ -131,10 +131,26 @@ fn run() -> Result<i32> {
 
     let diagram = parser::parse_diagram(&source)?;
     let layout = layout::solve(&diagram)?;
-    let svg = render_svg::render(&layout);
 
-    fs::write(&cli.output, svg)
-        .with_context(|| format!("cannot write {}", cli.output.display()))?;
+    // The output extension picks the writer. A flag would be a second way to
+    // say what the filename already says, and the two could disagree.
+    let wants_pdf = cli
+        .output
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("pdf"));
+
+    if wants_pdf {
+        #[cfg(feature = "pdf")]
+        {
+            fs::write(&cli.output, bgraph::render_pdf::render(&layout))
+                .with_context(|| format!("cannot write {}", cli.output.display()))?;
+        }
+        #[cfg(not(feature = "pdf"))]
+        bail!("this build has no PDF writer — rebuild with the `pdf` feature");
+    } else {
+        fs::write(&cli.output, render_svg::render(&layout))
+            .with_context(|| format!("cannot write {}", cli.output.display()))?;
+    }
 
     println!(
         "{} nodes, {} edges → {}",

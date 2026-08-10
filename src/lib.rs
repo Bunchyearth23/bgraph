@@ -124,6 +124,8 @@ pub mod layout;
 #[allow(missing_docs)]
 pub mod props;
 #[allow(missing_docs)]
+#[cfg(feature = "pdf")]
+pub mod render_pdf;
 pub mod render_svg;
 #[allow(missing_docs)]
 pub mod style;
@@ -167,4 +169,18 @@ pub fn render_source(source: &str) -> Result<String> {
     let diagram = parser::parse_diagram(source)?;
     let layout = layout::solve(&diagram)?;
     Ok(render_svg::render(&layout))
+}
+
+/// The same diagram as a PDF, as bytes ready to write.
+///
+/// Covered by the semver promise alongside [`render_source`] (`D-018`): an
+/// embedding program should not have to ship a renderer to get a page, which
+/// is the whole point of `D-014`. Vector output, so there is no rasteriser
+/// here and no dependency behind it — see `D-027` for why PNG is a different
+/// question.
+#[cfg(feature = "pdf")]
+pub fn render_source_pdf(source: &str) -> Result<Vec<u8>> {
+    let diagram = parser::parse_diagram(source)?;
+    let layout = layout::solve(&diagram)?;
+    Ok(render_pdf::render(&layout))
 }

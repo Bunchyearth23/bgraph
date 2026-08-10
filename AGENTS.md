@@ -53,11 +53,11 @@ disagree.
 
 ## Setup commands
 - `cargo build` — builds both `bgraph` and `bgraph-lsp`
-- `cargo run --bin bgraph -- examples/groups.bd -o groups.svg`
+- `cargo run --bin bgraph -- examples/groups.bd -o groups.svg` (`.pdf` picks the PDF writer)
 - `cargo run --bin bgraph -- watch examples/groups.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check examples/groups.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (323 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (327 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
 - `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (27 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
@@ -80,6 +80,7 @@ disagree.
 | `src/style.rs` | Style cascade, `extends` flattening, `GraphOpts` |
 | `src/layout.rs` | Anchor solver → absolute `Rect`s |
 | `src/render_svg.rs` | Shapes, edge routing, markers, text |
+| `src/render_pdf.rs` | PDF output, hand-written — vector, so no rasteriser |
 | `src/template.rs` | `{{holes}}` and the values a calling program binds |
 | `src/watch.rs` | Dependency-free HTTP live preview, with pan and zoom |
 | `src/lsp.rs` | Language server + `LineIndex` (byte ↔ UTF-16 position) |

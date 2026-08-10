@@ -24,7 +24,7 @@ name = "bgraph-lsp"
 path = "src/bin/bgraph-lsp.rs"
 
 [features]
-default = ["all-archetypes"]
+default = ["all-archetypes", "pdf"]
 all-archetypes = [
     "pie",
     "packet",
@@ -83,6 +83,10 @@ mindmap = []
 treeview = []
 class = []
 state = []
+
+# PDF is vector output, so it needs no rasteriser and no dependency
+# (`D-027`). On by default; switch it off and the writer is not compiled.
+pdf = []
 
 [dependencies]
 anyhow = "1.0.104"

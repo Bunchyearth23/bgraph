@@ -17,18 +17,31 @@ struct Routed {
     label: Option<(String, Rect)>,
 }
 
+/// The page: how much to shift the geometry, and how big the surface is.
+///
+/// Shared with the PDF writer so the two outputs cannot disagree about where
+/// the diagram sits — a second implementation of this would be a second place
+/// for the viewBox to drift from the page box.
+pub fn canvas(layout: &Layout) -> (f64, f64, f64, f64) {
+    let routed = route_all(layout);
+    let pad = layout.opts.padding;
+    let (min_x, min_y, max_x, max_y) = bounds(layout, &routed);
+    (
+        pad - min_x,
+        pad - min_y,
+        (max_x - min_x) + pad * 2.0,
+        (max_y - min_y) + pad * 2.0,
+    )
+}
+
+/// The whole diagram as one SVG document.
 pub fn render(layout: &Layout) -> String {
     // Routing comes first: a self-loop reaches above its node, and a label
     // may be nudged clear of a neighbouring line, so neither the canvas nor
     // the label placement can be decided before the geometry exists.
     let routed = route_all(layout);
 
-    let pad = layout.opts.padding;
-    let (min_x, min_y, max_x, max_y) = bounds(layout, &routed);
-    let width = (max_x - min_x) + pad * 2.0;
-    let height = (max_y - min_y) + pad * 2.0;
-    let dx = pad - min_x;
-    let dy = pad - min_y;
+    let (dx, dy, width, height) = canvas(layout);
 
     let mut body = String::new();
     let mut markers = BTreeMap::new();

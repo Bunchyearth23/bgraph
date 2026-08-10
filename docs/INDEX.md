@@ -25,8 +25,9 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**One chantier is planned. No question is open and nothing is blocked.**
-Thirty archetypes ship and the library is embeddable. The parked ideas were
+**Nothing is planned. No question is open and nothing is blocked.**
+Thirty archetypes ship, both editors have an extension, and the library renders
+SVG and PDF. The parked ideas were
 reviewed on 2026-08-10 and every one of them moved: what was worth building
 became a work item, what was not was discarded, and the one language question
 the review raised was answered the same day (`D-023`). One idea is still parked,
@@ -35,11 +36,8 @@ part, and that has to be decided before it can be costed.
 
 ### Work planned
 
-Roughly by cost. Nothing here has started.
+Nothing. The sixteen chantiers opened on 2026-08-10 all landed the same day.
 
-| id | state | title | notes |
-|---|---|---|---|
-| `W-042` | planned | PNG and PDF export, from the CLI **and** from the library | The largest surface here. `D-014` is what makes it more than a convenience: a program embedding the library should not be forced to ship an SVG renderer to get a picture. Merges `I-007` and `I-015`, which were the same work seen from two ends. |
 
 ### Risks
 
@@ -51,6 +49,7 @@ Known ways this goes wrong. `X-005` now has a chantier; the rest do not, because
 | `X-002` | mitigated | The two grammars can drift apart | `W-008` cross-checks them on every `cargo test` — but only when the `tree-sitter` CLI is on PATH; without it the test says SKIPPED and passes. |
 | `X-010` | mitigated | `tree-sitter test`'s summary line counts parses, not expectation matches | It read "failed parses: 0" while seven corpus expectations were stale across the `W-029` rename. `the_grammar_corpus_expectations_still_hold` now asserts the **exit code** on each `cargo test`, but only when the CLI is on PATH. |
 | `X-006` | mitigated | Edge labels avoid lines, not each other's readability | `W-010` scores candidates; `W-022` made the node and label penalties proportional to the overlapped area and distance a real cost, which stopped labels fleeing three rows from their own edge. Still local: nothing guarantees the best global arrangement — `W-037` adds the escape hatch (`label-offset`) rather than a better solver, because the author can see what the cost function cannot. |
+| `X-017` | open | There is no PNG or other raster output | `W-042` ships PDF because it is vector and needs nothing; a raster format needs glyph rasterisation and path filling, which is a real renderer. `D-027` records that the honest options were a large dependency tree in a crate that has five, or months of work — and that a PDF opens everywhere a PNG does. Anyone who needs a bitmap can rasterise the PDF or the SVG with a tool built for it. |
 | `X-016` | open | A harness wire joins the connectors, not the pin rows | `W-045` states the mapping on the wire (`1 → 3`) and `check` proves the pins exist, so nothing is wrong — but the line does not *touch* the pin it names, which is what a WireViz drawing gives you. Landing an endpoint at a row inside a box needs a per-edge endpoint offset the renderer has no notion of; `label-offset` moves labels, not endpoints. |
 | `X-004` | open | Orthogonal routing ignores obstacles | An `ortho` edge can pass straight through a node. No diagnostic. |
 | `X-008` | open | `D-016` removed `opacity`, which is a breaking change | Any file using `opacity: 0.5` now fails with `unknown property`. The repo's own files carried none, and the message names the fix — but nothing migrates it automatically. |
@@ -63,6 +62,7 @@ Known ways this goes wrong. `X-005` now has a chantier; the rest do not, because
 ### Decisions
 | id | state | date | title | was |
 |---|---|---|---|---|
+| `D-027` | active | 2026-08-10 | **PDF is written by hand; PNG is not written at all.** A PDF is a vector format — rectangles, béziers and `Tj` — so `W-042` emits one from the same `Layout` the SVG writer consumes, sharing `render_svg::canvas` so the page box and the viewBox cannot drift. That keeps the dependency list at five, matching the SVG writer and the watch server. A raster format cannot be done that way: it needs glyph rasterisation and path filling, which is either a large dependency tree or months of work, and a PDF already opens everywhere a PNG does. Recorded as `X-017` rather than left as an unstated gap. One thing falls out of it: a viewer must have Helvetica, so `W-040`'s advance table is *exact* for PDF and `X-005` does not apply to that output | |
 | `D-026` | active | 2026-08-10 | **Text is measured per character against one typeface's metrics, and the remaining error is accepted.** `W-040` replaces the flat `0.56 × font-size` with a Helvetica-class advance table, which removes the four-to-one variation between `l` and `W`. The *cross-family* error cannot be removed: an SVG names a font family and the renderer decides what it resolves to, so no measurement here can be right by anything but luck. The two ways out were both worse — embedding a font in every SVG costs hundreds of kilobytes per file and raises a licensing question the project has no answer to, and shipping metrics for a fixed set of families is the same estimate with a longer table and a promise it cannot keep. Non-ASCII keeps the flat guess, because a Latin table has nothing to say about CJK. `X-005` is therefore narrowed, never retired | |
 | `D-025` | active | 2026-08-10 | **A pin is a member line; a wire carries its pins as positional data.** `W-045` addresses a connector's pin with the two mechanisms that already ship — `- 1: +12V` is a member (`W-013`), and `j1 -> j2 "power" 1 3` puts the pin at each end in the edge's positional slots (`W-015`). No grammar changes, and it is `D-015` read literally: an archetype's positional data is its own. The dotted form `j1.3` was rejected on evidence rather than taste — `ident` forbids `.` and `3` is not an identifier, so it does not parse at all; `j1.p3` *does* parse, but as `ident` + `class_ref`, which means the prettiest syntax is also the one that silently means something else. A cable with N wires is N edges between the same pair, which is already legal | |
 | `D-024` | active | 2026-08-10 | **An activation bar is a block, not an inferred pairing.** `W-047` writes `activate api { … }` — a `group` whose `edge_members` are the messages the bar spans, rendered as a bar down that participant's lifeline instead of a frame. The mechanism is already built and already correct: a group records `members` **and** `edge_members`, and a sequence frame spans message *rows*, which is exactly a bar's extent. Nesting comes free because groups nest. Inferring the bar from a call and its matching reply was refused because "matching" is a guess as soon as two calls are in flight, and a silent guess is what `D-005` exists to prevent | |
@@ -97,6 +97,7 @@ not copies.
 
 | id | date | title | commit |
 |---|---|---|---|
+| `W-042` | 2026-08-10 | **PDF export**, hand-written, from the CLI (`-o out.pdf`) and the library (`render_source_pdf`, covered by `D-018`). Vector output needs no rasteriser, so the dependency list is still five — and a PDF viewer must have Helvetica, which is the table `W-040` added, so text there is exact rather than estimated. PNG is *not* delivered: `D-027` says why, and `X-017` carries it | this commit |
 | `W-038` | 2026-08-10 | A VS Code extension. **TextMate rather than WASM tree-sitter**: VS Code reads TextMate natively, so nothing is compiled, pinned or cached, and the semantic half comes from `bgraph-lsp` — the same binary Zed talks to. The failure mode changes with the choice, so the guard did too: a stale `.scm` breaks Zed loudly, a stale TextMate grammar silently stops colouring a word, and `the_textmate_grammar_knows_every_word_the_compiler_does` re-derives the list from `props.rs` on every run | this commit |
 | `W-040` | 2026-08-10 | Per-character advance widths in place of the flat `0.56`. Removes the larger half of `X-005` — the four-to-one variation *within* a typeface — and makes `text_width` measure the **widest** line rather than the longest, which had been a different line. Answers the question the chantier carried with `D-026`: the cross-family error cannot be removed at all, so `X-005` is narrowed, not retired | this commit |
 | `W-049` | 2026-08-10 | `type gitgraph` — commits on rails. Parentage is the edges and a commit with two parents is a merge, landing one step past its **latest** parent. Only the rails are computed, which is where this stays on the right side of `D-001`: the author declares every commit, its branch and what came before it. A parent declared after its child is refused, because the picture would show history running backwards | this commit |

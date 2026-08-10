@@ -633,6 +633,113 @@ fn a_packet_field_needs_bits() {
     assert!(err("type packet\nnode a \"A\"").contains("has no `bits`"));
 }
 
+// ---------------------------------------------------------------------- W-042
+
+#[cfg(feature = "pdf")]
+#[test]
+fn a_pdf_is_a_pdf() {
+    // Hand-written file structure: the header, the object table, the offsets
+    // and the pointer to them all have to agree, and nothing in the rest of
+    // the suite would notice if they stopped.
+    let pdf = crate::render_source_pdf("node a \"A\"\nnode b \"B\" right-of a\na -> b \"x\"")
+        .expect("renders");
+    let text = String::from_utf8_lossy(&pdf).to_string();
+
+    assert!(text.starts_with("%PDF-1.4"), "header");
+    assert!(text.trim_end().ends_with("%%EOF"), "trailer");
+
+    // Every offset in the cross-reference table must land on its object.
+    let start = text
+        .rsplit_once("startxref\n")
+        .and_then(|(_, tail)| tail.split_whitespace().next())
+        .and_then(|n| n.parse::<usize>().ok())
+        .expect("startxref");
+    assert!(text[start..].starts_with("xref"), "startxref points at the table");
+
+    let offsets: Vec<usize> = text
+        .lines()
+        .filter_map(|l| l.strip_suffix(" 00000 n "))
+        .filter_map(|n| n.parse().ok())
+        .collect();
+    assert_eq!(offsets.len(), 6, "catalog, pages, page, content, two fonts");
+    for (i, offset) in offsets.iter().enumerate() {
+        assert!(
+            text[*offset..].starts_with(&format!("{} 0 obj", i + 1)),
+            "object {} is not at the offset the table gives",
+            i + 1
+        );
+    }
+}
+
+#[cfg(feature = "pdf")]
+#[test]
+fn the_page_and_the_viewbox_are_the_same_surface() {
+    // Two writers, one canvas — a second implementation of the bounds would
+    // be a second place for them to drift.
+    let source = "node a \"A\"\nnode b \"B\" below a gap 40\na -> b";
+    let svg = crate::render_source(source).expect("svg");
+    let pdf = crate::render_source_pdf(source).expect("pdf");
+    let pdf = String::from_utf8_lossy(&pdf).to_string();
+
+    let view: Vec<f64> = svg
+        .split_once("viewBox=\"")
+        .and_then(|(_, tail)| tail.split_once('"'))
+        .expect("a viewBox")
+        .0
+        .split_whitespace()
+        .filter_map(|n| n.parse().ok())
+        .collect();
+    let media: Vec<f64> = pdf
+        .split_once("/MediaBox [")
+        .and_then(|(_, tail)| tail.split_once(']'))
+        .expect("a MediaBox")
+        .0
+        .split_whitespace()
+        .filter_map(|n| n.parse().ok())
+        .collect();
+
+    assert!((view[2] - media[2]).abs() < 0.01, "{view:?} {media:?}");
+    assert!((view[3] - media[3]).abs() < 0.01, "{view:?} {media:?}");
+}
+
+#[cfg(feature = "pdf")]
+#[test]
+fn pdf_text_is_measured_exactly_rather_than_estimated() {
+    // The one place `X-005` does not apply: a PDF viewer must have Helvetica,
+    // and the advance table `W-040` added is Helvetica's — so the centring
+    // here is right rather than close.
+    let pdf = crate::render_source_pdf("type pie\nslice a \"Organic\" 10").expect("renders");
+    let text = String::from_utf8_lossy(&pdf).to_string();
+    assert!(text.contains("/Helvetica"), "the base-14 font is named");
+    assert!(text.contains("Tj"), "text is shown, not drawn as paths");
+}
+
+#[cfg(feature = "pdf")]
+#[test]
+fn every_example_also_renders_as_a_pdf() {
+    // The sweep, again: an archetype whose geometry the PDF writer cannot
+    // express would otherwise only be found by opening a file.
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/examples");
+    let mut seen = 0;
+    for entry in std::fs::read_dir(dir).expect("examples/ is readable") {
+        let path = entry.expect("entry").path();
+        if path.extension().is_none_or(|e| e != "bd") {
+            continue;
+        }
+        let source = std::fs::read_to_string(&path).expect("readable");
+        // A template's holes are unbound, so it has nothing to render yet.
+        if source.contains("{{") {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        let pdf = crate::render_source_pdf(&source)
+            .unwrap_or_else(|e| panic!("{name}: {e:#}"));
+        assert!(pdf.starts_with(b"%PDF"), "{name}");
+        seen += 1;
+    }
+    assert!(seen >= 25, "only {seen} examples found");
+}
+
 // ---------------------------------------------------------------------- W-038
 
 #[test]
@@ -4786,6 +4893,10 @@ fn every_archetype_has_a_feature_and_every_feature_an_archetype() {
         .take_while(|l| !l.starts_with('['))
         .filter_map(|l| l.split_once(" = []"))
         .map(|(name, _)| name.trim())
+        // `pdf` gates an output format, not a genre. It is named here rather
+        // than filtered by a pattern, so a second non-archetype feature has to
+        // be justified in this list instead of slipping past a wildcard.
+        .filter(|name| *name != "pdf")
         .collect();
 
     let mut archetypes: Vec<&str> = crate::props::ARCHETYPES
