@@ -95,7 +95,7 @@ fn graph_settings(m: &mut String) {
 /// that does not exist; and `every_example_still_works` renders each one, so
 /// it cannot show one that no longer draws. Tables tell you what a property
 /// means — this is what you copy to start.
-const EXAMPLES: &[(&str, &str)] = &[
+pub(crate) const EXAMPLES: &[(&str, &str)] = &[
     ("free", include_str!("../examples/groups.bd")),
     ("pie", include_str!("../examples/pie.bd")),
     ("packet", include_str!("../examples/packet.bd")),
@@ -337,16 +337,30 @@ time the diagram grows.
 
 ```
 bgraph diagram.bd -o diagram.svg    # render
+bgraph diagram.bd -o diagram.png    # …with the `png` feature; --scale 2 for twice the size
+bgraph diagram.bd -o diagram.json   # the solved geometry, for another program
+bgraph diagram.bd -o d.svg --embed-font Inter.ttf   # text exact on any machine
+bgraph diagram.bd -o big.pdf --page a4  # tile a large diagram across sheets
+bgraph diagram.bd --theme dark      # a named palette under the file's own styles
 bgraph watch diagram.bd             # show it, and reload when it changes
 bgraph watch diagram.svg            # …a picture works too; the extension decides
 bgraph watch diagram.bd --server    # …the browser preview rather than a window
 bgraph watch diagram.bd --port 9000
+bgraph watch docs/diagrams          # a directory: build every .bd as it changes
+bgraph watch docs/diagrams --once   # …once, non-zero on failure — a build step
 bgraph check diagram.bd             # diagnostics only; non-zero on error
+bgraph check diagram.bd --ci        # …the flat form, whatever stdout is
+bgraph diff old.bd new.bd -o d.svg  # what appeared, what left, what moved
+bgraph explain diagram.bd api     # why that box is where it is
+bgraph layout diagram.bd            # write the placements in; the picture is unchanged
 bgraph report.bd --data q3.json     # fill a template's holes from JSON
 bgraph report.bd --set year=2026    # …or bind a scalar on the command line
 bgraph report.bd --rows r=sales.csv # …or one hole from the rows of a CSV
 bgraph watch report.bd --data q3.json  # live preview of a filled template
 bgraph fmt diagram.bd               # reformat; --check reports instead
+bgraph init pie                     # a working file for a genre; no genre lists them
+bgraph completions fish             # a completion script; bash|zsh|fish|elvish|powershell
+bgraph completions man              # …or the man page, from the same flags
 bgraph docs -o docs/reference.md    # regenerate this file
 bgraph-lsp                          # language server, LSP over stdin/stdout
 ```

@@ -55,11 +55,11 @@
     "statement": {
       "comment": "The statement keywords, and each archetype's word for its items. Derived from props.rs; a test re-derives it and fails on drift.",
       "name": "keyword.control.bgraph",
-      "match": "(?<![\\w-])(type|graph|style|group|activate|block|box|card|class|commit|connector|device|entity|entry|event|field|host|node|participant|point|position|requirement|scatter|series|set|signal|slice|state|step|task|topic)(?![\\w-])"
+      "match": "(?<![\\w-])(include|component|use|note|legend|align-group|same-width|same-height|type|graph|style|group|activate|block|box|card|class|commit|connector|device|entity|entry|event|field|host|node|participant|point|position|requirement|scatter|series|set|signal|slice|state|step|task|topic)(?![\\w-])"
     },
     "placement": {
       "name": "keyword.other.placement.bgraph",
-      "match": "(?<![\\w-])(at|right-of|left-of|above|below|gap|align|extends)(?![\\w-])"
+      "match": "(?<![\\w-])(at|right-of|left-of|above|below|gap|align|extends|as)(?![\\w-])"
     },
     "property": {
       "comment": "An identifier followed by a colon \u2014 the same lookahead pest uses.",

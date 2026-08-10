@@ -18,16 +18,30 @@ time the diagram grows.
 
 ```
 bgraph diagram.bd -o diagram.svg    # render
+bgraph diagram.bd -o diagram.png    # …with the `png` feature; --scale 2 for twice the size
+bgraph diagram.bd -o diagram.json   # the solved geometry, for another program
+bgraph diagram.bd -o d.svg --embed-font Inter.ttf   # text exact on any machine
+bgraph diagram.bd -o big.pdf --page a4  # tile a large diagram across sheets
+bgraph diagram.bd --theme dark      # a named palette under the file's own styles
 bgraph watch diagram.bd             # show it, and reload when it changes
 bgraph watch diagram.svg            # …a picture works too; the extension decides
 bgraph watch diagram.bd --server    # …the browser preview rather than a window
 bgraph watch diagram.bd --port 9000
+bgraph watch docs/diagrams          # a directory: build every .bd as it changes
+bgraph watch docs/diagrams --once   # …once, non-zero on failure — a build step
 bgraph check diagram.bd             # diagnostics only; non-zero on error
+bgraph check diagram.bd --ci        # …the flat form, whatever stdout is
+bgraph diff old.bd new.bd -o d.svg  # what appeared, what left, what moved
+bgraph explain diagram.bd api     # why that box is where it is
+bgraph layout diagram.bd            # write the placements in; the picture is unchanged
 bgraph report.bd --data q3.json     # fill a template's holes from JSON
 bgraph report.bd --set year=2026    # …or bind a scalar on the command line
 bgraph report.bd --rows r=sales.csv # …or one hole from the rows of a CSV
 bgraph watch report.bd --data q3.json  # live preview of a filled template
 bgraph fmt diagram.bd               # reformat; --check reports instead
+bgraph init pie                     # a working file for a genre; no genre lists them
+bgraph completions fish             # a completion script; bash|zsh|fish|elvish|powershell
+bgraph completions man              # …or the man page, from the same flags
 bgraph docs -o docs/reference.md    # regenerate this file
 bgraph-lsp                          # language server, LSP over stdin/stdout
 ```
@@ -194,6 +208,9 @@ Aliases are marked. They behave identically to the property they alias; the edit
 
 | Property | Applies to | Syntax | Meaning |
 |---|---|---|---|
+| `legend` | both | `legend: <text>` | What this style class is called in a `legend` statement. Its presence is what puts the class in one — a legend built from every class would list the ones that only round a corner, and one built from the colours in use would have nothing to call them. |
+| `description` | both | `description: <text>` | What this is, in a sentence. Emitted as an SVG `<title>` in every genre — a tooltip to a reader with a mouse, a label to one with a screen reader — and additionally *drawn* under the technology line in `type block`, which has room for it. |
+| `desc` *(alias)* | both | `desc: <text>` | Alias for `description`. |
 | `fill` | node | `fill: <color>` | Interior color of the shape. |
 | `background` *(alias)* | node | `background: <color>` | Alias of `fill`. |
 | `stroke` | both | `stroke: <color> <width> <solid\|dashed\|dotted>` | Outline. Accepts a color, a width and a dash pattern in any order; omit whichever you don't need. |
@@ -229,7 +246,11 @@ Declared once, in `graph { … }`. These are diagram-wide and are not part of th
 
 | Setting | Syntax | Meaning |
 |---|---|---|
+| `description` | `description: <text>` | What the diagram is, in a sentence, for a reader who cannot see it. Becomes `aria-label` on the SVG root, beside `role="img"`. |
+| `title` | `title: <text>` | Heading drawn above the diagram. Every genre accepts it here — the chart archetypes also take a `title` in their own settings, and that one wins where both are given. |
 | `padding` | `padding: <number>` | Margin between the drawing and the canvas edge. |
+| `sketch` | `sketch: <on\|off>` | Draw as if by hand. A sketched architecture says "this is a proposal" where a crisp one says "this is decided" — information rather than ornament. Deterministic: the wobble is a hash of each shape's own geometry, so the same file always produces the same file. |
+| `grid` | `grid: <number> <number>` | Column and row step for `at (col 3, row 2)`. One number sets both. A coordinate system, not a solver: nothing is snapped to it, and a box placed in pixels is unaffected. |
 | `gap` | `gap: <number>` | Default distance used by anchors that omit `gap`. |
 | `background` | `background: <color>` | Canvas fill. Also backs edge labels so they stay readable. |
 | `bg` *(alias)* | `bg: <color>` | Alias of `background`. |
@@ -303,6 +324,9 @@ slice <id> ["label"] <value>
 
 | Setting | Syntax | Meaning |
 |---|---|---|
+| `from` | `from: "<file.csv>"` | Read the slices from a CSV, resolved relative to this file. The header names the columns: `name` (or `label`) and `value`. Carries a consequence worth knowing — a file that reads the disk at render time is no longer autonomous, so `check` can pass and the render still fail. |
+| `top` | `top: <number>` | Keep the largest n slices and fold the rest into one. The palette has eight colours and `check` already advises this when a pie has more; `top` is what lets the file do it instead of someone doing the arithmetic by hand outside the tool. |
+| `other` | `other: <text>` | What the folded slice is called. `"Other"` unless the file says otherwise. |
 | `title` | `title: <text>` | Heading drawn above the chart. |
 | `radius` | `radius: <number>` | Outer radius in user units. |
 | `donut` | `donut: <0..1>` | Inner hole as a fraction of the radius. `0` is a full pie. |
@@ -509,8 +533,6 @@ On a `block` — these are its own, and are not offered elsewhere:
 | `kind` | node | `kind: <person\|system\|container\|component\|database\|queue\|external>` | What this element is. Usually written positionally — `block api "API" container`. `external` draws a dashed, muted box for something outside the system being described. |
 | `tech` | both | `tech: <text>` | The technology, drawn in brackets under the name — `[Container: Rust]`. On an edge it reads as the protocol: `web -> api "reads" { tech: "HTTPS/JSON" }`. |
 | `technology` *(alias)* | both | `technology: <text>` | Alias of `tech`. |
-| `description` | node | `description: <text>` | A sentence under the technology line, smaller and lighter. Wrapped at a fixed column, and the box is sized around it. |
-| `desc` *(alias)* | node | `desc: <text>` | Alias of `description`. |
 
 <details>
 <summary>A complete file — <code>examples/block.bd</code></summary>
@@ -898,6 +920,7 @@ signal <id> ["label"] <wave>
 | `lane` | `lane: <height> <gap>` | Height of a signal lane and the space beneath it. |
 | `ruler` | `ruler: <on\|off>` | Period numbers above the lanes. On by default. |
 | `every` | `every: <number>` | Label a ruler tick every N periods. 4 by default. |
+| `sketch` | `sketch: <on\|off>` | Draw as if by hand. A sketched architecture says "this is a proposal" where a crisp one says "this is decided" — information rather than ornament. Deterministic: the wobble is a hash of each shape's own geometry, so the same file always produces the same file. |
 | `grid` | `grid: <on\|off>` | Vertical lines on the period boundaries. On by default. |
 
 On a `signal` — these are its own, and are not offered elsewhere:

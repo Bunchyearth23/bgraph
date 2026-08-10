@@ -1,0 +1,7 @@
+// A diagram in its own right — render this file on its own and it draws.
+// Included under a prefix by `main.bd`, its own edge and anchor follow it.
+include "house.bds"
+
+node api "API"      .card
+node db  "Database" .card below api
+api -> db "reads"

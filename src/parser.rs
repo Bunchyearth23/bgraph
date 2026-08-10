@@ -77,7 +77,7 @@ pub fn parse(input: &str) -> std::result::Result<Diagram, ParseError> {
         .next()
         .expect("the file rule always yields one pair");
 
-    build(file).map_err(|err| ParseError {
+    build(file, input).map_err(|err| ParseError {
         message: format!("{err:#}"),
         span: Span { start: 0, end: 0 },
     })
@@ -186,7 +186,7 @@ fn error_span(err: &pest::error::Error<Rule>, input: &str) -> Span {
     }
 }
 
-fn build(file: Pair<Rule>) -> Result<Diagram> {
+fn build(file: Pair<Rule>, input: &str) -> Result<Diagram> {
     let mut diagram = Diagram::default();
 
     for pair in file.into_inner() {
@@ -210,6 +210,12 @@ fn build(file: Pair<Rule>) -> Result<Diagram> {
                 let block = pair.into_inner().next().expect("graph block");
                 diagram.graph.extend(parse_block(block)?);
             }
+            Rule::include_decl => diagram.includes.push(parse_include(pair)?),
+            Rule::constraint_decl => diagram.constraints.push(parse_constraint(pair)?),
+            Rule::note_decl => diagram.notes.push(parse_note(pair)?),
+            Rule::legend_decl => diagram.legends.push(parse_note(pair)?),
+            Rule::component_decl => diagram.components.push(parse_component(pair, input)?),
+            Rule::use_decl => diagram.uses.push(parse_use(pair)?),
             Rule::style_decl => diagram.styles.push(parse_style(pair)?),
             Rule::item_decl => diagram.nodes.push(parse_item(pair)?),
             Rule::group_decl => parse_group(pair, &mut diagram)?,
@@ -242,6 +248,139 @@ fn spanned(pair: &Pair<Rule>) -> Spanned<String> {
         value: pair.as_str().to_string(),
         span: span_of(pair),
     }
+}
+
+/// A `note` or a `legend`. They differ in what is drawn, not in how they are
+/// written — both are placed by the ordinary anchors, both take classes, and
+/// neither declares a name.
+fn parse_note(pair: Pair<Rule>) -> Result<crate::ast::NoteDecl> {
+    let span = span_of(&pair);
+    let mut text = String::new();
+    let mut classes = Vec::new();
+    let mut placement = None;
+    let mut props = Vec::new();
+
+    for part in pair.into_inner() {
+        match part.as_rule() {
+            Rule::string => text = unescape(part),
+            Rule::class_ref => classes.push(class_name(part)),
+            Rule::block => props = parse_block(part)?,
+            _ => placement = Some(parse_placement(part)?),
+        }
+    }
+
+    Ok(crate::ast::NoteDecl {
+        text,
+        classes,
+        placement,
+        props,
+        span,
+    })
+}
+
+fn parse_constraint(pair: Pair<Rule>) -> Result<crate::ast::ConstraintDecl> {
+    use crate::ast::{Align, ConstraintKind};
+    let span = span_of(&pair);
+    let mut kind = ConstraintKind::AlignGroup;
+    let mut align = Align::Center;
+    let mut members = Vec::new();
+
+    for part in pair.into_inner() {
+        match part.as_rule() {
+            Rule::constraint_kw => {
+                kind = match part.as_str() {
+                    "align-group" => ConstraintKind::AlignGroup,
+                    "same-width" => ConstraintKind::SameWidth,
+                    "same-height" => ConstraintKind::SameHeight,
+                    other => bail!("unknown constraint `{other}`"),
+                }
+            }
+            Rule::align_kw => {
+                align = match part.as_str() {
+                    "left" | "top" => Align::Start,
+                    "right" | "bottom" => Align::End,
+                    _ => Align::Center,
+                }
+            }
+            _ => members.push(spanned(&part)),
+        }
+    }
+
+    if members.len() < 2 {
+        bail!("a constraint needs at least two names — one box is already aligned with itself");
+    }
+    Ok(crate::ast::ConstraintDecl {
+        kind,
+        align,
+        members,
+        span,
+    })
+}
+
+fn parse_component(pair: Pair<Rule>, source: &str) -> Result<crate::ast::ComponentDecl> {
+    let span = span_of(&pair);
+    let mut inner = pair.into_inner();
+    let name = inner
+        .next()
+        .map(|p| spanned(&p))
+        .context("a component needs a name")?;
+    let block = inner.next().context("a component needs a block")?;
+    let block_span = span_of(&block);
+
+    // The body is kept as *text* rather than as statements: it is filled by
+    // the template engine before it is parsed, so a hole may stand anywhere,
+    // including in places a parsed form could not hold one.
+    let body = source
+        .get(block_span.start + 1..block_span.end.saturating_sub(1))
+        .unwrap_or_default()
+        .to_string();
+
+    Ok(crate::ast::ComponentDecl { name, body, span })
+}
+
+fn parse_use(pair: Pair<Rule>) -> Result<crate::ast::UseDecl> {
+    let span = span_of(&pair);
+    let mut inner = pair.into_inner();
+    let component = inner
+        .next()
+        .map(|p| spanned(&p))
+        .context("`use` needs a component")?;
+    let prefix = inner
+        .next()
+        .map(|p| spanned(&p))
+        .context("`use` needs `as <name>`")?;
+    let mut placement = None;
+    let mut bindings = Vec::new();
+    for rest in inner {
+        match rest.as_rule() {
+            Rule::block => bindings = parse_block(rest)?,
+            _ => placement = Some(parse_placement(rest)?),
+        }
+    }
+    Ok(crate::ast::UseDecl {
+        component,
+        prefix,
+        placement,
+        bindings,
+        span,
+    })
+}
+
+fn parse_include(pair: Pair<Rule>) -> Result<crate::ast::IncludeDecl> {
+    let span = span_of(&pair);
+    let mut inner = pair.into_inner();
+
+    let path = inner
+        .next()
+        .context("an include needs a path")
+        .map(|p| Spanned {
+            span: span_of(&p),
+            value: unescape(p),
+        })?;
+
+    let prefix = inner.next().map(|p| spanned(&p));
+
+    Ok(crate::ast::IncludeDecl { path, prefix, span })
 }
 
 fn parse_style(pair: Pair<Rule>) -> Result<StyleDecl> {
@@ -462,10 +601,15 @@ fn parse_placement(pair: Pair<Rule>) -> Result<Placement> {
     match pair.as_rule() {
         Rule::abs_pos => {
             let point = pair.into_inner().next().expect("at() always has a point");
+            let grid = point.as_rule() == Rule::cell;
             let mut coords = point.into_inner();
             let x = number(coords.next().expect("point x"))?;
             let y = number(coords.next().expect("point y"))?;
-            Ok(Placement::At { x, y })
+            Ok(if grid {
+                Placement::Cell { col: x, row: y }
+            } else {
+                Placement::At { x, y }
+            })
         }
         Rule::rel_pos => {
             let mut dir = RelDir::RightOf;
@@ -645,5 +789,135 @@ fn unescape(pair: Pair<Rule>) -> String {
         }
     }
 
+    out
+}
+
+// ------------------------------------------------------- error recovery
+
+/// Parse, and keep going past the first mistake.
+///
+/// A statement ends at a newline, so where to resume is not a guess — which is
+/// what makes this worth doing here rather than in the grammar. Without it, a
+/// missing separator on line 3 costs the diagnostics *and* the semantic
+/// highlighting of the fifty lines after it, which is precisely the moment
+/// both were wanted.
+///
+/// Returns whatever could be understood alongside every problem found. The
+/// diagram is `None` only when nothing at all could be salvaged.
+///
+/// The sound path is untouched: a file with no mistake is parsed once, exactly
+/// as [`parse`] does, and pays nothing for this.
+pub fn parse_recovering(input: &str) -> (Option<Diagram>, Vec<ParseError>) {
+    match parse(input) {
+        Ok(diagram) => return (Some(diagram), Vec::new()),
+        Err(first) => {
+            // An unbalanced brace is not a statement-shaped mistake: every
+            // boundary after it is a guess, so the one honest answer is the
+            // error itself.
+            if check_nesting(input).is_err() {
+                return (None, vec![first]);
+            }
+        }
+    }
+
+    let mut errors = Vec::new();
+    // Spaces rather than deletion, so every span in what is left still points
+    // where the reader's cursor is.
+    let mut repaired: Vec<u8> = input.as_bytes().to_vec();
+
+    for (start, chunk) in statements(input) {
+        let Err(err) = parse(chunk) else {
+            continue;
+        };
+        errors.push(ParseError {
+            message: err.message,
+            span: Span {
+                start: start + err.span.start,
+                end: start + err.span.end.max(err.span.start),
+            },
+        });
+        for byte in &mut repaired[start..start + chunk.len()] {
+            if *byte != b'\n' {
+                *byte = b' ';
+            }
+        }
+    }
+
+    if errors.is_empty() {
+        // Every statement parses on its own but the file does not: the
+        // mistake is *between* two of them rather than inside one, and
+        // blanking a statement at random would be a worse answer than simply
+        // reporting what the whole-file parse said.
+        return (None, parse(input).err().into_iter().collect());
+    }
+
+    let salvaged = String::from_utf8(repaired)
+        .ok()
+        .and_then(|text| parse(&text).ok());
+    (salvaged, errors)
+}
+
+/// The top-level statements, each with its byte offset.
+///
+/// A statement runs to the newline that returns brace depth to zero, so a
+/// block spanning ten lines is one statement rather than ten. The scanning
+/// rules are [`check_nesting`]'s: a brace inside a string, a comment or a
+/// `{{hole}}` is not structure.
+fn statements(input: &str) -> Vec<(usize, &str)> {
+    let mut out = Vec::new();
+    let mut chars = input.char_indices().peekable();
+    let mut depth = 0usize;
+    let mut start = 0usize;
+
+    while let Some((i, c)) = chars.next() {
+        match c {
+            '"' => {
+                while let Some((_, c)) = chars.next() {
+                    match c {
+                        '\\' => {
+                            chars.next();
+                        }
+                        '"' | '\n' => break,
+                        _ => {}
+                    }
+                }
+            }
+            // The newline is left for the loop below, unlike in
+            // `check_nesting`: consuming it here would weld a statement with
+            // a trailing comment onto the next one, and a mistake in either
+            // would then blank both.
+            '/' if chars.peek().map(|&(_, c)| c) == Some('/') => {
+                while let Some(&(_, c)) = chars.peek() {
+                    if c == '\n' {
+                        break;
+                    }
+                    chars.next();
+                }
+            }
+            '{' if chars.peek().map(|&(_, c)| c) == Some('{') => {
+                chars.next();
+                let mut prev = None;
+                for (_, c) in chars.by_ref() {
+                    if prev == Some('}') && c == '}' {
+                        break;
+                    }
+                    prev = Some(c);
+                }
+            }
+            '{' => depth += 1,
+            '}' => depth = depth.saturating_sub(1),
+            '\n' if depth == 0 => {
+                if !input[start..i].trim().is_empty() {
+                    out.push((start, &input[start..i]));
+                }
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+
+    if !input[start..].trim().is_empty() {
+        out.push((start, &input[start..]));
+    }
     out
 }

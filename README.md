@@ -27,10 +27,14 @@ orders  -> cache   "read-through" { router: ortho }
 ```
 
 ```sh
-bgraph diagram.bd -o diagram.svg
-bgraph watch diagram.bd            # live preview on :7878, reloads on save
-bgraph check diagram.bd            # diagnostics as file:line:col
-bgraph docs -o docs/reference.md   # regenerate the reference manual
+bgraph init pie > traffic.bd       # a working file for any of the 28 genres
+bgraph diagram.bd -o diagram.svg   # …or .pdf, .png, .json — the extension picks
+bgraph watch diagram.bd            # a native window, reloading on save
+bgraph watch docs/diagrams         # …or a whole directory, as a build loop
+bgraph check diagram.bd            # every mistake, with a caret under each
+bgraph explain diagram.bd api      # why that box is where it is
+bgraph diff old.bd new.bd          # what appeared, what left, what moved
+bgraph layout diagram.bd           # freeze the placements into the file
 ```
 
 ## What you get
@@ -44,11 +48,68 @@ bgraph docs -o docs/reference.md   # regenerate the reference manual
 - **Edge control** — straight or orthogonal routing, four arrow heads, dash
   patterns, labels.
 - **Self-sizing canvas** — the viewBox follows the content.
-- **Archetypes** — `type pie` and `type packet` reinterpret the same
-  statements as chart data, reusing the whole style cascade.
+- **A declared grid** — `graph { grid: 160 90 }` and `at (col 3, row 2)`.
+  Still `at`, in units you chose: a coordinate system, never a solver.
+- **Constraints that never reorder** — `align-group`, `same-width`,
+  `same-height`. They adjust one axis of what is already placed; deciding an
+  order stays your job.
+- **Composition** — `include "house.bds"` for a shared palette,
+  `include "core.bd" as core` for a diagram under a namespace, and
+  `component`/`use` for a shape placed many times. No silent shadowing: a name
+  in two files is an error naming both.
+- **Text that belongs to no box** — `note`, and a `legend` derived from the
+  style classes that asked to be in one.
+- **Archetypes** — twenty-eight genres reinterpret the same statements as
+  chart data, reusing the whole style cascade. `top: 8` folds a long tail;
+  `from: "sales.csv"` reads the rows from a table.
+- **Themes** — `--theme light|dark|print`, laid *underneath* what the file
+  declares, so the one box you coloured on purpose survives.
+- **Sketch mode** — `graph { sketch: on }`, and deterministic: the same file
+  always produces the same file.
+- **Outputs** — SVG, PDF (hand-written, no rasteriser), PNG behind a feature,
+  the solved geometry as JSON, `--page a4` to tile a large diagram across
+  sheets, `--embed-font` to carry the glyphs you used.
+- **Accessible by default** — `description` becomes an SVG `<title>` in every
+  genre, and `role="img"` with a label on the root.
 - **Editor support** — a tree-sitter grammar and a language server, packaged
-  as a [Zed extension](editors/zed): diagnostics, context-aware completion,
-  hover with resolved geometry, go-to-definition, outline.
+  for [Zed](editors/zed) and [VS Code](editors/vscode), and a few lines of
+  configuration away in Neovim, Helix and Emacs — see
+  [`editors/README.md`](editors/README.md). Diagnostics, context-aware
+  completion, hover with resolved geometry, go-to-definition, outline — and a
+  ` ```bgraph ` fence drawn in VS Code's Markdown preview.
+
+## In a browser
+
+The core is four dependencies of pure Rust and the SVG writer is hand-written,
+so the renderer compiles to wasm nearly as it stands:
+
+```sh
+./playground/build.sh --inline   # → playground/standalone.html, open it
+```
+
+Source on the left, SVG on the right, no server. The wasm boundary is four
+`extern "C"` functions over linear memory — no `wasm-bindgen`, which would be
+a dependency and a build step for four functions whose job is to move bytes.
+
+`include` and `from:` are refused there: both need a path to resolve against
+and a page has no disk, which is why the wasm build exposes `render_source`
+and nothing that touches a filesystem.
+
+## In a Typst document
+
+```sh
+./typst/build.sh                 # → typst/bgraph.wasm
+```
+
+```typst
+#import "typst/bgraph.typ": diagram
+#diagram(read("arch.bd"), width: 70%)
+```
+
+A diagram that does not parse **fails the build**, with the compiler's own
+message — which matches what `check` does and beats shipping a document with a
+hole where a diagram should be. See [`typst/README.md`](typst/README.md),
+including the two-command form that needs no plugin at all.
 
 ## Other archetypes
 

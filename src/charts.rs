@@ -99,15 +99,15 @@ pub fn is_dark(color: &str) -> bool {
     luminance(color).is_some_and(|l| l < 0.18)
 }
 
-struct Theme {
+pub(crate) struct Theme {
     dark: bool,
     surface: String,
-    ink: String,
+    pub(crate) ink: String,
     muted: String,
 }
 
 impl Theme {
-    fn of(opts: &GraphOpts) -> Theme {
+    pub(crate) fn of(opts: &GraphOpts) -> Theme {
         let dark = opts.background.as_deref().is_some_and(is_dark);
         Theme {
             dark,
@@ -131,6 +131,15 @@ fn setting<'a>(props: &'a [Prop], name: &str) -> Option<&'a [Value]> {
         .iter()
         .find(|p| p.name == name)
         .map(|p| p.values.as_slice())
+}
+
+/// A number the file may simply not have written. Distinct from [`number`],
+/// which always has an answer: `top` has to tell "not asked for" apart from
+/// any value it could fall back to.
+fn number_opt(props: &[Prop], name: &str) -> Option<f64> {
+    setting(props, name)
+        .and_then(|v| v.first())
+        .and_then(|v| v.as_num())
 }
 
 fn number(props: &[Prop], name: &str, fallback: f64) -> f64 {
@@ -184,7 +193,7 @@ fn family(style: &Style) -> String {
 
 // ------------------------------------------------------------------- pie
 
-const TITLE_SIZE: f64 = 16.0;
+pub(crate) const TITLE_SIZE: f64 = 16.0;
 const SWATCH: f64 = 13.0;
 const LEGEND_STEP: f64 = 24.0;
 const LEGEND_MARGIN: f64 = 28.0;
@@ -200,7 +209,9 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
     let start_at = number(cfg, "start", 0.0);
     let legend = toggle(cfg, "legend", true);
     let labels = word(cfg, "labels", "percent");
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     // Resolve on a bare base so a declared `fill` is distinguishable from
     // the default one, and the palette only fills in what was left unsaid.
@@ -222,6 +233,29 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
         };
         let label = node.label.clone().unwrap_or_else(|| node.id.value.clone());
         entries.push((label, value, style));
+    }
+
+    // `top n` — keep the largest n and fold the rest into one. The palette
+    // runs out at eight and `check` already advises exactly this; without it
+    // the advice could only be taken by doing the arithmetic by hand outside
+    // the tool, which is the state `I-047` recorded.
+    if let Some(keep) = number_opt(cfg, "top")
+        && keep >= 1.0
+        && entries.len() > keep as usize
+    {
+        let keep = keep as usize;
+        // Sorted by value, and ties broken by the order written, so the same
+        // file always folds the same way — a chart that reordered itself
+        // between runs would defeat the golden test and, worse, the reader.
+        entries.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let tail: f64 = entries[keep..].iter().map(|(_, v, _)| *v).sum();
+        let style = entries[keep].2.clone();
+        entries.truncate(keep);
+        entries.push((
+            text(cfg, "other").unwrap_or_else(|| "Other".into()),
+            tail,
+            style,
+        ));
     }
 
     let total: f64 = entries.iter().map(|(_, v, _)| *v).sum();
@@ -306,6 +340,7 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
             let y = title_h + i as f64 * LEGEND_STEP;
 
             nodes.push(PlacedNode {
+                id: String::new(),
                 lines: Vec::new(),
                 rect: Rect {
                     x,
@@ -374,7 +409,10 @@ pub(crate) fn trim_number(v: f64) -> String {
 
 // ---------------------------------------------------------------- packet
 
-#[cfg(feature = "packet")]
+// Both genres need it, so it survives as long as either does. Gating it on
+// `packet` alone left `bytefield` — and the featureless build — referring to
+// a struct that was no longer compiled.
+#[cfg(any(feature = "packet", feature = "bytefield"))]
 /// `packet` and `bytefield` are one layout at two granularities (`W-039`).
 /// Only the unit changes: the default row width, the ruler step, and which
 /// property carries the range. Everything below — splitting a field across a
@@ -415,7 +453,9 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         .and_then(|v| v.as_num())
         .unwrap_or(58.0)
         .max(20.0);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
     let declared: Vec<String> = setting(cfg, "branches")
         .map(|v| {
             v.iter()
@@ -563,6 +603,7 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             .unwrap_or_else(|| palette[rail.min(palette.len() - 1)].to_string());
 
         nodes.push(PlacedNode {
+            id: String::new(),
             lines: Vec::new(),
             rect: Rect {
                 x: x - DOT / 2.0,
@@ -655,7 +696,9 @@ pub fn tree(
 
     let row = number(cfg, "row", if kind == TreeKind::View { 26.0 } else { 92.0 }).max(12.0);
     let spacing = number(cfg, "spacing", 24.0).max(0.0);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
     let base = registry.resolve(Style::node_defaults(), def.item, &[], &[])?;
 
     let index: HashMap<&str, usize> = diagram
@@ -863,6 +906,7 @@ pub fn tree(
         let _ = node;
         let (x, y) = shift(pos[i]);
         nodes.push(PlacedNode {
+            id: node.id.as_str().to_string(),
             lines: vec![labels[i].clone()],
             rect: Rect {
                 x,
@@ -962,7 +1006,9 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
     let palette = theme.palette();
 
     let biggest = number(cfg, "radius", 110.0).max(30.0);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
 
     let mut sets = Vec::new();
@@ -1092,6 +1138,7 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         let (cx, cy) = place(i);
         let (opaque, _) = crate::render_svg::split_alpha(colour);
         nodes.push(PlacedNode {
+            id: String::new(),
             lines: Vec::new(),
             rect: Rect {
                 x: cx - r,
@@ -1174,7 +1221,9 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         .unwrap_or(18.0)
         .max(6.0);
     let ruler = toggle(cfg, "ruler", true);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let base = registry.resolve(Style::node_defaults(), def.item, &[], &[])?;
     let title_h = if title.is_some() {
@@ -1215,6 +1264,7 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
     }
 
     groups.push(PlacedGroup {
+        id: String::new(),
         lines: Vec::new(),
         rect: Rect {
             x: gutter,
@@ -1263,6 +1313,7 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         let span = high.saturating_sub(low) + 1;
 
         nodes.push(PlacedNode {
+            id: node.id.as_str().to_string(),
             lines: vec![label],
             rect: Rect {
                 x: gutter + 2.0,
@@ -1300,7 +1351,9 @@ pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
     let palette = theme.palette();
 
     let radius = number(cfg, "radius", 140.0).max(40.0);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
     let axes: Vec<String> = setting(cfg, "categories")
         .map(|v| {
             v.iter()
@@ -1479,6 +1532,7 @@ pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
         });
         for (x, y) in shape {
             nodes.push(PlacedNode {
+                id: String::new(),
                 lines: Vec::new(),
                 rect: Rect {
                     x: x - 3.5,
@@ -1547,7 +1601,9 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
         .and_then(|v| v.as_num())
         .unwrap_or(220.0)
         .max(80.0);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
     let actors: Vec<String> = setting(cfg, "actors")
         .map(|v| {
             v.iter()
@@ -1688,6 +1744,7 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
         }
         for (x, y) in path {
             nodes.push(PlacedNode {
+                id: String::new(),
                 lines: Vec::new(),
                 rect: Rect {
                     x: x - 4.5,
@@ -1732,6 +1789,7 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
             &group.props,
         )?;
         groups.push(PlacedGroup {
+            id: String::new(),
             lines: vec![
                 group
                     .label
@@ -1790,7 +1848,9 @@ pub fn kanban(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
     let def = crate::check::archetype_of(diagram);
 
     let col_w = number(cfg, "column", 220.0).max(80.0);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
 
     const PAD: f64 = 12.0;
@@ -1855,6 +1915,7 @@ pub fn kanban(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             let h = lines.len() as f64 * size * 1.35 + 2.0 * PAD;
 
             nodes.push(PlacedNode {
+                id: node.id.as_str().to_string(),
                 lines,
                 rect: Rect {
                     x: x + PAD,
@@ -1903,6 +1964,7 @@ pub fn kanban(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
         });
 
         groups.push(PlacedGroup {
+            id: String::new(),
             lines: Vec::new(),
             rect: Rect {
                 x,
@@ -1932,6 +1994,7 @@ pub fn kanban(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
     })
 }
 
+#[cfg(feature = "packet")]
 pub fn packet(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
     let unit = Granularity {
         per_row: 32.0,
@@ -1949,6 +2012,7 @@ pub fn bytefield(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Res
     packet_like(diagram, opts, registry, unit)
 }
 
+#[cfg(any(feature = "packet", feature = "bytefield"))]
 fn packet_like(
     diagram: &Diagram,
     opts: GraphOpts,
@@ -1970,7 +2034,9 @@ fn packet_like(
         .unwrap_or(46.0)
         .max(12.0);
     let ruler = toggle(cfg, "ruler", true);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let def = crate::check::archetype_of(diagram);
     let mut fields = Vec::new();
@@ -2038,6 +2104,7 @@ fn packet_like(
             let w = (segment_end - bit + 1) as f64 * bit_w;
 
             nodes.push(PlacedNode {
+                id: String::new(),
                 lines: if named {
                     Vec::new()
                 } else {
@@ -2159,7 +2226,9 @@ pub fn treemap(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
     let gap = number(cfg, "gap", 2.0).max(1.0);
     let header = number(cfg, "header", 20.0).max(0.0);
     let labels = word(cfg, "labels", "name");
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
     let roots = build_tiles(diagram, registry, def, None)?;
@@ -2338,6 +2407,7 @@ fn emit_tiles(
 
         if tile.is_group {
             groups.push(PlacedGroup {
+                id: String::new(),
                 lines: Vec::new(),
                 rect: inset,
                 style: Style {
@@ -2386,6 +2456,7 @@ fn emit_tiles(
         }
 
         nodes.push(PlacedNode {
+            id: String::new(),
             lines: Vec::new(),
             rect: inset,
             style: Style {
@@ -2576,7 +2647,9 @@ pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
     let y_axis = named("y-axis");
     let regions = named("quadrants");
     let show_names = word(cfg, "labels", "name") != "none";
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
     let title_h = if title.is_some() {
@@ -2714,6 +2787,7 @@ pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             .unwrap_or_else(|| palette[slot.min(palette.len() - 1)].to_string());
 
         nodes.push(PlacedNode {
+            id: node.id.as_str().to_string(),
             lines: Vec::new(),
             rect: Rect {
                 x: px - DOT / 2.0,
@@ -2814,7 +2888,9 @@ pub fn wave(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
     let ruler = toggle(cfg, "ruler", true);
     let grid = toggle(cfg, "grid", true);
     let every = number(cfg, "every", 4.0).max(1.0) as usize;
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
 
@@ -3179,7 +3255,9 @@ pub fn sankey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
     let gap = number(cfg, "gap", 14.0).max(2.0);
     let bar = number(cfg, "width", 16.0).max(2.0);
     let labels = word(cfg, "labels", "name");
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
 
@@ -3315,6 +3393,7 @@ pub fn sankey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             .unwrap_or_else(|| palette[i.min(palette.len() - 1)].to_string());
 
         nodes.push(PlacedNode {
+            id: node.id.as_str().to_string(),
             lines: Vec::new(),
             rect,
             style: Style {
@@ -3576,6 +3655,7 @@ fn draw_legend(
     for (i, (name, colour)) in names.iter().zip(colours).enumerate() {
         let row = y + i as f64 * LEGEND_STEP;
         nodes.push(PlacedNode {
+            id: String::new(),
             lines: Vec::new(),
             rect: Rect {
                 x,
@@ -3625,7 +3705,9 @@ pub fn bar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
         .unwrap_or(320.0)
         .max(80.0);
     let stacked = toggle(cfg, "stack", false);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
     let categories: Vec<String> = setting(cfg, "categories")
         .map(|v| {
             v.iter()
@@ -3791,6 +3873,7 @@ pub fn bar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
             // Adjacent fills must never touch, stacked segments included.
             let inset = if stacked { 1.0 } else { 0.0 };
             nodes.push(PlacedNode {
+                id: String::new(),
                 lines: Vec::new(),
                 rect: Rect {
                     x,
@@ -3862,7 +3945,9 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
         .and_then(|v| v.as_num())
         .unwrap_or(320.0)
         .max(80.0);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
     let categories: Vec<String> = setting(cfg, "categories")
         .map(|v| {
             v.iter()
@@ -4082,6 +4167,7 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
         if mark == "dot" || path.len() == 1 {
             for (x, y) in path {
                 nodes.push(PlacedNode {
+                    id: String::new(),
                     lines: Vec::new(),
                     rect: Rect {
                         x: x - 4.5,
@@ -4140,7 +4226,9 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
     let column = number(cfg, "column", 150.0).max(60.0);
     let row = number(cfg, "row", 46.0).max(20.0);
     let numbered = toggle(cfg, "numbered", false);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let base = registry.resolve(Style::node_defaults(), def.item, &[], &[])?;
     let title_h = if title.is_some() {
@@ -4203,6 +4291,7 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             .max(50.0);
 
         nodes.push(PlacedNode {
+            id: node.id.as_str().to_string(),
             lines: vec![label],
             rect: Rect {
                 x: centre(i) - w / 2.0,
@@ -4245,6 +4334,7 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         let top = first_row + first as f64 * row - row * 0.5;
         let height = (last - first) as f64 * row + row * 0.9;
         nodes.push(PlacedNode {
+            id: String::new(),
             lines: Vec::new(),
             rect: Rect {
                 x: centre(col) - BAR_W / 2.0,
@@ -4318,6 +4408,7 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         let left = (centre(lo) - column * 0.36).min(centre(lo) - title_w);
 
         groups.push(PlacedGroup {
+            id: String::new(),
             lines: group
                 .label
                 .clone()
@@ -4436,7 +4527,9 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
     let today = setting(cfg, "today")
         .and_then(|v| v.first())
         .and_then(|v| v.as_date());
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
 
@@ -4575,6 +4668,7 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
         });
 
         nodes.push(PlacedNode {
+            id: String::new(),
             lines: Vec::new(),
             rect: Rect {
                 x: x_of(*start),
@@ -4649,6 +4743,7 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
         });
 
         groups.push(PlacedGroup {
+            id: String::new(),
             lines: Vec::new(),
             rect: band,
             style,
@@ -4722,7 +4817,9 @@ pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         .and_then(|v| v.as_num())
         .unwrap_or(34.0)
         .max(14.0);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
     let accent = theme.palette()[0];
@@ -4882,6 +4979,7 @@ pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         // A mark, not a box: it carries no label of its own.
         let r = 5.0;
         nodes.push(PlacedNode {
+            id: String::new(),
             lines: Vec::new(),
             rect: Rect {
                 x: x - r,

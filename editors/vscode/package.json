@@ -9,9 +9,10 @@
   "repository": { "type": "git", "url": "https://github.com/Bunchyearth23/bgraph" },
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Programming Languages"],
-  "activationEvents": ["onLanguage:bgraph"],
+  "activationEvents": ["onLanguage:bgraph", "onLanguage:markdown"],
   "main": "./src/extension.js",
   "contributes": {
+    "markdown.markdownItPlugins": true,
     "languages": [
       {
         "id": "bgraph",

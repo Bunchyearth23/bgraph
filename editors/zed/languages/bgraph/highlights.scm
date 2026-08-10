@@ -13,6 +13,20 @@
   "at"
   "gap"
   "align"
+  ; Composition, and the two statements that belong to no box.
+  "include"
+  "as"
+  "component"
+  "use"
+  "note"
+  "legend"
+  ; Adjustments to what is already placed. They never reorder anything.
+  "align-group"
+  "same-width"
+  "same-height"
+  ; Grid units: `at (col 3, row 2)` is still `at`.
+  "col"
+  "row"
 ] @keyword
 
 ; Each archetype names its own elements — `node`, `slice`, `field`. The word
@@ -31,6 +45,21 @@
 (edge_declaration from: (identifier) @variable)
 (edge_declaration to: (identifier) @variable)
 (relative_position anchor: (identifier) @variable)
+
+; A constraint names boxes that already exist, so its members read as
+; references and not as declarations.
+(constraint_declaration member: (identifier) @variable)
+(constraint_declaration alignment: (alignment) @constant)
+
+; A component is declared once and placed under a name. The placing declares
+; the name; the component it names is a reference to the declaration above.
+(component_declaration name: (identifier) @variable.special)
+(use_declaration prefix: (identifier) @variable.special)
+(use_declaration component: (identifier) @variable)
+
+; An include's prefix declares a namespace the rest of the file refers into.
+(include_declaration prefix: (identifier) @variable.special)
+(include_declaration path: (string) @string.special.path)
 
 ; The archetype name is a fixed vocabulary word, not a user identifier.
 (type_declaration name: (identifier) @constant.builtin)

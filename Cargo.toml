@@ -14,17 +14,23 @@ publish = false
 [lib]
 name = "bgraph"
 path = "src/lib.rs"
+# `rlib` is what the binaries and other crates link against; `cdylib` is what
+# a wasm build needs to emit a module at all. Both, so one manifest serves
+# both without a second profile to keep in step.
+crate-type = ["cdylib", "rlib"]
 
 [[bin]]
 name = "bgraph"
 path = "src/main.rs"
+required-features = ["cli"]
 
 [[bin]]
 name = "bgraph-lsp"
 path = "src/bin/bgraph-lsp.rs"
+required-features = ["cli"]
 
 [features]
-default = ["all-archetypes", "pdf", "json", "csv"]
+default = ["cli", "all-archetypes", "pdf", "json", "csv", "completions"]
 all-archetypes = [
     "pie",
     "packet",
@@ -104,14 +110,58 @@ csv = []
 # it and an unfair one for someone embedding the library, so it is opt-in:
 #
 #   cargo build --features window
-window = ["dep:minifb", "dep:resvg", "dep:tiny-skia"]
+window = ["dep:minifb", "png"]
+
+# PNG output. Off by default for the same reason the window is: this is the
+# one thing in the crate that cannot be hand-rolled — a raster means zlib, and
+# a rasteriser means text shaping, curve flattening and antialiasing — so it
+# is the one place a dependency is the honest answer rather than a shortcut.
+#
+# Its own feature rather than part of `window`, because someone rendering
+# images in CI has no display and wants no windowing library. The implication
+# runs one way: a window already needs the rasteriser, so `window` turns this
+# on and not the reverse.
+png = ["dep:resvg", "dep:tiny-skia"]
+
+# Shell completions and a man page, generated from the same `Cli` struct clap
+# parses with — so they cannot describe flags the binary does not have.
+#
+# On by default, unlike `window`, because the cost is honest: `clap_complete`
+# has no dependency beyond the `clap` already here, and `clap_mangen` brings
+# one small crate. Both are binary-only, so the library a caller embeds is
+# untouched — and `--no-default-features`, which CI builds, still resolves to
+# the five this crate promises.
+completions = ["cli", "dep:clap_complete", "dep:clap_mangen"]
+
+# The two binaries. Optional so a *library* consumer — and the wasm build in
+# particular — does not compile an argument parser it will never call. The
+# binaries declare it in `required-features`, so `cargo build` still builds
+# them and `cargo build --no-default-features` builds only the library.
+cli = ["dep:clap"]
+
+# The wasm entry points: a handful of `extern "C"` functions over a linear
+# memory, hand-rolled for the same reason everything else here is. No
+# `wasm-bindgen`, which would be a dependency and a build step for four
+# functions whose whole job is to move bytes.
+wasm = []
+
+# Typst's own plugin protocol, which is a different shape: the host writes the
+# arguments into memory itself and takes the result through functions it
+# provides. Those are *imports*, so a module built with them cannot start
+# anywhere that does not supply them — hence a separate feature and a separate
+# module, rather than one that only Typst can instantiate.
+typst = ["wasm"]
 
 [dependencies]
 anyhow = "1.0.104"
-clap = { version = "4.6.4", features = ["derive"] }
+clap = { version = "4.6.4", features = ["derive"], optional = true }
 pest = "2.8.8"
 pest_derive = "2.8.8"
 serde_json = "1.0"
+
+# Only with `--features completions`, and binary-only either way.
+clap_complete = { version = "4", optional = true }
+clap_mangen = { version = "0.2", optional = true }
 
 # Only with `--features window`; see the note above. `minifb` is a window and a
 # pixel buffer in one crate, which is why this costs 128 packages where

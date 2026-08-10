@@ -49,11 +49,28 @@ if (( with_server )); then
   fi
 fi
 
+# The Markdown preview renders through this rather than through a `bgraph` on
+# PATH: a preview that only worked for people who had already installed the CLI
+# would miss exactly the readers it is for. Built here so the VSIX is complete;
+# without it the fence quietly falls back to a code block.
+if [[ ! -f bgraph.wasm ]] || [[ ../../src/lib.rs -nt bgraph.wasm ]]; then
+  if rustup target list --installed | grep -qx wasm32-unknown-unknown; then
+    echo "package.sh: building the Markdown preview's renderer…"
+    (cd ../.. && ./playground/build.sh >/dev/null)
+    cp ../../playground/bgraph.wasm bgraph.wasm
+  else
+    echo "package.sh: no wasm32-unknown-unknown target — the Markdown preview" >&2
+    echo "            will fall back to code blocks. \`rustup target add" >&2
+    echo "            wasm32-unknown-unknown\` and rerun to include it." >&2
+  fi
+fi
+
 staging="$(mktemp -d)"
 trap 'rm -rf "$staging"' EXIT
 mkdir -p "$staging/extension"
 
 cp -r package.json language-configuration.json README.md src syntaxes "$staging/extension/"
+[[ -f bgraph.wasm ]] && cp bgraph.wasm "$staging/extension/"
 (( with_server )) && cp -r node_modules "$staging/extension/"
 cp ../../LICENSE "$staging/extension/LICENSE"
 
@@ -67,6 +84,7 @@ cat > "$staging/[Content_Types].xml" <<'XML'
   <Default Extension="md" ContentType="text/markdown" />
   <Default Extension="vsixmanifest" ContentType="text/xml" />
   <Default Extension="LICENSE" ContentType="text/plain" />
+  <Default Extension="wasm" ContentType="application/wasm" />
 </Types>
 XML
 

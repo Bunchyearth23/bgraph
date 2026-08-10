@@ -1312,14 +1312,14 @@ fn the_textmate_grammar_knows_every_word_the_compiler_does() {
     // missing a keyword just stops colouring it, which nobody notices — so the
     // list is re-derived here rather than trusted.
     let grammar = include_str!("../editors/vscode/syntaxes/bgraph.tmLanguage.json");
+    // Found by its scope name and then by position, rather than by a literal
+    // prefix of the pattern: anchoring on the words themselves made this test
+    // fail the first time a keyword was added at the front of the list, which
+    // is exactly the change it exists to allow.
     let statement = grammar
         .lines()
-        .find(|l| l.contains("keyword.control.bgraph"))
-        .and_then(|_| {
-            grammar
-                .lines()
-                .find(|l| l.contains(r"(?<![\\w-])(type|graph|style|group|activate|"))
-        })
+        .skip_while(|l| !l.contains("keyword.control.bgraph"))
+        .find(|l| l.contains("\"match\""))
         .expect("the statement pattern is in the grammar");
 
     for (word, _) in crate::props::KEYWORDS {
@@ -2435,7 +2435,9 @@ fn each_data_property_belongs_to_exactly_the_genres_that_read_it() {
         ("to-card", &["er"]),
         ("date", &["timeline"]),
         ("tech", &["block"]),
-        ("description", &["block"]),
+        // `description` used to be here. It is shared now: every genre emits
+        // one as an SVG `<title>`, and `block` is simply the genre that also
+        // draws it. One property, one meaning — the case `D-015` is for.
         ("kind", &["block", "state"]),
     ] {
         let mut found = crate::props::genres_reading(prop);
@@ -5563,12 +5565,12 @@ fn every_archetype_has_a_feature_and_every_feature_an_archetype() {
         .take_while(|l| !l.starts_with('['))
         .filter_map(|l| l.split_once(" = []"))
         .map(|(name, _)| name.trim())
-        // `pdf` gates an output format, `json` and `csv` input ones — not
-        // genres.
+        // `pdf` gates an output format, `json` and `csv` input ones, `wasm`
+        // the four entry points a browser calls — none of them genres.
         // They are named here rather
         // than filtered by a pattern, so a second non-archetype feature has to
         // be justified in this list instead of slipping past a wildcard.
-        .filter(|name| !matches!(*name, "pdf" | "json" | "csv"))
+        .filter(|name| !matches!(*name, "pdf" | "json" | "csv" | "wasm"))
         .collect();
 
     let mut archetypes: Vec<&str> = crate::props::ARCHETYPES
@@ -5805,15 +5807,19 @@ fn every_example_still_works() {
             continue;
         }
 
-        let diagram = parse_diagram(&source).unwrap_or_else(|e| panic!("{name}: {e:#}"));
-        let errors: Vec<String> = crate::check::check(&diagram)
+        // Through the composer, because that is the pipeline: an example
+        // using `include` or a `component` is not a diagram until it has run.
+        // Parsing the text directly would have said `web.app` is an unknown
+        // node, which is true of the text and false of the diagram.
+        let composed = crate::compose::load(&path).unwrap_or_else(|e| panic!("{name}: {e:#}"));
+        let errors: Vec<String> = crate::check::check(&composed.diagram)
             .into_iter()
             .filter(|d| d.severity == crate::check::Severity::Error)
             .map(|d| d.message)
             .collect();
         assert!(errors.is_empty(), "{name}: {errors:?}");
 
-        let svg = crate::render_source(&source).unwrap_or_else(|e| panic!("{name}: {e:#}"));
+        let svg = crate::render_file(&path).unwrap_or_else(|e| panic!("{name}: {e:#}"));
         assert!(
             svg.starts_with("<svg") && svg.trim_end().ends_with("</svg>"),
             "{name}"
@@ -5930,4 +5936,2619 @@ fn the_highlighter_captures_every_kind_of_value() {
     for field in ["(item_declaration data:", "(edge_declaration data:"] {
         assert!(highlights.contains(field), "`{field}` is not captured");
     }
+}
+
+// ------------------------------------------------- `graph { title }` (I-053)
+
+#[test]
+fn any_genre_can_be_titled() {
+    // The defect I-053 named: `title` lived only in each chart archetype's
+    // own settings, so the genres that draw boxes had no way to say it at
+    // all. One assertion per family, because the free path and the chart
+    // paths reach the heading by different routes.
+    for source in [
+        r#"graph { title: "Heading" }
+           node a "A""#,
+        r#"type class
+           graph { title: "Heading" }
+           class a "A""#,
+        r#"type er
+           graph { title: "Heading" }
+           entity a "A""#,
+    ] {
+        let l = build(source);
+        assert!(
+            l.annotations.iter().any(|a| a.text == "Heading"),
+            "no heading drawn for:\n{source}"
+        );
+    }
+}
+
+#[test]
+fn the_diagram_title_sits_above_every_box() {
+    let l = build(
+        r#"graph { title: "Heading" }
+           node a "A"
+           node b "B" below a"#,
+    );
+    let top = l.nodes.iter().map(|n| n.rect.y).fold(f64::MAX, f64::min);
+    let heading = l
+        .annotations
+        .iter()
+        .find(|a| a.text == "Heading")
+        .expect("the heading should be placed");
+    assert!(
+        heading.y < top,
+        "the heading sits at {} but the topmost box starts at {top}",
+        heading.y
+    );
+}
+
+#[test]
+fn the_diagram_title_wears_the_diagram_font() {
+    // An empty family falls through to the renderer's serif default, which
+    // is never what the boxes are set in — the heading looked pasted on.
+    let l = build(
+        r#"graph { title: "Heading" }
+           node a "A""#,
+    );
+    let heading = l.annotations.iter().find(|a| a.text == "Heading").unwrap();
+    assert_eq!(
+        Some(heading.family.as_str()),
+        l.nodes[0].style.font_family.as_deref(),
+        "the heading is set in a different font from the boxes"
+    );
+}
+
+#[test]
+fn an_archetypes_own_title_beats_the_graph_one() {
+    // Both are legal, and the more specific one wins. Stated as a test
+    // because the fallback is written once per chart function.
+    let l = build(
+        r#"type pie { title: "Specific" }
+           graph { title: "General" }
+           slice a "A" 40"#,
+    );
+    assert!(l.annotations.iter().any(|a| a.text == "Specific"));
+    assert!(
+        !l.annotations.iter().any(|a| a.text == "General"),
+        "the graph-level title should have been overridden, not drawn as well"
+    );
+}
+
+#[test]
+fn a_chart_falls_back_to_the_graph_title() {
+    let l = build(
+        r#"type pie
+           graph { title: "General" }
+           slice a "A" 40"#,
+    );
+    assert!(l.annotations.iter().any(|a| a.text == "General"));
+}
+
+// ------------------------------------------------- completions (I-056)
+
+#[test]
+fn completions_are_on_by_default_and_cost_the_core_nothing() {
+    // The opposite call from `window`, and it needs stating for the same
+    // reason. `clap_complete` adds no dependency beyond the `clap` already
+    // here and `clap_mangen` brings one small crate, both binary-only — so
+    // this is on by default, where the window cannot be. What must stay
+    // true is that they are optional, so `--no-default-features` still
+    // resolves to the five dependencies this crate promises.
+    let manifest = include_str!("../Cargo.toml");
+
+    let defaults = manifest
+        .split_once("default = [")
+        .and_then(|(_, tail)| tail.split_once(']'))
+        .expect("a default feature list")
+        .0;
+    assert!(
+        defaults.contains("completions"),
+        "completions are not on by default: {defaults}"
+    );
+
+    for crate_name in ["clap_complete", "clap_mangen"] {
+        let line = manifest
+            .lines()
+            .find(|l| l.trim_start().starts_with(crate_name))
+            .unwrap_or_else(|| panic!("`{crate_name}` is not in the manifest"));
+        assert!(
+            line.contains("optional = true"),
+            "`{crate_name}` is not optional: {line}"
+        );
+    }
+}
+
+#[test]
+fn the_generated_reference_lists_the_completions_command() {
+    // The reference's command list is hand-written prose in `docgen.rs`,
+    // unlike the property tables — so it is the one part that can fall
+    // behind a subcommand, and only a test notices.
+    let manual = crate::docgen::reference();
+    assert!(
+        manual.contains("bgraph completions"),
+        "the reference does not mention `completions`"
+    );
+}
+
+// ------------------------------------------------- `bgraph init` (I-049)
+
+#[test]
+fn every_genre_starts_from_a_file_that_renders() {
+    // The promise of the command: what comes out is not a sketch to repair
+    // but a diagram. Anything less and the first thing a newcomer meets is
+    // a diagnostic.
+    for def in crate::props::ARCHETYPES {
+        let source = crate::init::skeleton(def.name)
+            .unwrap_or_else(|e| panic!("no skeleton for `{}`: {e:#}", def.name));
+
+        let diagram = parse_diagram(&source)
+            .unwrap_or_else(|e| panic!("`{}` does not parse: {e:#}", def.name));
+
+        let errors: Vec<_> = crate::check::check(&diagram)
+            .into_iter()
+            .filter(|d| d.severity == crate::check::Severity::Error)
+            .collect();
+        assert!(
+            errors.is_empty(),
+            "`{}` starts with an error: {errors:?}",
+            def.name
+        );
+
+        layout::solve(&diagram).unwrap_or_else(|e| panic!("`{}` does not draw: {e:#}", def.name));
+    }
+}
+
+#[test]
+fn the_skeleton_states_the_genres_own_shape() {
+    // The header is generated from the archetype tables rather than written
+    // per genre, so it cannot describe a keyword that was renamed. Asserted
+    // over every genre, because one hand-written header would pass a test
+    // that named only `pie`.
+    for def in crate::props::ARCHETYPES {
+        let source = crate::init::skeleton(def.name).unwrap();
+        let header: String = source.lines().take_while(|l| l.starts_with("//")).collect();
+
+        for item in def.items() {
+            assert!(
+                header.contains(&format!("{item} <id>")),
+                "`{}` never shows how to write a `{item}`",
+                def.name
+            );
+        }
+        for slot in def.slots {
+            assert!(
+                header.contains(&format!("<{}>", slot.prop)),
+                "`{}` never shows its `{}` slot",
+                def.name,
+                slot.prop
+            );
+        }
+    }
+}
+
+#[test]
+fn an_unknown_genre_names_the_ones_that_exist() {
+    // The person typing a wrong genre is the person who does not know the
+    // list, so the error is the list.
+    let e = crate::init::skeleton("piechart").expect_err("`piechart` is not a genre");
+    let message = format!("{e:#}");
+    assert!(message.contains("piechart"), "{message}");
+    assert!(message.contains("pie"), "{message}");
+    assert!(message.contains("gantt"), "{message}");
+}
+
+// ------------------------------------------------- diagnostics (I-051)
+
+/// The first diagnostic a source produces, with its position resolved.
+fn first_diag(source: &str) -> (crate::check::Diag, usize, usize) {
+    let diag = diags(source).into_iter().next().expect("a diagnostic");
+    let (line, col) = crate::lsp::LineIndex::new(source).line_col(diag.span.start);
+    (diag, line, col)
+}
+
+#[test]
+fn the_flat_form_has_not_moved() {
+    // Pinned byte for byte, and deliberately so. Editors parse this, CI logs
+    // are grepped for it, and readers have it in a shell alias — it is an
+    // interchange format, not a rendering, and the rich form beside it is
+    // not permission to drift.
+    let source = r#"node a "A" { fil: #fff }"#;
+    let (diag, line, col) = first_diag(source);
+
+    assert_eq!(
+        crate::report::flat("diagram.bd", line, col, &diag),
+        "diagram.bd:1:14: error: unknown property `fil` — did you mean `fill`?"
+    );
+}
+
+#[test]
+fn the_caret_lands_under_what_is_wrong() {
+    // The whole value of the rich form. An off-by-one here is worse than no
+    // caret at all: it points confidently at the wrong token.
+    let source = "node a \"A\"\nnode b \"B\" right-of a\nb -> nowhere\n";
+    let (diag, line, col) = first_diag(source);
+    let rendered = crate::report::rich("d.bd", source, line, col, &diag, false);
+
+    let lines: Vec<&str> = rendered.lines().collect();
+    let text = lines[3];
+    let carets = lines[4];
+
+    let at = carets.find('^').expect("a caret");
+    assert_eq!(
+        text[at..at + 7].to_string(),
+        "nowhere",
+        "the caret sits over `{}`",
+        &text[at..]
+    );
+    assert_eq!(
+        carets[at..].trim_end(),
+        "^".repeat(7),
+        "the caret does not cover the whole name"
+    );
+}
+
+#[test]
+fn a_span_running_past_its_line_is_not_underlined_to_the_end_of_the_file() {
+    // An unclosed block reaches to end of file. Underlining all of it would
+    // claim the rest of the diagram is the mistake.
+    // Built rather than provoked: which parser reports an unclosed block is
+    // beside the point, and the clamp is what is being tested.
+    let source = "node a \"A\" {\nnode b \"B\"\nnode c \"C\"\n";
+    let diag = crate::check::Diag {
+        severity: crate::check::Severity::Error,
+        message: "unclosed block".into(),
+        span: crate::ast::Span {
+            start: 11,
+            end: source.len(),
+        },
+    };
+
+    let rendered = crate::report::rich("d.bd", source, 0, 11, &diag, false);
+    let carets = rendered.lines().nth(4).expect("a caret line");
+    assert_eq!(
+        carets.chars().filter(|c| *c == '^').count(),
+        1,
+        "the underline runs past its own line:\n{rendered}"
+    );
+}
+
+#[test]
+fn colour_is_absent_when_it_is_not_wanted() {
+    // Escape sequences in a redirected stream are noise a reader has to strip.
+    let source = r#"node a "A" { fil: #fff }"#;
+    let (diag, line, col) = first_diag(source);
+
+    let plain = crate::report::rich("d.bd", source, line, col, &diag, false);
+    assert!(!plain.contains('\x1b'), "uncoloured output has escapes");
+
+    let tinted = crate::report::rich("d.bd", source, line, col, &diag, true);
+    assert!(tinted.contains('\x1b'), "coloured output has none");
+}
+
+// ------------------------------------------------- watch a directory (I-052)
+
+/// A scratch directory of its own per test, emptied first so a previous run
+/// cannot make this one pass.
+fn scratch(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("bgraph-{name}"));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("a scratch directory");
+    dir
+}
+
+#[test]
+fn a_directory_builds_every_diagram_in_it() {
+    let dir = scratch("build-all");
+    std::fs::write(dir.join("one.bd"), "node a \"A\"\n").unwrap();
+    std::fs::write(dir.join("two.bd"), "node b \"B\"\n").unwrap();
+    // Not a source, and must not become one: the loop renders `.bd`, not
+    // whatever else happens to share the directory.
+    std::fs::write(dir.join("notes.md"), "# notes\n").unwrap();
+
+    crate::watch::build_dir(&dir, None, true).expect("the directory should build");
+
+    assert!(dir.join("one.svg").is_file(), "one.svg was not written");
+    assert!(dir.join("two.svg").is_file(), "two.svg was not written");
+    assert!(!dir.join("notes.svg").exists(), "a non-source was rendered");
+}
+
+#[test]
+fn one_broken_file_does_not_stop_the_others() {
+    // Mid-edit, a broken file is the normal state of the one being worked on.
+    // Taking the loop down with it would end the session.
+    let dir = scratch("build-broken");
+    std::fs::write(dir.join("good.bd"), "node a \"A\"\n").unwrap();
+    std::fs::write(dir.join("bad.bd"), "node a \"A\" right-of ghost\n").unwrap();
+
+    let outcome = crate::watch::build_dir(&dir, None, true);
+
+    assert!(
+        dir.join("good.svg").is_file(),
+        "the sound file was not rendered"
+    );
+    assert!(
+        !dir.join("bad.svg").exists(),
+        "the broken file was rendered"
+    );
+    // …and the *command* still fails, or a build step would pass on a
+    // directory half of which does not draw.
+    assert!(outcome.is_err(), "a failed render exited zero");
+}
+
+#[test]
+fn a_picture_already_current_is_not_rewritten() {
+    let dir = scratch("build-current");
+    std::fs::write(dir.join("one.bd"), "node a \"A\"\n").unwrap();
+
+    crate::watch::build_dir(&dir, None, true).unwrap();
+    let first = std::fs::metadata(dir.join("one.svg"))
+        .and_then(|m| m.modified())
+        .unwrap();
+
+    crate::watch::build_dir(&dir, None, true).unwrap();
+    let second = std::fs::metadata(dir.join("one.svg"))
+        .and_then(|m| m.modified())
+        .unwrap();
+
+    assert_eq!(
+        first, second,
+        "an up-to-date picture was written again — a build loop that rewrites \
+         everything every pass is one that never settles"
+    );
+}
+
+#[test]
+fn the_pictures_can_go_somewhere_else() {
+    let dir = scratch("build-out-src");
+    let out = scratch("build-out-dst");
+    std::fs::write(dir.join("one.bd"), "node a \"A\"\n").unwrap();
+
+    crate::watch::build_dir(&dir, Some(&out), true).unwrap();
+
+    assert!(out.join("one.svg").is_file(), "nothing landed in --out");
+    assert!(
+        !dir.join("one.svg").exists(),
+        "the source directory was written to as well"
+    );
+}
+
+#[test]
+fn sources_come_back_in_a_stable_order() {
+    // The filesystem's order is not one, and a build whose log reorders
+    // itself each run is a log that cannot be compared with the last.
+    let dir = scratch("build-order");
+    for name in ["zebra.bd", "alpha.bd", "mid.bd"] {
+        std::fs::write(dir.join(name), "node a \"A\"\n").unwrap();
+    }
+
+    let names: Vec<String> = crate::watch::sources(&dir)
+        .unwrap()
+        .iter()
+        .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(names, ["alpha.bd", "mid.bd", "zebra.bd"]);
+}
+
+// ------------------------------------------------- PNG output (I-041)
+
+#[cfg(feature = "png")]
+#[test]
+fn the_raster_is_the_same_picture_as_the_vector() {
+    // One renderer, two encodings. A raster drawn by its own path would be a
+    // second renderer, and the two would drift the way a preview and an
+    // export always do when they are drawn separately.
+    let l = build("node a \"A\"\nnode b \"B\" right-of a\na -> b");
+    let (_, _, w, h) = crate::render_svg::canvas(&l);
+
+    let png = crate::render_png::render(&l, 1.0).expect("a raster");
+    assert_eq!(&png[1..4], b"PNG", "not a PNG");
+
+    // The IHDR width and height are big-endian at a fixed offset, which is
+    // enough to assert the size without decoding the image.
+    let width = u32::from_be_bytes([png[16], png[17], png[18], png[19]]);
+    let height = u32::from_be_bytes([png[20], png[21], png[22], png[23]]);
+    assert_eq!(width, w.round() as u32, "the raster is not the canvas wide");
+    assert_eq!(
+        height,
+        h.round() as u32,
+        "the raster is not the canvas tall"
+    );
+}
+
+#[cfg(feature = "png")]
+#[test]
+fn scale_multiplies_the_diagrams_own_size() {
+    let l = build("node a \"A\"");
+    let one = crate::render_png::render(&l, 1.0).unwrap();
+    let two = crate::render_png::render(&l, 2.0).unwrap();
+
+    let width = |png: &[u8]| u32::from_be_bytes([png[16], png[17], png[18], png[19]]);
+    // Each dimension rounds on its own, so twice the size is within a pixel
+    // rather than exactly double.
+    assert!(
+        width(&two).abs_diff(width(&one) * 2) <= 1,
+        "{} is not twice {}",
+        width(&two),
+        width(&one)
+    );
+}
+
+#[cfg(feature = "png")]
+#[test]
+fn a_nonsense_scale_does_not_bring_the_renderer_down() {
+    // `--scale 0` and `--scale -1` are things a person types. Neither may
+    // reach `Pixmap::new` as a zero or a negative.
+    let l = build("node a \"A\"");
+    for scale in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+        assert!(
+            crate::render_png::render(&l, scale).is_ok(),
+            "scale {scale} was not handled"
+        );
+    }
+}
+
+#[test]
+fn the_rasteriser_is_opt_in_and_the_window_implies_it() {
+    // `X-017` narrows here rather than retiring: raster becomes optional, not
+    // present. What must stay true is the direction of the implication — a
+    // window already needs the rasteriser, and someone rendering images in a
+    // build wants no windowing library.
+    let manifest = include_str!("../Cargo.toml");
+
+    let defaults = manifest
+        .split_once("default = [")
+        .and_then(|(_, tail)| tail.split_once(']'))
+        .expect("a default feature list")
+        .0;
+    assert!(!defaults.contains("png"), "the rasteriser is on by default");
+
+    let window = manifest
+        .lines()
+        .find(|l| l.starts_with("window = "))
+        .expect("a window feature");
+    assert!(
+        window.contains("\"png\""),
+        "the window does not imply the rasteriser: {window}"
+    );
+    assert!(
+        !window.contains("resvg"),
+        "the window names the rasteriser directly instead of going through \
+         `png`, so the two can drift: {window}"
+    );
+}
+
+// ------------------------------------------------- layout as JSON (I-045)
+
+fn geometry(source: &str) -> serde_json::Value {
+    serde_json::from_str(&crate::render_json::render(&build(source))).expect("valid JSON")
+}
+
+#[test]
+fn the_json_geometry_is_in_the_same_space_as_the_svg() {
+    // The whole reason the export is worth having. Emitting the layout's own
+    // untranslated coordinates would hand every consumer the same
+    // off-by-a-padding bug to find on their own.
+    let l = build("node a \"A\"\nnode b \"B\" right-of a\na -> b");
+    let (dx, dy, _, _) = crate::render_svg::canvas(&l);
+    let json = geometry("node a \"A\"\nnode b \"B\" right-of a\na -> b");
+
+    let node = json["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|n| n["id"] == "a")
+        .expect("`a` should be in the export");
+
+    assert_eq!(node["rect"]["x"].as_f64().unwrap(), l.nodes[0].rect.x + dx);
+    assert_eq!(node["rect"]["y"].as_f64().unwrap(), l.nodes[0].rect.y + dy);
+}
+
+#[test]
+fn every_box_the_author_named_is_addressable() {
+    // Geometry without names is a picture, not data.
+    let json = geometry(
+        r#"group core "Core" {
+             node api "API"
+             node db "DB" below api
+           }
+           node ui "UI" right-of core
+           api -> db"#,
+    );
+
+    let ids: Vec<&str> = json["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|n| n["id"].as_str())
+        .filter(|id| !id.is_empty())
+        .collect();
+    assert!(ids.contains(&"api"), "{ids:?}");
+    assert!(ids.contains(&"db"), "{ids:?}");
+    assert!(ids.contains(&"ui"), "{ids:?}");
+
+    let groups: Vec<&str> = json["groups"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|g| g["id"].as_str())
+        .collect();
+    assert_eq!(groups, ["core"]);
+
+    let edge = &json["edges"][0];
+    assert_eq!(edge["from"], "api");
+    assert_eq!(edge["to"], "db");
+}
+
+#[test]
+fn an_edge_carries_its_elbows_and_not_just_its_ends() {
+    // A consumer drawing a straight line between the endpoints of an
+    // orthogonal edge would be drawing a different diagram.
+    let json = geometry(
+        r#"node a "A"
+           node b "B" below a
+           a -> b { router: ortho }"#,
+    );
+    let points = json["edges"][0]["points"].as_array().unwrap();
+    assert!(
+        points.len() >= 2,
+        "an edge came back with fewer than two points"
+    );
+}
+
+#[test]
+fn the_export_declares_its_schema_version() {
+    // The shape is promised and the coordinates are not, so a consumer needs
+    // to be able to tell which half changed.
+    let json = geometry("node a \"A\"");
+    assert_eq!(
+        json["version"].as_u64().unwrap() as u32,
+        crate::render_json::VERSION
+    );
+}
+
+#[test]
+fn the_canvas_in_the_export_is_the_canvas_in_the_svg() {
+    let l = build("node a \"A\"\nnode b \"B\" right-of a");
+    let (_, _, w, h) = crate::render_svg::canvas(&l);
+    let json = geometry("node a \"A\"\nnode b \"B\" right-of a");
+
+    assert_eq!(json["canvas"]["width"].as_f64().unwrap(), w);
+    assert_eq!(json["canvas"]["height"].as_f64().unwrap(), h);
+}
+
+// ------------------------------------------------- editor setup (I-057)
+
+#[test]
+fn the_editor_guide_points_at_paths_that_exist() {
+    // Written because the first draft of that guide cited
+    // `tree-sitter-bgraph/queries/`, which has never existed — the queries
+    // live beside the Zed extension. A setup guide with a wrong path is worse
+    // than none: it costs the reader the time to discover it is wrong.
+    let guide = include_str!("../editors/README.md");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    let mut checked = 0;
+    for word in guide.split(|c: char| c.is_whitespace() || c == '`' || c == '*') {
+        let word = word.trim_end_matches(['.', ',', ':', ';', ')']);
+        if !word.starts_with("editors/")
+            && !word.starts_with("tree-sitter-bgraph/")
+            && !word.starts_with("src/")
+        {
+            continue;
+        }
+        // A path with a placeholder in it is an instruction, not a claim.
+        if word.contains('<') || word.contains('*') {
+            continue;
+        }
+        assert!(
+            root.join(word).exists(),
+            "the editor guide cites `{word}`, which does not exist"
+        );
+        checked += 1;
+    }
+    assert!(
+        checked >= 4,
+        "only {checked} paths were checked — the guide's \
+                           shape changed and this test stopped looking"
+    );
+}
+
+#[test]
+fn every_editor_the_repository_ships_is_in_the_guide() {
+    // A packaged editor that the guide does not mention is one nobody finds.
+    let guide = include_str!("../editors/README.md");
+    let editors = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/editors"));
+
+    for entry in std::fs::read_dir(editors).expect("an editors directory") {
+        let path = entry.expect("a directory entry").path();
+        if !path.is_dir() {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        assert!(
+            guide.to_lowercase().contains(&name.to_lowercase()),
+            "`editors/{name}` is packaged but the guide never mentions it"
+        );
+    }
+}
+
+// ------------------------------------------------- error recovery (I-055)
+
+#[test]
+fn a_mistake_on_line_three_does_not_cost_line_fifty() {
+    // The whole point. Before this, one bad separator threw away the
+    // diagnostics and the highlighting of everything after it — at exactly
+    // the moment both were wanted.
+    let source = "node a \"A\"\nnode b \"B\" right-of a\nnode ??? bad\nnode d \"D\" below b\n";
+    let (diagram, errors) = crate::parser::parse_recovering(source);
+
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    let diagram = diagram.expect("the sound statements should survive");
+    let ids: Vec<&str> = diagram.nodes.iter().map(|n| n.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        ["a", "b", "d"],
+        "a statement past the mistake was lost"
+    );
+}
+
+#[test]
+fn the_recovered_error_points_where_the_mistake_is() {
+    // An error reported at the top of the file is an error nobody can act on.
+    let source = "node a \"A\"\nnode ??? bad\n";
+    let (_, errors) = crate::parser::parse_recovering(source);
+
+    let span = errors.first().expect("an error").span;
+    assert!(
+        span.start >= 11,
+        "the error is reported at byte {} — before the second line even \
+         starts",
+        span.start
+    );
+}
+
+#[test]
+fn several_mistakes_are_all_reported() {
+    let source = "node ?? one\nnode b \"B\"\nnode ?? two\n";
+    let (diagram, errors) = crate::parser::parse_recovering(source);
+
+    assert_eq!(errors.len(), 2, "{errors:?}");
+    assert_eq!(diagram.expect("`b` should survive").nodes.len(), 1);
+}
+
+#[test]
+fn a_sound_file_pays_nothing_and_reports_nothing() {
+    let source = "node a \"A\"\nnode b \"B\" right-of a\na -> b\n";
+    let (diagram, errors) = crate::parser::parse_recovering(source);
+
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(diagram.expect("it parses").nodes.len(), 2);
+}
+
+#[test]
+fn a_block_spanning_lines_is_one_statement() {
+    // A statement ends at a newline *at depth zero*. Treating every line as a
+    // statement would cut a block in half and report three mistakes where
+    // there are none.
+    let source = "node a \"A\" {\n  fill: #fff\n  stroke: #000\n}\nnode ?? bad\n";
+    let (diagram, errors) = crate::parser::parse_recovering(source);
+
+    assert_eq!(errors.len(), 1, "the block was cut up: {errors:?}");
+    let diagram = diagram.expect("the block should survive");
+    assert_eq!(diagram.nodes.len(), 1);
+    assert_eq!(
+        diagram.nodes[0].props.len(),
+        2,
+        "the block lost its content"
+    );
+}
+
+#[test]
+fn a_trailing_comment_does_not_drag_the_next_statement_down_with_it() {
+    // The comment scanner must leave the newline behind, or the two lines
+    // become one chunk and a mistake in either blanks both.
+    let source = "node a \"A\" // fine\nnode ?? bad\n";
+    let (diagram, errors) = crate::parser::parse_recovering(source);
+
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert_eq!(
+        diagram
+            .expect("`a` should survive its own comment")
+            .nodes
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn an_unclosed_block_costs_only_what_is_inside_it() {
+    // A block that never closes swallows the rest of the file — depth never
+    // returns to zero, so everything after the `{` is one statement. That is
+    // the right answer rather than a shortcoming: what precedes it is still
+    // sound and still reported, and nothing inside is guessed at.
+    let source = "node a \"A\"\nnode b \"B\" {\nnode c \"C\"\n";
+    let (diagram, errors) = crate::parser::parse_recovering(source);
+
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    let diagram = diagram.expect("the statement before the block should survive");
+    let ids: Vec<&str> = diagram.nodes.iter().map(|n| n.id.as_str()).collect();
+    assert_eq!(ids, ["a"]);
+}
+
+#[test]
+fn nesting_past_the_cap_is_reported_rather_than_recovered_from() {
+    // The one case where recovery is refused: past `MAX_NESTING` every
+    // boundary is a guess, and the guard exists to stop a stack overflow
+    // rather than to improve a message.
+    let source = "node a ".to_string() + &"{ x: ".repeat(MAX_NESTING + 2);
+    let (diagram, errors) = crate::parser::parse_recovering(&source);
+
+    assert!(diagram.is_none(), "a file past the nesting cap was parsed");
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(
+        errors[0].message.contains("nested"),
+        "{}",
+        errors[0].message
+    );
+}
+
+#[test]
+fn a_syntax_error_no_longer_hides_the_rest_of_the_file() {
+    // The reason recovery was worth building. Three different kinds of
+    // problem, on three different lines, all reported in one pass — where
+    // before the first one silenced the other two until it was fixed.
+    let source = concat!(
+        "node a \"A\"\n",
+        "node ??? bad\n",
+        "node c \"C\" { fil: #fff }\n",
+        "c -> ghost\n",
+    );
+    let reported = crate::lsp::diagnostics(source);
+    let messages: Vec<String> = reported
+        .iter()
+        .filter_map(|d| d["message"].as_str().map(String::from))
+        .collect();
+
+    assert!(
+        messages.iter().any(|m| m.contains("syntax error")),
+        "{messages:?}"
+    );
+    assert!(
+        messages.iter().any(|m| m.contains("`fil`")),
+        "a property mistake after a syntax error went unreported: {messages:?}"
+    );
+    assert!(
+        messages.iter().any(|m| m.contains("ghost")),
+        "an unknown name after a syntax error went unreported: {messages:?}"
+    );
+}
+
+// ------------------------------------------------- composition (I-028, I-032)
+
+/// Write a set of files into a scratch directory and return the entry point.
+fn compose_files(name: &str, files: &[(&str, &str)]) -> std::path::PathBuf {
+    let dir = scratch(name);
+    for (file, source) in files {
+        std::fs::write(dir.join(file), source).expect("a scratch file");
+    }
+    dir.join(files[0].0)
+}
+
+#[test]
+fn an_include_brings_a_file_in_whole() {
+    let entry = compose_files(
+        "compose-plain",
+        &[
+            (
+                "main.bd",
+                "include \"core.bd\"\nnode ui \"UI\"\nui -> api\n",
+            ),
+            ("core.bd", "node api \"API\"\n"),
+        ],
+    );
+    let composed = crate::compose::load(&entry).expect("it should compose");
+    let ids: Vec<&str> = composed
+        .diagram
+        .nodes
+        .iter()
+        .map(|n| n.id.as_str())
+        .collect();
+    assert!(ids.contains(&"api"), "{ids:?}");
+    assert!(ids.contains(&"ui"), "{ids:?}");
+    crate::layout::solve(&composed.diagram).expect("and it should draw");
+}
+
+#[test]
+fn a_prefix_makes_a_clash_impossible() {
+    // Both files declare `api`. Without `as` that is an error; with it the
+    // two are simply different names.
+    let entry = compose_files(
+        "compose-prefix",
+        &[
+            (
+                "main.bd",
+                "include \"core.bd\" as core\nnode api \"Mine\"\napi -> core.api\n",
+            ),
+            ("core.bd", "node api \"Theirs\"\n"),
+        ],
+    );
+    let composed = crate::compose::load(&entry).expect("it should compose");
+    let ids: Vec<&str> = composed
+        .diagram
+        .nodes
+        .iter()
+        .map(|n| n.id.as_str())
+        .collect();
+    assert!(ids.contains(&"core.api"), "{ids:?}");
+    assert!(ids.contains(&"api"), "{ids:?}");
+    crate::layout::solve(&composed.diagram).expect("the qualified edge should resolve");
+}
+
+#[test]
+fn an_included_files_own_references_follow_it_under_the_prefix() {
+    // The included file's internal edge and anchor must be renamed with the
+    // names they point at, or the prefix would break the file it prefixes.
+    let entry = compose_files(
+        "compose-internal",
+        &[
+            ("main.bd", "include \"core.bd\" as core\nnode ui \"UI\"\n"),
+            (
+                "core.bd",
+                "node api \"API\"\nnode db \"DB\" below api\napi -> db\n",
+            ),
+        ],
+    );
+    let composed = crate::compose::load(&entry).expect("it should compose");
+    let edge = &composed.diagram.edges[0];
+    assert_eq!(edge.from.as_str(), "core.api");
+    assert_eq!(edge.to.as_str(), "core.db");
+    crate::layout::solve(&composed.diagram).expect("the anchor should still resolve");
+}
+
+#[test]
+fn a_name_in_two_files_is_an_error_naming_both() {
+    // `D-005` applied to a second file rather than a second spelling: no
+    // silent shadowing, and the message has to say where the other one is or
+    // it cannot be acted on.
+    let entry = compose_files(
+        "compose-clash",
+        &[
+            ("main.bd", "include \"core.bd\"\nnode api \"Mine\"\n"),
+            ("core.bd", "node api \"Theirs\"\n"),
+        ],
+    );
+    let message = format!("{:#}", crate::compose::load(&entry).expect_err("a clash"));
+    assert!(message.contains("api"), "{message}");
+    assert!(message.contains("main.bd"), "{message}");
+    assert!(message.contains("core.bd"), "{message}");
+}
+
+#[test]
+fn a_circular_include_names_the_chain() {
+    let entry = compose_files(
+        "compose-cycle",
+        &[
+            ("a.bd", "include \"b.bd\"\nnode a \"A\"\n"),
+            ("b.bd", "include \"a.bd\"\nnode b \"B\"\n"),
+        ],
+    );
+    let message = format!("{:#}", crate::compose::load(&entry).expect_err("a cycle"));
+    assert!(message.contains("circle"), "{message}");
+    assert!(message.contains("a.bd"), "{message}");
+    assert!(message.contains("b.bd"), "{message}");
+}
+
+#[test]
+fn a_bds_holds_styles_and_nothing_else() {
+    let entry = compose_files(
+        "compose-bds",
+        &[
+            ("main.bd", "include \"stray.bds\"\nnode a \"A\"\n"),
+            ("stray.bds", "style x { fill: #fff }\nnode b \"B\"\n"),
+        ],
+    );
+    let message = format!(
+        "{:#}",
+        crate::compose::load(&entry).expect_err("a stray item")
+    );
+    assert!(message.contains(".bds"), "{message}");
+
+    // …and one that holds only styles is fine, and its styles arrive.
+    let entry = compose_files(
+        "compose-bds-good",
+        &[
+            ("main.bd", "include \"house.bds\"\nnode a \"A\" .card\n"),
+            ("house.bds", "style card { fill: #1e293b }\n"),
+        ],
+    );
+    let composed = crate::compose::load(&entry).expect("styles should come in");
+    assert_eq!(composed.diagram.styles.len(), 1);
+    let l = crate::layout::solve(&composed.diagram).expect("it draws");
+    assert_eq!(l.nodes[0].style.fill.as_deref(), Some("#1e293b"));
+}
+
+#[test]
+fn a_diagnostic_points_at_the_file_that_wrote_it() {
+    // The whole reason the composer keeps a source map. A warning about a
+    // statement in an included file reported against the including file
+    // would send the reader to the wrong line of the wrong document.
+    let entry = compose_files(
+        "compose-spans",
+        &[
+            ("main.bd", "include \"core.bd\"\nnode ui \"UI\"\n"),
+            ("core.bd", "node api \"API\"\nnode db \"DB\" below api\n"),
+        ],
+    );
+    let composed = crate::compose::load(&entry).expect("it composes");
+
+    let api = composed
+        .diagram
+        .nodes
+        .iter()
+        .find(|n| n.id.as_str() == "api")
+        .expect("`api` is there");
+    let (path, line, _) = composed.map.locate(api.id.span.start);
+    assert_eq!(path.file_name().unwrap(), "core.bd");
+    assert_eq!(line, 0, "`api` is on the first line of core.bd");
+
+    let ui = composed
+        .diagram
+        .nodes
+        .iter()
+        .find(|n| n.id.as_str() == "ui")
+        .expect("`ui` is there");
+    let (path, line, _) = composed.map.locate(ui.id.span.start);
+    assert_eq!(path.file_name().unwrap(), "main.bd");
+    assert_eq!(line, 1, "`ui` is on the second line of main.bd");
+}
+
+#[test]
+fn render_source_refuses_an_include_rather_than_reading_the_disk() {
+    // It is the semver surface and the wasm build rests on it, so it cannot
+    // start opening files because a statement asked it to (`D-029`).
+    let message = format!(
+        "{:#}",
+        crate::render_source("include \"other.bd\"\nnode a \"A\"\n").expect_err("it must refuse")
+    );
+    assert!(message.contains("render_file"), "{message}");
+}
+
+#[test]
+fn a_qualified_name_does_not_swallow_a_class_reference() {
+    // The conflict `I-032` flagged. `core.api` is one token by maximal munch,
+    // so `.card` after it is still a class and not the tail of a name.
+    let l = build("style card { fill: #123456 }\nnode a \"A\" .card\n");
+    assert_eq!(l.nodes[0].style.fill.as_deref(), Some("#123456"));
+}
+
+#[test]
+fn the_composed_example_set_still_draws() {
+    // `examples/compose/` is what a bgraph-tagged fence cannot be: three
+    // files that are one diagram. That fence promises a complete current
+    // file, so the multi-file case is verified here rather than documented
+    // and never run.
+    let dir = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/examples/compose"));
+
+    let composed = crate::compose::load(&dir.join("main.bd")).expect("main.bd composes");
+    let ids: Vec<&str> = composed
+        .diagram
+        .nodes
+        .iter()
+        .map(|n| n.id.as_str())
+        .collect();
+    assert!(ids.contains(&"core.api"), "{ids:?}");
+    assert!(ids.contains(&"ui"), "{ids:?}");
+    crate::layout::solve(&composed.diagram).expect("and it draws");
+
+    // …and the included file is a diagram in its own right, which is the
+    // claim its own comment makes.
+    let alone = crate::compose::load(&dir.join("core.bd")).expect("core.bd composes alone");
+    crate::layout::solve(&alone.diagram).expect("and draws alone");
+}
+
+// ------------------------------------------------- named themes (I-029)
+
+#[test]
+fn every_theme_is_a_style_file_that_parses_and_resolves() {
+    // A theme *is* a `.bds`, run through the same parser and registry as one
+    // somebody writes. If that stopped being true, this is where it shows.
+    for theme in crate::themes::THEMES {
+        let parsed = parse_diagram(theme.styles)
+            .unwrap_or_else(|e| panic!("theme `{}` does not parse: {e:#}", theme.name));
+        crate::style::Registry::build(&parsed.styles)
+            .unwrap_or_else(|e| panic!("theme `{}` does not resolve: {e:#}", theme.name));
+        assert!(
+            parsed.nodes.is_empty() && parsed.edges.is_empty(),
+            "theme `{}` declares more than styles",
+            theme.name
+        );
+    }
+}
+
+#[test]
+fn every_theme_is_readable() {
+    // Validated for contrast the way the categorical palette already is: a
+    // theme that ships text nobody can read is worse than no theme.
+    for theme in crate::themes::THEMES {
+        let mut diagram = parse_diagram("node a \"A\"\nnode b \"B\" right-of a\na -> b\n").unwrap();
+        crate::themes::apply(&mut diagram, theme.name).expect("it applies");
+
+        let unreadable: Vec<String> = crate::check::check(&diagram)
+            .into_iter()
+            .filter(|d| d.message.contains("contrast"))
+            .map(|d| d.message)
+            .collect();
+        assert!(
+            unreadable.is_empty(),
+            "theme `{}`: {unreadable:?}",
+            theme.name
+        );
+    }
+}
+
+#[test]
+fn a_theme_goes_underneath_the_file_rather_than_over_it() {
+    // A theme that overrode the file would make `--theme` destructive rather
+    // than useful: it would silently discard the one box the author coloured
+    // on purpose.
+    let mut diagram = parse_diagram("node a \"A\" { fill: #f43f5e }\n").unwrap();
+    crate::themes::apply(&mut diagram, "dark").unwrap();
+    let l = crate::layout::solve(&diagram).unwrap();
+    assert_eq!(l.nodes[0].style.fill.as_deref(), Some("#f43f5e"));
+
+    // …and a named style the file declares wins over the theme's of the same
+    // name, which is the same rule one level up.
+    let mut diagram = parse_diagram("style node { fill: #ffffff }\nnode a \"A\"\n").unwrap();
+    crate::themes::apply(&mut diagram, "dark").unwrap();
+    let l = crate::layout::solve(&diagram).unwrap();
+    assert_eq!(l.nodes[0].style.fill.as_deref(), Some("#ffffff"));
+}
+
+#[test]
+fn a_declared_background_beats_the_themes() {
+    let mut diagram = parse_diagram("graph { background: #123456 }\nnode a \"A\"\n").unwrap();
+    crate::themes::apply(&mut diagram, "dark").unwrap();
+    let l = crate::layout::solve(&diagram).unwrap();
+    assert_eq!(l.opts.background.as_deref(), Some("#123456"));
+
+    // …and without one, the theme supplies it.
+    let mut diagram = parse_diagram("node a \"A\"\n").unwrap();
+    crate::themes::apply(&mut diagram, "dark").unwrap();
+    let l = crate::layout::solve(&diagram).unwrap();
+    assert_eq!(l.opts.background.as_deref(), Some("#0b1120"));
+}
+
+#[test]
+fn an_unknown_theme_names_the_ones_that_exist() {
+    let mut diagram = parse_diagram("node a \"A\"\n").unwrap();
+    let message = format!(
+        "{:#}",
+        crate::themes::apply(&mut diagram, "neon").expect_err("`neon` is not a theme")
+    );
+    for name in ["neon", "light", "dark", "print"] {
+        assert!(message.contains(name), "{message}");
+    }
+}
+
+// ------------------------------------------------- components (I-030)
+
+fn compose_one(name: &str, source: &str) -> crate::compose::Composed {
+    let dir = scratch(name);
+    let file = dir.join("main.bd");
+    std::fs::write(&file, source).expect("a scratch file");
+    crate::compose::load(&file).expect("it should compose")
+}
+
+#[test]
+fn a_component_placed_twice_declares_two_of_everything() {
+    let composed = compose_one(
+        "component-twice",
+        "component service {\n  node app \"{{label}}\"\n  node db \"DB\" below app\n  app -> db\n}\n\
+         use service as web { label: \"Web\" }\n\
+         use service as jobs { label: \"Jobs\" }\n",
+    );
+    let ids: Vec<&str> = composed
+        .diagram
+        .nodes
+        .iter()
+        .map(|n| n.id.as_str())
+        .collect();
+    for expected in ["web.app", "web.db", "jobs.app", "jobs.db"] {
+        assert!(ids.contains(&expected), "{ids:?}");
+    }
+    assert_eq!(
+        composed.diagram.edges.len(),
+        2,
+        "each instance has its own edge"
+    );
+    crate::layout::solve(&composed.diagram).expect("and it draws");
+}
+
+#[test]
+fn an_instance_is_a_frame_so_it_can_be_placed() {
+    // What makes the feature usable rather than a curiosity: without this an
+    // author can name the boxes inside an instance but cannot say where the
+    // instance goes.
+    let composed = compose_one(
+        "component-placed",
+        "component service {\n  node app \"A\"\n}\n\
+         use service as web\n\
+         use service as jobs right-of web gap 90\n",
+    );
+    let frames: Vec<&str> = composed
+        .diagram
+        .groups
+        .iter()
+        .map(|g| g.id.as_str())
+        .collect();
+    assert_eq!(frames, ["web", "jobs"]);
+
+    let l = crate::layout::solve(&composed.diagram).expect("it draws");
+    let web = l.groups.iter().find(|g| g.id == "web").unwrap();
+    let jobs = l.groups.iter().find(|g| g.id == "jobs").unwrap();
+    assert!(
+        jobs.rect.x > web.rect.right(),
+        "the second instance did not land to the right of the first"
+    );
+}
+
+#[test]
+fn a_binding_lands_where_the_hole_is_and_is_escaped_for_it() {
+    // The component body goes through the template engine, so a label with a
+    // quote in it cannot become a statement.
+    let composed = compose_one(
+        "component-escape",
+        "component box {\n  node b \"{{label}}\"\n}\n\
+         use box as one { label: \"a \\\" quote\" }\n",
+    );
+    let l = crate::layout::solve(&composed.diagram).expect("it draws");
+    assert_eq!(l.nodes[0].lines, vec!["a \" quote"]);
+}
+
+#[test]
+fn a_components_holes_are_not_the_files_holes() {
+    // A component's holes are bound by each `use`, not by whoever renders the
+    // file. Counting them would make every file with a component a template
+    // that can never be satisfied.
+    let source = "component box {\n  node b \"{{label}}\"\n}\nuse box as one { label: \"A\" }\n";
+    let template = crate::Template::parse(source).expect("it parses");
+    assert!(
+        template.holes().is_empty(),
+        "the file claims holes that belong to a component: {:?}",
+        template.holes()
+    );
+}
+
+#[test]
+fn placing_an_unknown_component_says_which_exist() {
+    let dir = scratch("component-unknown");
+    let file = dir.join("main.bd");
+    std::fs::write(
+        &file,
+        "component service {\n  node a \"A\"\n}\nuse serivce as web\n",
+    )
+    .unwrap();
+    let message = format!("{:#}", crate::compose::load(&file).expect_err("a typo"));
+    assert!(message.contains("serivce"), "{message}");
+    assert!(message.contains("service"), "{message}");
+}
+
+// ------------------------------------- grid and constraints (I-033…I-035)
+
+#[test]
+fn a_grid_cell_is_an_absolute_position_in_declared_units() {
+    // `D-031`: a coordinate system, not a solver. `at (col 3, row 2)` is
+    // still `at`, which is why it cannot break `D-001`.
+    let l = build(
+        r#"graph { grid: 160 90 }
+           node a "A" at (col 0, row 0)
+           node b "B" at (col 2, row 1)"#,
+    );
+    assert_eq!((l.nodes[0].rect.x, l.nodes[0].rect.y), (0.0, 0.0));
+    assert_eq!((l.nodes[1].rect.x, l.nodes[1].rect.y), (320.0, 90.0));
+}
+
+#[test]
+fn one_grid_number_is_a_square_cell() {
+    let l = build(
+        r#"graph { grid: 120 }
+           node a "A" at (col 1, row 1)"#,
+    );
+    assert_eq!((l.nodes[0].rect.x, l.nodes[0].rect.y), (120.0, 120.0));
+}
+
+#[test]
+fn a_box_in_pixels_is_untouched_by_the_grid() {
+    // Nothing is snapped to it. A grid that quietly moved a declared
+    // position would be exactly the solver `D-001` refuses.
+    let l = build(
+        r#"graph { grid: 160 90 }
+           node a "A" at (37, 41)"#,
+    );
+    assert_eq!((l.nodes[0].rect.x, l.nodes[0].rect.y), (37.0, 41.0));
+}
+
+#[test]
+fn same_width_resizes_before_placement_so_nothing_overlaps() {
+    // Found by looking at the picture: widening a box *after* it is placed
+    // does not push its neighbours along, it lands on top of them. A size
+    // constraint belongs before placement, because placement already knows
+    // how to lay out boxes of a given size.
+    let l = build(
+        r#"node a "A"
+           node b "A much longer label" right-of a gap 40
+           node c "C" right-of b gap 40
+           same-width a b c"#,
+    );
+    let widths: Vec<f64> = l.nodes.iter().map(|n| n.rect.w).collect();
+    assert!(
+        widths.windows(2).all(|w| (w[0] - w[1]).abs() < 0.01),
+        "widths differ: {widths:?}"
+    );
+    for pair in l.nodes.windows(2) {
+        assert!(
+            pair[1].rect.x >= pair[0].rect.right(),
+            "boxes overlap after being widened: {} then {}",
+            pair[0].rect.right(),
+            pair[1].rect.x
+        );
+    }
+}
+
+#[test]
+fn the_largest_wins_a_size_constraint() {
+    // Shrinking to match a narrower neighbour clips the label, and a
+    // constraint that makes text unreadable is worse than no constraint.
+    let l = build(
+        r#"node a "A"
+           node b "A much longer label" below a
+           same-width a b"#,
+    );
+    assert!(l.nodes[0].rect.w > 100.0, "the short box was not widened");
+}
+
+#[test]
+fn align_group_moves_the_others_onto_the_first() {
+    // The first named box decides, not an average: an average moves every
+    // box including the one the others were being lined up against.
+    let l = build(
+        r#"node a "A" at (0, 0) { size: 80 40 }
+           node b "B" at (120, 33) { size: 80 60 }
+           node c "C" at (240, 71) { size: 80 40 }
+           align-group top a b c"#,
+    );
+    assert_eq!(l.nodes[0].rect.y, 0.0, "the lead moved");
+    assert_eq!(l.nodes[1].rect.y, 0.0);
+    assert_eq!(l.nodes[2].rect.y, 0.0);
+}
+
+#[test]
+fn a_constraint_never_reorders() {
+    // The line `D-001` draws, and the whole reason this is a pass rather
+    // than a solver.
+    let l = build(
+        r#"node a "A"
+           node b "Long one" right-of a gap 40
+           node c "C" right-of b gap 40
+           same-width a b c
+           align-group center a b c"#,
+    );
+    let xs: Vec<f64> = l.nodes.iter().map(|n| n.rect.x).collect();
+    assert!(
+        xs.windows(2).all(|w| w[0] < w[1]),
+        "the declared order changed: {xs:?}"
+    );
+}
+
+#[test]
+fn a_constraint_needs_two_names() {
+    let message = err("align-group a");
+    assert!(message.contains("two names"), "{message}");
+}
+
+#[test]
+fn constraints_survive_composition() {
+    // Found the hard way: `merge` copied every other list and silently
+    // dropped this one, so a constraint written in a file did nothing at all
+    // and said nothing about it.
+    let composed = compose_one(
+        "constraints-compose",
+        "node a \"A\"\nnode b \"A much longer label\" below a\nsame-width a b\n",
+    );
+    assert_eq!(composed.diagram.constraints.len(), 1);
+    let l = crate::layout::solve(&composed.diagram).unwrap();
+    assert!(
+        l.nodes[0].rect.w > 100.0,
+        "the constraint was lost on the way"
+    );
+}
+
+// ------------------------------------------------- accessibility (I-040)
+
+#[test]
+fn a_described_box_carries_its_description_into_the_svg() {
+    // `<title>` on the shape rather than a wrapping group: valid on any SVG
+    // element, shown as a tooltip by a browser, read by a screen reader. One
+    // line serves the reader with a mouse and the reader without sight, which
+    // is why `I-040` was widened past accessibility.
+    let svg = crate::render_source(
+        r#"node cart "Cart" { description: "What the customer has chosen." }"#,
+    )
+    .unwrap();
+    assert!(
+        svg.contains("<title>What the customer has chosen.</title>"),
+        "{svg}"
+    );
+}
+
+#[test]
+fn a_description_is_escaped_like_every_other_text() {
+    let svg = crate::render_source(r#"node a "A" { description: "R&D <ops>" }"#).unwrap();
+    assert!(svg.contains("R&amp;D &lt;ops&gt;"), "{svg}");
+    assert!(!svg.contains("<ops>"), "unescaped markup reached the file");
+}
+
+#[test]
+fn the_root_says_what_the_diagram_is() {
+    // Without `role="img"` and a label an SVG is announced as a group of
+    // anonymous shapes, or skipped entirely.
+    let svg = crate::render_source(
+        r#"graph { description: "How an order reaches the warehouse." }
+           node a "A""#,
+    )
+    .unwrap();
+    assert!(svg.contains(r#"role="img""#), "{svg}");
+    assert!(
+        svg.contains(r#"aria-label="How an order reaches the warehouse.""#),
+        "{svg}"
+    );
+}
+
+#[test]
+fn the_label_falls_back_to_the_title_rather_than_asking_twice() {
+    let svg = crate::render_source("graph { title: \"Checkout\" }\nnode a \"A\"").unwrap();
+    assert!(svg.contains(r#"aria-label="Checkout""#), "{svg}");
+}
+
+#[test]
+fn a_chart_is_labelled_by_its_own_title() {
+    // A screen reader on a pie chart is the reader who needs the name most,
+    // and a chart names itself in its own settings rather than in `graph`.
+    let svg =
+        crate::render_source("type pie { title: \"Traffic sources\" }\nslice a \"A\" 40").unwrap();
+    assert!(svg.contains(r#"aria-label="Traffic sources""#), "{svg}");
+}
+
+#[test]
+fn an_undescribed_diagram_gains_no_empty_attributes() {
+    // A `role="img"` with nothing to say is worse than none: it promises a
+    // screen reader a label and then gives it an empty string.
+    let svg = crate::render_source("node a \"A\"").unwrap();
+    assert!(!svg.contains("role="), "{svg}");
+    assert!(!svg.contains("<title>"), "{svg}");
+}
+
+// ------------------------------------------------- the note statement (I-054)
+
+#[test]
+fn a_note_is_drawn_where_its_anchor_puts_it() {
+    let l = build(
+        r#"node api "API"
+           note "Figures are March." right-of api gap 30"#,
+    );
+    let note = l
+        .annotations
+        .iter()
+        .find(|a| a.text == "Figures are March.")
+        .expect("the note should be drawn");
+    assert!(
+        note.x > l.nodes[0].rect.right(),
+        "the note sits at {} but `api` ends at {}",
+        note.x,
+        l.nodes[0].rect.right()
+    );
+}
+
+#[test]
+fn a_note_is_not_a_box_and_cannot_be_pointed_at() {
+    // The whole difference between a note and a box with no border: it
+    // declares no name, so there is nothing for an edge to land on.
+    let l = build(r#"node a "A""#);
+    let before = l.nodes.len();
+    let l = build(
+        r#"node a "A"
+           note "An aside." below a"#,
+    );
+    assert_eq!(l.nodes.len(), before, "the note became a box");
+
+    // …and naming it is an unknown-name error, not a silent link.
+    let message = err(r#"node a "A"
+           note "An aside." below a
+           a -> aside"#);
+    assert!(message.contains("aside"), "{message}");
+}
+
+#[test]
+fn a_note_takes_a_style_class() {
+    let l = build(
+        r#"style caption { font: 11 #b45309 }
+           node a "A"
+           note "An aside." .caption below a"#,
+    );
+    let note = l
+        .annotations
+        .iter()
+        .find(|a| a.text == "An aside.")
+        .unwrap();
+    assert_eq!(note.color, "#b45309");
+    assert_eq!(note.size, 11.0);
+}
+
+#[test]
+fn a_note_anchored_to_nothing_is_left_out_rather_than_drawn_at_the_origin() {
+    // `check` has already reported the unknown name; drawing the note in the
+    // corner would add a second wrong thing to look at.
+    let source = r#"node a "A"
+                    note "An aside." below ghost"#;
+    let diagram = parse_diagram(source).expect("it parses");
+    let l = layout::solve(&diagram);
+    // The unknown anchor is an error, so this does not solve at all — which
+    // is the stronger form of the same answer.
+    assert!(l.is_err(), "an unknown anchor should be refused");
+}
+
+#[test]
+fn a_note_follows_a_box_a_constraint_moved() {
+    // Solved last, against the boxes as they finally sit.
+    let l = build(
+        r#"node a "A" at (0, 0) { size: 80 40 }
+           node b "B" at (200, 90) { size: 80 40 }
+           align-group top a b
+           note "Beside B." right-of b gap 20"#,
+    );
+    let b = l.nodes[1].rect;
+    let note = l
+        .annotations
+        .iter()
+        .find(|a| a.text == "Beside B.")
+        .unwrap();
+    assert_eq!(b.y, 0.0, "the constraint did not run");
+    assert!(
+        (note.y - b.cy()).abs() < b.h,
+        "the note stayed beside where `b` used to be"
+    );
+}
+
+#[test]
+fn every_style_field_is_inherited() {
+    // `overlay!` names its fields by hand, so a field added to `Style` and
+    // forgotten here is silently never inherited — a class sets it, the
+    // cascade drops it, and nothing says a word. That is exactly how the
+    // `legend` property arrived born broken.
+    let source = include_str!("style.rs");
+    let fields: Vec<&str> = source
+        .split_once("pub struct Style {")
+        .expect("the Style struct")
+        .1
+        .split_once("\n}")
+        .expect("its closing brace")
+        .0
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("pub "))
+        .filter_map(|l| l.split_once(':'))
+        .map(|(name, _)| name.trim())
+        .collect();
+
+    let listed = source
+        .split_once("overlay!(")
+        .expect("the overlay call")
+        .1
+        .split_once(");")
+        .expect("its close")
+        .0;
+
+    for field in &fields {
+        assert!(
+            listed
+                .lines()
+                .any(|l| l.trim().trim_end_matches(',') == *field),
+            "`Style::{field}` is never inherited — add it to `overlay!`"
+        );
+    }
+    assert!(fields.len() > 20, "only {} fields found", fields.len());
+}
+
+// ------------------------------------------------- a general legend (I-060)
+
+#[test]
+fn a_legend_lists_only_the_classes_that_asked_to_be_in_it() {
+    // Derived from what the file says rather than from the colours on the
+    // page: a legend built from every class would list the ones that only
+    // round a corner, and one built from the colours in use would have
+    // nothing to call them.
+    let l = build(
+        r#"style healthy { fill: #dcfce7 stroke: #16a34a legend: "Healthy" }
+           style down    { fill: #fee2e2 stroke: #dc2626 legend: "Down" }
+           style plain   { radius: 2 }
+           node a "A" .healthy
+           node b "B" .down below a
+           legend right-of a gap 40"#,
+    );
+    let texts: Vec<&str> = l.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert!(texts.contains(&"Healthy"), "{texts:?}");
+    assert!(texts.contains(&"Down"), "{texts:?}");
+    assert_eq!(
+        texts.len(),
+        2,
+        "something unasked-for got listed: {texts:?}"
+    );
+}
+
+#[test]
+fn a_swatch_carries_the_stroke_as_well_as_the_fill() {
+    // A status colour is usually a pale tint with the meaning in the border,
+    // so a swatch drawn from the fill alone is a key nobody can read.
+    let l = build(
+        r#"style healthy { fill: #dcfce7 stroke: #16a34a legend: "Healthy" }
+           node a "A" .healthy
+           legend right-of a gap 40"#,
+    );
+    let swatch = l
+        .nodes
+        .iter()
+        .find(|n| n.style.fill.as_deref() == Some("#dcfce7") && n.lines.is_empty())
+        .expect("a swatch should be drawn");
+    assert_eq!(swatch.style.stroke.as_deref(), Some("#16a34a"));
+}
+
+#[test]
+fn no_class_asks_for_a_legend_so_none_is_drawn() {
+    let l = build(
+        r#"style plain { radius: 2 }
+           node a "A" .plain
+           legend right-of a gap 40"#,
+    );
+    assert!(l.annotations.is_empty(), "an empty legend was drawn");
+}
+
+// ------------------------------------------------- `top n` (I-047)
+
+#[test]
+fn top_keeps_the_largest_and_folds_the_rest() {
+    // `check` already advises exactly this when a pie exhausts the palette.
+    // Before, the advice could only be taken by doing the arithmetic by hand
+    // outside the tool.
+    let l = build(
+        r#"type pie { top: 3 }
+           slice a "A" 50
+           slice b "B" 30
+           slice c "C" 10
+           slice d "D" 6
+           slice e "E" 4"#,
+    );
+    let labels: Vec<&str> = l
+        .annotations
+        .iter()
+        .map(|a| a.text.as_str())
+        .filter(|t| t.starts_with(['A', 'B', 'C', 'D', 'E', 'O']))
+        .collect();
+    assert!(labels.iter().any(|t| t.starts_with("Other")), "{labels:?}");
+    assert!(
+        !labels
+            .iter()
+            .any(|t| t.starts_with('D') || t.starts_with('E')),
+        "a folded slice is still listed: {labels:?}"
+    );
+}
+
+#[test]
+fn the_folded_slice_keeps_the_total_honest() {
+    // Folding must not lose a number: the whole is still the whole.
+    let l = build(
+        r#"type pie { top: 2 labels: value }
+           slice a "A" 50
+           slice b "B" 30
+           slice c "C" 12
+           slice d "D" 8"#,
+    );
+    let values: Vec<&str> = l.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert!(
+        values.iter().any(|t| t.contains("20")),
+        "12 and 8 did not add up to 20: {values:?}"
+    );
+}
+
+#[test]
+fn the_folded_slice_can_be_named() {
+    let l = build(
+        r#"type pie { top: 1 other: "Everything else" }
+           slice a "A" 50
+           slice b "B" 30"#,
+    );
+    assert!(
+        l.annotations
+            .iter()
+            .any(|a| a.text.starts_with("Everything else")),
+        "{:?}",
+        l.annotations.iter().map(|a| &a.text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn folding_is_the_same_every_run() {
+    // A chart that reordered itself between runs would defeat the golden
+    // test and, before that, the reader.
+    let source = r#"type pie { top: 2 }
+                    slice a "A" 10
+                    slice b "B" 10
+                    slice c "C" 10
+                    slice d "D" 10"#;
+    let first = crate::render_source(source).unwrap();
+    let second = crate::render_source(source).unwrap();
+    assert_eq!(first, second);
+}
+
+#[test]
+fn top_larger_than_the_data_changes_nothing() {
+    let l = build(
+        r#"type pie { top: 10 }
+           slice a "A" 50
+           slice b "B" 30"#,
+    );
+    assert!(
+        !l.annotations.iter().any(|a| a.text.starts_with("Other")),
+        "a fold happened with nothing to fold"
+    );
+}
+
+// ------------------------------------------------- multi-page print (I-061)
+
+#[cfg(feature = "pdf")]
+#[test]
+fn a_diagram_that_fits_is_still_one_page() {
+    // The default must not change: a diagram smaller than a sheet has always
+    // been one page sized to itself, and that is still the right answer.
+    let l = build("node a \"A\"");
+    let pdf = String::from_utf8_lossy(&crate::render_pdf::render(&l)).into_owned();
+    assert_eq!(
+        pdf.matches("/Type /Page\n").count() + pdf.matches("/Type /Page ").count(),
+        1
+    );
+    assert!(pdf.contains("/Count 1"), "not a single-page document");
+}
+
+#[cfg(feature = "pdf")]
+#[test]
+fn a_wide_diagram_is_tiled_across_sheets() {
+    let mut source = String::from("graph { flow: right, gap: 30 }\n");
+    for i in 0..14 {
+        source.push_str(&format!("node n{i} \"Stage {i}\"\n"));
+    }
+    let l = build(&source);
+    let pdf = String::from_utf8_lossy(&crate::render_pdf::render_paged(
+        &l,
+        crate::render_pdf::Page::A4,
+    ))
+    .into_owned();
+
+    assert!(
+        !pdf.contains("/Count 1"),
+        "a diagram much wider than A4 came out on one sheet"
+    );
+    // One content stream, several pages: a sheet is a window onto the drawing,
+    // so nothing is re-rendered and there is no second code path to disagree
+    // with the single-page one.
+    // `>>\nstream` rather than `stream`, because `endstream` contains the
+    // word too and counting that would always answer two.
+    assert_eq!(
+        pdf.matches(">>\nstream").count(),
+        1,
+        "the drawing was written more than once"
+    );
+}
+
+#[cfg(feature = "pdf")]
+#[test]
+fn a_page_size_is_named_or_measured() {
+    use crate::render_pdf::Page;
+    assert!((Page::parse("a4").unwrap().width - 595.28).abs() < 0.01);
+    assert!((Page::parse("A4").unwrap().height - 841.89).abs() < 0.01);
+    assert_eq!(Page::parse("400x300").unwrap().width, 400.0);
+    assert_eq!(Page::parse("400 x 300").unwrap().height, 300.0);
+    assert!(Page::parse("foolscap").is_none());
+}
+
+#[cfg(feature = "pdf")]
+#[test]
+fn sheets_overlap_so_a_seam_is_readable() {
+    // A box cut exactly in half at a seam is unreadable on both sheets, so
+    // adjacent tiles have to share a strip. Read off the produced document
+    // rather than off the constant, or the test would only be restating the
+    // number and not that it is used.
+    let mut source = String::from("graph { flow: right, gap: 30 }\n");
+    for i in 0..14 {
+        source.push_str(&format!("node n{i} \"Stage {i}\"\n"));
+    }
+    let l = build(&source);
+    let pdf = String::from_utf8_lossy(&crate::render_pdf::render_paged(
+        &l,
+        crate::render_pdf::Page::A4,
+    ))
+    .into_owned();
+
+    let lefts: Vec<f64> = pdf
+        .match_indices("/MediaBox [")
+        .filter_map(|(i, _)| {
+            let rest = &pdf[i + "/MediaBox [".len()..];
+            let inside = rest.split(']').next()?;
+            let mut numbers = inside.split_whitespace();
+            let x0: f64 = numbers.next()?.parse().ok()?;
+            let x1: f64 = numbers.nth(1)?.parse().ok()?;
+            Some((x0, x1))
+        })
+        .map(|(x0, x1)| {
+            assert!(x1 > x0, "a sheet with no width");
+            x0
+        })
+        .collect();
+
+    assert!(lefts.len() >= 2, "only {} sheets", lefts.len());
+    let step = lefts[1] - lefts[0];
+    assert!(
+        step > 0.0 && step < crate::render_pdf::Page::A4.width,
+        "sheets advance by {step}, which leaves no overlap"
+    );
+}
+
+// ------------------------------------------------- visual diff (I-050)
+
+fn diff_of(before: &str, after: &str) -> Layout {
+    crate::diff::compare(&build(before), &build(after))
+}
+
+#[test]
+fn an_added_box_is_green_and_a_removed_one_is_red() {
+    let l = diff_of(
+        "node a \"A\"\nnode gone \"Gone\" right-of a",
+        "node a \"A\"\nnode fresh \"Fresh\" right-of a",
+    );
+    let fresh = l.nodes.iter().find(|n| n.lines == ["Fresh"]).unwrap();
+    let gone = l.nodes.iter().find(|n| n.lines == ["Gone"]).unwrap();
+    assert_eq!(fresh.style.stroke.as_deref(), Some("#16a34a"));
+    assert_eq!(gone.style.stroke.as_deref(), Some("#dc2626"));
+}
+
+#[test]
+fn a_removed_box_goes_below_rather_than_under_what_replaced_it() {
+    // The first attempt drew removals in place. Something new usually takes
+    // the space, and the two labels then sat on top of each other — the test
+    // render read "Qaeuhee". A gutter never collides.
+    let l = diff_of(
+        "node a \"A\"\nnode cache \"Cache\" right-of a",
+        "node a \"A\"\nnode queue \"Queue\" right-of a",
+    );
+    let queue = l.nodes.iter().find(|n| n.lines == ["Queue"]).unwrap();
+    let cache = l.nodes.iter().find(|n| n.lines == ["Cache"]).unwrap();
+    assert!(
+        cache.rect.y > queue.rect.bottom(),
+        "the removed box is still on top of its replacement"
+    );
+}
+
+#[test]
+fn a_moved_box_keeps_a_ghost_of_where_it_was() {
+    // The pair is what says "moved" — either alone reads as removed or added.
+    let l = diff_of(
+        "node a \"A\"\nnode b \"B\" below a gap 40",
+        "node a \"A\"\nnode b \"B\" below a gap 120",
+    );
+    let b = l.nodes.iter().find(|n| n.lines == ["B"]).unwrap();
+    assert_eq!(b.style.stroke.as_deref(), Some("#d97706"));
+    assert!(
+        l.nodes
+            .iter()
+            .any(|n| n.lines.is_empty() && n.style.stroke.as_deref() == Some("#d97706")),
+        "no ghost was left where the box used to be"
+    );
+}
+
+#[test]
+fn an_unchanged_diagram_shows_nothing_but_itself() {
+    let source = "node a \"A\"\nnode b \"B\" right-of a\na -> b";
+    let l = diff_of(source, source);
+    assert!(
+        l.nodes
+            .iter()
+            .all(|n| n.style.stroke.as_deref() == Some("#94a3b8")),
+        "an unchanged diagram reported a change"
+    );
+}
+
+#[test]
+fn a_box_nudged_by_a_neighbours_label_is_not_called_moved() {
+    // Half a pixel, not zero: reporting every fractional shift would make
+    // each diff say everything moved, and nobody reads a diff like that.
+    let l = diff_of(
+        "node a \"A\"\nnode b \"B\" right-of a",
+        "node a \"A\"\nnode b \"B\" right-of a",
+    );
+    assert!(
+        !l.nodes
+            .iter()
+            .any(|n| n.style.stroke.as_deref() == Some("#d97706")),
+        "a still diagram reported a move"
+    );
+}
+
+// ------------------------------------------------- reading a table (I-048)
+
+#[cfg(feature = "csv")]
+#[test]
+fn a_chart_can_read_its_rows_from_a_table() {
+    let dir = scratch("from-csv");
+    std::fs::write(
+        dir.join("sales.csv"),
+        "name,value\nOrganic search,4820\nDirect,2410\nReferral,1180\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("main.bd"),
+        "type pie { title: \"From a table\" from: \"sales.csv\" }\n",
+    )
+    .unwrap();
+
+    let composed = crate::compose::load(&dir.join("main.bd")).expect("it composes");
+    assert_eq!(composed.diagram.nodes.len(), 3);
+    let l = crate::layout::solve(&composed.diagram).expect("it draws");
+    assert!(
+        l.annotations.iter().any(|a| a.text.starts_with("Organic")),
+        "the labels did not come through"
+    );
+}
+
+#[cfg(feature = "csv")]
+#[test]
+fn columns_are_matched_by_name_and_not_by_position() {
+    // A table whose columns are in a different order still reads correctly,
+    // which is the whole reason the header is the contract.
+    let dir = scratch("from-order");
+    std::fs::write(dir.join("t.csv"), "value,name\n40,A\n60,B\n").unwrap();
+    std::fs::write(dir.join("main.bd"), "type pie { from: \"t.csv\" }\n").unwrap();
+
+    let composed = crate::compose::load(&dir.join("main.bd")).expect("it composes");
+    assert_eq!(composed.diagram.nodes[0].label.as_deref(), Some("A"));
+}
+
+#[cfg(feature = "csv")]
+#[test]
+fn a_missing_column_says_which_and_lists_what_is_there() {
+    let dir = scratch("from-missing");
+    std::fs::write(dir.join("t.csv"), "label,amount\nA,1\n").unwrap();
+    std::fs::write(dir.join("main.bd"), "type pie { from: \"t.csv\" }\n").unwrap();
+
+    let message = format!(
+        "{:#}",
+        crate::compose::load(&dir.join("main.bd")).expect_err("no `value` column")
+    );
+    assert!(message.contains("value"), "{message}");
+    assert!(message.contains("amount"), "{message}");
+}
+
+#[cfg(feature = "csv")]
+#[test]
+fn a_missing_table_names_the_file_that_asked_for_it() {
+    // The consequence this feature accepts: a diagram that reads the disk at
+    // render time is no longer autonomous, so the diagnostic owes the reader
+    // both names.
+    let dir = scratch("from-gone");
+    std::fs::write(dir.join("main.bd"), "type pie { from: \"nope.csv\" }\n").unwrap();
+
+    let message = format!(
+        "{:#}",
+        crate::compose::load(&dir.join("main.bd")).expect_err("no such table")
+    );
+    assert!(message.contains("nope.csv"), "{message}");
+    assert!(message.contains("main.bd"), "{message}");
+}
+
+#[cfg(feature = "csv")]
+#[test]
+fn rows_are_numbered_rather_than_named_after_their_labels() {
+    // A label may repeat, contain spaces or be empty. None of those may
+    // become an identifier collision.
+    let dir = scratch("from-ids");
+    std::fs::write(dir.join("t.csv"), "name,value\nA,1\nA,2\n").unwrap();
+    std::fs::write(dir.join("main.bd"), "type pie { from: \"t.csv\" }\n").unwrap();
+
+    let composed = crate::compose::load(&dir.join("main.bd")).expect("duplicate labels are fine");
+    let ids: Vec<&str> = composed
+        .diagram
+        .nodes
+        .iter()
+        .map(|n| n.id.as_str())
+        .collect();
+    assert_eq!(ids, ["row1", "row2"]);
+}
+
+// ------------------------------------------------- sketch mode (I-043)
+
+#[test]
+fn sketch_mode_draws_paths_instead_of_rectangles() {
+    let plain = crate::render_source("node a \"A\"").unwrap();
+    let drawn = crate::render_source("graph { sketch: on }\nnode a \"A\"").unwrap();
+    assert!(plain.contains("<rect"), "{plain}");
+    // `rx=` rather than `<rect`: the canvas background is a rectangle too,
+    // and it is not a shape the author drew.
+    assert!(
+        !drawn.contains("rx="),
+        "a crisp box survived sketch mode: {drawn}"
+    );
+    assert!(drawn.contains("<path d=\"M"), "{drawn}");
+}
+
+#[test]
+fn a_sketch_is_the_same_file_every_time() {
+    // The whole difficulty of the feature. The golden test asserts the output
+    // is byte-identical run to run — and more to the point, a diagram that
+    // redrew itself differently on every save would be unreviewable.
+    let source = "graph { sketch: on }\nnode a \"A\"\nnode b \"B\" right-of a\na -> b";
+    let first = crate::render_source(source).unwrap();
+    for _ in 0..5 {
+        assert_eq!(crate::render_source(source).unwrap(), first);
+    }
+}
+
+#[test]
+fn two_boxes_in_different_places_wobble_differently() {
+    // Otherwise it is a stamp rather than a drawing: every box deformed
+    // identically reads as a font, not as a hand.
+    let svg =
+        crate::render_source("graph { sketch: on }\nnode a \"A\"\nnode b \"B\" right-of a gap 40")
+            .unwrap();
+    let paths: Vec<&str> = svg
+        .match_indices("<path d=\"M")
+        .map(|(i, _)| &svg[i..i + 40])
+        .collect();
+    assert!(paths.len() >= 2, "{paths:?}");
+    // Compare the fractional parts: the two boxes are at different x, so the
+    // *offsets* are what must differ rather than the coordinates.
+    assert_ne!(
+        paths[0].split_whitespace().nth(2),
+        paths[1].split_whitespace().nth(2),
+        "both boxes were deformed identically"
+    );
+}
+
+#[test]
+fn a_shape_whose_meaning_is_its_outline_is_left_alone() {
+    // A diamond drawn freehand stops reading as a decision, and a circle
+    // stops reading as a circle. Only the rectangles are wobbled.
+    let svg =
+        crate::render_source("graph { sketch: on }\nnode a \"A\" { shape: diamond }").unwrap();
+    assert!(svg.contains("<polygon") || svg.contains("<path"), "{svg}");
+    assert!(
+        !svg.contains("Q "),
+        "a diamond was drawn with the freehand bow"
+    );
+}
+
+// ------------------------------------------------- `explain` (I-037)
+
+fn explained(source: &str, id: &str) -> String {
+    let diagram = parse_diagram(source).expect("it parses");
+    let solved = layout::solve(&diagram).expect("it draws");
+    crate::explain::explain(&diagram, &solved, id).expect("it explains")
+}
+
+#[test]
+fn explain_says_what_the_file_declared_and_what_filled_in() {
+    // `D-001` makes placement the author's job, so a declared layout deserves
+    // a declared explanation: every line is a statement in the file or a
+    // default that stood in for one, and both are named.
+    let out = explained(
+        r#"graph { gap: 60 }
+           node ui "Browser"
+           node api "API" right-of ui gap 90"#,
+        "api",
+    );
+    assert!(out.contains("right-of ui"), "{out}");
+    assert!(out.contains("gap 90"), "{out}");
+    assert!(out.contains("declared"), "{out}");
+    // The gap was declared, so the graph default must not be claimed.
+    assert!(!out.contains("gap 60"), "{out}");
+}
+
+#[test]
+fn explain_names_the_default_when_the_file_was_silent() {
+    let out = explained(
+        r#"graph { gap: 60 }
+           node ui "Browser"
+           node api "API" right-of ui"#,
+        "api",
+    );
+    assert!(out.contains("gap 60"), "{out}");
+    assert!(out.contains("default"), "{out}");
+}
+
+#[test]
+fn explain_names_the_rule_an_author_forgets() {
+    // An unplaced box flowing from the statement before it is the single
+    // most common surprise, and the hardest thing to see in the source.
+    let out = explained("node a \"A\"\nnode b \"B\"", "b");
+    assert!(out.contains("flows"), "{out}");
+    assert!(out.contains('a'), "{out}");
+}
+
+#[test]
+fn explain_says_when_a_cell_has_no_grid_to_sit_on() {
+    // A cell with no declared grid puts everything on the origin — a
+    // question nobody thinks to ask, which is exactly when to volunteer it.
+    let out = explained("node a \"A\" at (col 2, row 1)", "a");
+    assert!(out.contains("NOT DECLARED"), "{out}");
+}
+
+#[test]
+fn explain_attributes_each_colour_to_the_layer_that_set_it() {
+    let out = explained(
+        r#"style card { fill: #1e293b stroke: #38bdf8 }
+           style hot extends card { stroke: #f43f5e }
+           node a "A" .hot { fill: #000000 }"#,
+        "a",
+    );
+    assert!(out.contains("#f43f5e"), "{out}");
+    assert!(
+        out.contains("#000000") && out.contains("own block"),
+        "the inline block did not win: {out}"
+    );
+}
+
+#[test]
+fn explain_mentions_a_constraint_acting_on_the_box() {
+    // Easy to forget three screens away from the statement it acts on.
+    let out = explained(
+        r#"node a "A"
+           node b "B" right-of a
+           same-width a b"#,
+        "a",
+    );
+    assert!(out.contains("same-width"), "{out}");
+    assert!(out.contains('b'), "{out}");
+}
+
+#[test]
+fn explaining_an_unknown_box_lists_the_ones_there_are() {
+    let diagram = parse_diagram("node a \"A\"\nnode b \"B\"").unwrap();
+    let solved = layout::solve(&diagram).unwrap();
+    let message = format!(
+        "{:#}",
+        crate::explain::explain(&diagram, &solved, "ghost").expect_err("no such box")
+    );
+    assert!(message.contains("ghost"), "{message}");
+    assert!(message.contains('a') && message.contains('b'), "{message}");
+}
+
+// ------------------------------------------------- `bgraph layout` (I-033)
+
+/// Fill in the placements and hand back both texts.
+fn frozen(source: &str) -> (String, String) {
+    let diagram = parse_diagram(source).expect("it parses");
+    let filled = crate::relayout::fill_in(source, &diagram).expect("it fills in");
+    (source.to_string(), filled)
+}
+
+#[test]
+fn freezing_a_layout_does_not_change_the_picture() {
+    // The whole promise, and the only guard that makes the command
+    // trustworthy: it edits the author's file, so the diagram must come out
+    // byte-identical.
+    for source in [
+        "node a \"A\"\nnode b \"B\"\nnode c \"C\"\na -> b",
+        "graph { flow: down, gap: 30 }\nnode a \"A\"\nnode b \"B\"",
+        "node a \"A\"\nnode b \"B\" { fill: #eef3ff }\nnode c \"C\"",
+        "node a \"A\" at (0, 0)\nnode b \"B\" right-of a\nnode c \"C\"",
+    ] {
+        let (before, after) = frozen(source);
+        let one = crate::render_source(&before).expect("the original draws");
+        let two = crate::render_source(&after).expect("the frozen one draws");
+        assert_eq!(
+            one, two,
+            "the picture moved:\n--- before\n{before}\n--- after\n{after}"
+        );
+    }
+}
+
+#[test]
+fn every_box_says_where_it_goes_afterwards() {
+    let (_, after) = frozen("node a \"A\"\nnode b \"B\"\nnode c \"C\"");
+    let diagram = parse_diagram(&after).unwrap();
+    assert!(
+        crate::relayout::unplaced(&diagram).is_empty(),
+        "still loose: {after}"
+    );
+}
+
+#[test]
+fn a_comment_and_the_author_s_spacing_survive() {
+    // `fmt` leaves interior alignment alone; this has to go further, because
+    // a comment and a column lined up by hand are things the author put
+    // there on purpose.
+    let source = "node ui   \"Browser\"          // the reader\nnode api  \"API\"\n";
+    let (_, after) = frozen(source);
+    assert!(after.contains("// the reader"), "{after}");
+    assert!(after.contains("node ui   \"Browser\""), "{after}");
+    assert!(after.contains("node api  \"API\" right-of ui"), "{after}");
+}
+
+#[test]
+fn a_placement_lands_before_a_block_and_not_against_it() {
+    // Both orders parse, but `right-of api{ … }` is not something a person
+    // would have typed — and that was the first output.
+    let (_, after) = frozen("node a \"A\"\nnode b \"B\" { fill: #eef3ff }\n");
+    assert!(after.contains("right-of a { fill:"), "{after}");
+}
+
+#[test]
+fn a_box_that_already_says_where_it_goes_is_left_alone() {
+    let source = "node a \"A\"\nnode b \"B\" below a gap 90\n";
+    let (_, after) = frozen(source);
+    assert_eq!(after, source, "a declared placement was rewritten");
+}
+
+#[test]
+fn freezing_twice_changes_nothing_the_second_time() {
+    let (_, once) = frozen("node a \"A\"\nnode b \"B\"\nnode c \"C\"");
+    let (_, twice) = frozen(&once);
+    assert_eq!(once, twice);
+}
+
+#[test]
+fn a_brace_inside_a_label_is_not_a_block() {
+    let (_, after) = frozen("node a \"A\"\nnode b \"a { brace\"\n");
+    assert!(after.contains("\"a { brace\" right-of a"), "{after}");
+}
+
+// ------------------------------------------------- embedded font (I-058)
+
+#[test]
+fn base64_round_trips_through_a_decoder() {
+    // Written out rather than pulled in, so it is worth proving against the
+    // real rules: padded to a multiple of four, and the tail correct for a
+    // length of one, two and three over.
+    fn decode(text: &str) -> Vec<u8> {
+        const A: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        let bits: Vec<u32> = text
+            .bytes()
+            .filter(|b| *b != b'=')
+            .map(|b| A.iter().position(|a| *a == b).expect("in the alphabet") as u32)
+            .collect();
+        let mut out = Vec::new();
+        for chunk in bits.chunks(4) {
+            let mut n = 0u32;
+            for (i, v) in chunk.iter().enumerate() {
+                n |= v << (18 - 6 * i);
+            }
+            let bytes = [(n >> 16) as u8, (n >> 8) as u8, n as u8];
+            out.extend_from_slice(&bytes[..chunk.len() - 1]);
+        }
+        out
+    }
+
+    for original in [
+        vec![],
+        vec![0x00],
+        vec![0x00, 0x01],
+        vec![0x00, 0x01, 0x00],
+        b"the quick brown fox".to_vec(),
+        (0..=255u8).collect::<Vec<u8>>(),
+    ] {
+        let encoded = crate::render_svg::base64_for_test(&original);
+        assert_eq!(encoded.len() % 4, 0, "not padded: {encoded}");
+        assert_eq!(decode(&encoded), original, "{encoded}");
+    }
+}
+
+#[test]
+fn an_embedded_font_becomes_a_font_face_the_diagram_can_ask_for() {
+    let l = {
+        let mut l = build(r#"node a "A" { font: 14 "Whatever" }"#);
+        // A TrueType magic number and nothing else: this is about the wiring,
+        // not about the font.
+        l.opts.embed_font = Some((
+            "Whatever".into(),
+            std::sync::Arc::new(vec![0x00, 0x01, 0x00, 0x00]),
+        ));
+        l
+    };
+    let svg = crate::render_svg::render(&l);
+    assert!(svg.contains("@font-face"), "{svg}");
+    assert!(svg.contains(r#"font-family:"Whatever""#), "{svg}");
+    assert!(svg.contains("data:font/ttf;base64,AAEAAA"), "{svg}");
+}
+
+#[test]
+fn a_diagram_with_no_embedded_font_carries_no_style_block() {
+    // Off unless asked for: the file grows by the size of the font, and that
+    // is a price only the person handing the file over should pay.
+    let svg = crate::render_source(r#"node a "A""#).unwrap();
+    assert!(!svg.contains("@font-face"), "{svg}");
+}
+
+// ------------------------------------------------- the wasm build (I-024)
+
+#[test]
+fn the_library_needs_no_argument_parser() {
+    // What makes a wasm build sane: a page has no argv, and a library
+    // consumer should not compile a parser it will never call. The binaries
+    // declare `cli` in `required-features`, so `cargo build` still builds
+    // them and `--no-default-features` resolves to four dependencies.
+    let manifest = include_str!("../Cargo.toml");
+
+    let clap = manifest
+        .lines()
+        .find(|l| l.starts_with("clap = "))
+        .expect("clap is in the manifest");
+    assert!(clap.contains("optional = true"), "{clap}");
+
+    assert_eq!(
+        manifest.matches("required-features = [\"cli\"]").count(),
+        2,
+        "both binaries must declare the feature that gives them their parser"
+    );
+
+    // And the library must emit a module at all, or there is nothing to load.
+    assert!(
+        manifest.contains("crate-type = [\"cdylib\", \"rlib\"]"),
+        "the library cannot produce a wasm module"
+    );
+}
+
+#[test]
+fn the_playground_loads_the_module_the_build_script_writes() {
+    // Two files that have to agree on a name, in two languages, and neither
+    // would fail loudly — the page would simply show nothing.
+    let page = include_str!("../playground/index.html");
+    let script = include_str!("../playground/build.sh");
+
+    assert!(page.contains("./bgraph.wasm"), "the page loads no module");
+    assert!(
+        script.contains("playground/bgraph.wasm"),
+        "the build script writes somewhere else"
+    );
+    for name in [
+        "bgraph_alloc",
+        "bgraph_free",
+        "bgraph_render",
+        "bgraph_result_len",
+    ] {
+        assert!(page.contains(name), "the page never calls `{name}`");
+        assert!(
+            include_str!("wasm.rs").contains(name),
+            "`{name}` is not exported"
+        );
+    }
+}
+
+// ------------------------------------------------- releases and CI (I-025, I-027)
+
+#[test]
+fn the_release_workflow_ships_both_binaries_and_neither_publishes() {
+    // The standing rule: never publish anything outward without being asked.
+    // A workflow that quietly created a release would break it on somebody
+    // else's machine, months from now, with nobody watching.
+    let release = include_str!("../.github/workflows/release.yml");
+
+    for binary in ["bgraph", "bgraph-lsp"] {
+        assert!(release.contains(binary), "`{binary}` is not shipped");
+    }
+    for forbidden in [
+        "softprops/action-gh-release",
+        "gh release create",
+        "cargo publish",
+    ] {
+        assert!(
+            !release.contains(forbidden),
+            "the release workflow publishes: `{forbidden}`"
+        );
+    }
+    // Two artefacts rather than one compromise: `window` is off by default
+    // and pulls seventy-eight more crates.
+    assert!(release.contains("--features window"), "{release}");
+}
+
+#[test]
+fn the_action_uses_the_flat_diagnostics_a_parser_wants() {
+    // A caret and a colour are for a terminal. An annotation parser wants
+    // `file:line:col`, which is exactly what `--ci` pins.
+    let action = include_str!("../.github/actions/bgraph/action.yml");
+    assert!(action.contains("check"), "the action never checks anything");
+    assert!(
+        action.contains("--ci"),
+        "the action reads the rich form, which nothing parses"
+    );
+    assert!(action.contains("fmt --check"), "{action}");
+}
+
+#[test]
+fn the_manifest_still_refuses_to_publish_itself() {
+    // `Q-005` is unanswered, and until it is, this is the line that keeps an
+    // accident from becoming a distribution.
+    let manifest = include_str!("../Cargo.toml");
+    assert!(manifest.contains("publish = false"), "{manifest}");
+}
+
+// ------------------------------------------------- Markdown preview (I-023)
+
+#[test]
+fn the_vs_code_extension_renders_a_bgraph_fence() {
+    // The single largest reason Mermaid gets used instead of something
+    // better: a diagram you can only see by leaving the document is one you
+    // stop keeping current.
+    let manifest = include_str!("../editors/vscode/package.json");
+    let extension = include_str!("../editors/vscode/src/extension.js");
+
+    assert!(
+        manifest.contains("\"markdown.markdownItPlugins\": true"),
+        "the extension does not offer itself to the Markdown preview"
+    );
+    assert!(
+        manifest.contains("onLanguage:markdown"),
+        "it would never activate on a Markdown file"
+    );
+    assert!(
+        extension.contains("extendMarkdownIt"),
+        "nothing is exported for the preview to call"
+    );
+}
+
+#[test]
+fn the_preview_renders_through_the_bundled_module_not_a_binary() {
+    // A preview that only worked for people who had already installed the CLI
+    // would miss exactly the readers it is for.
+    let extension = include_str!("../editors/vscode/src/extension.js");
+    let packaging = include_str!("../editors/vscode/package.sh");
+
+    assert!(extension.contains("bgraph.wasm"), "{extension}");
+    assert!(
+        packaging.contains("bgraph.wasm"),
+        "the VSIX would ship without the renderer"
+    );
+    // And a missing module must degrade to a code block rather than take the
+    // document's rendering down with it.
+    assert!(
+        extension.contains("fallback(tokens, index, options, env, self)"),
+        "there is no fallback for a fence it cannot draw"
+    );
+}
+
+// ------------------------------------------------- the Typst plugin (I-023)
+
+#[test]
+fn the_typst_module_is_built_apart_from_the_general_one() {
+    // Typst's protocol works through *imports* the host supplies, so a module
+    // built with them cannot be instantiated by anything else — the
+    // playground and the Markdown preview both pass an empty import object
+    // and would simply fail to load it. Two modules, and the manifest has to
+    // keep them apart.
+    let manifest = include_str!("../Cargo.toml");
+    assert!(manifest.contains("typst = [\"wasm\"]"), "{manifest}");
+
+    let general = include_str!("../playground/build.sh");
+    let for_typst = include_str!("../typst/build.sh");
+    assert!(
+        !general.contains("typst"),
+        "the playground's module would carry imports nothing supplies"
+    );
+    assert!(
+        for_typst.contains("features all-archetypes,json,typst"),
+        "{for_typst}"
+    );
+}
+
+#[test]
+fn the_typst_package_calls_the_entry_point_that_exists() {
+    // Two files in two languages that have to agree on a symbol, and neither
+    // fails loudly — Typst would say "plugin function takes 2 arguments",
+    // which is what the first attempt said.
+    let package = include_str!("../typst/bgraph.typ");
+    let wasm = include_str!("wasm.rs");
+
+    assert!(package.contains("bgraph_typst_render"), "{package}");
+    assert!(wasm.contains("bgraph_typst_render"), "{wasm}");
+    assert!(
+        package.contains("plugin(\"bgraph.wasm\")"),
+        "the package loads a module its build script does not write"
+    );
+}
+
+// ------------------------------------------------- font subsetting (I-058)
+
+/// Any TrueType font on this machine. Every platform this builds on ships
+/// some; a machine with none is a machine this test cannot speak about, and
+/// saying so beats passing silently.
+fn some_font() -> (std::path::PathBuf, Vec<u8>) {
+    let roots = [
+        "/usr/share/fonts",
+        "/usr/local/share/fonts",
+        "/System/Library/Fonts",
+        "C:\\Windows\\Fonts",
+    ];
+    let mut stack: Vec<std::path::PathBuf> = roots.iter().map(std::path::PathBuf::from).collect();
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().is_some_and(|e| e == "ttf")
+                && let Ok(bytes) = std::fs::read(&path)
+                // A collection and a CFF font are both `.ttf` sometimes, and
+                // neither is what this subsets.
+                && bytes.starts_with(&[0x00, 0x01, 0x00, 0x00])
+            {
+                return (path, bytes);
+            }
+        }
+    }
+    panic!("no TrueType font found under {roots:?} — this test cannot run here");
+}
+
+#[test]
+fn a_subset_font_is_smaller_and_still_a_font() {
+    let (path, font) = some_font();
+    let subset = crate::subset::keep_glyphs_for(&font, "Ligature: office");
+
+    assert!(
+        subset.len() < font.len(),
+        "{} did not shrink: {} → {}",
+        path.display(),
+        font.len(),
+        subset.len()
+    );
+    assert_eq!(&subset[..4], &font[..4], "the version was rewritten");
+
+    // The table directory must still be sorted by tag and point inside the
+    // file. A reader may find a table by binary search, and one that walks off
+    // the end reads whatever follows.
+    let count = u16::from_be_bytes([subset[4], subset[5]]) as usize;
+    let mut previous = [0u8; 4];
+    for i in 0..count {
+        let at = 12 + i * 16;
+        let tag: [u8; 4] = subset[at..at + 4].try_into().unwrap();
+        assert!(tag > previous, "the directory is out of order at {i}");
+        previous = tag;
+        let offset = u32::from_be_bytes(subset[at + 8..at + 12].try_into().unwrap()) as usize;
+        let length = u32::from_be_bytes(subset[at + 12..at + 16].try_into().unwrap()) as usize;
+        assert!(
+            offset + length <= subset.len(),
+            "table {} runs past the end of the file",
+            String::from_utf8_lossy(&tag)
+        );
+    }
+}
+
+#[test]
+fn every_table_the_reader_needs_survives() {
+    // Nothing is renumbered, so nothing may be dropped either: `cmap` still
+    // maps characters to the ids `hmtx` still gives widths for.
+    let (_, font) = some_font();
+    let subset = crate::subset::keep_glyphs_for(&font, "abc");
+
+    let tags = |bytes: &[u8]| -> Vec<String> {
+        let count = u16::from_be_bytes([bytes[4], bytes[5]]) as usize;
+        (0..count)
+            .map(|i| String::from_utf8_lossy(&bytes[12 + i * 16..16 + i * 16]).into_owned())
+            .collect()
+    };
+    let mut before = tags(&font);
+    let mut after = tags(&subset);
+    before.sort();
+    after.sort();
+    assert_eq!(before, after, "a table went missing");
+}
+
+#[test]
+fn anything_it_does_not_understand_comes_back_whole() {
+    // A font that is a little too large is a nuisance. A font that renders
+    // the wrong glyph is a lie, so anything unfamiliar is handed back.
+    for bytes in [
+        b"OTTO\x00\x00\x00\x00".to_vec(), // CFF outlines
+        b"ttcf\x00\x01\x00\x00".to_vec(), // a collection
+        b"not a font at all".to_vec(),
+        Vec::new(),
+    ] {
+        assert_eq!(
+            crate::subset::keep_glyphs_for(&bytes, "abc"),
+            bytes,
+            "something unfamiliar was rewritten"
+        );
+    }
+}
+
+// ------------------------------------------------- the server and `include`
+
+#[test]
+fn the_server_does_not_underline_a_name_borrowed_from_another_file() {
+    // Without composing, a file using `include` shows an error on every name
+    // it borrows: the composed diagram is valid and the buffer alone is not.
+    // An editor that underlines correct code is one people turn off.
+    let dir = scratch("lsp-include");
+    std::fs::write(dir.join("core.bd"), "node api \"API\"\n").unwrap();
+    let entry = dir.join("main.bd");
+    let text = "include \"core.bd\" as core\nnode ui \"UI\"\nui -> core.api\n";
+    std::fs::write(&entry, text).unwrap();
+
+    let alone = crate::lsp::diagnostics(text);
+    assert!(
+        alone.iter().any(|d| d["message"]
+            .as_str()
+            .is_some_and(|m| m.contains("core.api"))),
+        "the buffer on its own really is invalid, which is the whole point"
+    );
+
+    let composed = crate::lsp::diagnostics_for(text, Some(&entry));
+    assert!(
+        !composed.iter().any(|d| d["message"]
+            .as_str()
+            .is_some_and(|m| m.contains("core.api"))),
+        "still underlined after composing: {composed:?}"
+    );
+}
+
+#[test]
+fn a_problem_in_an_included_file_is_not_reported_against_this_one() {
+    // LSP publishes per document. A diagnostic from another file shown here
+    // would underline the wrong line of the wrong buffer.
+    let dir = scratch("lsp-include-other");
+    std::fs::write(dir.join("core.bd"), "node api \"API\" { fil: #fff }\n").unwrap();
+    let entry = dir.join("main.bd");
+    let text = "include \"core.bd\"\nnode ui \"UI\"\n";
+    std::fs::write(&entry, text).unwrap();
+
+    let reported = crate::lsp::diagnostics_for(text, Some(&entry));
+    assert!(
+        !reported
+            .iter()
+            .any(|d| d["message"].as_str().is_some_and(|m| m.contains("fil"))),
+        "somebody else's mistake was published here: {reported:?}"
+    );
+}
+
+#[test]
+fn the_buffer_wins_over_what_is_on_disk() {
+    // The file on disk is a version of the buffer from before the last
+    // keystroke. Composing from disk would report against text nobody sees.
+    let dir = scratch("lsp-include-buffer");
+    std::fs::write(dir.join("core.bd"), "node api \"API\"\n").unwrap();
+    let entry = dir.join("main.bd");
+    std::fs::write(&entry, "include \"core.bd\"\n").unwrap();
+
+    // Unsaved: the buffer names something that does not exist.
+    let text = "include \"core.bd\"\nnode ui \"UI\"\nui -> ghost\n";
+    let reported = crate::lsp::diagnostics_for(text, Some(&entry));
+    assert!(
+        reported
+            .iter()
+            .any(|d| d["message"].as_str().is_some_and(|m| m.contains("ghost"))),
+        "the server read the disk instead of the buffer: {reported:?}"
+    );
+}
+
+#[test]
+fn a_file_uri_becomes_a_path() {
+    assert_eq!(
+        crate::lsp::path_of("file:///home/a/b.bd"),
+        Some(std::path::PathBuf::from("/home/a/b.bd"))
+    );
+    // A path with a space in it is ordinary.
+    assert_eq!(
+        crate::lsp::path_of("file:///home/a%20b/c.bd"),
+        Some(std::path::PathBuf::from("/home/a b/c.bd"))
+    );
+    // Anything else means the buffer is checked on its own, which is what
+    // every editor did before `include` existed.
+    assert_eq!(crate::lsp::path_of("untitled:Untitled-1"), None);
 }

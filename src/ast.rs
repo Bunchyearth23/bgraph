@@ -44,6 +44,92 @@ pub struct Diagram {
     /// Containers. Members live in the flat `nodes`/`groups` lists and are
     /// named here, so the identifier namespace stays single and global.
     pub groups: Vec<GroupDecl>,
+    /// Other files this one pulls in. Resolved by [`crate::compose`] before
+    /// anything is checked, so by the time `check` runs there is one diagram
+    /// and no such thing as a file boundary (`D-029`).
+    pub includes: Vec<IncludeDecl>,
+    /// Fragments declared once and placed many times, and the placings.
+    /// Expanded by [`crate::compose`] alongside `include`, because a component
+    /// *is* an include of a file you did not have to make (`D-030`).
+    pub components: Vec<ComponentDecl>,
+    pub uses: Vec<UseDecl>,
+    /// Adjustments applied to the solved layout, in declaration order.
+    pub constraints: Vec<ConstraintDecl>,
+    /// Free text placed by the ordinary anchors, belonging to no box.
+    pub notes: Vec<NoteDecl>,
+    /// A key to the style classes in use. At most one is meaningful; a second
+    /// is reported rather than drawn twice.
+    pub legends: Vec<NoteDecl>,
+}
+
+/// `note "Figures are March" below api gap 20`.
+///
+/// It declares **no identifier**, and that is the design rather than an
+/// omission: a note is not a thing the diagram can point at, so there is
+/// nothing for an edge to land on and no way to write one that tries.
+#[derive(Debug)]
+pub struct NoteDecl {
+    pub text: String,
+    pub classes: Vec<Spanned<String>>,
+    pub placement: Option<Placement>,
+    pub props: Vec<Prop>,
+    pub span: Span,
+}
+
+/// `align-group left a b c`, `same-width a b c`.
+#[derive(Debug)]
+pub struct ConstraintDecl {
+    pub kind: ConstraintKind,
+    /// Which edge to line up on, for `align-group`. Defaults to `center`,
+    /// matching what `align` on a placement defaults to.
+    pub align: Align,
+    pub members: Vec<Spanned<String>>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstraintKind {
+    /// One cross-axis coordinate for the set.
+    AlignGroup,
+    SameWidth,
+    SameHeight,
+}
+
+/// `component service { … }` — the body kept as source text, because that is
+/// what the template engine fills and what the prefixing pass then parses.
+#[derive(Debug)]
+pub struct ComponentDecl {
+    pub name: Spanned<String>,
+    /// The block's contents, braces excluded, exactly as written.
+    pub body: String,
+    pub span: Span,
+}
+
+/// `use service as web { label: "Web" }`.
+#[derive(Debug)]
+pub struct UseDecl {
+    pub component: Spanned<String>,
+    /// The namespace this instance's names arrive under — always present,
+    /// because two instances of one component would otherwise declare the
+    /// same identifiers twice.
+    pub prefix: Spanned<String>,
+    /// Where the instance goes. It lands on the frame the expansion wraps
+    /// the instance in, so an instance is placed and anchored exactly as any
+    /// other group is — rather than needing a placement vocabulary of its own.
+    pub placement: Option<Placement>,
+    pub bindings: Vec<Prop>,
+    pub span: Span,
+}
+
+/// `include "shared.bds"`, or `include "core.bd" as core`.
+#[derive(Debug)]
+pub struct IncludeDecl {
+    /// As written, resolved relative to the file that wrote it.
+    pub path: Spanned<String>,
+    /// The namespace its names arrive under. Without one, every name must be
+    /// unique across the whole set, and a clash is an error naming both files.
+    pub prefix: Option<Spanned<String>>,
+    pub span: Span,
 }
 
 #[derive(Debug)]
@@ -296,12 +382,42 @@ pub enum Placement {
         x: f64,
         y: f64,
     },
+    /// `at (col 3, row 2)` — the same absolute placement in grid units,
+    /// multiplied by the step `graph { grid }` declares. Resolved in the
+    /// layout rather than the parser, because the parser does not know the
+    /// step (`D-031`).
+    Cell {
+        col: f64,
+        row: f64,
+    },
     Rel {
         dir: RelDir,
         anchor: Spanned<String>,
         gap: Option<f64>,
         align: Option<Align>,
     },
+}
+
+impl Placement {
+    /// A grid cell as the absolute position it stands for.
+    ///
+    /// The one definition of what a cell means, so the two places the layout
+    /// reads a placement cannot disagree. Without a declared `grid` a cell
+    /// falls back to a step of one, which places everything on top of the
+    /// origin — visibly wrong rather than silently ignored, and `check` says
+    /// so before it is ever drawn.
+    pub fn resolved(&self, grid: Option<(f64, f64)>) -> Placement {
+        match self {
+            Placement::Cell { col, row } => {
+                let (sx, sy) = grid.unwrap_or((1.0, 1.0));
+                Placement::At {
+                    x: col * sx,
+                    y: row * sy,
+                }
+            }
+            other => other.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

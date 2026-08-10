@@ -507,7 +507,12 @@ pub fn render(source: &str, values: &Bindings) -> Result<String> {
 /// Hole names, in order of first appearance.
 fn scan(source: &str) -> Vec<String> {
     let mut names = Vec::new();
-    let mut rest = source;
+    // A component's holes belong to the component: they are bound by each
+    // `use` that places it, not by whoever renders the file. Counting them
+    // here would make every file with a component a template that can never
+    // be satisfied.
+    let source = without_components(source);
+    let mut rest = source.as_str();
 
     while let Some(open) = rest.find("{{") {
         let after = &rest[open + 2..];
@@ -520,6 +525,62 @@ fn scan(source: &str) -> Vec<String> {
     }
 
     names
+}
+
+/// The source with every `component { … }` block blanked out.
+///
+/// Blanked rather than removed, so any offset taken from the result still
+/// lines up with the original — the language server reports hole positions
+/// from this scan.
+fn without_components(source: &str) -> String {
+    let mut out: Vec<u8> = source.as_bytes().to_vec();
+    let mut at = 0usize;
+
+    while let Some(found) = source[at..].find("component") {
+        let start = at + found;
+        // A word, not a prefix of one, and at the head of a statement.
+        let before_ok = start == 0
+            || source[..start]
+                .chars()
+                .next_back()
+                .is_some_and(|c| c == '\n' || c == ';' || c == ' ' || c == '\t');
+        let Some(open) = source[start..].find('{') else {
+            break;
+        };
+        let open = start + open;
+        if !before_ok {
+            at = start + "component".len();
+            continue;
+        }
+
+        // Depth counting, so a nested block does not end the component early.
+        let mut depth = 0usize;
+        let mut end = open;
+        for (i, c) in source[open..].char_indices() {
+            match c {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        end = open + i + 1;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if end <= open {
+            break;
+        }
+        for byte in &mut out[open..end] {
+            if *byte != b'\n' {
+                *byte = b' ';
+            }
+        }
+        at = end;
+    }
+
+    String::from_utf8(out).unwrap_or_else(|_| source.to_string())
 }
 
 /// Replaces every hole, a line at a time.

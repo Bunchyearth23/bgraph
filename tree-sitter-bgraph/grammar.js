@@ -36,6 +36,12 @@ module.exports = grammar({
 
     _statement: ($) =>
       choice(
+        $.include_declaration,
+        $.note_declaration,
+        $.legend_declaration,
+        $.constraint_declaration,
+        $.component_declaration,
+        $.use_declaration,
         $.type_declaration,
         $.graph_declaration,
         $.style_declaration,
@@ -49,6 +55,55 @@ module.exports = grammar({
     comment: (_) => token(seq('//', /[^\n]*/)),
 
     // ---------------------------------------------------------- statements
+
+    // `include "shared.bds"` merges another file whole; with `as` its names
+    // come in under a prefix (`D-029`).
+    include_declaration: ($) =>
+      seq('include', field('path', $.string), optional(seq('as', field('prefix', $.identifier)))),
+
+    // Text that belongs to no box. It declares no name, which is what stops
+    // anything referring to it.
+    note_declaration: ($) =>
+      seq(
+        'note',
+        field('text', $.string),
+        repeat(field('class', $.class_reference)),
+        optional(field('placement', $._placement)),
+        optional(field('body', $.block)),
+      ),
+
+    // A key to the colours, for the genres with no chart to build one from.
+    legend_declaration: ($) =>
+      seq(
+        'legend',
+        repeat(field('class', $.class_reference)),
+        optional(field('placement', $._placement)),
+        optional(field('body', $.block)),
+      ),
+
+    // A constraint adjusts one axis of already-placed boxes and never their
+    // order, which is what keeps the layout declared (`D-031`).
+    constraint_declaration: ($) =>
+      seq(
+        field('keyword', choice('align-group', 'same-width', 'same-height')),
+        optional(field('alignment', $.alignment)),
+        repeat1(field('member', $.identifier)),
+      ),
+
+    // A component is a file you did not have to make a file of: declared
+    // once, placed under a name, prefixed exactly as an included file is.
+    component_declaration: ($) =>
+      seq('component', field('name', $.identifier), field('body', $.group_block)),
+
+    use_declaration: ($) =>
+      seq(
+        'use',
+        field('component', $.identifier),
+        'as',
+        field('prefix', $.identifier),
+        optional(field('placement', $._placement)),
+        optional(field('bindings', $.block)),
+      ),
 
     // The archetype: `type pie { … }`. Absent means `free`.
     type_declaration: ($) =>
@@ -156,7 +211,7 @@ module.exports = grammar({
 
     _placement: ($) => choice($.absolute_position, $.relative_position),
 
-    absolute_position: ($) => seq('at', field('point', $.point)),
+    absolute_position: ($) => seq('at', field('point', choice($.cell, $.point))),
 
     relative_position: ($) =>
       seq(
@@ -175,6 +230,12 @@ module.exports = grammar({
     alignment: (_) => choice('left', 'right', 'center', 'middle', 'top', 'bottom'),
 
     point: ($) => seq('(', field('x', $.number), ',', field('y', $.number), ')'),
+
+    // `at (col 3, row 2)` — still `at`, in the units `graph { grid }` declares.
+    // A coordinate system and not a solver, which is why it cannot decide an
+    // order (`D-031`).
+    cell: ($) =>
+      seq('(', 'col', field('col', $.number), ',', 'row', field('row', $.number), ')'),
 
     // ---------------------------------------------------------- blocks
 
@@ -214,7 +275,13 @@ module.exports = grammar({
     // ---------------------------------------------------------- tokens
 
     // A trailing hyphen is excluded so `a->b` splits into `a` `->` `b`.
-    identifier: (_) => /[a-zA-Z_][a-zA-Z0-9_]*(-[a-zA-Z0-9_]+)*/,
+    //
+    // A qualified name — `core.api` — is one token, which is what lets a
+    // leading `.box` stay unambiguously a class reference: the lexer takes the
+    // longest match, so the dot in `core.api` is never seen on its own
+    // (`D-029`). A dot must be followed by a name part.
+    identifier: (_) =>
+      /[a-zA-Z_][a-zA-Z0-9_]*(-[a-zA-Z0-9_]+)*(\.[a-zA-Z_][a-zA-Z0-9_]*(-[a-zA-Z0-9_]+)*)*/,
 
     number: (_) => token(seq(optional('-'), /\d+/, optional(seq('.', /\d+/)), optional(choice('px', '%')))),
 

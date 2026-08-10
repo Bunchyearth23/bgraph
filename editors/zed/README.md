@@ -15,11 +15,20 @@ place: unknown nodes and styles, anchor cycles, misspelled properties (with a
 suggestion), invalid enum values, self-referencing anchors. Warnings for
 properties that have no effect where they are written.
 
+A file that uses `include` is **composed before it is checked**, against the
+buffer rather than the version on disk — so a name borrowed from another file
+is not underlined, and a mistake belonging to an included file is left for
+that file's own buffer to show.
+
+**No Markdown preview.** Zed's extension API has no hook for extending its
+Markdown rendering, so this is a limit of the editor rather than something
+left undone. `bgraph watch` beside the editor is the answer meanwhile.
+
 **Completion**, context-aware:
 
 | Where you are | What you get |
 |---|---|
-| start of a line | `type`, `graph`, `style`, `node`, plus node ids |
+| start of a line | `type`, `graph`, `style`, `node`, `include`, `component`, `use`, `note`, `legend`, the three constraints, plus node ids |
 | after `type` | archetype names |
 | after `.` | declared style names |
 | after `extends` | declared style names |

@@ -403,6 +403,22 @@ fn check_nodes<'a>(
     // Anchors are checked after the whole index exists, so forward references
     // are legal. A group is a perfectly good anchor.
     let anchorable = anchor_names(diagram);
+
+    // A note has no name of its own, so it cannot be reported the way a box
+    // is — but its anchor is a name like any other, and an unknown one has to
+    // be an error here or the note would simply not be drawn and say nothing
+    // about why.
+    for note in &diagram.notes {
+        if let Some(Placement::Rel { anchor, .. }) = &note.placement
+            && !anchorable.contains(anchor.as_str())
+        {
+            out.push(Diag::error(
+                anchor.span,
+                format!("unknown node `{}`", anchor.as_str()),
+            ));
+        }
+    }
+
     for (owner, placement) in placements(diagram) {
         let Placement::Rel { anchor, .. } = placement else {
             continue;
@@ -726,7 +742,7 @@ fn check_cycles(diagram: &Diagram, nodes: &HashMap<&str, usize>, out: &mut Vec<D
         for &i in &pending {
             let anchor = match &diagram.nodes[i].placement {
                 Some(Placement::Rel { anchor, .. }) => Some(anchor.as_str()),
-                Some(Placement::At { .. }) => None,
+                Some(Placement::At { .. } | Placement::Cell { .. }) => None,
                 // An unplaced node flows from the previous one in source order.
                 None if i > 0 => Some(diagram.nodes[i - 1].id.as_str()),
                 None => None,

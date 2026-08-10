@@ -1,4 +1,7 @@
-#![forbid(unsafe_code)]
+// `unsafe` is forbidden everywhere except the wasm boundary, where four
+// functions have to hand raw pointers to a caller that is not Rust. Scoped to
+// that module rather than lifted for the crate.
+#![cfg_attr(not(feature = "wasm"), forbid(unsafe_code))]
 #![warn(missing_docs)]
 
 //! `bgraph` — stylable diagrams from a layout-first DSL.
@@ -111,6 +114,11 @@
 //! never be improved.
 
 pub mod check;
+pub mod compose;
+#[allow(missing_docs)]
+pub mod diff;
+#[allow(missing_docs)]
+pub mod explain;
 pub mod parser;
 pub mod template;
 
@@ -127,17 +135,32 @@ pub mod fmt;
 pub mod layout;
 #[allow(missing_docs)]
 pub mod props;
+pub mod relayout;
+pub mod render_json;
 #[allow(missing_docs)]
 #[cfg(feature = "pdf")]
 pub mod render_pdf;
+#[allow(missing_docs)]
+#[cfg(feature = "png")]
+pub mod render_png;
 pub mod render_svg;
+pub mod report;
 #[allow(missing_docs)]
 pub mod style;
+pub mod subset;
+#[allow(missing_docs)]
+pub mod themes;
+#[allow(missing_docs)]
+#[cfg(feature = "wasm")]
+pub mod wasm;
 
 // Support for the `bgraph` and `bgraph-lsp` binaries, not part of the library.
 #[allow(missing_docs)]
 #[doc(hidden)]
 pub mod docgen;
+#[allow(missing_docs)]
+#[doc(hidden)]
+pub mod init;
 #[allow(missing_docs)]
 #[doc(hidden)]
 pub mod lsp;
@@ -171,7 +194,34 @@ pub use template::{Bindings, Template, Value};
 /// server does.
 pub fn render_source(source: &str) -> Result<String> {
     let diagram = parser::parse_diagram(source)?;
+    // No filesystem here, and deliberately: this function is the semver
+    // surface and the wasm build rests on it, so it cannot start opening
+    // files because a statement asked it to (`D-029`). It says which call
+    // does rather than failing vaguely.
+    if let Some(first) = diagram.includes.first() {
+        anyhow::bail!(
+            "`include \"{}\"` needs a file to resolve it against, and \
+             `render_source` is given text — use `bgraph::render_file`",
+            first.path.as_str()
+        );
+    }
     let layout = layout::solve(&diagram)?;
+    Ok(render_svg::render(&layout))
+}
+
+/// A file on disk to SVG, resolving whatever it includes.
+///
+/// The counterpart to [`render_source`]: same pipeline, but a path to resolve
+/// `include` against. A file with no includes renders identically either way.
+///
+/// # Errors
+///
+/// The first problem found, as [`render_source`] does — plus the ones only a
+/// set of files can have: a circular include, or a name declared in two of
+/// them with no `as` to separate them.
+pub fn render_file(path: &std::path::Path) -> Result<String> {
+    let composed = compose::load(path)?;
+    let layout = layout::solve(&composed.diagram)?;
     Ok(render_svg::render(&layout))
 }
 

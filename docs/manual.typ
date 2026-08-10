@@ -625,6 +625,76 @@ measuring — otherwise text that is genuinely unreadable gets reported as fine.
 
 // ══════════════════════════════════════════════════════════════════════════════
 #pagebreak(weak: true)
+#slide(title: "Composing files")[
+
+A diagram need not be one file.
+
+```
+include "house.bds"          // a shared palette: styles only
+include "core.bd" as core    // a diagram, under a namespace
+
+node ui "Browser" .card
+ui -> core.api "HTTPS"
+```
+
+Without `as`, every declared name must be unique across the whole set. A clash
+is an error naming *both* files — never a silent shadowing, which is the same
+rule that makes an unknown name an error rather than a no-op. With `as`, the
+included file's names arrive under a prefix and a clash becomes impossible;
+its own internal edges and anchors are renamed with it, so prefixing never
+breaks the file it prefixes.
+
+A qualified name is *one token*. That is what keeps a leading `.card`
+unambiguously a class reference: the lexer takes the longest match, so the dot
+in `core.api` is never seen on its own, and no new punctuation was needed.
+
+A `.bds` holds style declarations and nothing else. A shared house palette is
+what the extension promises, and a file that could also declare nodes would be
+a `.bd` under a misleading name.
+
+Diagnostics point at the file and the line that wrote the statement, not at
+the file that pulled it in. The files are laid end to end into one buffer and
+each one's spans are shifted by where its text starts, so a single offset
+answers both questions at once — and nothing else in the engine has to learn
+that composition exists.
+
+A circular include is an error naming the chain.
+
+*A component* is an include of a file you did not have to make. Declared once,
+placed under a name, prefixed the same way — so two placings cannot collide,
+and the prefixing that makes one safe makes the other safe too.
+
+```
+component service {
+  node app "{{label}}"
+  node db  "Database" below app gap 34
+}
+
+use service as web
+use service as jobs right-of web gap 90 { label: "Jobs" }
+```
+
+The body goes through the same template engine a file with holes does, so a
+binding is escaped for wherever its hole sits. An instance is a *frame*, which
+is what makes it placeable: a group is already anchorable and already sized by
+what it holds, so an instance needs no placement vocabulary of its own. `web`
+names the instance; `web.app` names a box inside it.
+
+No conditionals and no loops — past that it is a macro system, and a much
+larger promise than this makes.
+
+#v(0.3em)
+
+#diagram(
+  image("diagrams/compose.svg", width: 88%),
+  caption: [Three files, one diagram. The prefix is what makes the second
+  include safe: without it, two files declaring `api` would be an error
+  naming both.],
+)
+
+]
+
+#pagebreak(weak: true)
 #slide(title: "Working with it")[
 
 #two-col(
@@ -634,22 +704,109 @@ measuring — otherwise text that is genuinely unreadable gets reported as fine.
 ```
 bgraph diagram.bd -o diagram.svg
 bgraph diagram.bd -o diagram.pdf
+bgraph diagram.bd -o diagram.png
+bgraph diagram.bd -o diagram.json
+bgraph diagram.bd -o big.pdf --page a4
 bgraph watch diagram.bd
+bgraph watch docs/diagrams
 bgraph check diagram.bd
+bgraph diff old.bd new.bd
+bgraph explain diagram.bd api
+bgraph layout diagram.bd
 bgraph fmt diagram.bd
+bgraph completions fish
+bgraph init pie
+bgraph diagram.bd --theme dark
 ```
 
 The output extension picks the writer. A flag would be a second way of saying
 what the filename already says.
 
-`check` prints `file:line:col: severity: message` and exits non-zero on an
-error — the form editors and build systems already understand.
+`.json` writes the solved geometry instead of a picture — the rectangles, the
+routed edge points with their elbows, the placed labels — in the same
+coordinate space the SVG uses, so a rectangle here is the rectangle in the file
+beside it. The *shape* of that document is promised; the *values* are not, and
+move whenever the drawing improves, exactly as the SVG does.
+
+`--embed-font` carries a font inside the SVG, so its text is exact on a
+machine that does not have it — the practical half of the risk that this crate
+measures text with an advance table a viewer may not share. Only the glyphs the diagram draws are carried: every glyph keeps its id and
+the unused ones are emptied, which takes a typical weight from about a hundred
+kilobytes to forty. A full subset would renumber the glyphs and rebuild the
+tables that index them — and a subtly wrong font fails at the reader's end
+with no message, which is the worst outcome for the one feature meant to make
+their view match yours.
+
+`--page a4` tiles a diagram larger than a sheet across several, with an
+overlap at each seam so a box cut in half is readable on both. PDF only — an
+SVG has no pages, and pretending otherwise would be inventing a concept the
+format does not have. One content stream, several pages: a sheet is a *window*
+onto the drawing, so nothing is re-rendered and there is no second code path
+to disagree with the single-page one.
+
+PNG needs the `png` feature, and is the one output that does: everything else
+here is hand-rolled, but a raster means zlib and a rasteriser means text
+shaping and antialiasing. `--scale 2` doubles the diagram's own size — a scale
+rather than a pixel width, since the layout already decided the shape.
+
+`check` reports every mistake rather than the first. A statement ends at a
+newline, so where to resume after a syntax error is not a guess — the sound
+statements are still parsed, still checked, and still reported on. Before that,
+one missed separator on line 3 silenced the diagnostics for everything after
+it, at exactly the moment they were wanted.
+
+`check` exits non-zero on an error. At a terminal it shows the offending line
+with a caret under it; redirected — or with `--ci` — it prints
+`file:line:col: severity: message`, the form editors and build systems already
+understand. That form is an interchange format rather than a rendering, so it
+does not move; the caret beside it is not permission to drift.
 
 `fmt` fixes what is structural: indentation, trailing space, runs of blank
 lines. It leaves columns lined up by hand exactly as written — indentation is
 structural and so its business, alignment is taste and is not. `--check`
 reports instead of writing, and exits non-zero, so one command serves a person
 and a build.
+
+Given a **directory**, `watch` is a build loop rather than a view: every `.bd`
+in it is rendered whenever it changes, which is what a repository of sources
+beside their committed pictures needs. `--once` builds and stops, exiting
+non-zero if anything failed, so a person and a build run the same command. One
+broken file never stops the others — mid-edit that is the normal state of the
+file being worked on. `--follow` additionally opens a window on whichever file
+changed last; it is opt-in, because a window that changes subject on its own is
+one you stop trusting.
+
+`--theme` lays a named palette — `light`, `dark`, `print` — *underneath* what
+the file declares, so the one box coloured on purpose survives it. A theme is
+a style file and nothing more: the same source, the same parser, one mechanism
+rather than two.
+
+`layout` writes the placements into a loose file, once, so every box says
+where it goes from then on — auto-placement as a source transformation rather
+than as an engine. It inserts into lines instead of rewriting them, so
+comments and hand-aligned columns survive, and it renders the file before and
+after and refuses to write if the picture moved.
+
+`explain` answers "why is that box there". Because placement is declared, the
+answer is a statement in the file or a default that stood in for one — and
+both are named, along with which layer of the cascade settled each colour. It
+needs nothing from the solver: an explanation derived from the same text the
+author wrote cannot drift from it.
+
+`diff` draws two versions of a diagram as one picture: green for what
+appeared, amber with a ghost for what moved, and what is gone in a row
+underneath. Matched by identifier — which the language already gives every
+box — so it is a set difference on the solved geometry rather than an image
+comparison, and it stays vector and deterministic.
+
+`init` writes a working file for a genre — the archetype's shape stated from
+the compiler's own tables, over the genre's example — so the first thing you
+meet is a diagram rather than a diagnostic. With no genre it lists them, which
+is what someone who does not know which one they want is really asking.
+
+`completions` writes a shell script — or the man page, with `completions man` —
+generated from the same flag definitions the binary parses with, so neither can
+describe an option it does not have.
 
 *The live preview*
 

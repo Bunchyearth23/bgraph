@@ -161,7 +161,23 @@ pub struct Style {
     pub block_kind: Option<BlockKind>,
     /// `type block` — the technology line, drawn in brackets under the name.
     pub tech: Option<String>,
-    /// `type block` — a sentence under the technology line.
+    /// The text this class shows in a `legend`. Its presence is what opts a
+    /// class into one: a legend derived from every class in the file would
+    /// list the ones that only round a corner, and one derived from the
+    /// colours in use would have nothing to call them.
+    pub legend: Option<String>,
+    /// What this is, in a sentence.
+    ///
+    /// One property, one meaning. `type block` draws it under the technology
+    /// line because that genre has room for it; **every** genre emits it as an
+    /// SVG `<title>`, which is a tooltip to a reader with a mouse and a label
+    /// to one with a screen reader. Inventing a second word for the second use
+    /// would have been two names for one idea, which is what `D-015` is for.
+    ///
+    /// It lives on `Style` rather than on the placed box because `Style` is
+    /// the one thing already resolved per item and carried to the renderer —
+    /// a second value would have to be threaded through all thirty places a
+    /// placed box is built.
     pub description: Option<String>,
     /// `type requirements` — how likely it is to go unmet, and how it will be
     /// shown to be met. Kept as words: both are drawn, neither is computed.
@@ -252,6 +268,7 @@ impl Style {
             block_kind,
             tech,
             description,
+            legend,
             risk,
             verify,
             link,
@@ -339,6 +356,7 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
     let first = v.first();
 
     match prop.name.as_str() {
+        "legend" => style.legend = first.and_then(|x| x.as_text()).map(String::from),
         "fill" | "background" => style.fill = first.and_then(|x| x.as_paint()).map(String::from),
         "stroke" | "border" | "color" => {
             // `stroke: #38bdf8 2px dashed` — paint, then optional width, then pattern.
@@ -659,6 +677,24 @@ pub struct GraphOpts {
     pub gap: f64,
     pub background: Option<String>,
     pub flow: RelDir,
+    /// A heading for any genre. The chart archetypes carry a `title` of their
+    /// own in their settings and that one wins; this is what every other
+    /// genre — `free`, `class`, `er`, `harness` — had no way to say at all.
+    pub title: Option<String>,
+    /// What the diagram is, for a screen reader. Becomes `aria-label` on the
+    /// SVG root alongside `role="img"`.
+    pub description: Option<String>,
+    /// Column and row step for `at (col 3, row 2)`, when one is declared.
+    pub grid: Option<(f64, f64)>,
+    /// A font to carry inside the SVG: the family it should be called, and
+    /// its bytes. Set from the command line rather than from the file,
+    /// because it is a choice about the *output* — the same diagram is
+    /// embedded for a hand-off and left light for a repository.
+    pub embed_font: Option<(String, std::sync::Arc<Vec<u8>>)>,
+    /// Draw as if by hand. A sketched architecture says "this is a proposal"
+    /// where a crisp one says "this is decided", which is information rather
+    /// than ornament.
+    pub sketch: bool,
 }
 
 impl Default for GraphOpts {
@@ -670,6 +706,11 @@ impl Default for GraphOpts {
             // the surface is. `background: none` opts back out.
             background: Some("#ffffff".into()),
             flow: RelDir::RightOf,
+            title: None,
+            description: None,
+            grid: None,
+            embed_font: None,
+            sketch: false,
         }
     }
 }
@@ -681,6 +722,26 @@ impl GraphOpts {
         for prop in props {
             let first = prop.values.first();
             match prop.name.as_str() {
+                "title" => opts.title = first.and_then(|x| x.as_text()).map(String::from),
+                "description" | "desc" => {
+                    opts.description = first.and_then(|x| x.as_text()).map(String::from)
+                }
+                "sketch" => {
+                    opts.sketch = !matches!(
+                        first.and_then(|x| x.as_word()),
+                        Some("off" | "false" | "none")
+                    )
+                }
+                "grid" => {
+                    let numbers: Vec<f64> = prop.values.iter().filter_map(|v| v.as_num()).collect();
+                    opts.grid = match numbers.as_slice() {
+                        // One number is a square cell, which is the common
+                        // case and reads better than writing it twice.
+                        [step] => Some((*step, *step)),
+                        [x, y, ..] => Some((*x, *y)),
+                        [] => bail!("`grid` needs a step: `grid: 160 90`, or one number for both"),
+                    };
+                }
                 "padding" => opts.padding = first.and_then(|x| x.as_num()).unwrap_or(opts.padding),
                 "gap" => opts.gap = first.and_then(|x| x.as_num()).unwrap_or(opts.gap),
                 "background" | "bg" => {

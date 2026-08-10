@@ -17,6 +17,165 @@ a -> b "carries"
 
 ---
 
+## Composing files
+
+`include` merges another file whole, resolved relative to the file that wrote
+it.
+
+```
+// main.bd — a bgraph-tagged fence promises one complete file, and this is
+// three. The whole set is in examples/compose/, and a test renders it.
+include "house.bds"          // a shared palette: styles only
+include "core.bd" as core    // a diagram, under a namespace
+
+node ui "Browser" .card
+ui -> core.api "HTTPS"
+```
+
+Without `as`, every declared name must be unique across the whole set — a
+clash is an error naming **both** files, never a silent shadowing. With `as`,
+the included file's names arrive under a prefix and a clash becomes
+impossible: `core.api` refers into it, and the file's own internal edges and
+anchors are renamed with it, so prefixing never breaks the file it prefixes.
+
+A qualified name is one token. That is what keeps `.card` unambiguously a
+class reference: the lexer takes the longest match, so the dot in `core.api`
+is never seen on its own.
+
+A `.bds` holds `style` declarations and nothing else — that is what the
+extension promises, and a file that could also declare nodes would be a `.bd`
+under a misleading name.
+
+A circular include is an error naming the chain. Diagnostics point at the file
+and line that wrote the statement, not at the file that pulled it in.
+
+The library keeps the split: `render_source` takes text and refuses an
+`include`, because it has no path to resolve one against — the wasm build and
+the semver promise both rest on it doing no I/O. `render_file` takes a path
+and resolves them.
+
+### Components
+
+A shape declared once and placed many times. A component *is* an include of a
+file you did not have to make: the same prefixing, so two placings cannot
+collide.
+
+```
+component service {
+  node app "{{label}}"
+  node db  "Database" below app gap 34
+  app -> db "reads"
+}
+
+use service as web
+use service as jobs right-of web gap 90 { label: "Jobs" }
+
+web.app -> jobs.app "enqueues"
+```
+
+The body goes through the same template engine a file with holes does, so a
+binding is escaped for wherever its hole sits — a label with a quote in it
+cannot become a statement. A component's holes belong to the component, not to
+the file: they are bound by each `use`, and a file with a component is not
+thereby a template.
+
+**An instance is a frame.** That is what makes it placeable: a group is
+already anchorable and already sized by what it holds, so `use service as jobs
+right-of web` needs no placement vocabulary of its own. `web` names the
+instance; `web.app` names a box inside it.
+
+Deliberately no conditionals and no loops. Past that it is a macro system, and
+a much larger promise than this makes — the library fills a table for the
+cases that need one.
+
+The whole example is in [`examples/components.bd`](../examples/components.bd).
+
+### Notes
+
+Text that belongs to no box — a caption, a warning, an aside:
+
+```bgraph
+style caption { font: 11 #b45309 }
+
+node api "API"
+node db "Database" below api gap 60
+
+note "Figures are March; April is not in yet." .caption right-of api gap 30
+note "Replica, not the primary." below db gap 14
+```
+
+It is placed by the same anchors as everything else, so it costs no new
+placement vocabulary, and it takes a style class the same way a box does.
+
+A note **declares no name**. That is the design rather than an omission: it is
+not a thing the diagram can point at, so there is nothing for an edge to land
+on and no way to write one that tries. An anchor that names nothing is an
+error, as everywhere else.
+
+Notes are solved last, against the boxes as they finally sit — so a note
+anchored to something a constraint moved moves with it.
+
+### A legend
+
+The chart archetypes build a key from their own series. Every other genre had
+no way to declare one:
+
+```bgraph
+style healthy  { fill: #dcfce7 stroke: #16a34a legend: "Healthy" }
+style degraded { fill: #fef3c7 stroke: #d97706 legend: "Degraded" }
+style plain    { radius: 2 }
+
+node api "API" .healthy
+node jobs "Workers" .degraded below api
+
+legend right-of api gap 70
+```
+
+It lists the style classes that declare a `legend:` text — nothing else. A
+legend built from every class would list the ones that only round a corner,
+and one built from the colours on the page would have nothing to call them.
+So the file says which classes mean something, and the legend can only ever
+describe a colour the file actually used.
+
+The swatch carries the class's stroke as well as its fill, because a status
+colour is usually a pale tint with the meaning in the border.
+
+### Saying what something is
+
+`description` is one property with one meaning: what this is, in a sentence.
+
+```bgraph
+graph { description: "How an order reaches the warehouse." }
+
+node cart "Cart" { description: "What the customer has chosen but not paid for." }
+```
+
+Every genre emits it as an SVG `<title>` — a tooltip to a reader with a mouse,
+a label to one with a screen reader — and it also reaches the JSON export.
+`type block` additionally *draws* it, under the technology line, because that
+genre has room for it.
+
+At the diagram level it becomes `aria-label` on the SVG root, beside
+`role="img"`. Without those an SVG is announced as a group of anonymous shapes
+or skipped entirely. A chart's own `title` serves as the label when no
+`description` is given, so a pie chart names itself without being told twice.
+
+### Named themes
+
+`--theme light`, `--theme dark`, `--theme print`. A theme **is** a style
+file — the same `.bds` source, parsed by the same parser — laid *underneath*
+what the diagram declares, so `--theme dark` on a file that colours one box
+red gives a dark diagram with a red box. A theme that overrode the file would
+make the flag destructive rather than useful.
+
+The theme also supplies a `background`, but only when the file did not, for
+the same reason.
+
+`print` is the one worth knowing about: black and white, every distinction
+carried by the stroke, so it survives a grayscale printer.
+
+---
+
 ## Archetypes
 
 `type` picks the **genre** of diagram, once, at the top of the file. Without
@@ -117,8 +276,34 @@ is worse than none.
 
 Angles are hard to compare. `check` warns when a pie has fewer than three
 slices — a bar or a single number reads better — and when it has more than
-eight, which exhausts the palette; merge the tail into an `Other` slice
-rather than repeating a hue.
+eight, which exhausts the palette.
+
+A pie can also read its slices from a table:
+
+```bgraph
+type pie { title: "Traffic sources" from: "sales.csv" }
+```
+
+```
+name,value
+Organic search,4820
+Direct,2410
+```
+
+Columns are matched by **header name**, not by position, so a table whose
+columns are in a different order still reads correctly and one missing a
+column says which. The path resolves relative to the file that wrote it.
+
+This carries a consequence worth knowing rather than discovering: a diagram
+that reads the disk at render time is **no longer autonomous**. `check` can
+pass on the text and the render still fail because the table moved — so the
+diagnostic names both files. The template engine remains the answer when the
+*shape* varies; `from` is for when only the rows do.
+
+`top: 8` takes that advice for you: the largest eight are kept and the rest
+are folded into one slice, named `"Other"` unless `other:` says otherwise.
+The total stays honest, and the fold is the same on every run — sorted by
+value, ties broken by the order written.
 
 ### Activation bars in `type sequence`
 
@@ -198,6 +383,94 @@ renumber coordinates.
 `align` takes `left` / `right` / `center` for vertical placements and
 `top` / `bottom` / `center` (or `middle`) for horizontal ones. It defaults
 to `center`.
+
+### Sketch mode
+
+```bgraph
+graph { sketch: on }
+```
+
+A sketched architecture says *this is a proposal* where a crisp one says *this
+is decided* — information rather than ornament, and the reason it is worth
+having at all.
+
+It is **deterministic**. The wobble is a hash of each shape's own geometry, so
+the same file always produces the same file: the golden test would refuse
+anything else, and a diagram that redrew itself on every save would be
+unreviewable. Two boxes in different places deform differently, which is what
+makes it look drawn rather than stamped.
+
+Only the rectangles are wobbled. A diamond drawn freehand stops reading as a
+decision and a circle stops reading as a circle — a shape whose meaning is its
+outline is not one to wobble.
+
+### A grid
+
+Declare a step once and place in cells:
+
+```bgraph
+graph { grid: 170 110 }
+
+node a "Ingest" at (col 0, row 0)
+node b "Queue"  at (col 1, row 0)
+node c "Store"  at (col 1, row 1)
+```
+
+`at (col 3, row 2)` is still `at`, in units the file declared — a coordinate
+system, not a solver. Nothing is snapped to it: a box placed in pixels is
+unaffected, and a grid that quietly moved a declared position would be exactly
+the auto-placement this language refuses.
+
+### Freezing a loose file
+
+Write a diagram without placements, then run `bgraph layout` once and every
+box says where it goes:
+
+```
+node ui   "Browser"          // the reader
+node api  "API"
+```
+
+becomes
+
+```
+node ui   "Browser"          // the reader
+node api  "API" right-of ui
+```
+
+It **inserts into lines** rather than rewriting them, so a comment, a column
+lined up by hand and a trailing note all survive — `fmt` leaves interior
+alignment alone and this goes further still.
+
+**The picture does not change.** That is the whole promise, and it is checked
+rather than asserted: the file is rendered before and after, and if the two
+differ nothing is written. A box that already says where it goes is left
+alone, and running it twice changes nothing the second time.
+
+### Constraints
+
+Three statements adjust what is already placed, and none of them reorders
+anything:
+
+```bgraph
+node a "A"
+node b "A much longer label" right-of a gap 40
+node c "C" right-of b gap 40
+
+same-width a b c
+same-height a b c
+align-group top a b c
+```
+
+`same-width` and `same-height` give a set one size — the **largest** wins,
+because shrinking to match a narrower neighbour clips the label. They are
+applied *before* placement, so widening a box pushes its neighbours along
+instead of landing on top of them.
+
+`align-group` gives a set one cross-axis coordinate. The **first** name
+decides, not an average: an average moves every box, including the one the
+others were being lined up against. The axis is read off the geometry — a row
+lines up on `y`, a column on `x`.
 
 ```bgraph
 node a "A" at (0, 0)
@@ -367,6 +640,7 @@ outside the shape it belongs to.
 
 ```bgraph
 graph {
+  title: "Order pipeline"  // heading drawn above the diagram
   background: #0b1120   // canvas fill (also backs edge labels)
                         // omit it and the surface is #ffffff, explicitly;
                         // `background: none` gives a transparent SVG
@@ -375,6 +649,10 @@ graph {
   flow: right           // right | left | down | up — for unplaced nodes
 }
 ```
+
+`title` works in every genre. The chart archetypes also take a `title` in
+their own settings — `type pie { title: … }` — and that one wins where both
+are given, being the more specific of the two.
 
 The canvas size is derived from the content: nothing is ever clipped, and
 negative coordinates are fine.
@@ -394,17 +672,31 @@ Label text is XML-escaped on output, so `<`, `&` and quotes are safe.
 
 ```
 bgraph diagram.bd -o diagram.svg    # render once
+bgraph diagram.bd -o diagram.png    # …with the `png` feature; --scale 2 for twice the size
+bgraph diagram.bd -o diagram.json   # the solved geometry, for another program
+bgraph diagram.bd -o d.svg --embed-font Inter.ttf   # text exact on any machine
+bgraph diagram.bd -o big.pdf --page a4  # tile a large diagram across sheets
+bgraph diagram.bd --theme dark      # a named palette under the file's own styles
 bgraph watch diagram.bd             # show it, and reload when it changes
 bgraph watch diagram.svg            # …a picture works too; the extension decides
 bgraph watch diagram.bd --server    # …the browser preview rather than a window
 bgraph watch diagram.bd --port 9000
+bgraph watch docs/diagrams          # a directory: build every .bd as it changes
+bgraph watch docs/diagrams --once   # …once, non-zero on failure — a build step
 bgraph check diagram.bd             # diagnostics only, no output file
+bgraph check diagram.bd --ci        # …the flat form, whatever stdout is
+bgraph diff old.bd new.bd -o d.svg  # what appeared, what left, what moved
+bgraph explain diagram.bd api     # why that box is where it is
+bgraph layout diagram.bd            # write the placements in; the picture is unchanged
 bgraph report.bd --data q3.json     # fill a template from a JSON object
 bgraph report.bd --data - --emit    # …from a pipe, printing the filled source
 bgraph report.bd --rows r=sales.csv # one hole from the rows of a CSV
 bgraph watch report.bd --data q3.json   # live preview, data re-read on save
 bgraph fmt diagram.bd               # reformat to the canonical shape
 bgraph fmt --check examples/*.bd    # …or report what would change, and exit non-zero
+bgraph init pie                     # a working file for a genre; no genre lists them
+bgraph completions fish             # a completion script; bash|zsh|fish|elvish|powershell
+bgraph completions man              # …or the man page, from the same flag definitions
 bgraph docs -o docs/reference.md    # regenerate the reference manual
 ```
 
@@ -424,10 +716,14 @@ diagram.bd:14:3: warning: `fill` has no effect on an edge
 
 ## Editor support
 
-`bgraph-lsp` is a language server for this DSL, packaged for Zed in
-[`editors/zed`](../editors/zed) along with a tree-sitter grammar. It reports
-the same diagnostics as `check`, completes properties and values in context,
-shows a node's resolved position on hover and jumps to declarations.
+`bgraph-lsp` is a language server for this DSL. It reports the same
+diagnostics as `check`, completes properties and values in context, shows a
+node's resolved position on hover and jumps to declarations.
+
+Packaged for [Zed](../editors/zed) and [VS Code](../editors/vscode); Neovim,
+Helix and Emacs each need a few lines of configuration, which
+[`editors/README.md`](../editors/README.md) gives in full alongside where the
+tree-sitter queries live.
 
 Any LSP client can use it — the binary speaks LSP over stdin/stdout with no
-arguments.
+arguments and no configuration file.

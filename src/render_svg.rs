@@ -18,8 +18,10 @@ use crate::style::{Head, Router, Shape, Style};
 /// endpoint clipping and label avoidance are the difference between a line
 /// between two centres and a drawn edge, and a second implementation of them
 /// would be a second answer.
-pub(crate) struct Routed {
+pub struct Routed {
+    /// The line as drawn, elbows included — not just the two endpoints.
     pub points: Vec<(f64, f64)>,
+    /// The label and the rectangle it was given, once avoidance has run.
     pub label: Option<(String, Rect)>,
 }
 
@@ -69,7 +71,10 @@ pub fn render(layout: &Layout) -> String {
         body.push_str(&free_polyline(shape));
     }
     for group in &layout.groups {
-        body.push_str(&group_frame(group, &layout.opts.background));
+        body.push_str(&described(
+            &group_frame(group, &layout.opts.background),
+            group.style.description.as_deref(),
+        ));
     }
 
     for (edge, route) in layout.edges.iter().zip(&routed) {
@@ -142,7 +147,12 @@ pub fn render(layout: &Layout) -> String {
         if node.style.shadow == Some(true) {
             needs_shadow = true;
         }
-        body.push_str(&node_shape(node));
+        let shape = if layout.opts.sketch {
+            sketch_shape(node)
+        } else {
+            node_shape(node)
+        };
+        body.push_str(&described(&shape, node.style.description.as_deref()));
         body.push_str(&node_label(node));
     }
 
@@ -151,6 +161,19 @@ pub fn render(layout: &Layout) -> String {
     }
 
     let mut defs = String::new();
+    // The font, when one was handed in. An `@font-face` in `<defs><style>` is
+    // what makes an SVG's text *exact* everywhere rather than approximately
+    // right — it is the practical half of `X-005`, which is that this crate
+    // measures text with an advance table and a viewer may not have the font
+    // that table describes. Carrying the font removes the "may not".
+    if let Some((family, bytes)) = &layout.opts.embed_font {
+        let _ = write!(
+            defs,
+            r#"<style>@font-face{{font-family:"{}";src:url("data:font/ttf;base64,{}");}}</style>"#,
+            esc(family),
+            base64(bytes)
+        );
+    }
     for (id, (head, color)) in &markers {
         defs.push_str(&marker_def(id, *head, color, &layout.opts.background));
     }
@@ -160,8 +183,21 @@ pub fn render(layout: &Layout) -> String {
         );
     }
 
+    // `role="img"` plus a label is what makes an SVG readable to a screen
+    // reader at all: without them it is announced as a group of anonymous
+    // shapes, or skipped. The label is what the file already says — the
+    // diagram's own description, or failing that its title — rather than
+    // something to be written twice.
+    let label = layout
+        .opts
+        .description
+        .as_deref()
+        .or(layout.opts.title.as_deref())
+        .map(|text| format!(r#" role="img" aria-label="{}""#, esc(text)))
+        .unwrap_or_default();
+
     let mut svg = format!(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}">"#,
+        r#"<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}"{label}>"#,
         w = n(width),
         h = n(height)
     );
@@ -183,7 +219,11 @@ pub fn render(layout: &Layout) -> String {
     svg
 }
 
-pub(crate) fn route_all(layout: &Layout) -> Vec<Routed> {
+/// Route every edge and place every edge label.
+///
+/// Public because three writers need the same answer — SVG, PDF and the JSON
+/// export — and a second implementation would be a second diagram.
+pub fn route_all(layout: &Layout) -> Vec<Routed> {
     let mut routed: Vec<Routed> = layout
         .edges
         .iter()
@@ -612,6 +652,128 @@ fn group_frame(group: &PlacedGroup, background: &Option<String>) -> String {
 
 // ---------------------------------------------------------------- shapes
 
+/// A shape with its description attached, when it has one.
+///
+/// `<title>` as a child of the shape rather than a wrapping group: it is valid
+/// on any SVG element, it is what a browser shows as a tooltip, and it is what
+/// a screen reader reads — so one line serves the sighted reader with a mouse
+/// and the reader without sight, which is the whole reason `I-040` was widened
+/// past accessibility.
+fn described(shape: &str, description: Option<&str>) -> String {
+    let Some(text) = description.filter(|t| !t.is_empty()) else {
+        return shape.to_string();
+    };
+    // The shapes are written self-closing, so the tag is reopened to hold the
+    // title. Done here rather than in each of the eight shape branches, which
+    // would be eight places to forget.
+    let Some(stripped) = shape.strip_suffix("/>") else {
+        return shape.to_string();
+    };
+    let tag = stripped
+        .split_once(|c: char| c.is_whitespace())
+        .map(|(head, _)| head.trim_start_matches('<'))
+        .unwrap_or_default();
+    if tag.is_empty() {
+        return shape.to_string();
+    }
+    format!("{stripped}><title>{}</title></{tag}>", esc(text))
+}
+
+/// A deterministic offset in `[-amount, amount]`, from a shape's own numbers.
+///
+/// **Not random**, and it cannot be: the golden test asserts the output is
+/// byte-identical run to run, and more to the point a diagram that redrew
+/// itself differently every save would be unreviewable. The wobble is an
+/// FNV-1a hash of the geometry, so the same box always deforms the same way —
+/// and two boxes in different places deform differently, which is what makes
+/// it look drawn rather than stamped.
+fn wobble(seed: &[f64], salt: u64, amount: f64) -> f64 {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325 ^ salt;
+    for value in seed {
+        // Through the bit pattern of the rounded value: two runs must hash
+        // the same, and a float printed and reparsed does not always.
+        for byte in ((value * 64.0).round() as i64).to_le_bytes() {
+            hash ^= byte as u64;
+            hash = hash.wrapping_mul(0x100_0000_01b3);
+        }
+    }
+    let unit = (hash >> 11) as f64 / (1u64 << 53) as f64;
+    (unit * 2.0 - 1.0) * amount
+}
+
+/// A node in sketch mode. Only the rectangular shapes are redrawn: a circle
+/// or a diamond drawn freehand stops being recognisable as one, and a shape
+/// whose meaning is its outline is not one to wobble.
+fn sketch_shape(node: &PlacedNode) -> String {
+    let s = &node.style;
+    match s.shape.unwrap_or(Shape::Rect) {
+        Shape::Rect | Shape::Stadium => {
+            let fill = paint("fill", s.fill.as_deref().unwrap_or("#ffffff"));
+            let stroke = paint("stroke", s.stroke.as_deref().unwrap_or("#1f2937"));
+            let sw = n(s.stroke_width.unwrap_or(1.5));
+            let dash = s
+                .dash_array()
+                .map(|d| format!(r#" stroke-dasharray="{d}""#))
+                .unwrap_or_default();
+            sketched_box(
+                &node.rect,
+                &format!(r#"{fill}{stroke} stroke-width="{sw}"{dash}"#),
+            )
+        }
+        _ => node_shape(node),
+    }
+}
+
+/// A rectangle drawn as if by hand: each corner nudged, each side bowed.
+fn sketched_box(r: &Rect, common: &str) -> String {
+    let a = 2.4;
+    let p = |x: f64, y: f64, salt: u64| {
+        (
+            x + wobble(&[r.x, r.y, r.w, r.h, x], salt, a),
+            y + wobble(&[r.x, r.y, r.w, r.h, y], salt ^ 0x9e37, a),
+        )
+    };
+    let (x0, y0) = p(r.x, r.y, 1);
+    let (x1, y1) = p(r.right(), r.y, 2);
+    let (x2, y2) = p(r.right(), r.bottom(), 3);
+    let (x3, y3) = p(r.x, r.bottom(), 4);
+
+    // A quadratic through the middle of each side, pulled off the straight
+    // line — a hand does not draw a chord, it draws a slight bow.
+    let mid = |ax: f64, ay: f64, bx: f64, by: f64, salt: u64| {
+        (
+            (ax + bx) / 2.0 + wobble(&[ax, ay, bx, by], salt, a * 1.6),
+            (ay + by) / 2.0 + wobble(&[bx, by, ax, ay], salt, a * 1.6),
+        )
+    };
+    let (m0x, m0y) = mid(x0, y0, x1, y1, 11);
+    let (m1x, m1y) = mid(x1, y1, x2, y2, 12);
+    let (m2x, m2y) = mid(x2, y2, x3, y3, 13);
+    let (m3x, m3y) = mid(x3, y3, x0, y0, 14);
+
+    format!(
+        r#"<path d="M {} {} Q {} {} {} {} Q {} {} {} {} Q {} {} {} {} Q {} {} {} {} Z"{common} stroke-linejoin="round"/>"#,
+        n(x0),
+        n(y0),
+        n(m0x),
+        n(m0y),
+        n(x1),
+        n(y1),
+        n(m1x),
+        n(m1y),
+        n(x2),
+        n(y2),
+        n(m2x),
+        n(m2y),
+        n(x3),
+        n(y3),
+        n(m3x),
+        n(m3y),
+        n(x0),
+        n(y0),
+    )
+}
+
 fn node_shape(node: &PlacedNode) -> String {
     let r = &node.rect;
     let s = &node.style;
@@ -1020,6 +1182,46 @@ pub fn split_alpha(color: &str) -> (String, Option<f64>) {
         .filter(|a| *a < 1.0);
 
     (format!("#{rgb}"), alpha)
+}
+
+/// Base64, written out rather than pulled in.
+///
+/// Twenty lines against a dependency, in a crate whose whole shape is that
+/// the SVG writer, the PDF writer and the HTTP preview are all hand-rolled.
+/// There is no decoder here because nothing in this crate reads one back.
+#[cfg(test)]
+pub(crate) fn base64_for_test(bytes: &[u8]) -> String {
+    base64(bytes)
+}
+
+fn base64(bytes: &[u8]) -> String {
+    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+
+    for chunk in bytes.chunks(3) {
+        let b = [
+            chunk[0],
+            *chunk.get(1).unwrap_or(&0),
+            *chunk.get(2).unwrap_or(&0),
+        ];
+        let n = (b[0] as u32) << 16 | (b[1] as u32) << 8 | b[2] as u32;
+        out.push(ALPHABET[(n >> 18 & 63) as usize] as char);
+        out.push(ALPHABET[(n >> 12 & 63) as usize] as char);
+        // The tail is padded rather than truncated: a decoder is entitled to
+        // a multiple of four, and a browser that gets three characters simply
+        // drops the font with no message.
+        out.push(if chunk.len() > 1 {
+            ALPHABET[(n >> 6 & 63) as usize] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            ALPHABET[(n & 63) as usize] as char
+        } else {
+            '='
+        });
+    }
+    out
 }
 
 fn esc(s: &str) -> String {

@@ -1,0 +1,70 @@
+# Check a repository's diagrams the way its code is checked.
+#
+# `check` already exits non-zero and `fmt --check` already runs in this
+# project's own workflow; what was missing was the packaging, so that someone
+# else adds one step rather than a build script (`I-027`).
+name: bgraph
+description: Check bgraph diagrams, and prove committed SVGs are current.
+
+inputs:
+  path:
+    description: Directory of .bd files to check.
+    required: false
+    default: "."
+  drift:
+    description: >
+      Also assert every committed .svg is what the renderer produces now. Off
+      by default, because a repository that does not commit its pictures would
+      fail on a rule it never opted into.
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    # Built from source here. An action that compiles the tool on every run is
+    # an action nobody keeps — this waits on the released binaries (`I-025`),
+    # and until they exist it is honest about being slow rather than pretending
+    # to be fast.
+    - name: Build bgraph
+      shell: bash
+      run: cargo build --release --bin bgraph
+
+    - name: Check every diagram
+      shell: bash
+      run: |
+        shopt -s nullglob globstar
+        files=(${{ inputs.path }}/**/*.bd)
+        if (( ${#files[@]} == 0 )); then
+          echo "no .bd files under ${{ inputs.path }}"
+          exit 0
+        fi
+        status=0
+        for f in "${files[@]}"; do
+          # --ci for the flat form: a caret and a colour are for a terminal,
+          # and an annotation parser wants file:line:col.
+          ./target/release/bgraph check "$f" --ci || status=1
+        done
+        exit $status
+
+    - name: Canonical formatting
+      shell: bash
+      run: |
+        shopt -s nullglob globstar
+        files=(${{ inputs.path }}/**/*.bd)
+        (( ${#files[@]} )) && ./target/release/bgraph fmt --check "${files[@]}"
+
+    - name: Committed pictures are current
+      if: inputs.drift == 'true'
+      shell: bash
+      run: |
+        shopt -s nullglob globstar
+        for f in ${{ inputs.path }}/**/*.bd; do
+          svg="${f%.bd}.svg"
+          [[ -f "$svg" ]] || continue
+          ./target/release/bgraph "$f" -o /tmp/fresh.svg >/dev/null
+          if ! cmp -s "$svg" /tmp/fresh.svg; then
+            echo "::error file=$svg::$svg is stale — regenerate it with \`bgraph $f -o $svg\`"
+            exit 1
+          fi
+        done

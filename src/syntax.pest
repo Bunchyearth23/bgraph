@@ -12,7 +12,13 @@ sep = _{ (nl | ";" | ",")* }
 
 // A trailing hyphen is disallowed so `a->b` splits into `a` `->` `b`
 // while keywords like `right-of` still read as one token.
-ident  = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_" | ("-" ~ (ASCII_ALPHANUMERIC | "_")))* }
+part   = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_" | ("-" ~ (ASCII_ALPHANUMERIC | "_")))* }
+// A qualified name — `core.api` — is *one* token. That is what settles the
+// conflict `I-032` flagged: maximal munch takes the whole of it, so a leading
+// `.box` is still unambiguously a class reference and no new sigil is needed
+// (`D-029`). A dot must be followed by a name part, or `a.` would swallow the
+// dot and leave the reader with a stranger error than "unknown name".
+ident  = @{ part ~ ("." ~ part)* }
 string = ${ "\"" ~ str_inner ~ "\"" }
 str_inner = @{ (!("\"" | "\\") ~ ANY | "\\" ~ ANY)* }
 number = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ ("px" | "%")? }
@@ -30,7 +36,36 @@ term = _{ (nl | ";" | ",")+ | &EOI }
 // an edge; PEG backtracking still lets a node actually named `type` have edges.
 // `edge_decl` precedes `item_decl` only for speed: `item_decl` would fail on
 // the arrow anyway and backtrack.
-stmt = _{ type_decl | graph_decl | style_decl | group_decl | edge_decl | item_decl }
+stmt = _{ include_decl | component_decl | use_decl | constraint_decl | note_decl | legend_decl | type_decl | graph_decl | style_decl | group_decl | edge_decl | item_decl }
+
+// `include "shared.bds"` merges another file whole; with `as` its names come
+// in under a prefix. Resolved before parsing reaches `check`, so by the time
+// anything is validated there is one diagram (`D-029`).
+include_decl = { "include" ~ string ~ ("as" ~ ident)? }
+
+// A component is a file you did not have to make a file of. It is declared
+// once and placed under a name, exactly as an included file is — so a
+// component and an `include … as` are the same mechanism seen twice, and the
+// prefixing that makes one safe makes the other safe too (`D-030`).
+// A constraint adjusts one axis of already-placed boxes and never their
+// order — that is what keeps `D-001` intact. An explicit `at` wins, and a
+// contradiction is a warning naming both rather than a silent move (`D-031`).
+// Text that belongs to no box: a caption, a warning, an aside. Placed by the
+// same anchors as everything else, so it costs no new placement vocabulary —
+// and it declares no name, which is what stops anything referring to it.
+note_decl = { "note" ~ string ~ class_ref* ~ placement? ~ block? }
+
+// A key to the colours, in the genres that have no chart to build one from.
+// It lists the style classes that declare a `legend:` text and nothing else —
+// derived from what the file says rather than guessed at, so a legend cannot
+// describe a colour nobody used.
+legend_decl = { "legend" ~ !":" ~ class_ref* ~ placement? ~ block? }
+
+constraint_kw   = { "align-group" | "same-width" | "same-height" }
+constraint_decl = { constraint_kw ~ align_kw? ~ ident+ }
+
+component_decl = { "component" ~ ident ~ group_block }
+use_decl       = { "use" ~ ident ~ "as" ~ ident ~ placement? ~ block? }
 
 type_decl  = { "type" ~ ident ~ block? }
 
@@ -81,13 +116,16 @@ class_ref = { "." ~ ident }
 arrow     = @{ "<->" | "<-" | "-->" | "..>" | "--" | "->" | ".." }
 
 placement = _{ abs_pos | rel_pos }
-abs_pos   = { "at" ~ point }
+abs_pos   = { "at" ~ (cell | point) }
 rel_pos   = { rel_dir ~ name ~ gap? ~ align? }
 rel_dir    = { "right-of" | "left-of" | "below" | "above" }
 gap        = { "gap" ~ number }
 align      = { "align" ~ align_kw }
 align_kw   = { "left" | "right" | "center" | "middle" | "top" | "bottom" }
 point      = { "(" ~ number ~ "," ~ number ~ ")" }
+// `at (col 3, row 2)` is still `at`, in units declared once by `graph { grid }`.
+// A coordinate system, not a solver — which is why it cannot break `D-001`.
+cell       = { "(" ~ "col" ~ number ~ "," ~ "row" ~ number ~ ")" }
 
 // A line opening with `- ` or `+ ` is a member — a class's field, a table's
 // column — and runs to the end of the line. The space is what keeps `-4` a

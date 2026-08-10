@@ -1,0 +1,86 @@
+# Binaries per platform, built on a tag.
+#
+# "Install Rust and build it" is a barrier that keeps a tool to its author, and
+# `I-025` recorded it as one. This only *builds*: nothing here pushes anything
+# anywhere, because the licence question is not settled and because publishing
+# is a decision this repository leaves to a person (`Q-005`, AGENTS.md).
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  # So the artefacts can be produced and looked at without cutting a tag.
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install the target
+        run: rustup target add ${{ matrix.target }}
+
+      # Two artefacts rather than one compromise. `window` is off by default
+      # and pulls seventy-eight more crates: that is a fair price for someone
+      # who wants a window and an unfair one for a build server, so whoever
+      # downloads chooses rather than the release deciding for them.
+      - name: Build (default features)
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Build (with a window)
+        if: matrix.os != 'ubuntu-latest'
+        run: cargo build --release --target ${{ matrix.target }} --features window
+
+      # minifb needs X11 and Wayland headers, which a bare runner does not
+      # have. Installed only where it is needed rather than in every job.
+      - name: Build (with a window, Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libwayland-dev libxcb1-dev
+          cargo build --release --target ${{ matrix.target }} --features window
+
+      - name: Name the artefacts
+        shell: bash
+        run: |
+          mkdir -p out
+          suffix=""
+          [[ "${{ matrix.os }}" == windows-latest ]] && suffix=".exe"
+          for name in bgraph bgraph-lsp; do
+            cp "target/${{ matrix.target }}/release/$name$suffix" \
+               "out/$name-${{ matrix.target }}$suffix"
+          done
+          cp LICENSE out/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bgraph-${{ matrix.target }}
+          path: out/
+
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup target add wasm32-unknown-unknown
+      - run: ./playground/build.sh --inline
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bgraph-playground
+          path: |
+            playground/standalone.html
+            playground/bgraph.wasm

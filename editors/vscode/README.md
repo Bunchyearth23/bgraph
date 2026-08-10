@@ -9,10 +9,28 @@ Syntax highlighting and the `bgraph` language server for `.bd` files.
 | `syntaxes/bgraph.tmLanguage.json` | Highlighting. A TextMate grammar, not tree-sitter — VS Code reads these natively, so nothing has to be compiled or pinned. |
 | `src/extension.js` | Launches `bgraph-lsp` and speaks LSP to it. Everything semantic comes from there. |
 | `language-configuration.json` | Comments, brackets, indentation. |
+| `bgraph.wasm` | The renderer, for the Markdown preview. Built by `package.sh`; not committed. |
 
 The server is the same binary the Zed extension talks to, and it reuses the
 front half of the compiler — so the editor and `bgraph check` can never
 disagree about what a file means.
+
+## Diagrams in the Markdown preview
+
+A ` ```bgraph ` fence is drawn in VS Code's Markdown preview — the one thing
+Mermaid gets used for that this could not do. It renders through `bgraph.wasm`,
+bundled beside the extension, **not** through a `bgraph` on `PATH`: a preview
+that only worked for people who had already installed the CLI would miss
+exactly the readers it is for.
+
+`package.sh` builds that module (it needs `rustup target add
+wasm32-unknown-unknown`). Without it the fence falls back to a code block —
+quietly, because a preview that threw would take the whole document's
+rendering with it. An error *inside* a fence is reported in place.
+
+A file spread over several files works here too: the server resolves
+`include` against the file's own path, so a name borrowed from another file is
+not underlined.
 
 ## Building a package
 

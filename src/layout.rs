@@ -38,6 +38,12 @@ impl Rect {
 }
 
 pub struct PlacedNode {
+    /// The identifier the author wrote, when the box is one they can name.
+    /// Empty for the boxes a chart invents — a legend swatch, an axis plate —
+    /// which nothing in the source addresses and nothing outside should try
+    /// to correlate. What makes the JSON export and the visual diff possible
+    /// at all: geometry without names is a picture, not data.
+    pub id: String,
     pub lines: Vec<String>,
     pub rect: Rect,
     pub style: Style,
@@ -56,6 +62,8 @@ pub struct PlacedEdge {
 }
 
 pub struct PlacedGroup {
+    /// As on a node: the declared name, or empty for a frame nobody wrote.
+    pub id: String,
     pub lines: Vec<String>,
     pub rect: Rect,
     pub style: Style,
@@ -376,7 +384,21 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         bail!("{}", diag.message);
     }
 
-    let opts = GraphOpts::from_props(&diagram.graph)?;
+    let mut opts = GraphOpts::from_props(&diagram.graph)?;
+    // A chart's own `title` is the diagram's name too, and the SVG's
+    // `aria-label` is built from `opts`. Lifted here, once, rather than in
+    // each of the eighteen chart functions — a screen reader on a pie chart
+    // is exactly the reader who needs the name most.
+    if opts.title.is_none()
+        && let Some(title) = diagram
+            .archetype_props
+            .iter()
+            .find(|p| p.name == "title")
+            .and_then(|p| p.values.first())
+            .and_then(|v| v.as_text())
+    {
+        opts.title = Some(title.to_string());
+    }
     let registry = Registry::build(&diagram.styles)?;
 
     // The archetype decides what the statements mean.
@@ -625,14 +647,24 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     // a node waits for its anchor, a group waits for its members. A group
     // carrying a placement translates its whole subtree once solved, so its
     // members only count as anchorable after that translation.
-    let solved = place_all(diagram, &index, &sizes, &opts)?;
+    // Size constraints run *before* placement, because a box widened after
+    // the fact does not push its neighbours along — it lands on top of them.
+    // Placement already knows how to lay out boxes of a given size, so the
+    // honest order is: decide the sizes, then place.
+    constrain_sizes(diagram, &index, &mut sizes);
+
+    let mut solved = place_all(diagram, &index, &sizes, &opts)?;
+    // Alignment runs after, because it is the one constraint that genuinely
+    // needs positions to exist.
+    constrain_alignment(diagram, &index, &mut solved);
     let placed = solved.nodes;
 
     let mut nodes: Vec<PlacedNode> = diagram
         .nodes
         .iter()
         .enumerate()
-        .map(|(i, _node)| PlacedNode {
+        .map(|(i, node)| PlacedNode {
+            id: node.id.as_str().to_string(),
             lines: labels[i].clone(),
             rect: placed[i].expect("every node is placed once the loop exits"),
             style: styles[i].clone(),
@@ -731,6 +763,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                 )
                 .map_err(|e| e.context(format!("in group `{}`", group.id.as_str())))?;
             Ok(PlacedGroup {
+                id: group.id.as_str().to_string(),
                 lines: group
                     .label
                     .clone()
@@ -800,6 +833,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             // boxes, so the rule would vanish under the class's own fill.
             let thickness = s.stroke_width.unwrap_or(1.5);
             rules.push(PlacedNode {
+                id: String::new(),
                 lines: Vec::new(),
                 rect: Rect {
                     x: placed.rect.x,
@@ -1003,6 +1037,202 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     // After the boxes, so the compartment rules land on top of them.
     nodes.extend(rules);
 
+    // Notes: free text placed by the ordinary anchors. Solved last, against
+    // the boxes as they finally sit, because a note anchored to something the
+    // constraints moved must move with it.
+    for note in &diagram.notes {
+        let style = registry.resolve(node_base.clone(), "note", &note.classes, &note.props)?;
+        let size = style.font_size.unwrap_or(12.0);
+        let lines: Vec<String> = note.text.split('\n').map(|l| l.to_string()).collect();
+        let w = text_width(&lines, size);
+        let h = lines.len() as f64 * size * LINE_HEIGHT;
+
+        let rect = match note.placement.as_ref().map(|p| p.resolved(opts.grid)) {
+            Some(Placement::At { x, y }) => Rect { x, y, w, h },
+            Some(Placement::Rel {
+                dir,
+                ref anchor,
+                gap,
+                align,
+            }) => {
+                let found = index.get(anchor.as_str()).and_then(|entity| match entity {
+                    Entity::Node(i) => nodes.get(*i).map(|n| n.rect),
+                    Entity::Group(g) => groups.get(*g).map(|f| f.rect),
+                });
+                // An anchor that does not resolve has already been reported by
+                // `check`; drawing the note at the origin would add a second
+                // wrong thing to look at, so it is left out.
+                let Some(anchor_rect) = found else { continue };
+                offset_from(&anchor_rect, dir, gap.unwrap_or(opts.gap), align, w, h)
+            }
+            // Unreachable — `resolved` leaves no cells — and answered rather
+            // than panicked, as everywhere else.
+            Some(Placement::Cell { col, row }) => Rect {
+                x: col,
+                y: row,
+                w,
+                h,
+            },
+            None => continue,
+        };
+
+        for (i, line) in lines.iter().enumerate() {
+            annotations.push(Annotation {
+                text: line.clone(),
+                x: rect.x,
+                y: rect.y + (i as f64 + 0.5) * size * LINE_HEIGHT,
+                anchor: Anchor::Start,
+                size,
+                color: style.font_color.clone().unwrap_or_else(|| {
+                    if dark {
+                        "#cbd5e1".into()
+                    } else {
+                        "#52514e".into()
+                    }
+                }),
+                weight: "400".into(),
+                family: style.font_family.clone().unwrap_or_default(),
+            });
+        }
+    }
+
+    // A legend, for the genres that have no chart to build one from. Derived
+    // from the style classes that declare a `legend:` text, in the order they
+    // were declared — so it lists what the file actually says rather than
+    // guessing from the colours on the page.
+    for legend in &diagram.legends {
+        let style = registry.resolve(node_base.clone(), "note", &legend.classes, &legend.props)?;
+        let size = style.font_size.unwrap_or(12.0);
+        let swatch = size;
+        let step = size * 2.0;
+        let gap_to_text = size * 0.7;
+
+        // The swatch takes the class's stroke as well as its fill: a pale
+        // fill is common — a status colour is usually a tint with the meaning
+        // in the border — and a swatch drawn from the fill alone would be a
+        // key nobody can read.
+        let entries: Vec<(String, String, String)> = diagram
+            .styles
+            .iter()
+            .filter_map(|decl| {
+                let resolved = registry.get(decl.name.as_str())?;
+                let text = resolved.legend.clone()?;
+                Some((
+                    text,
+                    resolved.fill.clone().unwrap_or_else(|| "#94a3b8".into()),
+                    resolved.stroke.clone().unwrap_or_else(|| "#94a3b8".into()),
+                ))
+            })
+            .collect();
+        if entries.is_empty() {
+            continue;
+        }
+
+        let widest = entries
+            .iter()
+            .map(|(text, _, _)| advance(text, size))
+            .fold(0.0_f64, f64::max);
+        let w = swatch + gap_to_text + widest;
+        let h = entries.len() as f64 * step;
+
+        let rect = match legend.placement.as_ref().map(|p| p.resolved(opts.grid)) {
+            Some(Placement::At { x, y }) => Rect { x, y, w, h },
+            Some(Placement::Rel {
+                dir,
+                ref anchor,
+                gap,
+                align,
+            }) => {
+                let found = index.get(anchor.as_str()).and_then(|entity| match entity {
+                    Entity::Node(i) => nodes.get(*i).map(|n| n.rect),
+                    Entity::Group(g) => groups.get(*g).map(|f| f.rect),
+                });
+                let Some(anchor_rect) = found else { continue };
+                offset_from(&anchor_rect, dir, gap.unwrap_or(opts.gap), align, w, h)
+            }
+            Some(Placement::Cell { col, row }) => Rect {
+                x: col,
+                y: row,
+                w,
+                h,
+            },
+            None => continue,
+        };
+
+        for (i, (text, fill, stroke)) in entries.iter().enumerate() {
+            let y = rect.y + i as f64 * step;
+            nodes.push(PlacedNode {
+                id: String::new(),
+                lines: Vec::new(),
+                rect: Rect {
+                    x: rect.x,
+                    y: y + (step - swatch) / 2.0,
+                    w: swatch,
+                    h: swatch,
+                },
+                style: Style {
+                    fill: Some(fill.clone()),
+                    stroke: Some(stroke.clone()),
+                    stroke_width: Some(1.2),
+                    radius: Some(3.0),
+                    ..Style::default()
+                },
+            });
+            annotations.push(Annotation {
+                text: text.clone(),
+                x: rect.x + swatch + gap_to_text,
+                y: y + step / 2.0,
+                anchor: Anchor::Start,
+                size,
+                color: style.font_color.clone().unwrap_or_else(|| {
+                    if dark {
+                        "#e2e8f0".into()
+                    } else {
+                        "#1a1a1a".into()
+                    }
+                }),
+                weight: "500".into(),
+                family: style.font_family.clone().unwrap_or_default(),
+            });
+        }
+    }
+
+    // `graph { title }` on a genre that draws boxes rather than a chart. The
+    // chart archetypes each reserve a band and shift their content down; here
+    // nothing needs shifting, because the heading simply sits above the
+    // content and `bounds` already grows the canvas to hold an annotation.
+    // Flush with the left edge of the drawing, as every chart title is.
+    if let Some(title) = opts.title.clone()
+        && let Some(area) = bbox(
+            nodes
+                .iter()
+                .map(|n| n.rect)
+                .chain(groups.iter().map(|g| g.rect)),
+        )
+    {
+        let theme = crate::charts::Theme::of(&opts);
+        annotations.push(Annotation {
+            text: title,
+            x: area.x,
+            // The same two-and-a-half-line clearance the charts use: at less
+            // the heading sits on the top row of boxes and reads as one of
+            // them rather than as a title over them.
+            y: area.y - crate::charts::TITLE_SIZE * 1.5,
+            anchor: Anchor::Start,
+            size: crate::charts::TITLE_SIZE,
+            color: theme.ink.clone(),
+            weight: "600".into(),
+            // Read off the drawing rather than restated here: a diagram that
+            // declares its own font must not get a heading in a different
+            // one, and an empty family falls through to the renderer's serif
+            // default, which is never what the boxes are set in.
+            family: nodes
+                .first()
+                .and_then(|n| n.style.font_family.clone())
+                .unwrap_or_default(),
+        });
+    }
+
     Ok(Layout {
         guides,
         polylines,
@@ -1067,6 +1297,128 @@ pub struct Solved {
 /// placement translates its whole subtree once its members have landed, and
 /// its members only become anchorable after that translation, so nothing
 /// outside can latch onto a position that is about to move.
+/// Apply the declared constraints to the solved rectangles.
+///
+/// A pass over what is already placed, in declaration order, adjusting one
+/// axis and never the order — which is the whole of what `D-031` allows,
+/// because `D-001` makes the order the author's to state. Nothing here can
+/// move a box past another one.
+///
+/// A name the constraint cannot resolve is simply skipped: `check` has
+/// already reported it, and reporting it twice would say there are two
+/// mistakes.
+fn members_of(
+    constraint: &crate::ast::ConstraintDecl,
+    index: &HashMap<&str, Entity>,
+) -> Vec<usize> {
+    constraint
+        .members
+        .iter()
+        .filter_map(|m| match index.get(m.as_str()).copied() {
+            Some(Entity::Node(i)) => Some(i),
+            // A group or an unknown name is skipped rather than reported:
+            // `check` has already spoken, and saying it twice would claim
+            // there are two mistakes.
+            _ => None,
+        })
+        .collect()
+}
+
+/// `same-width` and `same-height`, applied to the intrinsic sizes.
+fn constrain_sizes(diagram: &Diagram, index: &HashMap<&str, Entity>, sizes: &mut [(f64, f64)]) {
+    use crate::ast::ConstraintKind;
+
+    for constraint in &diagram.constraints {
+        let members = members_of(constraint, index);
+        if members.len() < 2 {
+            continue;
+        }
+        // The largest wins, not the first: shrinking a box to match a
+        // narrower neighbour clips its label, and a constraint that makes
+        // text unreadable is worse than no constraint at all.
+        match constraint.kind {
+            ConstraintKind::SameWidth => {
+                let widest = members.iter().map(|i| sizes[*i].0).fold(0.0_f64, f64::max);
+                for i in members {
+                    sizes[i].0 = widest;
+                }
+            }
+            ConstraintKind::SameHeight => {
+                let tallest = members.iter().map(|i| sizes[*i].1).fold(0.0_f64, f64::max);
+                for i in members {
+                    sizes[i].1 = tallest;
+                }
+            }
+            ConstraintKind::AlignGroup => {}
+        }
+    }
+}
+
+/// `align-group`, applied to the solved rectangles.
+fn constrain_alignment(diagram: &Diagram, index: &HashMap<&str, Entity>, solved: &mut Solved) {
+    use crate::ast::ConstraintKind;
+
+    for constraint in &diagram.constraints {
+        if constraint.kind != ConstraintKind::AlignGroup {
+            continue;
+        }
+        let rects: Vec<usize> = members_of(constraint, index)
+            .into_iter()
+            .filter(|i| solved.nodes[*i].is_some())
+            .collect();
+        if rects.len() < 2 {
+            continue;
+        }
+
+        match constraint.kind {
+            // The first named box decides, rather than an average: an average
+            // moves every box including the one the author was lining the
+            // others up against, which is never what was meant.
+            ConstraintKind::AlignGroup => {
+                let Some(lead) = solved.nodes[rects[0]] else {
+                    continue;
+                };
+                // Which axis is decided by which one the boxes already differ
+                // on least — a row lines up on y, a column on x. Reading it
+                // off the geometry rather than asking for it keeps the
+                // statement short, and the ambiguous case cannot arise: two
+                // boxes at the same point need no aligning.
+                let spread = |f: fn(&Rect) -> f64| {
+                    let values: Vec<f64> = rects
+                        .iter()
+                        .filter_map(|i| solved.nodes[*i])
+                        .map(|r| f(&r))
+                        .collect();
+                    values.iter().cloned().fold(f64::MIN, f64::max)
+                        - values.iter().cloned().fold(f64::MAX, f64::min)
+                };
+                let horizontal = spread(|r| r.x) >= spread(|r| r.y);
+
+                for i in &rects[1..] {
+                    let Some(rect) = solved.nodes[*i].as_mut() else {
+                        continue;
+                    };
+                    if horizontal {
+                        rect.y = match constraint.align {
+                            Align::Start => lead.y,
+                            Align::Center => lead.cy() - rect.h / 2.0,
+                            Align::End => lead.bottom() - rect.h,
+                        };
+                    } else {
+                        rect.x = match constraint.align {
+                            Align::Start => lead.x,
+                            Align::Center => lead.cx() - rect.w / 2.0,
+                            Align::End => lead.right() - rect.w,
+                        };
+                    }
+                }
+            }
+            // Handled before placement, where a size belongs.
+            ConstraintKind::SameWidth | ConstraintKind::SameHeight => {}
+        }
+    }
+}
+
 fn place_all(
     diagram: &Diagram,
     index: &HashMap<&str, Entity>,
@@ -1119,6 +1471,9 @@ fn place_all(
                 })
             });
 
+            // A grid cell resolves to an absolute position here, in one
+            // place, so nothing downstream has to know cells exist.
+            let placement = placement.map(|p| p.resolved(opts.grid));
             let rect = match placement {
                 None => Rect {
                     x: 0.0,
@@ -1127,6 +1482,16 @@ fn place_all(
                     h,
                 },
                 Some(Placement::At { x, y }) => Rect { x, y, w, h },
+                // Unreachable: `resolved` above turned every cell into an
+                // `At`. Answered rather than panicked, and answered with what
+                // a step of one would give, because no input may bring the
+                // renderer down.
+                Some(Placement::Cell { col, row }) => Rect {
+                    x: col,
+                    y: row,
+                    w,
+                    h,
+                },
                 Some(Placement::Rel {
                     dir,
                     ref anchor,
@@ -1203,9 +1568,10 @@ fn place_all(
                 h: inner.h + padding * 2.0 + title,
             };
 
-            let (frame, delta) = match &group.placement {
+            let placed_at = group.placement.as_ref().map(|p| p.resolved(opts.grid));
+            let (frame, delta) = match &placed_at {
                 None => (frame, (0.0, 0.0)),
-                Some(Placement::At { x, y }) => (
+                Some(Placement::At { x, y }) | Some(Placement::Cell { col: x, row: y }) => (
                     Rect {
                         x: *x,
                         y: *y,

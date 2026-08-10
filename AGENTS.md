@@ -46,10 +46,15 @@ disagree.
 ## Stack
 - Language: Rust (edition 2024), package manager cargo
 - Parsing: `pest` + `pest_derive`, grammar in `src/syntax.pest`
-- CLI: `clap` · Errors: `anyhow` · LSP wire format: `serde_json`
+- CLI: `clap` (**optional** — the binaries declare `required-features = ["cli"]`,
+  so a library or wasm consumer compiles no argument parser) · Errors: `anyhow`
+  · LSP wire format: `serde_json`
 - Tree-sitter grammar: `tree-sitter-bgraph/` (JS grammar + generated parser)
 - Zed extension: `editors/zed/`, compiled to `wasm32-wasip1`
-- SVG output and the watch server are hand-rolled — no dependency for either
+- SVG, PDF, the watch server, base64 and the TrueType subsetter are all
+  hand-rolled — no dependency for any of them
+- Optional, each behind its own feature: `png` (a rasteriser, `resvg`),
+  `window` (`minifb`, and it turns `png` on), `completions`, `wasm`, `typst`
 
 ## Setup commands
 - `cargo build` — builds both `bgraph` and `bgraph-lsp`
@@ -59,7 +64,13 @@ disagree.
 - `cargo build --features window` — the native window (opt-in: +78 crates)
 - `cargo run --bin bgraph -- check examples/groups.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (336 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (504 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo build --no-default-features` — the four-dependency library. **A CI
+  step, and it has been red before**: a `#[cfg]` on a type without one on its
+  users compiles under `default` and not here
+- `./playground/build.sh --inline` — the wasm module and a standalone page
+- `./typst/build.sh` — the module Typst's plugin protocol expects (its imports
+  make it unloadable anywhere else, hence a second feature and a second file)
 - `cargo clippy --all-targets` / `cargo fmt`
 - `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (27 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
@@ -76,7 +87,18 @@ disagree.
 | `src/parser.rs` | pest pairs → AST, with spans and friendly error text |
 | `src/ast.rs` | Untyped tree; `Span` / `Spanned<T>` on every declaration |
 | `src/props.rs` | **The vocabulary** — properties, archetypes, palettes, docs |
-| `src/charts.rs` | The `pie` and `packet` archetypes |
+| `src/charts.rs` | Every chart archetype |
+| `src/compose.rs` | `include` and `component` — files laid end to end, spans shifted, so one offset says which file *and* which line |
+| `src/themes.rs` | `--theme`; a theme **is** a `.bds`, parsed by the same parser |
+| `src/subset.rs` | TrueType subsetting for `--embed-font`. Conservative: ids are kept, unused outlines emptied |
+| `src/render_json.rs` | The solved geometry, shape promised and values not (`D-028`) |
+| `src/render_png.rs` | Raster, behind `png`, through `render_svg` so there is one picture |
+| `src/diff.rs` | Two versions as one drawing, matched by identifier |
+| `src/explain.rs` | Why a box is where it is — needs nothing from the solver |
+| `src/relayout.rs` | `bgraph layout`: inserts into lines, never rewrites them |
+| `src/report.rs` | The two forms of a diagnostic. The flat one is an interchange format and does not move |
+| `src/init.rs` | `bgraph init <genre>`, generated from the same tables |
+| `src/wasm.rs` | The wasm boundary. **The only `unsafe` in the crate**, and `forbid` is scoped around it |
 | `src/docgen.rs` | `docs/reference.md`, generated from the `props.rs` tables |
 | `src/check.rs` | **The validator** — spanned diagnostics, one source of truth |
 | `src/style.rs` | Style cascade, `extends` flattening, `GraphOpts` |
@@ -90,7 +112,9 @@ disagree.
 | `src/lsp.rs` | Language server + `LineIndex` (byte ↔ UTF-16 position) |
 | `tree-sitter-bgraph/` | Tree-sitter grammar, corpus tests, generated parser |
 | `editors/zed/` | Zed extension: manifest, wasm shim, `.scm` queries |
-| `editors/vscode/` | VS Code extension: TextMate grammar, LSP client |
+| `editors/vscode/` | VS Code extension: TextMate grammar, LSP client, Markdown preview |
+| `playground/` | The wasm module and a single-page playground |
+| `typst/` | bgraph as a Typst plugin, plus the no-plugin form |
 
 ## Conventions
 - Property **values stay raw in the AST** (`ast::Value`) and are interpreted in

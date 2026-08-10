@@ -72,6 +72,37 @@ pub const CARDINALITIES: &[&str] = &[
 
 pub const PROPS: &[PropDef] = &[
     PropDef {
+        name: "legend",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "legend: <text>",
+        doc: "What this style class is called in a `legend` statement. Its \
+              presence is what puts the class in one — a legend built from \
+              every class would list the ones that only round a corner, and \
+              one built from the colours in use would have nothing to call \
+              them.",
+    },
+    PropDef {
+        name: "description",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "description: <text>",
+        doc: "What this is, in a sentence. Emitted as an SVG `<title>` in every \
+              genre — a tooltip to a reader with a mouse, a label to one with a \
+              screen reader — and additionally *drawn* under the technology \
+              line in `type block`, which has room for it.",
+    },
+    PropDef {
+        name: "desc",
+        alias: true,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "desc: <text>",
+        doc: "Alias for `description`.",
+    },
+    PropDef {
         name: "fill",
         alias: false,
         ctx: Ctx::Node,
@@ -304,12 +335,53 @@ pub const PROPS: &[PropDef] = &[
 
 pub const GRAPH_PROPS: &[PropDef] = &[
     PropDef {
+        name: "description",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "description: <text>",
+        doc: "What the diagram is, in a sentence, for a reader who cannot see \
+              it. Becomes `aria-label` on the SVG root, beside `role=\"img\"`.",
+    },
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the diagram. Every genre accepts it here — \
+              the chart archetypes also take a `title` in their own settings, \
+              and that one wins where both are given.",
+    },
+    PropDef {
         name: "padding",
         alias: false,
         ctx: Ctx::Both,
         words: &[],
         syntax: "padding: <number>",
         doc: "Margin between the drawing and the canvas edge.",
+    },
+    PropDef {
+        name: "sketch",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &["on", "off"],
+        syntax: "sketch: <on|off>",
+        doc: "Draw as if by hand. A sketched architecture says \"this is a \
+              proposal\" where a crisp one says \"this is decided\" — \
+              information rather than ornament. Deterministic: the wobble is a \
+              hash of each shape's own geometry, so the same file always \
+              produces the same file.",
+    },
+    PropDef {
+        name: "grid",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "grid: <number> <number>",
+        doc: "Column and row step for `at (col 3, row 2)`. One number sets \
+              both. A coordinate system, not a solver: nothing is snapped to \
+              it, and a box placed in pixels is unaffected.",
     },
     PropDef {
         name: "gap",
@@ -1601,6 +1673,38 @@ pub const TOGGLE: &[&str] = &["on", "off", "true", "false"];
 
 pub const PIE_PROPS: &[PropDef] = &[
     PropDef {
+        name: "from",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "from: \"<file.csv>\"",
+        doc: "Read the slices from a CSV, resolved relative to this file. The \
+              header names the columns: `name` (or `label`) and `value`. \
+              Carries a consequence worth knowing — a file that reads the disk \
+              at render time is no longer autonomous, so `check` can pass and \
+              the render still fail.",
+    },
+    PropDef {
+        name: "top",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "top: <number>",
+        doc: "Keep the largest n slices and fold the rest into one. The \
+              palette has eight colours and `check` already advises this when \
+              a pie has more; `top` is what lets the file do it instead of \
+              someone doing the arithmetic by hand outside the tool.",
+    },
+    PropDef {
+        name: "other",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "other: <text>",
+        doc: "What the folded slice is called. `\"Other\"` unless the file \
+              says otherwise.",
+    },
+    PropDef {
         name: "title",
         alias: false,
         ctx: Ctx::Both,
@@ -1792,23 +1896,11 @@ pub const BLOCK_ITEM_PROPS: &[PropDef] = &[
         syntax: "technology: <text>",
         doc: "Alias of `tech`.",
     },
-    PropDef {
-        name: "description",
-        alias: false,
-        ctx: Ctx::Node,
-        words: &[],
-        syntax: "description: <text>",
-        doc: "A sentence under the technology line, smaller and lighter. \
-              Wrapped at a fixed column, and the box is sized around it.",
-    },
-    PropDef {
-        name: "desc",
-        alias: true,
-        ctx: Ctx::Node,
-        words: &[],
-        syntax: "desc: <text>",
-        doc: "Alias of `description`.",
-    },
+    // `description` and `desc` used to live here. They are on the shared
+    // table now, because every genre emits one as an SVG `<title>` — `block`
+    // is simply the genre that also *draws* it, under the technology line,
+    // sizing the box around it. One property, one meaning (`D-015`), and
+    // `D-022` forbids it appearing in both tables.
 ];
 
 pub const ER_PROPS: &[PropDef] = &[PropDef {
@@ -2072,6 +2164,18 @@ pub const WAVE_PROPS: &[PropDef] = &[
         doc: "Label a ruler tick every N periods. 4 by default.",
     },
     PropDef {
+        name: "sketch",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &["on", "off"],
+        syntax: "sketch: <on|off>",
+        doc: "Draw as if by hand. A sketched architecture says \"this is a \
+              proposal\" where a crisp one says \"this is decided\" — \
+              information rather than ornament. Deterministic: the wobble is a \
+              hash of each shape's own geometry, so the same file always \
+              produces the same file.",
+    },
+    PropDef {
         name: "grid",
         alias: false,
         ctx: Ctx::Both,
@@ -2273,6 +2377,50 @@ pub const PALETTE_DARK: &[&str] = &[
 
 /// Keywords that open a statement.
 pub const KEYWORDS: &[(&str, &str)] = &[
+    (
+        "include",
+        "Merge another file — `include \"house.bds\"`, or `include \"core.bd\" \
+         as core` to bring its names in under a prefix. Without a prefix every \
+         name must be unique across the set; a clash names both files.",
+    ),
+    (
+        "legend",
+        "A key to the colours: `legend right-of core gap 30`. Lists the style \
+         classes that declare a `legend:` text, so it can only ever describe a \
+         colour the file actually used. The chart archetypes build their own \
+         from their series and need no statement.",
+    ),
+    (
+        "note",
+        "Text that belongs to no box: `note \"Figures are March\" below api gap 20`. \
+         Placed by the same anchors as everything else, and it declares no name \
+         — so nothing can point at it, which is the whole difference between a \
+         note and a box with no border.",
+    ),
+    (
+        "align-group",
+        "Give a set of boxes one cross-axis coordinate: `align-group top a b c`. \
+         A pass over the solved layout, never a reordering — the first name \
+         decides, and an explicit `at` wins.",
+    ),
+    (
+        "same-width",
+        "Give a set of boxes one width: `same-width a b c`. The widest wins, \
+         because shrinking to match a narrower neighbour clips the label. \
+         Applied before placement, so nothing is pushed on top of anything.",
+    ),
+    ("same-height", "The same, for height."),
+    (
+        "component",
+        "A fragment declared once and placed many times — `component service \
+         { … }`, then `use service as web`. Its holes are bound by each \
+         placing, and its names arrive under the placing's prefix.",
+    ),
+    (
+        "use",
+        "Place a component: `use service as web right-of jobs { label: \"Web\" }`. \
+         The instance is a frame, so it is anchored like any other group.",
+    ),
     (
         "type",
         "Diagram archetype, declared once at the top of the file — `type pie`. \
