@@ -18,7 +18,72 @@ use crate::layout::{Anchor, Chart, Layout, Rect};
 use crate::style::{Head, Shape};
 
 /// A PDF page of the whole diagram, as bytes ready to write to a file.
+/// A page size in points, and how much neighbouring sheets share.
+///
+/// Points because that is what a PDF measures in and what the layout already
+/// produces — asking for millimetres would mean a conversion this crate does
+/// not otherwise need.
+#[derive(Debug, Clone, Copy)]
+pub struct Page {
+    pub width: f64,
+    pub height: f64,
+    /// Repeated along each seam, so a box cut in half is readable on both
+    /// sheets and a reader can see how two pages join.
+    pub overlap: f64,
+}
+
+impl Page {
+    /// A4 at 72 points to the inch, which is what a PDF's user space is.
+    pub const A4: Page = Page {
+        width: 595.28,
+        height: 841.89,
+        overlap: 24.0,
+    };
+
+    /// A named size, or `WIDTHxHEIGHT` in points.
+    pub fn parse(text: &str) -> Option<Page> {
+        match text.to_ascii_lowercase().as_str() {
+            "a4" => Some(Page::A4),
+            "a3" => Some(Page {
+                width: 841.89,
+                height: 1190.55,
+                ..Page::A4
+            }),
+            "letter" => Some(Page {
+                width: 612.0,
+                height: 792.0,
+                ..Page::A4
+            }),
+            other => {
+                let (w, h) = other.split_once('x')?;
+                Some(Page {
+                    width: w.trim().parse().ok()?,
+                    height: h.trim().parse().ok()?,
+                    ..Page::A4
+                })
+            }
+        }
+    }
+}
+
 pub fn render(layout: &Layout) -> Vec<u8> {
+    render_pages(layout, None)
+}
+
+/// The same diagram across as many sheets as it takes.
+///
+/// One content stream, several pages. A PDF page's `MediaBox` is a rectangle
+/// in user space, so a *window* onto the drawing is all a sheet is — there is
+/// nothing to re-render, nothing to clip, and no second code path that could
+/// disagree with the single-page one.
+///
+/// Only the PDF gets this. An SVG has no pages, and pretending otherwise would
+/// be inventing a concept the format does not have.
+pub fn render_paged(layout: &Layout, page: Page) -> Vec<u8> {
+    render_pages(layout, Some(page))
+}
+
+fn render_pages(layout: &Layout, page: Option<Page>) -> Vec<u8> {
     let (dx, dy, width, height) = crate::render_svg::canvas(layout);
 
     let mut c = Content::new(height);
@@ -158,7 +223,7 @@ pub fn render(layout: &Layout) -> Vec<u8> {
         );
     }
 
-    assemble(&c.body, &c.alphas, width, height)
+    assemble(&c.body, &c.alphas, width, height, page)
 }
 
 fn shift((x, y): (f64, f64), dx: f64, dy: f64) -> (f64, f64) {
@@ -588,7 +653,13 @@ fn escape(text: &str) -> String {
 
 /// The file around the content stream: the object table, the page tree, the
 /// two fonts and the alpha states, then the cross-reference table.
-fn assemble(body: &str, alphas: &BTreeMap<String, f64>, width: f64, height: f64) -> Vec<u8> {
+fn assemble(
+    body: &str,
+    alphas: &BTreeMap<String, f64>,
+    width: f64,
+    height: f64,
+    page: Option<Page>,
+) -> Vec<u8> {
     let mut states = String::new();
     for (name, alpha) in alphas {
         let stroking = name.starts_with("GSS");
@@ -600,21 +671,68 @@ fn assemble(body: &str, alphas: &BTreeMap<String, f64>, width: f64, height: f64)
         );
     }
 
-    let objects = [
+    // Each sheet is a window onto the one drawing: the tiles below are
+    // `MediaBox` rectangles, not re-renders. Without a page size there is one
+    // sheet and it is the whole canvas, exactly as before.
+    let boxes: Vec<(f64, f64, f64, f64)> = match page {
+        None => vec![(0.0, 0.0, width, height)],
+        Some(p) => {
+            let step_x = (p.width - p.overlap).max(1.0);
+            let step_y = (p.height - p.overlap).max(1.0);
+            let cols = ((width / step_x).ceil() as usize).max(1);
+            let rows = ((height / step_y).ceil() as usize).max(1);
+            let mut out = Vec::with_capacity(cols * rows);
+            // Row by row from the top, because that is the order a reader
+            // lays the sheets out — the PDF's own y axis runs the other way,
+            // which is why the top edge is `height - …` here.
+            for row in 0..rows {
+                for col in 0..cols {
+                    let x0 = col as f64 * step_x;
+                    let top = row as f64 * step_y;
+                    out.push((x0, height - top - p.height, x0 + p.width, height - top));
+                }
+            }
+            out
+        }
+    };
+
+    // Object numbering: 1 catalog, 2 pages, then one object per page, then
+    // the shared content stream and the two fonts.
+    let content_id = 3 + boxes.len();
+    let kids: Vec<String> = (0..boxes.len()).map(|i| format!("{} 0 R", 3 + i)).collect();
+
+    let mut objects = vec![
         "<< /Type /Catalog /Pages 2 0 R >>".to_string(),
-        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>".to_string(),
         format!(
-            "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {} {}] /Contents 4 0 R \
-             /Resources << /Font << /F1 5 0 R /F2 6 0 R >> /ExtGState << {states} >> >> >>",
-            num(width),
-            num(height)
+            "<< /Type /Pages /Kids [{}] /Count {} >>",
+            kids.join(" "),
+            boxes.len()
         ),
-        format!("<< /Length {} >>\nstream\n{body}endstream", body.len()),
+    ];
+    for (x0, y0, x1, y1) in &boxes {
+        objects.push(format!(
+            "<< /Type /Page /Parent 2 0 R /MediaBox [{} {} {} {}] /Contents {content_id} 0 R \
+             /Resources << /Font << /F1 {} 0 R /F2 {} 0 R >> /ExtGState << {states} >> >> >>",
+            num(*x0),
+            num(*y0),
+            num(*x1),
+            num(*y1),
+            content_id + 1,
+            content_id + 2
+        ));
+    }
+    objects.push(format!(
+        "<< /Length {} >>\nstream\n{body}endstream",
+        body.len()
+    ));
+    objects.push(
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"
             .to_string(),
+    );
+    objects.push(
         "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"
             .to_string(),
-    ];
+    );
 
     let mut out = String::from("%PDF-1.4\n");
     let mut offsets = Vec::with_capacity(objects.len());

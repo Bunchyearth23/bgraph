@@ -52,6 +52,11 @@ struct Cli {
     /// print. What the file declares still wins
     #[arg(long, value_name = "NAME")]
     theme: Option<String>,
+
+    /// Tile a large diagram across sheets: a4, a3, letter, or WIDTHxHEIGHT in
+    /// points. PDF only — an SVG has no pages
+    #[arg(long, value_name = "SIZE")]
+    page: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -467,8 +472,19 @@ fn run() -> Result<i32> {
     match extension.as_str() {
         "pdf" => {
             #[cfg(feature = "pdf")]
-            fs::write(&cli.output, bgraph::render_pdf::render(&layout))
-                .with_context(|| format!("cannot write {}", cli.output.display()))?;
+            {
+                let bytes = match &cli.page {
+                    Some(size) => {
+                        let page = bgraph::render_pdf::Page::parse(size).with_context(|| {
+                            format!("unknown page size `{size}` (try a4, a3, letter, or 595x842)")
+                        })?;
+                        bgraph::render_pdf::render_paged(&layout, page)
+                    }
+                    None => bgraph::render_pdf::render(&layout),
+                };
+                fs::write(&cli.output, bytes)
+                    .with_context(|| format!("cannot write {}", cli.output.display()))?;
+            }
             #[cfg(not(feature = "pdf"))]
             bail!("this build has no PDF writer — rebuild with the `pdf` feature");
         }
@@ -489,6 +505,9 @@ fn run() -> Result<i32> {
             bail!("this build has no rasteriser — rebuild with the `png` feature");
         }
         _ => {
+            if cli.page.is_some() {
+                bail!("`--page` is for a PDF; an SVG has no pages");
+            }
             if cli.scale != 1.0 {
                 bail!("`--scale` is for a raster; an SVG and a PDF have no resolution to choose");
             }

@@ -706,6 +706,7 @@ bgraph diagram.bd -o diagram.svg
 bgraph diagram.bd -o diagram.pdf
 bgraph diagram.bd -o diagram.png
 bgraph diagram.bd -o diagram.json
+bgraph diagram.bd -o big.pdf --page a4
 bgraph watch diagram.bd
 bgraph watch docs/diagrams
 bgraph check diagram.bd
@@ -723,6 +724,13 @@ routed edge points with their elbows, the placed labels — in the same
 coordinate space the SVG uses, so a rectangle here is the rectangle in the file
 beside it. The *shape* of that document is promised; the *values* are not, and
 move whenever the drawing improves, exactly as the SVG does.
+
+`--page a4` tiles a diagram larger than a sheet across several, with an
+overlap at each seam so a box cut in half is readable on both. PDF only — an
+SVG has no pages, and pretending otherwise would be inventing a concept the
+format does not have. One content stream, several pages: a sheet is a *window*
+onto the drawing, so nothing is re-rendered and there is no second code path
+to disagree with the single-page one.
 
 PNG needs the `png` feature, and is the one output that does: everything else
 here is hand-rolled, but a raster means zlib and a rasteriser means text

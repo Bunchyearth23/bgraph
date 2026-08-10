@@ -7602,3 +7602,102 @@ fn top_larger_than_the_data_changes_nothing() {
         "a fold happened with nothing to fold"
     );
 }
+
+// ------------------------------------------------- multi-page print (I-061)
+
+#[cfg(feature = "pdf")]
+#[test]
+fn a_diagram_that_fits_is_still_one_page() {
+    // The default must not change: a diagram smaller than a sheet has always
+    // been one page sized to itself, and that is still the right answer.
+    let l = build("node a \"A\"");
+    let pdf = String::from_utf8_lossy(&crate::render_pdf::render(&l)).into_owned();
+    assert_eq!(
+        pdf.matches("/Type /Page\n").count() + pdf.matches("/Type /Page ").count(),
+        1
+    );
+    assert!(pdf.contains("/Count 1"), "not a single-page document");
+}
+
+#[cfg(feature = "pdf")]
+#[test]
+fn a_wide_diagram_is_tiled_across_sheets() {
+    let mut source = String::from("graph { flow: right, gap: 30 }\n");
+    for i in 0..14 {
+        source.push_str(&format!("node n{i} \"Stage {i}\"\n"));
+    }
+    let l = build(&source);
+    let pdf = String::from_utf8_lossy(&crate::render_pdf::render_paged(
+        &l,
+        crate::render_pdf::Page::A4,
+    ))
+    .into_owned();
+
+    assert!(
+        !pdf.contains("/Count 1"),
+        "a diagram much wider than A4 came out on one sheet"
+    );
+    // One content stream, several pages: a sheet is a window onto the drawing,
+    // so nothing is re-rendered and there is no second code path to disagree
+    // with the single-page one.
+    // `>>\nstream` rather than `stream`, because `endstream` contains the
+    // word too and counting that would always answer two.
+    assert_eq!(
+        pdf.matches(">>\nstream").count(),
+        1,
+        "the drawing was written more than once"
+    );
+}
+
+#[cfg(feature = "pdf")]
+#[test]
+fn a_page_size_is_named_or_measured() {
+    use crate::render_pdf::Page;
+    assert!((Page::parse("a4").unwrap().width - 595.28).abs() < 0.01);
+    assert!((Page::parse("A4").unwrap().height - 841.89).abs() < 0.01);
+    assert_eq!(Page::parse("400x300").unwrap().width, 400.0);
+    assert_eq!(Page::parse("400 x 300").unwrap().height, 300.0);
+    assert!(Page::parse("foolscap").is_none());
+}
+
+#[cfg(feature = "pdf")]
+#[test]
+fn sheets_overlap_so_a_seam_is_readable() {
+    // A box cut exactly in half at a seam is unreadable on both sheets, so
+    // adjacent tiles have to share a strip. Read off the produced document
+    // rather than off the constant, or the test would only be restating the
+    // number and not that it is used.
+    let mut source = String::from("graph { flow: right, gap: 30 }\n");
+    for i in 0..14 {
+        source.push_str(&format!("node n{i} \"Stage {i}\"\n"));
+    }
+    let l = build(&source);
+    let pdf = String::from_utf8_lossy(&crate::render_pdf::render_paged(
+        &l,
+        crate::render_pdf::Page::A4,
+    ))
+    .into_owned();
+
+    let lefts: Vec<f64> = pdf
+        .match_indices("/MediaBox [")
+        .filter_map(|(i, _)| {
+            let rest = &pdf[i + "/MediaBox [".len()..];
+            let inside = rest.split(']').next()?;
+            let mut numbers = inside.split_whitespace();
+            let x0: f64 = numbers.next()?.parse().ok()?;
+            let x1: f64 = numbers.nth(1)?.parse().ok()?;
+            Some((x0, x1))
+        })
+        .map(|(x0, x1)| {
+            assert!(x1 > x0, "a sheet with no width");
+            x0
+        })
+        .collect();
+
+    assert!(lefts.len() >= 2, "only {} sheets", lefts.len());
+    let step = lefts[1] - lefts[0];
+    assert!(
+        step > 0.0 && step < crate::render_pdf::Page::A4.width,
+        "sheets advance by {step}, which leaves no overlap"
+    );
+}
