@@ -30,7 +30,7 @@ type packet     // field a "A" 0 7
 type treemap    // box a "A" 42
 type quadrant   // point a "A" 0.8 0.2
 type bar        // series s 4 8 15
-type xy         // series s 4 8 15
+type xy         // series s 4 8 15, or scatter s 1 4 3 8
 type sankey     // a -> b 40
 type wave       // signal s "clk" "p...."
 type gantt      // task a "A" 2026-01-01 5d
@@ -46,6 +46,32 @@ Every archetype reads the *same* statements, under its own word: a box is a
 `node`, a `slice`, a `field`, an `entity`. The style cascade, the diagnostics
 and the editor support are identical in all of them. What changes is which
 properties carry meaning — `check` tells you when one is in the wrong place.
+
+### A second word for a second shape
+
+An archetype may have **more than one word**, when the same picture can be
+described by data of a different shape. `xy` is the one that does:
+
+```bgraph
+type xy { size: 400 200 legend: off }
+series north 4 8 15 16 23        // spread evenly across the axis
+```
+
+```bgraph
+type xy { size: 400 200 legend: off }
+scatter north 1 4  3 8  7 15  9 23   // read two at a time: (1, 4), (3, 8) …
+```
+
+The word decides the shape — never the number of values you wrote. Two shapes
+of the same length would be indistinguishable, and the error message could not
+tell you which one it thought you meant.
+
+A plot is one or the other. `series` takes its x from a mark's *position in the
+line*, `scatter` from the numbers written; putting both on one axis would give
+x two meanings at once, so it is refused rather than blended. A scatter also
+draws dots by default — joining scattered points would claim a continuity the
+data does not have — and `mark: line` sorts them by x first, so the line runs
+left to right whatever order you wrote them in.
 
 The two sections below walk through `pie` and `packet` in prose.
 **[`reference.md`](reference.md) is the exhaustive list** — every archetype,

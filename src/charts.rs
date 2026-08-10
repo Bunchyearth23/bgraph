@@ -215,7 +215,7 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
             chart_defaults(),
             def.item,
             &node.classes,
-            &node.effective_props(def.slots),
+            &node.props_for(def),
         )?;
         let Some(value) = style.value.filter(|v| *v > 0.0) else {
             continue;
@@ -398,7 +398,7 @@ pub fn packet(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             Style::node_defaults(),
             def.item,
             &node.classes,
-            &node.effective_props(def.slots),
+            &node.props_for(def),
         )?;
         let Some((first, last)) = style.bits else {
             continue;
@@ -674,7 +674,7 @@ fn build_tiles(
                 chart_defaults(),
                 def.item,
                 &node.classes,
-                &node.effective_props(def.slots),
+                &node.props_for(def),
             )?;
             tiles.push(Tile {
                 label: node.label.clone().unwrap_or_else(|| node.id.value.clone()),
@@ -1109,7 +1109,7 @@ pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             chart_defaults(),
             def.item,
             &node.classes,
-            &node.effective_props(def.slots),
+            &node.props_for(def),
         )?;
         let (Some(x), Some(y)) = (style.x, style.y) else {
             continue;
@@ -1236,7 +1236,7 @@ pub fn wave(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
             chart_defaults(),
             def.item,
             &node.classes,
-            &node.effective_props(def.slots),
+            &node.props_for(def),
         )?;
         let Some(spec) = style.wave.clone() else {
             continue;
@@ -1713,7 +1713,7 @@ pub fn sankey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             chart_defaults(),
             def.item,
             &node.classes,
-            &node.effective_props(def.slots),
+            &node.props_for(def),
         )?;
         let fill = style
             .fill
@@ -2049,7 +2049,7 @@ pub fn bar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
             chart_defaults(),
             def.item,
             &node.classes,
-            &node.effective_props(def.slots),
+            &node.props_for(def),
         )?;
         let Some(points) = style.points.clone().filter(|p| !p.is_empty()) else {
             continue;
@@ -2266,7 +2266,6 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
         .and_then(|v| v.as_num())
         .unwrap_or(320.0)
         .max(80.0);
-    let mark = word(cfg, "mark", "line");
     let title = text(cfg, "title");
     let categories: Vec<String> = setting(cfg, "categories")
         .map(|v| {
@@ -2279,16 +2278,40 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
 
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
 
+    // `series` spreads its numbers across the axis; `scatter` reads them as
+    // coordinates (`D-023`). Both end up as `(x, y)` here, with an indexed
+    // series taking its position as x — `check` refuses a file mixing the
+    // two, so the plot only ever means one of them.
     let mut series = Vec::new();
+    let mut scattered = false;
     for (i, node) in diagram.nodes.iter().enumerate() {
         let style = registry.resolve(
             chart_defaults(),
             def.item,
             &node.classes,
-            &node.effective_props(def.slots),
+            &node.props_for(def),
         )?;
-        let Some(points) = style.points.clone().filter(|p| !p.is_empty()) else {
-            continue;
+        let points: Vec<(f64, f64)> = match style.pairs.clone().filter(|p| p.len() >= 2) {
+            Some(flat) => {
+                scattered = true;
+                // `chunks_exact` drops a trailing x rather than inventing a y
+                // for it; `check` is what tells the author the count is odd.
+                let mut pairs: Vec<(f64, f64)> =
+                    flat.chunks_exact(2).map(|c| (c[0], c[1])).collect();
+                // A line through points in *declaration* order zigzags. Sorting
+                // by x costs a scatter nothing and is the only reading of
+                // `mark: line` that means anything.
+                pairs.sort_by(|a, b| a.0.total_cmp(&b.0));
+                pairs
+            }
+            None => match style.points.clone().filter(|p| !p.is_empty()) {
+                Some(values) => values
+                    .into_iter()
+                    .enumerate()
+                    .map(|(n, v)| (n as f64, v))
+                    .collect(),
+                None => continue,
+            },
         };
         let colour = style
             .fill
@@ -2299,11 +2322,14 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
         series.push((name, points, colour, style));
     }
 
+    // A scatter is points until told otherwise; joining them by default would
+    // claim a continuity the data does not have.
+    let mark = word(cfg, "mark", if scattered { "dot" } else { "line" });
     let count = series.iter().map(|(_, p, _, _)| p.len()).max().unwrap_or(0);
 
     let (mut lo, mut hi) = (f64::MAX, f64::MIN);
     for (_, points, _, _) in &series {
-        for v in points {
+        for (_, v) in points {
             lo = lo.min(*v);
             hi = hi.max(*v);
         }
@@ -2340,32 +2366,49 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
         h: height,
     };
 
+    // An indexed series is placed by position and needs no x scale; a scatter
+    // is placed by the numbers written, so it needs one. A declared `x-axis`
+    // supplies it either way.
+    let (mut x_lo, mut x_hi) = (f64::MAX, f64::MIN);
+    for (_, points, _, _) in &series {
+        for (x, _) in points {
+            x_lo = x_lo.min(*x);
+            x_hi = x_hi.max(*x);
+        }
+    }
+    if series.is_empty() {
+        (x_lo, x_hi) = (0.0, count as f64);
+    }
+    let x_scale = match setting(cfg, "x-axis") {
+        Some(v) if v.len() == 2 => Some(nice_scale(
+            v[0].as_num().unwrap_or(x_lo),
+            v[1].as_num().unwrap_or(x_hi),
+            5,
+        )),
+        _ if scattered => Some(nice_scale(x_lo, x_hi, 5)),
+        _ => None,
+    };
+
     // Points sit on the plot's edges, not in slot centres: a line has to
     // reach the axis at both ends or it reads as clipped.
-    let at = |i: usize| -> f64 {
-        if count <= 1 {
-            0.5
-        } else {
-            i as f64 / (count - 1) as f64
+    let at = |x: f64| -> f64 {
+        match &x_scale {
+            Some(scale) => scale.fraction(x),
+            None if count <= 1 => 0.5,
+            None => x / (count - 1) as f64,
         }
     };
 
-    let x_labels: Vec<(f64, String)> = match setting(cfg, "x-axis") {
-        Some(v) if v.len() == 2 => {
-            let x = nice_scale(
-                v[0].as_num().unwrap_or(0.0),
-                v[1].as_num().unwrap_or(count as f64),
-                5,
-            );
-            x.ticks
-                .iter()
-                .map(|t| (x.fraction(*t), trim_number(*t)))
-                .collect()
-        }
-        _ => categories
+    let x_labels: Vec<(f64, String)> = match &x_scale {
+        Some(scale) => scale
+            .ticks
+            .iter()
+            .map(|t| (scale.fraction(*t), trim_number(*t)))
+            .collect(),
+        None => categories
             .iter()
             .enumerate()
-            .map(|(i, name)| (at(i), name.clone()))
+            .map(|(i, name)| (at(i as f64), name.clone()))
             .collect(),
     };
 
@@ -2400,10 +2443,9 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
     for (_, points, colour, style) in &series {
         let path: Vec<(f64, f64)> = points
             .iter()
-            .enumerate()
-            .map(|(i, v)| {
+            .map(|(x, v)| {
                 (
-                    plot.x + at(i) * plot.w,
+                    plot.x + at(*x) * plot.w,
                     plot.bottom() - scale.fraction(*v) * plot.h,
                 )
             })
@@ -2550,7 +2592,7 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             Style::node_defaults(),
             def.item,
             &node.classes,
-            &node.effective_props(def.slots),
+            &node.props_for(def),
         )?;
         let label = node.label.clone().unwrap_or_else(|| node.id.value.clone());
         let w = (text_width(
@@ -2763,7 +2805,7 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
             chart_defaults(),
             def.item,
             &node.classes,
-            &node.effective_props(def.slots),
+            &node.props_for(def),
         )?;
         let Some(start) = style.start else { continue };
         let length = style.length.unwrap_or(1.0).max(0.25);
@@ -3042,7 +3084,7 @@ pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             chart_defaults(),
             def.item,
             &node.classes,
-            &node.effective_props(def.slots),
+            &node.props_for(def),
         )?;
         let Some(day) = style.start else { continue };
         let name = node.label.clone().unwrap_or_else(|| node.id.value.clone());

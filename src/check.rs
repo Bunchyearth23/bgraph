@@ -100,7 +100,13 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         #[cfg(feature = "sankey")]
         "sankey" => check_sankey(diagram, &mut out),
         #[cfg(any(feature = "bar", feature = "xy"))]
-        "bar" | "xy" => check_bar(diagram, &mut out),
+        "bar" | "xy" => {
+            check_bar(diagram, &mut out);
+            #[cfg(feature = "xy")]
+            if archetype == "xy" {
+                check_scatter(diagram, &mut out);
+            }
+        }
         _ => {
             check_cycles(diagram, &nodes, &mut out);
             check_unused_data(diagram, &mut out);
@@ -405,22 +411,32 @@ fn check_groups(diagram: &Diagram, def: &'static props::ArchetypeDef, nodes: &Ha
 /// word for its elements.
 fn check_keyword(node: &NodeDecl, def: &'static props::ArchetypeDef, out: &mut Vec<Diag>) {
     let written = node.keyword.as_str();
-    if written == def.item || written == "node" {
+    if def.accepts(written) {
         return;
     }
 
-    let elsewhere = props::ARCHETYPES.iter().find(|a| a.item == written);
+    let elsewhere = props::ARCHETYPES
+        .iter()
+        .find(|a| a.items().any(|i| i == written));
     let hint = match elsewhere {
         Some(other) => format!(" — `{written}` belongs to `type {}`", other.name),
         None => String::new(),
     };
 
+    // An archetype with a second form (`D-023`) must name both here, or the
+    // message sends the author to the wrong keyword half the time.
+    let words: Vec<String> = def.items().map(plural).collect();
+    let declares = match words.split_last() {
+        Some((last, [])) => last.clone(),
+        Some((last, head)) => format!("{} or {last}", head.join(", ")),
+        None => unreachable!("every archetype declares at least one word"),
+    };
+
     out.push(Diag::error(
         node.keyword.span,
         format!(
-            "`type {}` declares {}, not {}{hint}",
+            "`type {}` declares {declares}, not {}{hint}",
             def.name,
-            plural(def.item),
             plural(written)
         ),
     ));
@@ -447,7 +463,14 @@ fn check_positional(node: &NodeDecl, def: &'static props::ArchetypeDef, out: &mu
         return;
     }
 
-    let wanted: usize = def.slots.iter().map(|s| s.arity).sum();
+    // The shape follows the word the author wrote, not the archetype's
+    // primary form (`D-023`).
+    let written = node.keyword.as_str();
+    let slots = def.slots_for(written);
+    // `node` is the universal synonym, so it reports under the primary word.
+    let word = if written == "node" { def.item } else { written };
+
+    let wanted: usize = slots.iter().map(|s| s.arity).sum();
     if wanted == 0 {
         out.push(Diag::error(
             node.positional_span,
@@ -457,14 +480,12 @@ fn check_positional(node: &NodeDecl, def: &'static props::ArchetypeDef, out: &mu
     }
 
     if node.positional.len() > wanted {
-        let shape: Vec<String> = def.slots.iter().map(|s| format!("<{}>", s.prop)).collect();
+        let shape: Vec<String> = slots.iter().map(|s| format!("<{}>", s.prop)).collect();
         out.push(Diag::error(
             node.positional_span,
             format!(
-                "`{}` takes {wanted} value{} after the label — `{} <id> [\"label\"] {}`",
-                def.item,
+                "`{word}` takes {wanted} value{} after the label — `{word} <id> [\"label\"] {}`",
                 if wanted == 1 { "" } else { "s" },
-                def.item,
                 shape.join(" ")
             ),
         ));
@@ -473,7 +494,7 @@ fn check_positional(node: &NodeDecl, def: &'static props::ArchetypeDef, out: &mu
 
     // Written twice, once in each form: say which one wins.
     let mut rest = node.positional.len();
-    for slot in def.slots {
+    for slot in slots {
         if rest == 0 {
             break;
         }
@@ -586,7 +607,7 @@ fn check_cycles(diagram: &Diagram, nodes: &HashMap<&str, usize>, out: &mut Vec<D
 /// True when a node names the property but leaves it to a `{{hole}}` — the
 /// datum is declared, just not bound yet, so "it is missing" would be a lie.
 fn awaits_binding(node: &NodeDecl, def: &'static props::ArchetypeDef, name: &str) -> bool {
-    node.effective_props(def.slots)
+    node.props_for(def)
         .iter()
         .any(|p| p.name == name && p.values.iter().any(|v| v.is_hole()))
 }
@@ -614,7 +635,7 @@ fn resolved_nodes(diagram: &Diagram, base: crate::style::Style) -> Vec<crate::st
                     base.clone(),
                     def.item,
                     &node.classes,
-                    &node.effective_props(def.slots),
+                    &node.props_for(def),
                 )
                 .unwrap_or_default()
         })
@@ -760,6 +781,56 @@ fn check_packet(diagram: &Diagram, out: &mut Vec<Diag>) {
 
 /// `bar` and `xy` read the same data: named categories and one number per
 /// category, per series.
+/// `series` and `scatter` are two readings of the same axes (`D-023`), and one
+/// plot cannot be both: an indexed series takes its x from its position in the
+/// line, a scatter from the numbers written. Letting them share a plot would
+/// put two meanings of x on one axis, and no reader could tell which applied
+/// to which mark.
+#[cfg(feature = "xy")]
+fn check_scatter(diagram: &Diagram, out: &mut Vec<Diag>) {
+    let def = archetype_of(diagram);
+    let styles = resolved_nodes(diagram, base_style("xy"));
+
+    let mut first: Option<&'static str> = None;
+    for node in &diagram.nodes {
+        // `node` is the universal synonym and carries the primary form, so it
+        // reads as `series` here rather than as a third thing.
+        let form = if node.keyword.as_str() == "scatter" {
+            "scatter"
+        } else {
+            def.item
+        };
+        match first {
+            None => first = Some(form),
+            Some(seen) if seen != form => out.push(Diag::error(
+                node.keyword.span,
+                format!(
+                    "`{seen}` and `{form}` cannot share a plot — one takes its x from \
+                     its position in the line, the other from the numbers written"
+                ),
+            )),
+            Some(_) => {}
+        }
+    }
+
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        let Some(pairs) = styles.get(i).and_then(|s| s.pairs.as_ref()) else {
+            continue;
+        };
+        if pairs.len() % 2 == 1 {
+            out.push(Diag::error(
+                node.id.span,
+                format!(
+                    "`{}` has {} values — `scatter` reads them two at a time, so the \
+                     last x has no y",
+                    node.id.as_str(),
+                    pairs.len()
+                ),
+            ));
+        }
+    }
+}
+
 fn check_bar(diagram: &Diagram, out: &mut Vec<Diag>) {
     let archetype = archetype_of(diagram).name;
     warn_ignored(diagram, archetype, out);
@@ -771,7 +842,14 @@ fn check_bar(diagram: &Diagram, out: &mut Vec<Diag>) {
         .map_or(0, |p| p.values.len());
 
     let styles = resolved_nodes(diagram, base_style(archetype));
+    // A `scatter` carries its own x (`D-023`), so it is neither missing its
+    // numbers nor measurable against a category list.
+    let scattered = styles.iter().any(|s| s.pairs.is_some());
+
     for (i, node) in diagram.nodes.iter().enumerate() {
+        if styles.get(i).and_then(|s| s.pairs.as_ref()).is_some() {
+            continue;
+        }
         let points = styles.get(i).and_then(|s| s.points.as_ref());
         let Some(points) = points.filter(|p| !p.is_empty()) else {
             if awaits_binding(node, archetype_of(diagram), "points") {
@@ -803,7 +881,7 @@ fn check_bar(diagram: &Diagram, out: &mut Vec<Diag>) {
         }
     }
 
-    if categories == 0 {
+    if categories == 0 && !scattered {
         out.push(Diag::warn(
             diagram
                 .archetype
@@ -829,7 +907,11 @@ fn check_bar(diagram: &Diagram, out: &mut Vec<Diag>) {
         .nodes
         .iter()
         .enumerate()
-        .filter(|(i, _)| styles.get(*i).and_then(|s| s.points.as_ref()).is_some())
+        .filter(|(i, _)| {
+            styles
+                .get(*i)
+                .is_some_and(|s| s.points.is_some() || s.pairs.is_some())
+        })
         .count();
     if drawn > crate::props::PALETTE_LIGHT.len() {
         out.push(Diag::warn(

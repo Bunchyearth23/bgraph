@@ -137,6 +137,21 @@ fn archetypes(m: &mut String) {
             shape
         );
 
+        // A second word carries a second positional shape (`D-023`). It is
+        // written out in full rather than as a note, because the shape *is*
+        // the difference between the two.
+        for alt in def.alt_items {
+            let shape = slot_shape(alt.slots);
+            let _ = write!(
+                m,
+                "\n```\n{} <id> [\"label\"]{}{}\n```\n\n{}\n",
+                alt.item,
+                if shape.is_empty() { "" } else { " " },
+                shape,
+                squash(alt.doc)
+            );
+        }
+
         if !def.edge_slots.is_empty() {
             let _ = write!(
                 m,

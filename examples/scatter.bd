@@ -1,0 +1,12 @@
+// `scatter` is `type xy` read as coordinates rather than as positions —
+// values two at a time, so the x written is the x drawn (D-023).
+type xy {
+  title: "Latency against load"
+  size: 560 320
+  mark: dot
+}
+graph { background: #0b1120 padding: 30 }
+style series { font: 11 #cbd5e1 }
+
+scatter edge    "Edge nodes"    120 41  260 44  410 52  530 61  680 78  790 96
+scatter central "Central nodes" 140 63  300 71  450 88  610 112 740 141 860 176

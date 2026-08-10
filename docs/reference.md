@@ -721,11 +721,17 @@ api  --> browser "201 Created"
 
 ### `type xy`
 
-Lines, areas or dots over a shared x axis. One series per statement, its numbers evenly spaced across the plot.
+Lines, areas or dots over a shared x axis. One series per statement, its numbers evenly spaced across the plot — or `scatter`, which reads coordinates instead.
 
 ```
 series <id> ["label"] <points> …
 ```
+
+```
+scatter <id> ["label"] <pairs> …
+```
+
+The same plot, read as coordinates: values are taken two at a time, so `scatter north 1 4 3 8` places points at (1, 4) and (3, 8). Its x values are the ones written, not the position in the line — which is the whole difference from `series`.
 
 | Setting | Syntax | Meaning |
 |---|---|---|
@@ -741,7 +747,8 @@ On a `series` — these are its own, and are not offered elsewhere:
 
 | Property | Where | Syntax | Meaning |
 |---|---|---|---|
-| `points` | node | `points: <n> <n> …` | One number per category, in order. Usually written positionally — `series north 4 8 15`. |
+| `points` | node | `points: <n> <n> …` | One number per step, spread evenly across the x axis. Usually written positionally — `series north 4 8 15`. |
+| `pairs` | node | `pairs: <x> <y> <x> <y> …` | Coordinates, read two at a time — the shape `scatter` carries. `scatter north 1 4 3 8` is two points, at (1, 4) and (3, 8). An odd count is an error: the last x would have no y. |
 
 <details>
 <summary>A complete file — <code>examples/xy.bd</code></summary>

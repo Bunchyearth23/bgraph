@@ -97,6 +97,15 @@ impl NodeDecl {
     pub fn effective_props(&self, slots: &[crate::props::Slot]) -> Vec<Prop> {
         fold_positional(&self.positional, self.positional_span, slots, &self.props)
     }
+
+    /// The same, resolved against the archetype — which is nearly always what
+    /// a caller wants, because the positional shape follows the **word the
+    /// author wrote** (`D-023`), not the archetype's primary form. Taking the
+    /// def rather than a slot list is what stops a caller reaching for
+    /// `def.slots` and silently misreading a second form.
+    pub fn props_for(&self, def: &crate::props::ArchetypeDef) -> Vec<Prop> {
+        self.effective_props(def.slots_for(self.keyword.as_str()))
+    }
 }
 
 /// Positional values fill the archetype's slots in order and are placed

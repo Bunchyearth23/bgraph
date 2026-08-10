@@ -132,6 +132,10 @@ pub struct Style {
     pub data: Option<Vec<String>>,
     /// A series, one number per category.
     pub points: Option<Vec<f64>>,
+    /// Coordinates, read two at a time — the shape `xy`'s `scatter` keyword
+    /// carries (`D-023`). Kept as a flat list because that is how it is
+    /// written; `check` is what refuses an odd count.
+    pub pairs: Option<Vec<f64>>,
     /// State-machine semantics.
     pub kind: Option<StateKind>,
     pub guard: Option<String>,
@@ -197,6 +201,7 @@ impl Style {
             wave,
             data,
             points,
+            pairs,
             kind,
             block_kind,
             tech,
@@ -373,6 +378,7 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
         }
         "value" => style.value = first.and_then(|x| x.as_num()),
         "points" => style.points = Some(v.iter().filter_map(|x| x.as_num()).collect()),
+        "pairs" => style.pairs = Some(v.iter().filter_map(|x| x.as_num()).collect()),
         "kind" => {
             let word = first.and_then(|x| x.as_word()).unwrap_or_default();
             // One word, two genres: `check` has already refused the wrong

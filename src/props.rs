@@ -481,6 +481,32 @@ pub const SERIES_ITEM_PROPS: &[PropDef] = &[PropDef {
           `series north 4 8 15`.",
 }];
 
+/// `xy` reads everything `bar` does, plus the coordinates its `scatter`
+/// keyword carries. Kept apart from `SERIES_ITEM_PROPS` because `bar` has no
+/// x axis to place a pair on, and offering `pairs` there is the noise `D-019`
+/// removed.
+pub const XY_ITEM_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "points",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "points: <n> <n> …",
+        doc: "One number per step, spread evenly across the x axis. Usually \
+              written positionally — `series north 4 8 15`.",
+    },
+    PropDef {
+        name: "pairs",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "pairs: <x> <y> <x> <y> …",
+        doc: "Coordinates, read two at a time — the shape `scatter` carries. \
+              `scatter north 1 4 3 8` is two points, at (1, 4) and (3, 8). An \
+              odd count is an error: the last x would have no y.",
+    },
+];
+
 pub const GANTT_ITEM_PROPS: &[PropDef] = &[
     PropDef {
         name: "start",
@@ -564,9 +590,47 @@ pub struct ArchetypeDef {
     /// Values written after the label, in order, and the property each one
     /// fills. `slice a "A" 4820` is sugar for `slice a "A" { value: 4820 }`.
     pub slots: &'static [Slot],
+    /// Further keywords, each carrying its own positional shape (`D-023`).
+    /// The form is chosen by the **word the author wrote**, never by how many
+    /// values follow it: two shapes of the same length would be
+    /// indistinguishable, and the diagnostic could not say which was meant.
+    pub alt_items: &'static [AltItem],
     /// The same, for edges: `a -> b 40` where the archetype's datum rides on
     /// the link rather than on what it joins.
     pub edge_slots: &'static [Slot],
+}
+
+/// A second word for the same archetype, with a positional shape of its own.
+pub struct AltItem {
+    pub item: &'static str,
+    pub doc: &'static str,
+    pub slots: &'static [Slot],
+}
+
+impl ArchetypeDef {
+    /// Whether this archetype answers to the word the author wrote. `node` is
+    /// the universal synonym everywhere.
+    pub fn accepts(&self, written: &str) -> bool {
+        written == self.item
+            || written == "node"
+            || self.alt_items.iter().any(|a| a.item == written)
+    }
+
+    /// The positional shape that word carries. `node` takes the primary form,
+    /// which is what keeps the universal synonym meaningful.
+    pub fn slots_for(&self, written: &str) -> &'static [Slot] {
+        self.alt_items
+            .iter()
+            .find(|a| a.item == written)
+            .map_or(self.slots, |a| a.slots)
+    }
+
+    /// Every word this archetype answers to, primary first. `node` is left
+    /// out: it is a synonym, not a form, and offering it would put it in
+    /// completion twice.
+    pub fn items(&self) -> impl Iterator<Item = &'static str> {
+        std::iter::once(self.item).chain(self.alt_items.iter().map(|a| a.item))
+    }
 }
 
 pub struct Slot {
@@ -587,6 +651,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         props: &[],
         item_props: &[],
         slots: &[],
+        alt_items: &[],
         edge_slots: &[],
     },
     #[cfg(feature = "pie")]
@@ -601,6 +666,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "value",
             arity: 1,
         }],
+        alt_items: &[],
         edge_slots: &[],
     },
     #[cfg(feature = "gantt")]
@@ -615,6 +681,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "start",
             arity: 2,
         }],
+        alt_items: &[],
         edge_slots: &[],
     },
     #[cfg(feature = "class")]
@@ -626,6 +693,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         props: CLASS_PROPS,
         item_props: &[],
         slots: &[],
+        alt_items: &[],
         edge_slots: &[],
     },
     #[cfg(feature = "timeline")]
@@ -641,6 +709,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "date",
             arity: 1,
         }],
+        alt_items: &[],
         edge_slots: &[],
     },
     #[cfg(feature = "block")]
@@ -657,6 +726,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "kind",
             arity: 1,
         }],
+        alt_items: &[],
         edge_slots: &[],
     },
     #[cfg(feature = "er")]
@@ -671,6 +741,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         props: ER_PROPS,
         item_props: ER_ITEM_PROPS,
         slots: &[],
+        alt_items: &[],
         edge_slots: &[
             Slot {
                 prop: "from-card",
@@ -692,6 +763,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         props: STATE_PROPS,
         item_props: STATE_ITEM_PROPS,
         slots: &[],
+        alt_items: &[],
         edge_slots: &[],
     },
     #[cfg(feature = "sequence")]
@@ -703,6 +775,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         props: SEQUENCE_PROPS,
         item_props: &[],
         slots: &[],
+        alt_items: &[],
         edge_slots: &[],
     },
     #[cfg(feature = "xy")]
@@ -710,12 +783,25 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         name: "xy",
         item: "series",
         doc: "Lines, areas or dots over a shared x axis. One series per \
-              statement, its numbers evenly spaced across the plot.",
+              statement, its numbers evenly spaced across the plot — or \
+              `scatter`, which reads coordinates instead.",
         props: XY_PROPS,
-        item_props: SERIES_ITEM_PROPS,
+        item_props: XY_ITEM_PROPS,
         slots: &[Slot {
             prop: "points",
             arity: VARIADIC,
+        }],
+        alt_items: &[AltItem {
+            item: "scatter",
+            doc: "The same plot, read as coordinates: values are taken two at \
+                  a time, so `scatter north 1 4 3 8` places points at (1, 4) \
+                  and (3, 8). Its x values are the ones written, not the \
+                  position in the line — which is the whole difference from \
+                  `series`.",
+            slots: &[Slot {
+                prop: "pairs",
+                arity: VARIADIC,
+            }],
         }],
         edge_slots: &[],
     },
@@ -731,6 +817,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "points",
             arity: VARIADIC,
         }],
+        alt_items: &[],
         edge_slots: &[],
     },
     #[cfg(feature = "sankey")]
@@ -743,6 +830,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         props: SANKEY_PROPS,
         item_props: SANKEY_ITEM_PROPS,
         slots: &[],
+        alt_items: &[],
         edge_slots: &[Slot {
             prop: "value",
             arity: 1,
@@ -760,6 +848,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "wave",
             arity: 1,
         }],
+        alt_items: &[],
         edge_slots: &[],
     },
     #[cfg(feature = "quadrant")]
@@ -780,6 +869,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
                 arity: 1,
             },
         ],
+        alt_items: &[],
         edge_slots: &[],
     },
     #[cfg(feature = "treemap")]
@@ -795,6 +885,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "value",
             arity: 1,
         }],
+        alt_items: &[],
         edge_slots: &[],
     },
     #[cfg(feature = "packet")]
@@ -809,6 +900,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "bits",
             arity: 2,
         }],
+        alt_items: &[],
         edge_slots: &[],
     },
 ];

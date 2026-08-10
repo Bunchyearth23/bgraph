@@ -387,17 +387,32 @@ impl Server {
                 .map(|(name, doc)| completion(name, 14, "keyword", doc))
                 .collect();
 
-            // The archetype's own word first; `node` stays available.
-            if item != "node" {
-                out.insert(
-                    0,
-                    completion(
-                        item,
-                        14,
-                        "keyword",
-                        &format!("Declare a {item} — what `type {archetype}` calls its elements."),
-                    ),
-                );
+            // The archetype's own word first; `node` stays available. A second
+            // word carries a second positional shape (`D-023`), so leaving it
+            // out would hide half of what the archetype accepts — and its own
+            // doc is what tells the two apart, so it is offered with that
+            // rather than a generic line.
+            if let Some(def) = props::archetype(archetype) {
+                let mut at = 0;
+                if def.item != "node" {
+                    out.insert(
+                        at,
+                        completion(
+                            def.item,
+                            14,
+                            "keyword",
+                            &format!(
+                                "Declare a {} — what `type {archetype}` calls its elements.",
+                                def.item
+                            ),
+                        ),
+                    );
+                    at += 1;
+                }
+                for alt in def.alt_items {
+                    out.insert(at, completion(alt.item, 14, "keyword", alt.doc));
+                    at += 1;
+                }
             }
             if archetype == "free" && !current.is_empty() {
                 out.extend(

@@ -188,6 +188,17 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   `extension.toml`'s `rev` must move after every `grammar.js` change or Zed
   silently reuses the cached grammar. `editors/zed/install.sh` does both.
 
+- [2026-08-10] **`def.slots` is the archetype's *primary* form, not the form in
+  front of you.** Once an archetype has a second keyword (`D-023`), thirteen
+  call sites reading `node.effective_props(def.slots)` would silently fold a
+  `scatter`'s coordinates into `points` and draw the wrong plot — with no
+  error, because both are lists of numbers. They all go through
+  `NodeDecl::props_for(def)` now, which resolves from the **written keyword**.
+  The method takes the whole `ArchetypeDef` rather than a slot list precisely
+  so a caller cannot reach past it; that is the same shape of fix as deleting
+  `relevant_here` — make the wrong thing unsayable rather than remembering not
+  to say it.
+
 ### Gotchas
 - [2026-07-31] `template::scan` is textual on purpose, so `{{…}}` written
   inside a **comment** is still a hole. Writing about the syntax in a `.bd`

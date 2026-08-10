@@ -2216,6 +2216,121 @@ fn a_numeric_x_axis_replaces_the_categories() {
     assert!(err("type xy { x-axis: 5 }\nseries s 1").contains("takes a minimum and a maximum"));
 }
 
+// --------------------------------------------------------------- W-048, D-023
+
+#[test]
+fn the_written_keyword_chooses_the_positional_shape() {
+    // The whole of D-023: the same archetype, two words, two shapes. Nothing
+    // dispatches on how many values were written.
+    let def = crate::props::archetype("xy").expect("xy exists");
+
+    assert_eq!(def.slots_for("series")[0].prop, "points");
+    assert_eq!(def.slots_for("scatter")[0].prop, "pairs");
+    // `node` is a synonym, not a third form — it takes the primary shape.
+    assert_eq!(def.slots_for("node")[0].prop, "points");
+
+    assert!(def.accepts("series") && def.accepts("scatter") && def.accepts("node"));
+    assert!(!def.accepts("slice"));
+}
+
+#[test]
+fn a_scatter_point_lands_on_the_x_it_declares() {
+    // An indexed series spreads evenly; a scatter does not. Declared x values
+    // 0, 10 and 100 must land at the left edge, a tenth in, and the right —
+    // never at 0, half and full, which is what evenly-spaced would give.
+    let l = build(
+        r#"
+        type xy { size: 400 200 mark: dot legend: off }
+        scatter s "S" 0 5 10 5 100 5
+    "#,
+    );
+
+    let mut xs: Vec<f64> = l.nodes.iter().map(|n| n.rect.x + n.rect.w / 2.0).collect();
+    xs.sort_by(f64::total_cmp);
+    assert_eq!(xs.len(), 3, "three coordinate pairs, three marks");
+
+    let span = xs[2] - xs[0];
+    let tenth = (xs[1] - xs[0]) / span;
+    assert!(
+        (tenth - 0.1).abs() < 0.02,
+        "the middle point sits a tenth along, not half: {tenth} from {xs:?}"
+    );
+}
+
+#[test]
+fn a_scatter_is_dots_until_told_otherwise() {
+    // Joining scattered points by default would claim a continuity the data
+    // does not have. `series` keeps its line.
+    let dots = build("type xy { size: 400 200 legend: off }\nscatter s \"S\" 1 4 3 8");
+    assert!(dots.polylines.is_empty(), "no line through a scatter");
+    assert_eq!(dots.nodes.len(), 2);
+
+    let lined = build("type xy { size: 400 200 legend: off }\nseries s \"S\" 4 8");
+    assert!(!lined.polylines.is_empty(), "a series still draws its line");
+}
+
+#[test]
+fn a_line_through_a_scatter_follows_x_not_declaration_order() {
+    // Written out of order on purpose: a polyline in declaration order would
+    // double back, which reads as data that goes backwards in x.
+    let l = build(
+        r#"
+        type xy { size: 400 200 mark: line legend: off }
+        scatter s "S" 90 1 10 9 50 5
+    "#,
+    );
+
+    let path = &l.polylines[0].points;
+    assert!(
+        path.windows(2).all(|w| w[0].0 <= w[1].0),
+        "the line runs left to right: {path:?}"
+    );
+}
+
+#[test]
+fn series_and_scatter_cannot_share_a_plot() {
+    // Two meanings of x on one axis, and no reader could tell which mark used
+    // which. Refused rather than blended.
+    let e = err("type xy\nseries a \"A\" 1 2 3\nscatter b \"B\" 1 4 3 8");
+    assert!(e.contains("cannot share a plot"), "{e}");
+    assert!(e.contains("series") && e.contains("scatter"), "{e}");
+}
+
+#[test]
+fn an_odd_count_of_coordinates_is_refused() {
+    // The last x has no y. Silently dropping it would draw a plot missing a
+    // point the author wrote.
+    let e = err("type xy\nscatter s \"S\" 1 4 3");
+    assert!(e.contains("two at a time"), "{e}");
+    assert!(e.contains("last x has no y"), "{e}");
+}
+
+#[test]
+fn a_scatter_needs_no_categories() {
+    // It carries its own x, so the `no categories` warning would be noise.
+    let diagram = parse_diagram("type xy\nscatter s \"S\" 1 4 3 8").expect("parses");
+    let warnings: Vec<String> = crate::check::check(&diagram)
+        .into_iter()
+        .map(|d| d.message)
+        .collect();
+    assert!(
+        !warnings.iter().any(|m| m.contains("categories")),
+        "{warnings:?}"
+    );
+}
+
+#[test]
+fn the_second_keyword_belongs_to_its_own_archetype() {
+    // `scatter` is xy's. Written under `bar` it is an unknown keyword, and the
+    // message names the genre that does read it.
+    let e = err("type bar { categories: \"a\" }\nscatter s \"S\" 1 4");
+    assert!(e.contains("`type xy`"), "{e}");
+
+    // And xy's own message names both of its words, not just the first.
+    let e = err("type xy\nslice s \"S\" 1");
+    assert!(e.contains("series") && e.contains("scatter"), "{e}");
+}
+
 #[test]
 fn a_single_point_is_still_drawn() {
     let l = build(
