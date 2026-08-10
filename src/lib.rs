@@ -132,6 +132,7 @@ pub mod fmt;
 pub mod layout;
 #[allow(missing_docs)]
 pub mod props;
+pub mod relayout;
 pub mod render_json;
 #[allow(missing_docs)]
 #[cfg(feature = "pdf")]

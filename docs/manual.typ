@@ -712,6 +712,7 @@ bgraph watch docs/diagrams
 bgraph check diagram.bd
 bgraph diff old.bd new.bd
 bgraph explain diagram.bd api
+bgraph layout diagram.bd
 bgraph fmt diagram.bd
 bgraph completions fish
 bgraph init pie
@@ -770,6 +771,12 @@ one you stop trusting.
 the file declares, so the one box coloured on purpose survives it. A theme is
 a style file and nothing more: the same source, the same parser, one mechanism
 rather than two.
+
+`layout` writes the placements into a loose file, once, so every box says
+where it goes from then on — auto-placement as a source transformation rather
+than as an engine. It inserts into lines instead of rewriting them, so
+comments and hand-aligned columns survive, and it renders the file before and
+after and refuses to write if the picture moved.
 
 `explain` answers "why is that box there". Because placement is declared, the
 answer is a statement in the file or a default that stood in for one — and

@@ -128,6 +128,16 @@ enum Command {
         /// bash | elvish | fish | powershell | zsh | man
         shell: String,
     },
+    /// Write the placements into the file, once, so every box says where it
+    /// goes. The picture does not change
+    Layout {
+        /// Input DSL files
+        inputs: Vec<PathBuf>,
+
+        /// Report which files would change, and change nothing
+        #[arg(long)]
+        check: bool,
+    },
     /// Say why a box is where it is, and where each of its colours came from
     Explain {
         /// Input DSL file
@@ -203,6 +213,65 @@ fn watch_dir(
     }
 
     watch::build_dir(dir, out, once)?;
+    Ok(0)
+}
+
+/// Freeze the layout into the source.
+///
+/// The picture must not change — that is the whole promise — so the file is
+/// re-rendered before and after and the two compared. A mismatch is refused
+/// rather than written: rewriting someone's file and changing their diagram
+/// while doing it is the one outcome this command may never produce.
+fn write_layout(inputs: &[PathBuf], check: bool) -> Result<i32> {
+    if inputs.is_empty() {
+        bail!("no input file (try `bgraph layout diagram.bd`)");
+    }
+
+    let mut changed = 0;
+    for path in inputs {
+        let source =
+            fs::read_to_string(path).with_context(|| format!("cannot read {}", path.display()))?;
+        let diagram = parser::parse_diagram(&source)
+            .with_context(|| format!("{} does not parse, so it is left alone", path.display()))?;
+
+        let filled = bgraph::relayout::fill_in(&source, &diagram)?;
+        if filled == source {
+            continue;
+        }
+
+        let before = render_svg::render(&layout::solve(&diagram)?);
+        let after = render_svg::render(&layout::solve(&parser::parse_diagram(&filled)?)?);
+        if before != after {
+            bail!(
+                "{} would draw differently after `layout`, so nothing was written —                  this is a bug in bgraph, not in the file",
+                path.display()
+            );
+        }
+
+        changed += 1;
+        if check {
+            println!("{}", path.display());
+        } else {
+            fs::write(path, &filled).with_context(|| format!("cannot write {}", path.display()))?;
+            println!(
+                "{}: {} placement{} written",
+                path.display(),
+                bgraph::relayout::unplaced(&diagram).len(),
+                if bgraph::relayout::unplaced(&diagram).len() == 1 {
+                    ""
+                } else {
+                    "s"
+                }
+            );
+        }
+    }
+
+    if check && changed > 0 {
+        return Ok(1);
+    }
+    if changed == 0 {
+        println!("every box already says where it goes");
+    }
     Ok(0)
 }
 
@@ -387,6 +456,7 @@ fn run() -> Result<i32> {
         #[cfg(feature = "completions")]
         Some(Command::Completions { shell }) => return completions(&shell),
         Some(Command::Init { genre, output }) => return init(genre, output),
+        Some(Command::Layout { inputs, check }) => return write_layout(&inputs, check),
         Some(Command::Explain { input, name }) => {
             let composed = bgraph::compose::load(&input)?;
             let solved = layout::solve(&composed.diagram)?;

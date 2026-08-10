@@ -421,6 +421,32 @@ system, not a solver. Nothing is snapped to it: a box placed in pixels is
 unaffected, and a grid that quietly moved a declared position would be exactly
 the auto-placement this language refuses.
 
+### Freezing a loose file
+
+Write a diagram without placements, then run `bgraph layout` once and every
+box says where it goes:
+
+```
+node ui   "Browser"          // the reader
+node api  "API"
+```
+
+becomes
+
+```
+node ui   "Browser"          // the reader
+node api  "API" right-of ui
+```
+
+It **inserts into lines** rather than rewriting them, so a comment, a column
+lined up by hand and a trailing note all survive — `fmt` leaves interior
+alignment alone and this goes further still.
+
+**The picture does not change.** That is the whole promise, and it is checked
+rather than asserted: the file is rendered before and after, and if the two
+differ nothing is written. A box that already says where it goes is left
+alone, and running it twice changes nothing the second time.
+
 ### Constraints
 
 Three statements adjust what is already placed, and none of them reorders
@@ -660,6 +686,7 @@ bgraph check diagram.bd             # diagnostics only, no output file
 bgraph check diagram.bd --ci        # …the flat form, whatever stdout is
 bgraph diff old.bd new.bd -o d.svg  # what appeared, what left, what moved
 bgraph explain diagram.bd api     # why that box is where it is
+bgraph layout diagram.bd            # write the placements in; the picture is unchanged
 bgraph report.bd --data q3.json     # fill a template from a JSON object
 bgraph report.bd --data - --emit    # …from a pipe, printing the filled source
 bgraph report.bd --rows r=sales.csv # one hole from the rows of a CSV

@@ -8028,3 +8028,83 @@ fn explaining_an_unknown_box_lists_the_ones_there_are() {
     assert!(message.contains("ghost"), "{message}");
     assert!(message.contains('a') && message.contains('b'), "{message}");
 }
+
+// ------------------------------------------------- `bgraph layout` (I-033)
+
+/// Fill in the placements and hand back both texts.
+fn frozen(source: &str) -> (String, String) {
+    let diagram = parse_diagram(source).expect("it parses");
+    let filled = crate::relayout::fill_in(source, &diagram).expect("it fills in");
+    (source.to_string(), filled)
+}
+
+#[test]
+fn freezing_a_layout_does_not_change_the_picture() {
+    // The whole promise, and the only guard that makes the command
+    // trustworthy: it edits the author's file, so the diagram must come out
+    // byte-identical.
+    for source in [
+        "node a \"A\"\nnode b \"B\"\nnode c \"C\"\na -> b",
+        "graph { flow: down, gap: 30 }\nnode a \"A\"\nnode b \"B\"",
+        "node a \"A\"\nnode b \"B\" { fill: #eef3ff }\nnode c \"C\"",
+        "node a \"A\" at (0, 0)\nnode b \"B\" right-of a\nnode c \"C\"",
+    ] {
+        let (before, after) = frozen(source);
+        let one = crate::render_source(&before).expect("the original draws");
+        let two = crate::render_source(&after).expect("the frozen one draws");
+        assert_eq!(
+            one, two,
+            "the picture moved:\n--- before\n{before}\n--- after\n{after}"
+        );
+    }
+}
+
+#[test]
+fn every_box_says_where_it_goes_afterwards() {
+    let (_, after) = frozen("node a \"A\"\nnode b \"B\"\nnode c \"C\"");
+    let diagram = parse_diagram(&after).unwrap();
+    assert!(
+        crate::relayout::unplaced(&diagram).is_empty(),
+        "still loose: {after}"
+    );
+}
+
+#[test]
+fn a_comment_and_the_author_s_spacing_survive() {
+    // `fmt` leaves interior alignment alone; this has to go further, because
+    // a comment and a column lined up by hand are things the author put
+    // there on purpose.
+    let source = "node ui   \"Browser\"          // the reader\nnode api  \"API\"\n";
+    let (_, after) = frozen(source);
+    assert!(after.contains("// the reader"), "{after}");
+    assert!(after.contains("node ui   \"Browser\""), "{after}");
+    assert!(after.contains("node api  \"API\" right-of ui"), "{after}");
+}
+
+#[test]
+fn a_placement_lands_before_a_block_and_not_against_it() {
+    // Both orders parse, but `right-of api{ … }` is not something a person
+    // would have typed — and that was the first output.
+    let (_, after) = frozen("node a \"A\"\nnode b \"B\" { fill: #eef3ff }\n");
+    assert!(after.contains("right-of a { fill:"), "{after}");
+}
+
+#[test]
+fn a_box_that_already_says_where_it_goes_is_left_alone() {
+    let source = "node a \"A\"\nnode b \"B\" below a gap 90\n";
+    let (_, after) = frozen(source);
+    assert_eq!(after, source, "a declared placement was rewritten");
+}
+
+#[test]
+fn freezing_twice_changes_nothing_the_second_time() {
+    let (_, once) = frozen("node a \"A\"\nnode b \"B\"\nnode c \"C\"");
+    let (_, twice) = frozen(&once);
+    assert_eq!(once, twice);
+}
+
+#[test]
+fn a_brace_inside_a_label_is_not_a_block() {
+    let (_, after) = frozen("node a \"A\"\nnode b \"a { brace\"\n");
+    assert!(after.contains("\"a { brace\" right-of a"), "{after}");
+}
