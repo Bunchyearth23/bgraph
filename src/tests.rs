@@ -8229,3 +8229,51 @@ fn the_playground_loads_the_module_the_build_script_writes() {
         );
     }
 }
+
+// ------------------------------------------------- releases and CI (I-025, I-027)
+
+#[test]
+fn the_release_workflow_ships_both_binaries_and_neither_publishes() {
+    // The standing rule: never publish anything outward without being asked.
+    // A workflow that quietly created a release would break it on somebody
+    // else's machine, months from now, with nobody watching.
+    let release = include_str!("../.github/workflows/release.yml");
+
+    for binary in ["bgraph", "bgraph-lsp"] {
+        assert!(release.contains(binary), "`{binary}` is not shipped");
+    }
+    for forbidden in [
+        "softprops/action-gh-release",
+        "gh release create",
+        "cargo publish",
+    ] {
+        assert!(
+            !release.contains(forbidden),
+            "the release workflow publishes: `{forbidden}`"
+        );
+    }
+    // Two artefacts rather than one compromise: `window` is off by default
+    // and pulls seventy-eight more crates.
+    assert!(release.contains("--features window"), "{release}");
+}
+
+#[test]
+fn the_action_uses_the_flat_diagnostics_a_parser_wants() {
+    // A caret and a colour are for a terminal. An annotation parser wants
+    // `file:line:col`, which is exactly what `--ci` pins.
+    let action = include_str!("../.github/actions/bgraph/action.yml");
+    assert!(action.contains("check"), "the action never checks anything");
+    assert!(
+        action.contains("--ci"),
+        "the action reads the rich form, which nothing parses"
+    );
+    assert!(action.contains("fmt --check"), "{action}");
+}
+
+#[test]
+fn the_manifest_still_refuses_to_publish_itself() {
+    // `Q-005` is unanswered, and until it is, this is the line that keeps an
+    // accident from becoming a distribution.
+    let manifest = include_str!("../Cargo.toml");
+    assert!(manifest.contains("publish = false"), "{manifest}");
+}
