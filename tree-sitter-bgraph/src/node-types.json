@@ -8,6 +8,10 @@
         "required": true,
         "types": [
           {
+            "type": "cell",
+            "named": true
+          },
+          {
             "type": "point",
             "named": true
           }
@@ -53,6 +57,32 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "cell",
+    "named": true,
+    "fields": {
+      "col": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      },
+      "row": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "number",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -1026,6 +1056,10 @@
     "named": false
   },
   {
+    "type": "col",
+    "named": false
+  },
+  {
     "type": "color",
     "named": true
   },
@@ -1112,6 +1146,10 @@
   },
   {
     "type": "right-of",
+    "named": false
+  },
+  {
+    "type": "row",
     "named": false
   },
   {

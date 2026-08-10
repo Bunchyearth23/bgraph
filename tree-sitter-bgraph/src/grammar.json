@@ -1057,8 +1057,17 @@
           "type": "FIELD",
           "name": "point",
           "content": {
-            "type": "SYMBOL",
-            "name": "point"
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "SYMBOL",
+                "name": "cell"
+              },
+              {
+                "type": "SYMBOL",
+                "name": "point"
+              }
+            ]
           }
         }
       ]
@@ -1214,6 +1223,47 @@
         {
           "type": "FIELD",
           "name": "y",
+          "content": {
+            "type": "SYMBOL",
+            "name": "number"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": ")"
+        }
+      ]
+    },
+    "cell": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "("
+        },
+        {
+          "type": "STRING",
+          "value": "col"
+        },
+        {
+          "type": "FIELD",
+          "name": "col",
+          "content": {
+            "type": "SYMBOL",
+            "name": "number"
+          }
+        },
+        {
+          "type": "STRING",
+          "value": ","
+        },
+        {
+          "type": "STRING",
+          "value": "row"
+        },
+        {
+          "type": "FIELD",
+          "name": "row",
           "content": {
             "type": "SYMBOL",
             "name": "number"

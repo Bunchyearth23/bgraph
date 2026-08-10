@@ -211,7 +211,7 @@ module.exports = grammar({
 
     _placement: ($) => choice($.absolute_position, $.relative_position),
 
-    absolute_position: ($) => seq('at', field('point', $.point)),
+    absolute_position: ($) => seq('at', field('point', choice($.cell, $.point))),
 
     relative_position: ($) =>
       seq(
@@ -230,6 +230,12 @@ module.exports = grammar({
     alignment: (_) => choice('left', 'right', 'center', 'middle', 'top', 'bottom'),
 
     point: ($) => seq('(', field('x', $.number), ',', field('y', $.number), ')'),
+
+    // `at (col 3, row 2)` — still `at`, in the units `graph { grid }` declares.
+    // A coordinate system and not a solver, which is why it cannot decide an
+    // order (`D-031`).
+    cell: ($) =>
+      seq('(', 'col', field('col', $.number), ',', 'row', field('row', $.number), ')'),
 
     // ---------------------------------------------------------- blocks
 

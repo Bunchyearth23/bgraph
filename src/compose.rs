@@ -56,6 +56,19 @@ impl SourceMap {
         (path, line, col)
     }
 
+    /// Where the file containing `offset` starts in the composed buffer.
+    ///
+    /// Subtract it and a span is back in that file's own coordinates, which is
+    /// what an editor needs — it addresses one buffer and knows nothing about
+    /// the others laid down beside it.
+    pub fn base_of(&self, offset: usize) -> usize {
+        let i = self
+            .files
+            .partition_point(|(start, _)| *start <= offset)
+            .saturating_sub(1);
+        self.files[i].0
+    }
+
     /// The one file's worth of text a span belongs to, for showing the line a
     /// diagnostic points at.
     pub fn source_of(&self, offset: usize) -> &str {
@@ -83,6 +96,21 @@ pub struct Composed {
 
 /// Load `path`, resolving its includes.
 pub fn load(path: &Path) -> Result<Composed> {
+    compose(path, None)
+}
+
+/// The same, with the entry file's text supplied rather than read.
+///
+/// For an editor: the buffer is what the reader is looking at, and the file on
+/// disk is a version of it from before the last keystroke. Composing from disk
+/// would report diagnostics against text nobody can see. The *included* files
+/// are still read from disk, which is correct — those are not being edited in
+/// this buffer.
+pub fn load_text(path: &Path, source: &str) -> Result<Composed> {
+    compose(path, Some(source))
+}
+
+fn compose(path: &Path, entry: Option<&str>) -> Result<Composed> {
     let mut state = State {
         diagram: Diagram::default(),
         text: String::new(),
@@ -92,7 +120,7 @@ pub fn load(path: &Path) -> Result<Composed> {
         origin: HashMap::new(),
         chain: Vec::new(),
     };
-    state.absorb(path, None)?;
+    state.absorb(path, None, entry)?;
 
     Ok(Composed {
         diagram: state.diagram,
@@ -112,7 +140,7 @@ struct State {
 }
 
 impl State {
-    fn absorb(&mut self, path: &Path, prefix: Option<&str>) -> Result<()> {
+    fn absorb(&mut self, path: &Path, prefix: Option<&str>, entry: Option<&str>) -> Result<()> {
         let path = path
             .canonicalize()
             .with_context(|| format!("cannot open {}", path.display()))?;
@@ -124,8 +152,11 @@ impl State {
             bail!("`include` runs in a circle: {}", chain.join(" → "));
         }
 
-        let source = std::fs::read_to_string(&path)
-            .with_context(|| format!("cannot read {}", path.display()))?;
+        let source = match entry {
+            Some(text) => text.to_string(),
+            None => std::fs::read_to_string(&path)
+                .with_context(|| format!("cannot read {}", path.display()))?,
+        };
         let mut diagram = crate::parser::parse(&source)
             .map_err(|e| anyhow::anyhow!("{}: {}", path.display(), e.message))?;
 
@@ -173,7 +204,10 @@ impl State {
                 (None, Some(inner)) => Some(inner.as_str().to_string()),
                 (None, None) => None,
             };
-            self.absorb(&target, nested.as_deref())
+            // Only the entry file's text is supplied; everything it pulls in
+            // comes from disk, which is right — those are not being edited in
+            // the buffer this was called for.
+            self.absorb(&target, nested.as_deref(), None)
                 .with_context(|| format!("included from {}", path.display()))?;
         }
         self.chain.pop();

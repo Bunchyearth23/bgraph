@@ -207,7 +207,7 @@ impl Server {
             "method": "textDocument/publishDiagnostics",
             "params": {
                 "uri": uri,
-                "diagnostics": diagnostics(text),
+                "diagnostics": diagnostics_for(text, path_of(&uri).as_deref()),
             }
         })]
     }
@@ -909,6 +909,92 @@ impl Server {
 }
 
 // ------------------------------------------------------------ diagnostics
+
+/// A `file://` URI as a path, when it is one.
+///
+/// Only the plain form, and deliberately: a URI this does not understand
+/// means composition is skipped and the buffer is checked on its own, which
+/// is the behaviour every editor had before `include` existed.
+pub(crate) fn path_of(uri: &str) -> Option<std::path::PathBuf> {
+    let rest = uri.strip_prefix("file://")?;
+    // `file:///home/…` — the authority is empty, so what is left starts at
+    // the third slash. A percent-escape is decoded because a path with a
+    // space in it is ordinary.
+    let mut out = String::with_capacity(rest.len());
+    let mut chars = rest.chars();
+    while let Some(c) = chars.next() {
+        if c != '%' {
+            out.push(c);
+            continue;
+        }
+        let hex: String = chars.by_ref().take(2).collect();
+        match u8::from_str_radix(&hex, 16) {
+            Ok(byte) => out.push(byte as char),
+            Err(_) => {
+                out.push('%');
+                out.push_str(&hex);
+            }
+        }
+    }
+    Some(std::path::PathBuf::from(out))
+}
+
+/// Diagnostics for a buffer, resolving its includes when it has a path.
+///
+/// Without this a file using `include` shows an error on every name it
+/// borrows — the composed diagram is valid and the buffer alone is not, and
+/// an editor that underlines correct code is one people turn off.
+///
+/// Only the problems belonging to **this** file are returned. A diagnostic
+/// from an included file is that file's to show, and publishing it here would
+/// underline the wrong line of the wrong document.
+pub(crate) fn diagnostics_for(text: &str, path: Option<&std::path::Path>) -> Vec<Value> {
+    let composed = path
+        .filter(|_| text.contains("include"))
+        .and_then(|path| crate::compose::load_text(path, text).ok());
+
+    let Some(composed) = composed else {
+        return diagnostics(text);
+    };
+
+    let index = LineIndex::new(text);
+    let mut diags = check::check(&composed.diagram);
+    if let Ok(layout) = crate::layout::solve(&composed.diagram) {
+        diags.extend(check::after_layout(&layout));
+    }
+
+    let mut out: Vec<Value> = Vec::new();
+    for diag in diags {
+        let (owner, _, _) = composed.map.locate(diag.span.start);
+        if owner != path.expect("a path was needed to compose") {
+            continue;
+        }
+        // Back into this buffer's own coordinates: the span indexes the
+        // composed text, and this file's slice of it starts somewhere else.
+        let base = composed.map.base_of(diag.span.start);
+        let local = crate::ast::Span {
+            start: diag.span.start.saturating_sub(base),
+            end: diag.span.end.saturating_sub(base),
+        };
+        out.push(json!({
+            "range": index.range(local),
+            "severity": if diag.severity == Severity::Error { 1 } else { 2 },
+            "source": "bgraph",
+            "message": diag.message,
+        }));
+    }
+
+    // The template's own rules still apply to the buffer as written.
+    for (span, message) in crate::template::lint(text) {
+        out.push(json!({
+            "range": index.range(span),
+            "severity": 2,
+            "source": "bgraph",
+            "message": message,
+        }));
+    }
+    out
+}
 
 pub(crate) fn diagnostics(text: &str) -> Vec<Value> {
     let index = LineIndex::new(text);

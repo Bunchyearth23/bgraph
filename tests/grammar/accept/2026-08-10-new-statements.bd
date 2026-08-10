@@ -1,0 +1,37 @@
+// Everything the language gained on 2026-08-10, in one file, so the two
+// grammars are cross-checked on it. The `at (col …)` line is the reason this
+// file exists: it was added to pest and not to tree-sitter, and nothing
+// noticed — no example and no corpus file used a grid cell.
+include "shared.bds"
+include "core.bd" as core
+
+graph {
+  title: "Everything new"
+  description: "One file per statement the language gained."
+  grid: 160 90
+  sketch: off
+}
+
+style hot { fill: #fee2e2 stroke: #dc2626 legend: "Degraded" }
+
+component service {
+  node app "{{label}}"
+  node db  "Database" below app gap 34
+  app -> db "reads"
+}
+
+use service as web
+use service as jobs right-of web gap 90 { label: "Jobs" }
+
+node ui  "Browser" .hot at (col 0, row 0)
+node api "API"     .hot at (col 2, row 1) { description: "Takes the card." }
+
+same-width  ui api
+same-height ui api
+align-group top ui api
+
+note "Figures are March." .hot below api gap 20
+legend right-of api gap 60
+
+ui -> core.api "HTTPS"
+web.app -> jobs.app "enqueues"

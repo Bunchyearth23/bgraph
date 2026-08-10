@@ -8467,3 +8467,88 @@ fn anything_it_does_not_understand_comes_back_whole() {
         );
     }
 }
+
+// ------------------------------------------------- the server and `include`
+
+#[test]
+fn the_server_does_not_underline_a_name_borrowed_from_another_file() {
+    // Without composing, a file using `include` shows an error on every name
+    // it borrows: the composed diagram is valid and the buffer alone is not.
+    // An editor that underlines correct code is one people turn off.
+    let dir = scratch("lsp-include");
+    std::fs::write(dir.join("core.bd"), "node api \"API\"\n").unwrap();
+    let entry = dir.join("main.bd");
+    let text = "include \"core.bd\" as core\nnode ui \"UI\"\nui -> core.api\n";
+    std::fs::write(&entry, text).unwrap();
+
+    let alone = crate::lsp::diagnostics(text);
+    assert!(
+        alone.iter().any(|d| d["message"]
+            .as_str()
+            .is_some_and(|m| m.contains("core.api"))),
+        "the buffer on its own really is invalid, which is the whole point"
+    );
+
+    let composed = crate::lsp::diagnostics_for(text, Some(&entry));
+    assert!(
+        !composed.iter().any(|d| d["message"]
+            .as_str()
+            .is_some_and(|m| m.contains("core.api"))),
+        "still underlined after composing: {composed:?}"
+    );
+}
+
+#[test]
+fn a_problem_in_an_included_file_is_not_reported_against_this_one() {
+    // LSP publishes per document. A diagnostic from another file shown here
+    // would underline the wrong line of the wrong buffer.
+    let dir = scratch("lsp-include-other");
+    std::fs::write(dir.join("core.bd"), "node api \"API\" { fil: #fff }\n").unwrap();
+    let entry = dir.join("main.bd");
+    let text = "include \"core.bd\"\nnode ui \"UI\"\n";
+    std::fs::write(&entry, text).unwrap();
+
+    let reported = crate::lsp::diagnostics_for(text, Some(&entry));
+    assert!(
+        !reported
+            .iter()
+            .any(|d| d["message"].as_str().is_some_and(|m| m.contains("fil"))),
+        "somebody else's mistake was published here: {reported:?}"
+    );
+}
+
+#[test]
+fn the_buffer_wins_over_what_is_on_disk() {
+    // The file on disk is a version of the buffer from before the last
+    // keystroke. Composing from disk would report against text nobody sees.
+    let dir = scratch("lsp-include-buffer");
+    std::fs::write(dir.join("core.bd"), "node api \"API\"\n").unwrap();
+    let entry = dir.join("main.bd");
+    std::fs::write(&entry, "include \"core.bd\"\n").unwrap();
+
+    // Unsaved: the buffer names something that does not exist.
+    let text = "include \"core.bd\"\nnode ui \"UI\"\nui -> ghost\n";
+    let reported = crate::lsp::diagnostics_for(text, Some(&entry));
+    assert!(
+        reported
+            .iter()
+            .any(|d| d["message"].as_str().is_some_and(|m| m.contains("ghost"))),
+        "the server read the disk instead of the buffer: {reported:?}"
+    );
+}
+
+#[test]
+fn a_file_uri_becomes_a_path() {
+    assert_eq!(
+        crate::lsp::path_of("file:///home/a/b.bd"),
+        Some(std::path::PathBuf::from("/home/a/b.bd"))
+    );
+    // A path with a space in it is ordinary.
+    assert_eq!(
+        crate::lsp::path_of("file:///home/a%20b/c.bd"),
+        Some(std::path::PathBuf::from("/home/a b/c.bd"))
+    );
+    // Anything else means the buffer is checked on its own, which is what
+    // every editor did before `include` existed.
+    assert_eq!(crate::lsp::path_of("untitled:Untitled-1"), None);
+}
