@@ -37,6 +37,7 @@ module.exports = grammar({
     _statement: ($) =>
       choice(
         $.include_declaration,
+        $.constraint_declaration,
         $.component_declaration,
         $.use_declaration,
         $.type_declaration,
@@ -57,6 +58,15 @@ module.exports = grammar({
     // come in under a prefix (`D-029`).
     include_declaration: ($) =>
       seq('include', field('path', $.string), optional(seq('as', field('prefix', $.identifier)))),
+
+    // A constraint adjusts one axis of already-placed boxes and never their
+    // order, which is what keeps the layout declared (`D-031`).
+    constraint_declaration: ($) =>
+      seq(
+        field('keyword', choice('align-group', 'same-width', 'same-height')),
+        optional(field('alignment', $.alignment)),
+        repeat1(field('member', $.identifier)),
+      ),
 
     // A component is a file you did not have to make a file of: declared
     // once, placed under a name, prefixed exactly as an included file is.

@@ -663,6 +663,8 @@ pub struct GraphOpts {
     /// own in their settings and that one wins; this is what every other
     /// genre — `free`, `class`, `er`, `harness` — had no way to say at all.
     pub title: Option<String>,
+    /// Column and row step for `at (col 3, row 2)`, when one is declared.
+    pub grid: Option<(f64, f64)>,
 }
 
 impl Default for GraphOpts {
@@ -675,6 +677,7 @@ impl Default for GraphOpts {
             background: Some("#ffffff".into()),
             flow: RelDir::RightOf,
             title: None,
+            grid: None,
         }
     }
 }
@@ -687,6 +690,16 @@ impl GraphOpts {
             let first = prop.values.first();
             match prop.name.as_str() {
                 "title" => opts.title = first.and_then(|x| x.as_text()).map(String::from),
+                "grid" => {
+                    let numbers: Vec<f64> = prop.values.iter().filter_map(|v| v.as_num()).collect();
+                    opts.grid = match numbers.as_slice() {
+                        // One number is a square cell, which is the common
+                        // case and reads better than writing it twice.
+                        [step] => Some((*step, *step)),
+                        [x, y, ..] => Some((*x, *y)),
+                        [] => bail!("`grid` needs a step: `grid: 160 90`, or one number for both"),
+                    };
+                }
                 "padding" => opts.padding = first.and_then(|x| x.as_num()).unwrap_or(opts.padding),
                 "gap" => opts.gap = first.and_then(|x| x.as_num()).unwrap_or(opts.gap),
                 "background" | "bg" => {

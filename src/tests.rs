@@ -7132,3 +7132,133 @@ fn placing_an_unknown_component_says_which_exist() {
     assert!(message.contains("serivce"), "{message}");
     assert!(message.contains("service"), "{message}");
 }
+
+// ------------------------------------- grid and constraints (I-033…I-035)
+
+#[test]
+fn a_grid_cell_is_an_absolute_position_in_declared_units() {
+    // `D-031`: a coordinate system, not a solver. `at (col 3, row 2)` is
+    // still `at`, which is why it cannot break `D-001`.
+    let l = build(
+        r#"graph { grid: 160 90 }
+           node a "A" at (col 0, row 0)
+           node b "B" at (col 2, row 1)"#,
+    );
+    assert_eq!((l.nodes[0].rect.x, l.nodes[0].rect.y), (0.0, 0.0));
+    assert_eq!((l.nodes[1].rect.x, l.nodes[1].rect.y), (320.0, 90.0));
+}
+
+#[test]
+fn one_grid_number_is_a_square_cell() {
+    let l = build(
+        r#"graph { grid: 120 }
+           node a "A" at (col 1, row 1)"#,
+    );
+    assert_eq!((l.nodes[0].rect.x, l.nodes[0].rect.y), (120.0, 120.0));
+}
+
+#[test]
+fn a_box_in_pixels_is_untouched_by_the_grid() {
+    // Nothing is snapped to it. A grid that quietly moved a declared
+    // position would be exactly the solver `D-001` refuses.
+    let l = build(
+        r#"graph { grid: 160 90 }
+           node a "A" at (37, 41)"#,
+    );
+    assert_eq!((l.nodes[0].rect.x, l.nodes[0].rect.y), (37.0, 41.0));
+}
+
+#[test]
+fn same_width_resizes_before_placement_so_nothing_overlaps() {
+    // Found by looking at the picture: widening a box *after* it is placed
+    // does not push its neighbours along, it lands on top of them. A size
+    // constraint belongs before placement, because placement already knows
+    // how to lay out boxes of a given size.
+    let l = build(
+        r#"node a "A"
+           node b "A much longer label" right-of a gap 40
+           node c "C" right-of b gap 40
+           same-width a b c"#,
+    );
+    let widths: Vec<f64> = l.nodes.iter().map(|n| n.rect.w).collect();
+    assert!(
+        widths.windows(2).all(|w| (w[0] - w[1]).abs() < 0.01),
+        "widths differ: {widths:?}"
+    );
+    for pair in l.nodes.windows(2) {
+        assert!(
+            pair[1].rect.x >= pair[0].rect.right(),
+            "boxes overlap after being widened: {} then {}",
+            pair[0].rect.right(),
+            pair[1].rect.x
+        );
+    }
+}
+
+#[test]
+fn the_largest_wins_a_size_constraint() {
+    // Shrinking to match a narrower neighbour clips the label, and a
+    // constraint that makes text unreadable is worse than no constraint.
+    let l = build(
+        r#"node a "A"
+           node b "A much longer label" below a
+           same-width a b"#,
+    );
+    assert!(l.nodes[0].rect.w > 100.0, "the short box was not widened");
+}
+
+#[test]
+fn align_group_moves_the_others_onto_the_first() {
+    // The first named box decides, not an average: an average moves every
+    // box including the one the others were being lined up against.
+    let l = build(
+        r#"node a "A" at (0, 0) { size: 80 40 }
+           node b "B" at (120, 33) { size: 80 60 }
+           node c "C" at (240, 71) { size: 80 40 }
+           align-group top a b c"#,
+    );
+    assert_eq!(l.nodes[0].rect.y, 0.0, "the lead moved");
+    assert_eq!(l.nodes[1].rect.y, 0.0);
+    assert_eq!(l.nodes[2].rect.y, 0.0);
+}
+
+#[test]
+fn a_constraint_never_reorders() {
+    // The line `D-001` draws, and the whole reason this is a pass rather
+    // than a solver.
+    let l = build(
+        r#"node a "A"
+           node b "Long one" right-of a gap 40
+           node c "C" right-of b gap 40
+           same-width a b c
+           align-group center a b c"#,
+    );
+    let xs: Vec<f64> = l.nodes.iter().map(|n| n.rect.x).collect();
+    assert!(
+        xs.windows(2).all(|w| w[0] < w[1]),
+        "the declared order changed: {xs:?}"
+    );
+}
+
+#[test]
+fn a_constraint_needs_two_names() {
+    let message = err("align-group a");
+    assert!(message.contains("two names"), "{message}");
+}
+
+#[test]
+fn constraints_survive_composition() {
+    // Found the hard way: `merge` copied every other list and silently
+    // dropped this one, so a constraint written in a file did nothing at all
+    // and said nothing about it.
+    let composed = compose_one(
+        "constraints-compose",
+        "node a \"A\"\nnode b \"A much longer label\" below a\nsame-width a b\n",
+    );
+    assert_eq!(composed.diagram.constraints.len(), 1);
+    let l = crate::layout::solve(&composed.diagram).unwrap();
+    assert!(
+        l.nodes[0].rect.w > 100.0,
+        "the constraint was lost on the way"
+    );
+}

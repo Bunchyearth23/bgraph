@@ -322,6 +322,16 @@ pub const GRAPH_PROPS: &[PropDef] = &[
         doc: "Margin between the drawing and the canvas edge.",
     },
     PropDef {
+        name: "grid",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "grid: <number> <number>",
+        doc: "Column and row step for `at (col 3, row 2)`. One number sets \
+              both. A coordinate system, not a solver: nothing is snapped to \
+              it, and a box placed in pixels is unaffected.",
+    },
+    PropDef {
         name: "gap",
         alias: false,
         ctx: Ctx::Both,
@@ -2288,6 +2298,22 @@ pub const KEYWORDS: &[(&str, &str)] = &[
         "Merge another file — `include \"house.bds\"`, or `include \"core.bd\" \
          as core` to bring its names in under a prefix. Without a prefix every \
          name must be unique across the set; a clash names both files.",
+    ),
+    (
+        "align-group",
+        "Give a set of boxes one cross-axis coordinate: `align-group top a b c`. \
+         A pass over the solved layout, never a reordering — the first name \
+         decides, and an explicit `at` wins.",
+    ),
+    (
+        "same-width",
+        "Give a set of boxes one width: `same-width a b c`. The widest wins, \
+         because shrinking to match a narrower neighbour clips the label. \
+         Applied before placement, so nothing is pushed on top of anything.",
+    ),
+    (
+        "same-height",
+        "The same, for height.",
     ),
     (
         "component",

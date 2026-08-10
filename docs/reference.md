@@ -240,6 +240,7 @@ Declared once, in `graph { … }`. These are diagram-wide and are not part of th
 |---|---|---|
 | `title` | `title: <text>` | Heading drawn above the diagram. Every genre accepts it here — the chart archetypes also take a `title` in their own settings, and that one wins where both are given. |
 | `padding` | `padding: <number>` | Margin between the drawing and the canvas edge. |
+| `grid` | `grid: <number> <number>` | Column and row step for `at (col 3, row 2)`. One number sets both. A coordinate system, not a solver: nothing is snapped to it, and a box placed in pixels is unaffected. |
 | `gap` | `gap: <number>` | Default distance used by anchors that omit `gap`. |
 | `background` | `background: <color>` | Canvas fill. Also backs edge labels so they stay readable. |
 | `bg` *(alias)* | `bg: <color>` | Alias of `background`. |

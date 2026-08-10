@@ -211,6 +211,7 @@ fn build(file: Pair<Rule>, input: &str) -> Result<Diagram> {
                 diagram.graph.extend(parse_block(block)?);
             }
             Rule::include_decl => diagram.includes.push(parse_include(pair)?),
+            Rule::constraint_decl => diagram.constraints.push(parse_constraint(pair)?),
             Rule::component_decl => diagram.components.push(parse_component(pair, input)?),
             Rule::use_decl => diagram.uses.push(parse_use(pair)?),
             Rule::style_decl => diagram.styles.push(parse_style(pair)?),
@@ -245,6 +246,45 @@ fn spanned(pair: &Pair<Rule>) -> Spanned<String> {
         value: pair.as_str().to_string(),
         span: span_of(pair),
     }
+}
+
+fn parse_constraint(pair: Pair<Rule>) -> Result<crate::ast::ConstraintDecl> {
+    use crate::ast::{Align, ConstraintKind};
+    let span = span_of(&pair);
+    let mut kind = ConstraintKind::AlignGroup;
+    let mut align = Align::Center;
+    let mut members = Vec::new();
+
+    for part in pair.into_inner() {
+        match part.as_rule() {
+            Rule::constraint_kw => {
+                kind = match part.as_str() {
+                    "align-group" => ConstraintKind::AlignGroup,
+                    "same-width" => ConstraintKind::SameWidth,
+                    "same-height" => ConstraintKind::SameHeight,
+                    other => bail!("unknown constraint `{other}`"),
+                }
+            }
+            Rule::align_kw => {
+                align = match part.as_str() {
+                    "left" | "top" => Align::Start,
+                    "right" | "bottom" => Align::End,
+                    _ => Align::Center,
+                }
+            }
+            _ => members.push(spanned(&part)),
+        }
+    }
+
+    if members.len() < 2 {
+        bail!("a constraint needs at least two names — one box is already aligned with itself");
+    }
+    Ok(crate::ast::ConstraintDecl {
+        kind,
+        align,
+        members,
+        span,
+    })
 }
 
 fn parse_component(pair: Pair<Rule>, source: &str) -> Result<crate::ast::ComponentDecl> {
@@ -531,10 +571,15 @@ fn parse_placement(pair: Pair<Rule>) -> Result<Placement> {
     match pair.as_rule() {
         Rule::abs_pos => {
             let point = pair.into_inner().next().expect("at() always has a point");
+            let grid = point.as_rule() == Rule::cell;
             let mut coords = point.into_inner();
             let x = number(coords.next().expect("point x"))?;
             let y = number(coords.next().expect("point y"))?;
-            Ok(Placement::At { x, y })
+            Ok(if grid {
+                Placement::Cell { col: x, row: y }
+            } else {
+                Placement::At { x, y }
+            })
         }
         Rule::rel_pos => {
             let mut dir = RelDir::RightOf;

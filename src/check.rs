@@ -726,7 +726,7 @@ fn check_cycles(diagram: &Diagram, nodes: &HashMap<&str, usize>, out: &mut Vec<D
         for &i in &pending {
             let anchor = match &diagram.nodes[i].placement {
                 Some(Placement::Rel { anchor, .. }) => Some(anchor.as_str()),
-                Some(Placement::At { .. }) => None,
+                Some(Placement::At { .. } | Placement::Cell { .. }) => None,
                 // An unplaced node flows from the previous one in source order.
                 None if i > 0 => Some(diagram.nodes[i - 1].id.as_str()),
                 None => None,

@@ -633,7 +633,16 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     // a node waits for its anchor, a group waits for its members. A group
     // carrying a placement translates its whole subtree once solved, so its
     // members only count as anchorable after that translation.
-    let solved = place_all(diagram, &index, &sizes, &opts)?;
+    // Size constraints run *before* placement, because a box widened after
+    // the fact does not push its neighbours along — it lands on top of them.
+    // Placement already knows how to lay out boxes of a given size, so the
+    // honest order is: decide the sizes, then place.
+    constrain_sizes(diagram, &index, &mut sizes);
+
+    let mut solved = place_all(diagram, &index, &sizes, &opts)?;
+    // Alignment runs after, because it is the one constraint that genuinely
+    // needs positions to exist.
+    constrain_alignment(diagram, &index, &mut solved);
     let placed = solved.nodes;
 
     let mut nodes: Vec<PlacedNode> = diagram
@@ -1114,6 +1123,125 @@ pub struct Solved {
 /// placement translates its whole subtree once its members have landed, and
 /// its members only become anchorable after that translation, so nothing
 /// outside can latch onto a position that is about to move.
+/// Apply the declared constraints to the solved rectangles.
+///
+/// A pass over what is already placed, in declaration order, adjusting one
+/// axis and never the order — which is the whole of what `D-031` allows,
+/// because `D-001` makes the order the author's to state. Nothing here can
+/// move a box past another one.
+///
+/// A name the constraint cannot resolve is simply skipped: `check` has
+/// already reported it, and reporting it twice would say there are two
+/// mistakes.
+fn members_of(constraint: &crate::ast::ConstraintDecl, index: &HashMap<&str, Entity>) -> Vec<usize> {
+    constraint
+        .members
+        .iter()
+        .filter_map(|m| match index.get(m.as_str()).copied() {
+            Some(Entity::Node(i)) => Some(i),
+            // A group or an unknown name is skipped rather than reported:
+            // `check` has already spoken, and saying it twice would claim
+            // there are two mistakes.
+            _ => None,
+        })
+        .collect()
+}
+
+/// `same-width` and `same-height`, applied to the intrinsic sizes.
+fn constrain_sizes(diagram: &Diagram, index: &HashMap<&str, Entity>, sizes: &mut [(f64, f64)]) {
+    use crate::ast::ConstraintKind;
+
+    for constraint in &diagram.constraints {
+        let members = members_of(constraint, index);
+        if members.len() < 2 {
+            continue;
+        }
+        // The largest wins, not the first: shrinking a box to match a
+        // narrower neighbour clips its label, and a constraint that makes
+        // text unreadable is worse than no constraint at all.
+        match constraint.kind {
+            ConstraintKind::SameWidth => {
+                let widest = members.iter().map(|i| sizes[*i].0).fold(0.0_f64, f64::max);
+                for i in members {
+                    sizes[i].0 = widest;
+                }
+            }
+            ConstraintKind::SameHeight => {
+                let tallest = members.iter().map(|i| sizes[*i].1).fold(0.0_f64, f64::max);
+                for i in members {
+                    sizes[i].1 = tallest;
+                }
+            }
+            ConstraintKind::AlignGroup => {}
+        }
+    }
+}
+
+/// `align-group`, applied to the solved rectangles.
+fn constrain_alignment(diagram: &Diagram, index: &HashMap<&str, Entity>, solved: &mut Solved) {
+    use crate::ast::ConstraintKind;
+
+    for constraint in &diagram.constraints {
+        if constraint.kind != ConstraintKind::AlignGroup {
+            continue;
+        }
+        let rects: Vec<usize> = members_of(constraint, index)
+            .into_iter()
+            .filter(|i| solved.nodes[*i].is_some())
+            .collect();
+        if rects.len() < 2 {
+            continue;
+        }
+
+        match constraint.kind {
+            // The first named box decides, rather than an average: an average
+            // moves every box including the one the author was lining the
+            // others up against, which is never what was meant.
+            ConstraintKind::AlignGroup => {
+                let Some(lead) = solved.nodes[rects[0]] else {
+                    continue;
+                };
+                // Which axis is decided by which one the boxes already differ
+                // on least — a row lines up on y, a column on x. Reading it
+                // off the geometry rather than asking for it keeps the
+                // statement short, and the ambiguous case cannot arise: two
+                // boxes at the same point need no aligning.
+                let spread = |f: fn(&Rect) -> f64| {
+                    let values: Vec<f64> = rects
+                        .iter()
+                        .filter_map(|i| solved.nodes[*i])
+                        .map(|r| f(&r))
+                        .collect();
+                    values.iter().cloned().fold(f64::MIN, f64::max)
+                        - values.iter().cloned().fold(f64::MAX, f64::min)
+                };
+                let horizontal = spread(|r| r.x) >= spread(|r| r.y);
+
+                for i in &rects[1..] {
+                    let Some(rect) = solved.nodes[*i].as_mut() else {
+                        continue;
+                    };
+                    if horizontal {
+                        rect.y = match constraint.align {
+                            Align::Start => lead.y,
+                            Align::Center => lead.cy() - rect.h / 2.0,
+                            Align::End => lead.bottom() - rect.h,
+                        };
+                    } else {
+                        rect.x = match constraint.align {
+                            Align::Start => lead.x,
+                            Align::Center => lead.cx() - rect.w / 2.0,
+                            Align::End => lead.right() - rect.w,
+                        };
+                    }
+                }
+            }
+            // Handled before placement, where a size belongs.
+            ConstraintKind::SameWidth | ConstraintKind::SameHeight => {}
+        }
+    }
+}
+
 fn place_all(
     diagram: &Diagram,
     index: &HashMap<&str, Entity>,
@@ -1166,6 +1294,9 @@ fn place_all(
                 })
             });
 
+            // A grid cell resolves to an absolute position here, in one
+            // place, so nothing downstream has to know cells exist.
+            let placement = placement.map(|p| p.resolved(opts.grid));
             let rect = match placement {
                 None => Rect {
                     x: 0.0,
@@ -1174,6 +1305,16 @@ fn place_all(
                     h,
                 },
                 Some(Placement::At { x, y }) => Rect { x, y, w, h },
+                // Unreachable: `resolved` above turned every cell into an
+                // `At`. Answered rather than panicked, and answered with what
+                // a step of one would give, because no input may bring the
+                // renderer down.
+                Some(Placement::Cell { col, row }) => Rect {
+                    x: col,
+                    y: row,
+                    w,
+                    h,
+                },
                 Some(Placement::Rel {
                     dir,
                     ref anchor,
@@ -1250,9 +1391,10 @@ fn place_all(
                 h: inner.h + padding * 2.0 + title,
             };
 
-            let (frame, delta) = match &group.placement {
+            let placed_at = group.placement.as_ref().map(|p| p.resolved(opts.grid));
+            let (frame, delta) = match &placed_at {
                 None => (frame, (0.0, 0.0)),
-                Some(Placement::At { x, y }) => (
+                Some(Placement::At { x, y }) | Some(Placement::Cell { col: x, row: y }) => (
                     Rect {
                         x: *x,
                         y: *y,

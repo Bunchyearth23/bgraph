@@ -36,7 +36,7 @@ term = _{ (nl | ";" | ",")+ | &EOI }
 // an edge; PEG backtracking still lets a node actually named `type` have edges.
 // `edge_decl` precedes `item_decl` only for speed: `item_decl` would fail on
 // the arrow anyway and backtrack.
-stmt = _{ include_decl | component_decl | use_decl | type_decl | graph_decl | style_decl | group_decl | edge_decl | item_decl }
+stmt = _{ include_decl | component_decl | use_decl | constraint_decl | type_decl | graph_decl | style_decl | group_decl | edge_decl | item_decl }
 
 // `include "shared.bds"` merges another file whole; with `as` its names come
 // in under a prefix. Resolved before parsing reaches `check`, so by the time
@@ -47,6 +47,12 @@ include_decl = { "include" ~ string ~ ("as" ~ ident)? }
 // once and placed under a name, exactly as an included file is — so a
 // component and an `include … as` are the same mechanism seen twice, and the
 // prefixing that makes one safe makes the other safe too (`D-030`).
+// A constraint adjusts one axis of already-placed boxes and never their
+// order — that is what keeps `D-001` intact. An explicit `at` wins, and a
+// contradiction is a warning naming both rather than a silent move (`D-031`).
+constraint_kw   = { "align-group" | "same-width" | "same-height" }
+constraint_decl = { constraint_kw ~ align_kw? ~ ident+ }
+
 component_decl = { "component" ~ ident ~ group_block }
 use_decl       = { "use" ~ ident ~ "as" ~ ident ~ placement? ~ block? }
 
@@ -99,13 +105,16 @@ class_ref = { "." ~ ident }
 arrow     = @{ "<->" | "<-" | "-->" | "..>" | "--" | "->" | ".." }
 
 placement = _{ abs_pos | rel_pos }
-abs_pos   = { "at" ~ point }
+abs_pos   = { "at" ~ (cell | point) }
 rel_pos   = { rel_dir ~ name ~ gap? ~ align? }
 rel_dir    = { "right-of" | "left-of" | "below" | "above" }
 gap        = { "gap" ~ number }
 align      = { "align" ~ align_kw }
 align_kw   = { "left" | "right" | "center" | "middle" | "top" | "bottom" }
 point      = { "(" ~ number ~ "," ~ number ~ ")" }
+// `at (col 3, row 2)` is still `at`, in units declared once by `graph { grid }`.
+// A coordinate system, not a solver — which is why it cannot break `D-001`.
+cell       = { "(" ~ "col" ~ number ~ "," ~ "row" ~ number ~ ")" }
 
 // A line opening with `- ` or `+ ` is a member — a class's field, a table's
 // column — and runs to the end of the line. The space is what keeps `-4` a

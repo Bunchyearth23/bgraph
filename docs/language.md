@@ -288,6 +288,48 @@ renumber coordinates.
 `top` / `bottom` / `center` (or `middle`) for horizontal ones. It defaults
 to `center`.
 
+### A grid
+
+Declare a step once and place in cells:
+
+```bgraph
+graph { grid: 170 110 }
+
+node a "Ingest" at (col 0, row 0)
+node b "Queue"  at (col 1, row 0)
+node c "Store"  at (col 1, row 1)
+```
+
+`at (col 3, row 2)` is still `at`, in units the file declared — a coordinate
+system, not a solver. Nothing is snapped to it: a box placed in pixels is
+unaffected, and a grid that quietly moved a declared position would be exactly
+the auto-placement this language refuses.
+
+### Constraints
+
+Three statements adjust what is already placed, and none of them reorders
+anything:
+
+```bgraph
+node a "A"
+node b "A much longer label" right-of a gap 40
+node c "C" right-of b gap 40
+
+same-width a b c
+same-height a b c
+align-group top a b c
+```
+
+`same-width` and `same-height` give a set one size — the **largest** wins,
+because shrinking to match a narrower neighbour clips the label. They are
+applied *before* placement, so widening a box pushes its neighbours along
+instead of landing on top of them.
+
+`align-group` gives a set one cross-axis coordinate. The **first** name
+decides, not an average: an average moves every box, including the one the
+others were being lined up against. The axis is read off the geometry — a row
+lines up on `y`, a column on `x`.
+
 ```bgraph
 node a "A" at (0, 0)
 node b "B" right-of a gap 80 align top      // tops line up

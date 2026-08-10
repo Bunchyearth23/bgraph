@@ -53,6 +53,27 @@ pub struct Diagram {
     /// *is* an include of a file you did not have to make (`D-030`).
     pub components: Vec<ComponentDecl>,
     pub uses: Vec<UseDecl>,
+    /// Adjustments applied to the solved layout, in declaration order.
+    pub constraints: Vec<ConstraintDecl>,
+}
+
+/// `align-group left a b c`, `same-width a b c`.
+#[derive(Debug)]
+pub struct ConstraintDecl {
+    pub kind: ConstraintKind,
+    /// Which edge to line up on, for `align-group`. Defaults to `center`,
+    /// matching what `align` on a placement defaults to.
+    pub align: Align,
+    pub members: Vec<Spanned<String>>,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstraintKind {
+    /// One cross-axis coordinate for the set.
+    AlignGroup,
+    SameWidth,
+    SameHeight,
 }
 
 /// `component service { … }` — the body kept as source text, because that is
@@ -342,12 +363,42 @@ pub enum Placement {
         x: f64,
         y: f64,
     },
+    /// `at (col 3, row 2)` — the same absolute placement in grid units,
+    /// multiplied by the step `graph { grid }` declares. Resolved in the
+    /// layout rather than the parser, because the parser does not know the
+    /// step (`D-031`).
+    Cell {
+        col: f64,
+        row: f64,
+    },
     Rel {
         dir: RelDir,
         anchor: Spanned<String>,
         gap: Option<f64>,
         align: Option<Align>,
     },
+}
+
+impl Placement {
+    /// A grid cell as the absolute position it stands for.
+    ///
+    /// The one definition of what a cell means, so the two places the layout
+    /// reads a placement cannot disagree. Without a declared `grid` a cell
+    /// falls back to a step of one, which places everything on top of the
+    /// origin — visibly wrong rather than silently ignored, and `check` says
+    /// so before it is ever drawn.
+    pub fn resolved(&self, grid: Option<(f64, f64)>) -> Placement {
+        match self {
+            Placement::Cell { col, row } => {
+                let (sx, sy) = grid.unwrap_or((1.0, 1.0));
+                Placement::At {
+                    x: col * sx,
+                    y: row * sy,
+                }
+            }
+            other => other.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
