@@ -1,0 +1,105 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "bgraph",
+  "scopeName": "source.bgraph",
+  "patterns": [
+    {
+      "include": "#comment"
+    },
+    {
+      "include": "#string"
+    },
+    {
+      "include": "#member"
+    },
+    {
+      "include": "#statement"
+    },
+    {
+      "include": "#property"
+    },
+    {
+      "include": "#class"
+    },
+    {
+      "include": "#arrow"
+    },
+    {
+      "include": "#placement"
+    },
+    {
+      "include": "#value"
+    }
+  ],
+  "repository": {
+    "comment": {
+      "name": "comment.line.double-slash.bgraph",
+      "match": "//.*$"
+    },
+    "string": {
+      "name": "string.quoted.double.bgraph",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.bgraph",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "member": {
+      "comment": "A `- ` or `+ ` line is a member and runs to the end of the line.",
+      "name": "variable.other.member.bgraph",
+      "match": "^\\s*[-+] .*$"
+    },
+    "statement": {
+      "comment": "The statement keywords, and each archetype's word for its items. Derived from props.rs; a test re-derives it and fails on drift.",
+      "name": "keyword.control.bgraph",
+      "match": "(?<![\\w-])(type|graph|style|group|activate|block|box|card|class|commit|connector|device|entity|entry|event|field|host|node|participant|point|position|requirement|scatter|series|set|signal|slice|state|step|task|topic)(?![\\w-])"
+    },
+    "placement": {
+      "name": "keyword.other.placement.bgraph",
+      "match": "(?<![\\w-])(at|right-of|left-of|above|below|gap|align|extends)(?![\\w-])"
+    },
+    "property": {
+      "comment": "An identifier followed by a colon \u2014 the same lookahead pest uses.",
+      "name": "variable.other.property.bgraph",
+      "match": "[A-Za-z_][A-Za-z0-9_-]*(?=\\s*:)"
+    },
+    "class": {
+      "name": "entity.other.attribute-name.bgraph",
+      "match": "\\.[A-Za-z_][A-Za-z0-9_-]*"
+    },
+    "arrow": {
+      "name": "keyword.operator.arrow.bgraph",
+      "match": "<->|<-|-->|\\.\\.>|--|->|\\.\\."
+    },
+    "value": {
+      "patterns": [
+        {
+          "comment": "A hole parses, so it is a value and not a text hack.",
+          "name": "variable.other.placeholder.bgraph",
+          "match": "\\{\\{[^}]*\\}\\}"
+        },
+        {
+          "comment": "`#` is only ever a colour here; comments are `//`.",
+          "name": "constant.other.color.bgraph",
+          "match": "#[0-9a-fA-F]+"
+        },
+        {
+          "comment": "Dates and durations lex before numbers, as in both grammars.",
+          "name": "constant.numeric.date.bgraph",
+          "match": "\\d{4}-\\d{2}-\\d{2}"
+        },
+        {
+          "name": "constant.numeric.duration.bgraph",
+          "match": "\\d+(\\.\\d+)?(mo|w|d|h)(?![A-Za-z0-9_])"
+        },
+        {
+          "name": "constant.numeric.bgraph",
+          "match": "-?\\d+(\\.\\d+)?(px|%)?"
+        }
+      ]
+    }
+  }
+}

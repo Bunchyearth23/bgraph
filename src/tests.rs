@@ -633,6 +633,64 @@ fn a_packet_field_needs_bits() {
     assert!(err("type packet\nnode a \"A\"").contains("has no `bits`"));
 }
 
+// ---------------------------------------------------------------------- W-038
+
+#[test]
+fn the_textmate_grammar_knows_every_word_the_compiler_does() {
+    // `X-009` in its VS Code form. A tree-sitter query naming a node type the
+    // grammar dropped stops the language loading, loudly; a TextMate grammar
+    // missing a keyword just stops colouring it, which nobody notices — so the
+    // list is re-derived here rather than trusted.
+    let grammar = include_str!("../editors/vscode/syntaxes/bgraph.tmLanguage.json");
+    let statement = grammar
+        .lines()
+        .find(|l| l.contains("keyword.control.bgraph"))
+        .and_then(|_| {
+            grammar
+                .lines()
+                .find(|l| l.contains(r"(?<![\\w-])(type|graph|style|group|activate|"))
+        })
+        .expect("the statement pattern is in the grammar");
+
+    for (word, _) in crate::props::KEYWORDS {
+        assert!(
+            statement.contains(&format!("{word}|")) || statement.contains(&format!("{word})")),
+            "`{word}` is a statement keyword the VS Code grammar does not colour"
+        );
+    }
+
+    for def in crate::props::ARCHETYPES {
+        for item in def.items() {
+            assert!(
+                statement.contains(&format!("{item}|")) || statement.contains(&format!("{item})")),
+                "`{item}` is `type {}`'s word and the VS Code grammar does not colour it",
+                def.name
+            );
+        }
+    }
+}
+
+#[test]
+fn the_vscode_manifest_claims_the_language_this_project_is() {
+    // The three facts a manifest can get wrong in a way that only shows up on
+    // someone else's machine: the extension, the scope name the grammar
+    // declares, and the entry point.
+    let manifest = include_str!("../editors/vscode/package.json");
+    assert!(manifest.contains("\".bd\""), "the file extension");
+    assert!(manifest.contains("source.bgraph"), "the scope name");
+    assert!(manifest.contains("./src/extension.js"), "the entry point");
+
+    let grammar = include_str!("../editors/vscode/syntaxes/bgraph.tmLanguage.json");
+    assert!(
+        grammar.contains("\"scopeName\": \"source.bgraph\""),
+        "the grammar must answer to the scope the manifest contributes"
+    );
+
+    // The server the client launches is the one this repository builds.
+    let client = include_str!("../editors/vscode/src/extension.js");
+    assert!(client.contains("bgraph-lsp"), "the default server binary");
+}
+
 // ---------------------------------------------------------------------- W-040
 
 #[test]

@@ -25,7 +25,7 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**Two chantiers are planned. No question is open and nothing is blocked.**
+**One chantier is planned. No question is open and nothing is blocked.**
 Thirty archetypes ship and the library is embeddable. The parked ideas were
 reviewed on 2026-08-10 and every one of them moved: what was worth building
 became a work item, what was not was discarded, and the one language question
@@ -39,7 +39,6 @@ Roughly by cost. Nothing here has started.
 
 | id | state | title | notes |
 |---|---|---|---|
-| `W-038` | planned | A VS Code extension, beside the Zed one | Same three pieces the Zed extension already has — the tree-sitter grammar, `bgraph-lsp`, and the highlight queries — repackaged for a second editor. VS Code takes a TextMate grammar or a WASM tree-sitter build rather than Zed's git-pinned one, and speaks LSP over a client the extension launches itself, so `src/lsp.rs` is reused unchanged. `X-009` applies here too: the queries are part of the grammar's public surface, and a stale one breaks the language rather than degrading. |
 | `W-042` | planned | PNG and PDF export, from the CLI **and** from the library | The largest surface here. `D-014` is what makes it more than a convenience: a program embedding the library should not be forced to ship an SVG renderer to get a picture. Merges `I-007` and `I-015`, which were the same work seen from two ends. |
 
 ### Risks
@@ -48,7 +47,7 @@ Known ways this goes wrong. `X-005` now has a chantier; the rest do not, because
 
 | id | state | title | notes |
 |---|---|---|---|
-| `X-009` | mitigated | Editor queries can name node types the grammar has dropped | It broke once — `W-029` renamed `node_declaration` and Zed stopped recognising `.bd` entirely. `the_editor_queries_match_the_grammar` compiles every `.scm` against the generated parser, but only when the `tree-sitter` CLI is on PATH. `W-038` doubles the surface this applies to. |
+| `X-009` | mitigated | Editor queries can name node types the grammar has dropped | It broke once — `W-029` renamed `node_declaration` and Zed stopped recognising `.bd` entirely. `the_editor_queries_match_the_grammar` compiles every `.scm` against the generated parser, but only when the `tree-sitter` CLI is on PATH. `W-038` did **not** double it: VS Code takes a TextMate grammar, which cannot name a tree-sitter node type at all — it has its own guard instead. |
 | `X-002` | mitigated | The two grammars can drift apart | `W-008` cross-checks them on every `cargo test` — but only when the `tree-sitter` CLI is on PATH; without it the test says SKIPPED and passes. |
 | `X-010` | mitigated | `tree-sitter test`'s summary line counts parses, not expectation matches | It read "failed parses: 0" while seven corpus expectations were stale across the `W-029` rename. `the_grammar_corpus_expectations_still_hold` now asserts the **exit code** on each `cargo test`, but only when the CLI is on PATH. |
 | `X-006` | mitigated | Edge labels avoid lines, not each other's readability | `W-010` scores candidates; `W-022` made the node and label penalties proportional to the overlapped area and distance a real cost, which stopped labels fleeing three rows from their own edge. Still local: nothing guarantees the best global arrangement — `W-037` adds the escape hatch (`label-offset`) rather than a better solver, because the author can see what the cost function cannot. |
@@ -98,6 +97,7 @@ not copies.
 
 | id | date | title | commit |
 |---|---|---|---|
+| `W-038` | 2026-08-10 | A VS Code extension. **TextMate rather than WASM tree-sitter**: VS Code reads TextMate natively, so nothing is compiled, pinned or cached, and the semantic half comes from `bgraph-lsp` — the same binary Zed talks to. The failure mode changes with the choice, so the guard did too: a stale `.scm` breaks Zed loudly, a stale TextMate grammar silently stops colouring a word, and `the_textmate_grammar_knows_every_word_the_compiler_does` re-derives the list from `props.rs` on every run | this commit |
 | `W-040` | 2026-08-10 | Per-character advance widths in place of the flat `0.56`. Removes the larger half of `X-005` — the four-to-one variation *within* a typeface — and makes `text_width` measure the **widest** line rather than the longest, which had been a different line. Answers the question the chantier carried with `D-026`: the cross-family error cannot be removed at all, so `X-005` is narrowed, not retired | this commit |
 | `W-049` | 2026-08-10 | `type gitgraph` — commits on rails. Parentage is the edges and a commit with two parents is a merge, landing one step past its **latest** parent. Only the rails are computed, which is where this stays on the right side of `D-001`: the author declares every commit, its branch and what came before it. A parent declared after its child is refused, because the picture would show history running backwards | this commit |
 | `W-041` | 2026-08-10 | A tree layout engine, and the three genres over it — `orgchart`, `mindmap`, `treeview`. Hierarchy from **edges**, not group nesting: an org chart is written `ceo -> cto`, and nesting a manager in a group *and* declaring them as a box would be two statements for one fact. The engine is the subtree-width pass — measure bottom-up, hand each child a disjoint slice — so siblings cannot overlap by construction and there is nothing to repair. One cargo feature each, per `W-028` | this commit |

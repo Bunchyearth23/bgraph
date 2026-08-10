@@ -1,0 +1,44 @@
+{
+  "name": "bgraph",
+  "displayName": "bgraph",
+  "description": "Syntax highlighting and language server for the bgraph diagram DSL",
+  "version": "0.1.0",
+  "publisher": "bunchyearth23",
+  "private": true,
+  "license": "SEE LICENSE IN ../../LICENSE",
+  "repository": { "type": "git", "url": "https://github.com/Bunchyearth23/bgraph" },
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Programming Languages"],
+  "activationEvents": ["onLanguage:bgraph"],
+  "main": "./src/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "bgraph",
+        "aliases": ["bgraph"],
+        "extensions": [".bd"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "bgraph",
+        "scopeName": "source.bgraph",
+        "path": "./syntaxes/bgraph.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "title": "bgraph",
+      "properties": {
+        "bgraph.server.path": {
+          "type": "string",
+          "default": "bgraph-lsp",
+          "description": "Path to the bgraph-lsp binary. Left as a bare name it is looked up on PATH."
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

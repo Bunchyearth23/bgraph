@@ -57,11 +57,12 @@ disagree.
 - `cargo run --bin bgraph -- watch examples/groups.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check examples/groups.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (321 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (323 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
 - `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (27 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
 - `./editors/zed/install.sh` — installs the server, regenerates + pins the grammar
+- `cd editors/vscode && npm install` — the VS Code client's one dependency
 
 ## Architecture
 | Path | Purpose |
@@ -84,6 +85,7 @@ disagree.
 | `src/lsp.rs` | Language server + `LineIndex` (byte ↔ UTF-16 position) |
 | `tree-sitter-bgraph/` | Tree-sitter grammar, corpus tests, generated parser |
 | `editors/zed/` | Zed extension: manifest, wasm shim, `.scm` queries |
+| `editors/vscode/` | VS Code extension: TextMate grammar, LSP client |
 
 ## Conventions
 - Property **values stay raw in the AST** (`ast::Value`) and are interpreted in
@@ -110,6 +112,11 @@ disagree.
 - ALWAYS: when a tree-sitter node type is renamed, update
   `editors/zed/languages/bgraph/*.scm` in the same breath — the queries are
   part of the grammar's public surface, not decoration
+- ALWAYS: a new archetype's item word must reach
+  `editors/vscode/syntaxes/bgraph.tmLanguage.json` too. A stale `.scm` breaks
+  Zed loudly; a stale TextMate grammar just stops colouring a word, which
+  nobody notices — `the_textmate_grammar_knows_every_word_the_compiler_does`
+  is what makes it loud
 - ALWAYS: keep completion quiet. It must not fire inside strings or comments,
   must not offer aliases, and must not offer a property the current archetype
   does not read. A suggestion that appears while you type prose is worse than
