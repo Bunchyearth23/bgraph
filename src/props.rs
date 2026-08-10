@@ -431,6 +431,20 @@ pub const PACKET_ITEM_PROPS: &[PropDef] = &[PropDef {
           bit. Usually written positionally — `field flags \"Flags\" 8 15`.",
 }];
 
+/// The same idea one order of magnitude up. Kept as its own property rather
+/// than reusing `bits` so that writing the wrong one is an error naming the
+/// genre that reads it (`D-022`) — the two are indistinguishable by value.
+pub const BYTEFIELD_ITEM_PROPS: &[PropDef] = &[PropDef {
+    name: "bytes",
+    alias: false,
+    ctx: Ctx::Node,
+    words: &[],
+    syntax: "bytes: <first> <last>",
+    doc: "Inclusive byte range of a field. `bytes: 4` is shorthand for a \
+          single byte. Usually written positionally — `field magic \"Magic\" \
+          0 3`, which is four bytes.",
+}];
+
 pub const QUADRANT_ITEM_PROPS: &[PropDef] = &[
     PropDef {
         name: "x",
@@ -898,6 +912,23 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         item_props: PACKET_ITEM_PROPS,
         slots: &[Slot {
             prop: "bits",
+            arity: 2,
+        }],
+        alt_items: &[],
+        edge_slots: &[],
+    },
+    #[cfg(feature = "bytefield")]
+    ArchetypeDef {
+        name: "bytefield",
+        item: "field",
+        doc: "A wire-format diagram at byte granularity — `packet` with the \
+              ruler counting bytes rather than bits. Each field needs an \
+              inclusive byte range; one crossing a row boundary is split \
+              across rows.",
+        props: BYTEFIELD_PROPS,
+        item_props: BYTEFIELD_ITEM_PROPS,
+        slots: &[Slot {
+            prop: "bytes",
             arity: 2,
         }],
         alt_items: &[],
@@ -1492,6 +1523,41 @@ pub const TREEMAP_PROPS: &[PropDef] = &[
         words: TREEMAP_LABELS,
         syntax: "labels: <name|value|both|none>",
         doc: "What to write on each tile. Tiles too small to read are skipped.",
+    },
+];
+
+pub const BYTEFIELD_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the diagram.",
+    },
+    PropDef {
+        name: "width",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "width: <bytes>",
+        doc: "Bytes per row. 16 by default — the width a hex dump is read at.",
+    },
+    PropDef {
+        name: "cell",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "cell: <width> <height>",
+        doc: "Width of one byte and the height of a row.",
+    },
+    PropDef {
+        name: "ruler",
+        alias: false,
+        ctx: Ctx::Both,
+        words: TOGGLE,
+        syntax: "ruler: <on|off>",
+        doc: "Byte offsets above each row. On by default.",
     },
 ];
 

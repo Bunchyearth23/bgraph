@@ -99,6 +99,7 @@ const EXAMPLES: &[(&str, &str)] = &[
     ("free", include_str!("../examples/groups.bd")),
     ("pie", include_str!("../examples/pie.bd")),
     ("packet", include_str!("../examples/packet.bd")),
+    ("bytefield", include_str!("../examples/bytefield.bd")),
     ("treemap", include_str!("../examples/treemap.bd")),
     ("quadrant", include_str!("../examples/quadrant.bd")),
     ("wave", include_str!("../examples/wave.bd")),

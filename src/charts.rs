@@ -373,11 +373,47 @@ fn trim_number(v: f64) -> String {
 // ---------------------------------------------------------------- packet
 
 #[cfg(feature = "packet")]
+/// `packet` and `bytefield` are one layout at two granularities (`W-039`).
+/// Only the unit changes: the default row width, the ruler step, and which
+/// property carries the range. Everything below — splitting a field across a
+/// row boundary, naming only its first segment, the corner range — is the
+/// same picture read at a different scale, so it is written once.
+struct Granularity {
+    /// Cells per row when the file does not say. A packet is read 32 bits
+    /// wide; a byte layout is read 16 bytes wide, as a hex dump is.
+    per_row: f64,
+    /// Ruler step, when the row divides by it. Bits group by eight, bytes by
+    /// four — that is where a reader's eye already puts the marks.
+    step: u32,
+}
+
 pub fn packet(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
+    let unit = Granularity {
+        per_row: 32.0,
+        step: 8,
+    };
+    packet_like(diagram, opts, registry, unit)
+}
+
+#[cfg(feature = "bytefield")]
+pub fn bytefield(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
+    let unit = Granularity {
+        per_row: 16.0,
+        step: 4,
+    };
+    packet_like(diagram, opts, registry, unit)
+}
+
+fn packet_like(
+    diagram: &Diagram,
+    opts: GraphOpts,
+    registry: &Registry,
+    unit: Granularity,
+) -> Result<Layout> {
     let cfg = &diagram.archetype_props;
     let theme = Theme::of(&opts);
 
-    let per_row = number(cfg, "width", 32.0).max(1.0) as u32;
+    let per_row = number(cfg, "width", unit.per_row).max(1.0) as u32;
     let bit_w = setting(cfg, "cell")
         .and_then(|v| v.first())
         .and_then(|v| v.as_num())
@@ -400,7 +436,10 @@ pub fn packet(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             &node.classes,
             &node.props_for(def),
         )?;
-        let Some((first, last)) = style.bits else {
+        // Only one of the two can be set: the other property does not exist
+        // in this genre, so writing it is an unknown-property error naming the
+        // genre that does read it.
+        let Some((first, last)) = style.bits.or(style.bytes) else {
             continue;
         };
         let label = node.label.clone().unwrap_or_else(|| node.id.value.clone());
@@ -487,8 +526,8 @@ pub fn packet(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
     }
 
     if ruler {
-        let step = if per_row.is_multiple_of(8) {
-            8
+        let step = if per_row.is_multiple_of(unit.step) {
+            unit.step
         } else {
             per_row
         };

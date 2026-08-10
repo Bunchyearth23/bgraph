@@ -391,15 +391,6 @@ fn an_empty_diagram_still_renders() {
     assert!(svg.ends_with("</svg>"));
 }
 
-#[test]
-fn the_showcase_file_stays_valid() {
-    let source = include_str!("../diagram.bd");
-    let l = build(source);
-    assert_eq!(l.nodes.len(), 7);
-    assert_eq!(l.edges.len(), 7);
-    assert!(render_svg::render(&l).starts_with("<svg"));
-}
-
 // The property table in `props.rs` drives validation, completion and hover;
 // `style.rs` does the interpreting. These two tests are what keep them honest.
 
@@ -640,6 +631,88 @@ fn packet_reports_overlaps_and_notes_gaps() {
 #[test]
 fn a_packet_field_needs_bits() {
     assert!(err("type packet\nnode a \"A\"").contains("has no `bits`"));
+}
+
+// ---------------------------------------------------------------------- W-039
+
+#[test]
+fn a_bytefield_is_a_packet_one_order_of_magnitude_up() {
+    // Same layout, same splitting, same renderer — only the unit differs. The
+    // geometry is asserted rather than assumed, because "it reuses packet" is
+    // exactly the claim that stops being true quietly.
+    let l = build(
+        r#"
+        type bytefield { width: 16 cell: 10 40 }
+        node a "A" { bytes: 0 3 }
+        node b "B" { bytes: 4 15 }
+    "#,
+    );
+
+    assert!(matches!(l.chart, crate::layout::Chart::Packet));
+    assert_eq!(l.nodes[0].rect.x, 0.0);
+    assert_eq!(l.nodes[0].rect.w, 40.0, "four bytes at ten each");
+    assert_eq!(l.nodes[1].rect.x, 40.0);
+    assert_eq!(l.nodes[0].rect.y, l.nodes[1].rect.y);
+}
+
+#[test]
+fn a_bytefield_row_is_sixteen_bytes_by_default() {
+    // A hex dump is read sixteen across; a packet is read thirty-two bits
+    // across. Sharing one default would make one of the two wrong.
+    let l = build("type bytefield { cell: 10 40 ruler: off }\nnode a \"A\" { bytes: 0 31 }");
+
+    // Thirty-two bytes at sixteen per row is two rows, so two segments.
+    assert_eq!(l.nodes.len(), 2, "{:?}", l.nodes.len());
+    assert!(l.nodes[1].rect.y > l.nodes[0].rect.y);
+    assert_eq!(l.nodes[0].rect.w, 160.0);
+}
+
+#[test]
+fn the_bytefield_ruler_counts_in_fours() {
+    // Bits group by eight, bytes by four — that is where a reader's eye
+    // already puts the marks.
+    let l = build("type bytefield { width: 16 cell: 10 40 }\nnode a \"A\" { bytes: 0 15 }");
+    let ticks: Vec<&str> = l
+        .annotations
+        .iter()
+        .map(|a| a.text.as_str())
+        .filter(|t| t.parse::<u32>().is_ok())
+        .collect();
+    assert!(
+        ticks.contains(&"4") && ticks.contains(&"12"),
+        "byte offsets every four: {ticks:?}"
+    );
+    assert!(!ticks.contains(&"2"), "not every two: {ticks:?}");
+}
+
+#[test]
+fn a_bytefield_field_needs_bytes_and_says_so_in_its_own_unit() {
+    // The diagnostics are the shared ones, but a message about `bits` in a
+    // byte diagram would send the author to the wrong property.
+    let e = err("type bytefield\nnode a \"A\"");
+    assert!(e.contains("has no `bytes`"), "{e}");
+    assert!(e.contains("bytefield"), "{e}");
+
+    let e = err("type bytefield\nnode a { bytes: 0 3 }\nnode b { bytes: 2 7 }");
+    assert!(e.contains("covers bytes 2–7"), "{e}");
+
+    let d = diags("type bytefield\nnode a { bytes: 0 3 }\nnode b { bytes: 6 7 }");
+    assert!(
+        d.iter()
+            .any(|x| x.message.contains("bytes 4–5 are unassigned")),
+        "{d:?}"
+    );
+}
+
+#[test]
+fn bits_and_bytes_do_not_answer_for_each_other() {
+    // They are indistinguishable by value — only the archetype knows which
+    // unit was meant — so each is refused in the other's genre by name.
+    let e = err("type bytefield\nnode a { bits: 0 3 }");
+    assert!(e.contains("`type packet`"), "{e}");
+
+    let e = err("type packet\nnode a { bytes: 0 3 }");
+    assert!(e.contains("`type bytefield`"), "{e}");
 }
 
 #[test]
@@ -891,13 +964,28 @@ fn the_pest_grammar_matches_the_corpus() {
 fn the_tree_sitter_grammar_agrees_with_pest() {
     let mut probe = corpus_files("accept");
     probe.extend(corpus_files("reject"));
-    for extra in [
-        concat!(env!("CARGO_MANIFEST_DIR"), "/diagram.bd"),
-        concat!(env!("CARGO_MANIFEST_DIR"), "/examples/pie.bd"),
-        concat!(env!("CARGO_MANIFEST_DIR"), "/examples/packet.bd"),
-    ] {
-        probe.push(std::path::PathBuf::from(extra));
-    }
+
+    // The examples were named by hand here — three of them, out of nineteen —
+    // so every file added since was cross-checked by nothing, and the list
+    // still pointed at `diagram.bd` after that file went away, which failed
+    // the whole guard rather than the one entry. Sweep the directory: a list
+    // written by hand is a list that stops being true.
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/examples");
+    let mut examples: Vec<std::path::PathBuf> =
+        std::fs::read_dir(dir)
+            .unwrap_or_else(|e| panic!("cannot read {dir}: {e}"))
+            .filter_map(|entry| {
+                let path = entry.expect("readable entry").path();
+                (path.extension().is_some_and(|e| e == "bd")).then_some(path)
+            })
+            .collect();
+    examples.sort();
+    assert!(
+        examples.len() >= 16,
+        "only {} examples found — the sweep is not finding them",
+        examples.len()
+    );
+    probe.extend(examples);
 
     // The CLI is needed to regenerate the parser anyway. Without it the
     // check cannot run, and says so rather than passing quietly.

@@ -31,7 +31,7 @@ is sugar for the named property, so the long form always works. See
 The premise: mermaid-class tools auto-place everything and you fight the
 engine. Here **layout is declared** (relative anchors between nodes) and
 **style is a real cascade**. See `docs/language.md` for the syntax and
-`diagram.bd` for a worked example.
+`examples/` for a worked file per archetype.
 
 **Where this is going** (`D-014`): archetypes covering four audiences —
 statistics, software, embedded and data — and, at the end of it, an
@@ -53,11 +53,11 @@ disagree.
 
 ## Setup commands
 - `cargo build` — builds both `bgraph` and `bgraph-lsp`
-- `cargo run --bin bgraph -- diagram.bd -o diag.svg`
-- `cargo run --bin bgraph -- watch diagram.bd` → http://127.0.0.1:7878
-- `cargo run --bin bgraph -- check diagram.bd` — diagnostics as `file:line:col`
+- `cargo run --bin bgraph -- examples/groups.bd -o groups.svg`
+- `cargo run --bin bgraph -- watch examples/groups.bd` → http://127.0.0.1:7878
+- `cargo run --bin bgraph -- check examples/groups.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (201 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (266 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
 - `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (27 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`

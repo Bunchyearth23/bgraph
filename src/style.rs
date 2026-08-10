@@ -124,6 +124,10 @@ pub struct Style {
     /// can supply it: `value` feeds `type pie`, `bits` feeds `type packet`.
     pub value: Option<f64>,
     pub bits: Option<(u32, u32)>,
+    /// The same range one order of magnitude up, for `type bytefield`. A
+    /// separate field because a value cannot tell you which unit it was
+    /// written in, and only the archetype knows.
+    pub bytes: Option<(u32, u32)>,
     /// Quadrant coordinates, in the archetype's own range.
     pub x: Option<f64>,
     pub y: Option<f64>,
@@ -196,6 +200,7 @@ impl Style {
             shadow,
             value,
             bits,
+            bytes,
             x,
             y,
             wave,
@@ -428,13 +433,20 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
         }
         "x" => style.x = first.and_then(|v| v.as_num()),
         "y" => style.y = first.and_then(|v| v.as_num()),
-        "bits" => {
+        // Same shape, two units. A single value is a range of one, which is
+        // what makes `bits: 8` and `bytes: 4` mean one cell rather than none.
+        "bits" | "bytes" => {
             let start = first.and_then(|x| x.as_num()).unwrap_or(0.0).max(0.0) as u32;
             let end = v
                 .get(1)
                 .and_then(|x| x.as_num())
                 .map_or(start, |n| n.max(0.0) as u32);
-            style.bits = Some((start.min(end), start.max(end)));
+            let range = Some((start.min(end), start.max(end)));
+            if prop.name == "bits" {
+                style.bits = range;
+            } else {
+                style.bytes = range;
+            }
         }
         "shadow" => {
             style.shadow = Some(!matches!(

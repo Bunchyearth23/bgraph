@@ -73,7 +73,9 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         #[cfg(feature = "pie")]
         "pie" => check_pie(diagram, &mut out),
         #[cfg(feature = "packet")]
-        "packet" => check_packet(diagram, &mut out),
+        "packet" => check_packet(diagram, "packet", &mut out),
+        #[cfg(feature = "bytefield")]
+        "bytefield" => check_packet(diagram, "bytefield", &mut out),
         #[cfg(feature = "treemap")]
         "treemap" => check_treemap(diagram, &mut out),
         #[cfg(feature = "quadrant")]
@@ -616,7 +618,7 @@ fn awaits_binding(node: &NodeDecl, def: &'static props::ArchetypeDef, name: &str
 /// boxes; the chart archetypes draw marks and take no box defaults.
 pub fn base_style(archetype: &str) -> crate::style::Style {
     match archetype {
-        "free" | "packet" => crate::style::Style::node_defaults(),
+        "free" | "packet" | "bytefield" => crate::style::Style::node_defaults(),
         _ => crate::charts::chart_defaults(),
     }
 }
@@ -730,18 +732,27 @@ fn check_pie(diagram: &Diagram, out: &mut Vec<Diag>) {
     }
 }
 
-fn check_packet(diagram: &Diagram, out: &mut Vec<Diag>) {
-    warn_ignored(diagram, "packet", out);
+/// `packet` and `bytefield` are validated identically — the same gaps and the
+/// same overlaps matter — so only the unit's name changes (`W-039`). Written
+/// once, because a second copy is a second place for the two to drift apart.
+fn check_packet(diagram: &Diagram, archetype: &'static str, out: &mut Vec<Diag>) {
+    warn_ignored(diagram, archetype, out);
+
+    let (slot, unit) = if archetype == "bytefield" {
+        ("bytes", "byte")
+    } else {
+        ("bits", "bit")
+    };
 
     let styles = resolved_nodes(diagram, crate::style::Style::node_defaults());
     let mut fields: Vec<(u32, u32, &str, Span)> = Vec::new();
 
     for (i, node) in diagram.nodes.iter().enumerate() {
-        match styles.get(i).and_then(|s| s.bits) {
-            None if !awaits_binding(node, archetype_of(diagram), "bits") => out.push(Diag::error(
+        match styles.get(i).and_then(|s| s.bits.or(s.bytes)) {
+            None if !awaits_binding(node, archetype_of(diagram), slot) => out.push(Diag::error(
                 node.id.span,
                 format!(
-                    "`{}` has no `bits` — every field of a packet needs a range",
+                    "`{}` has no `{slot}` — every field of a {archetype} needs a range",
                     node.id.as_str()
                 ),
             )),
@@ -760,16 +771,16 @@ fn check_packet(diagram: &Diagram, out: &mut Vec<Diag>) {
             out.push(Diag::error(
                 b_span,
                 format!(
-                    "`{b_id}` covers bits {b_start}–{b_end}, which overlap \
+                    "`{b_id}` covers {slot} {b_start}–{b_end}, which overlap \
                      `{a_id}` at {a_start}–{a_end}"
                 ),
             ));
         } else if b_start > a_end + 1 {
             let (from, to) = (a_end + 1, b_start - 1);
             let range = if from == to {
-                format!("bit {from} is")
+                format!("{unit} {from} is")
             } else {
-                format!("bits {from}–{to} are")
+                format!("{slot} {from}–{to} are")
             };
             out.push(Diag::warn(
                 b_span,

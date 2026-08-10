@@ -74,7 +74,7 @@ node seq   "Sequence number"  { bits: 32 63 }
 Guided tour: [`docs/language.md`](docs/language.md).
 Exhaustive reference (generated from the compiler's own tables):
 [`docs/reference.md`](docs/reference.md).
-Worked examples: [`diagram.bd`](diagram.bd), [`examples/`](examples).
+Worked examples: [`examples/`](examples) — one complete file per archetype.
 
 ## Build
 

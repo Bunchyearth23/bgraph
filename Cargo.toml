@@ -7,15 +7,8 @@ description = "Stylable diagrams from a layout-first DSL — you place the boxes
 repository = "https://github.com/Bunchyearth23/bgraph"
 readme = "README.md"
 authors = ["Arnaud De Cafmeyer"]
-# Proprietary, all rights reserved — not an SPDX licence, so the file is
-# named rather than identified.
 license-file = "LICENSE"
 
-# Not published, and that is a standing decision (D-020), not an oversight.
-# The licence is proprietary, so a public registry is the wrong place for it
-# regardless; and a version on crates.io cannot be withdrawn, only yanked.
-# `cargo publish` refuses outright on this line, so the refusal is
-# load-bearing rather than a comment someone can miss.
 publish = false
 
 [lib]
@@ -31,17 +24,11 @@ name = "bgraph-lsp"
 path = "src/bin/bgraph-lsp.rs"
 
 [features]
-# One feature per archetype, so a program embedding `bgraph` for a single
-# chart does not compile the other fifteen. `free` is not a feature: it is the
-# language itself, and a file that declares no `type` is a free graph.
-#
-# An archetype that is not compiled in is *unknown*, not broken: `check` says
-# so and lists what is available. Silently accepting `type pie` and then
-# failing to draw it would be the worse trade.
 default = ["all-archetypes"]
 all-archetypes = [
     "pie",
     "packet",
+    "bytefield",
     "treemap",
     "quadrant",
     "wave",
@@ -58,6 +45,7 @@ all-archetypes = [
 ]
 pie = []
 packet = []
+bytefield = []
 treemap = []
 quadrant = []
 wave = []

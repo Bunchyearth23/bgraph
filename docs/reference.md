@@ -1082,6 +1082,71 @@ field urg   "Urgent pointer"      144 159
 
 </details>
 
+### `type bytefield`
+
+A wire-format diagram at byte granularity — `packet` with the ruler counting bytes rather than bits. Each field needs an inclusive byte range; one crossing a row boundary is split across rows.
+
+```
+field <id> ["label"] <bytes> <bytes>
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+| `width` | `width: <bytes>` | Bytes per row. 16 by default — the width a hex dump is read at. |
+| `cell` | `cell: <width> <height>` | Width of one byte and the height of a row. |
+| `ruler` | `ruler: <on\|off>` | Byte offsets above each row. On by default. |
+
+On a `field` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `bytes` | node | `bytes: <first> <last>` | Inclusive byte range of a field. `bytes: 4` is shorthand for a single byte. Usually written positionally — `field magic "Magic" 0 3`, which is four bytes. |
+
+<details>
+<summary>A complete file — <code>examples/bytefield.bd</code></summary>
+
+```
+// `bytefield` is `packet` read one order of magnitude up: the ruler counts
+// bytes, and a field's range is an inclusive byte range (W-039).
+type bytefield {
+  title: "ELF64 header"
+  width: 16
+  cell: 40 46
+  ruler: on
+}
+
+graph { background: #0b1120 }
+
+style field {
+  fill: #1e293b
+  stroke: #334155 1
+  radius: 3
+  font: 12 #e2e8f0
+}
+
+style magic extends field { fill: #422006 stroke: #f59e0b 1 }
+style offset extends field { fill: #0c2a3e stroke: #38bdf8 1 }
+
+// `field <id> ["label"] <bytes> <bytes>` — an inclusive range, in position.
+field ident   "e_ident" .magic   0 15
+field etype   "e_type"          16 17
+field machine "e_machine"       18 19
+field version "e_version"       20 23
+field entry   "e_entry"         24 31
+field phoff   "e_phoff" .offset 32 39
+field shoff   "e_shoff" .offset 40 47
+field flags   "e_flags"         48 51
+field ehsize  "e_ehsize"        52 53
+field phentsz "e_phentsize"     54 55
+field phnum   "e_phnum"         56 57
+field shentsz "e_shentsize"     58 59
+field shnum   "e_shnum"         60 61
+field shstr   "e_shstrndx"      62 63
+```
+
+</details>
+
 Edges and placement are ignored by the chart archetypes — and reported, not
 silently dropped.
 

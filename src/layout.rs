@@ -338,6 +338,8 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         "pie" => return crate::charts::pie(diagram, opts, &registry),
         #[cfg(feature = "packet")]
         "packet" => return crate::charts::packet(diagram, opts, &registry),
+        #[cfg(feature = "bytefield")]
+        "bytefield" => return crate::charts::bytefield(diagram, opts, &registry),
         #[cfg(feature = "treemap")]
         "treemap" => return crate::charts::treemap(diagram, opts, &registry),
         #[cfg(feature = "quadrant")]
