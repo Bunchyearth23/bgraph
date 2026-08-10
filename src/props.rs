@@ -304,6 +304,16 @@ pub const PROPS: &[PropDef] = &[
 
 pub const GRAPH_PROPS: &[PropDef] = &[
     PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the diagram. Every genre accepts it here — \
+              the chart archetypes also take a `title` in their own settings, \
+              and that one wins where both are given.",
+    },
+    PropDef {
         name: "padding",
         alias: false,
         ctx: Ctx::Both,

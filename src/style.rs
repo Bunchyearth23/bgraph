@@ -659,6 +659,10 @@ pub struct GraphOpts {
     pub gap: f64,
     pub background: Option<String>,
     pub flow: RelDir,
+    /// A heading for any genre. The chart archetypes carry a `title` of their
+    /// own in their settings and that one wins; this is what every other
+    /// genre — `free`, `class`, `er`, `harness` — had no way to say at all.
+    pub title: Option<String>,
 }
 
 impl Default for GraphOpts {
@@ -670,6 +674,7 @@ impl Default for GraphOpts {
             // the surface is. `background: none` opts back out.
             background: Some("#ffffff".into()),
             flow: RelDir::RightOf,
+            title: None,
         }
     }
 }
@@ -681,6 +686,7 @@ impl GraphOpts {
         for prop in props {
             let first = prop.values.first();
             match prop.name.as_str() {
+                "title" => opts.title = first.and_then(|x| x.as_text()).map(String::from),
                 "padding" => opts.padding = first.and_then(|x| x.as_num()).unwrap_or(opts.padding),
                 "gap" => opts.gap = first.and_then(|x| x.as_num()).unwrap_or(opts.gap),
                 "background" | "bg" => {

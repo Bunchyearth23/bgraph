@@ -99,15 +99,15 @@ pub fn is_dark(color: &str) -> bool {
     luminance(color).is_some_and(|l| l < 0.18)
 }
 
-struct Theme {
+pub(crate) struct Theme {
     dark: bool,
     surface: String,
-    ink: String,
+    pub(crate) ink: String,
     muted: String,
 }
 
 impl Theme {
-    fn of(opts: &GraphOpts) -> Theme {
+    pub(crate) fn of(opts: &GraphOpts) -> Theme {
         let dark = opts.background.as_deref().is_some_and(is_dark);
         Theme {
             dark,
@@ -184,7 +184,7 @@ fn family(style: &Style) -> String {
 
 // ------------------------------------------------------------------- pie
 
-const TITLE_SIZE: f64 = 16.0;
+pub(crate) const TITLE_SIZE: f64 = 16.0;
 const SWATCH: f64 = 13.0;
 const LEGEND_STEP: f64 = 24.0;
 const LEGEND_MARGIN: f64 = 28.0;
@@ -200,7 +200,9 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
     let start_at = number(cfg, "start", 0.0);
     let legend = toggle(cfg, "legend", true);
     let labels = word(cfg, "labels", "percent");
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     // Resolve on a bare base so a declared `fill` is distinguishable from
     // the default one, and the palette only fills in what was left unsaid.
@@ -415,7 +417,9 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         .and_then(|v| v.as_num())
         .unwrap_or(58.0)
         .max(20.0);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
     let declared: Vec<String> = setting(cfg, "branches")
         .map(|v| {
             v.iter()
@@ -655,7 +659,9 @@ pub fn tree(
 
     let row = number(cfg, "row", if kind == TreeKind::View { 26.0 } else { 92.0 }).max(12.0);
     let spacing = number(cfg, "spacing", 24.0).max(0.0);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
     let base = registry.resolve(Style::node_defaults(), def.item, &[], &[])?;
 
     let index: HashMap<&str, usize> = diagram
@@ -962,7 +968,9 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
     let palette = theme.palette();
 
     let biggest = number(cfg, "radius", 110.0).max(30.0);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
 
     let mut sets = Vec::new();
@@ -1174,7 +1182,9 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         .unwrap_or(18.0)
         .max(6.0);
     let ruler = toggle(cfg, "ruler", true);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let base = registry.resolve(Style::node_defaults(), def.item, &[], &[])?;
     let title_h = if title.is_some() {
@@ -1300,7 +1310,9 @@ pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
     let palette = theme.palette();
 
     let radius = number(cfg, "radius", 140.0).max(40.0);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
     let axes: Vec<String> = setting(cfg, "categories")
         .map(|v| {
             v.iter()
@@ -1547,7 +1559,9 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
         .and_then(|v| v.as_num())
         .unwrap_or(220.0)
         .max(80.0);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
     let actors: Vec<String> = setting(cfg, "actors")
         .map(|v| {
             v.iter()
@@ -1790,7 +1804,9 @@ pub fn kanban(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
     let def = crate::check::archetype_of(diagram);
 
     let col_w = number(cfg, "column", 220.0).max(80.0);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
 
     const PAD: f64 = 12.0;
@@ -1970,7 +1986,9 @@ fn packet_like(
         .unwrap_or(46.0)
         .max(12.0);
     let ruler = toggle(cfg, "ruler", true);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let def = crate::check::archetype_of(diagram);
     let mut fields = Vec::new();
@@ -2159,7 +2177,9 @@ pub fn treemap(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
     let gap = number(cfg, "gap", 2.0).max(1.0);
     let header = number(cfg, "header", 20.0).max(0.0);
     let labels = word(cfg, "labels", "name");
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
     let roots = build_tiles(diagram, registry, def, None)?;
@@ -2576,7 +2596,9 @@ pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
     let y_axis = named("y-axis");
     let regions = named("quadrants");
     let show_names = word(cfg, "labels", "name") != "none";
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
     let title_h = if title.is_some() {
@@ -2814,7 +2836,9 @@ pub fn wave(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
     let ruler = toggle(cfg, "ruler", true);
     let grid = toggle(cfg, "grid", true);
     let every = number(cfg, "every", 4.0).max(1.0) as usize;
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
 
@@ -3179,7 +3203,9 @@ pub fn sankey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
     let gap = number(cfg, "gap", 14.0).max(2.0);
     let bar = number(cfg, "width", 16.0).max(2.0);
     let labels = word(cfg, "labels", "name");
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
 
@@ -3625,7 +3651,9 @@ pub fn bar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
         .unwrap_or(320.0)
         .max(80.0);
     let stacked = toggle(cfg, "stack", false);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
     let categories: Vec<String> = setting(cfg, "categories")
         .map(|v| {
             v.iter()
@@ -3862,7 +3890,9 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
         .and_then(|v| v.as_num())
         .unwrap_or(320.0)
         .max(80.0);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
     let categories: Vec<String> = setting(cfg, "categories")
         .map(|v| {
             v.iter()
@@ -4140,7 +4170,9 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
     let column = number(cfg, "column", 150.0).max(60.0);
     let row = number(cfg, "row", 46.0).max(20.0);
     let numbered = toggle(cfg, "numbered", false);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let base = registry.resolve(Style::node_defaults(), def.item, &[], &[])?;
     let title_h = if title.is_some() {
@@ -4436,7 +4468,9 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
     let today = setting(cfg, "today")
         .and_then(|v| v.first())
         .and_then(|v| v.as_date());
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
 
@@ -4722,7 +4756,9 @@ pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         .and_then(|v| v.as_num())
         .unwrap_or(34.0)
         .max(14.0);
-    let title = text(cfg, "title");
+    // `graph { title }` is the fallback: every genre can be titled there, and
+    // a chart that names itself in its own settings still wins (I-053).
+    let title = text(cfg, "title").or_else(|| opts.title.clone());
 
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
     let accent = theme.palette()[0];

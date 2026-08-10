@@ -229,6 +229,7 @@ Declared once, in `graph { … }`. These are diagram-wide and are not part of th
 
 | Setting | Syntax | Meaning |
 |---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. Every genre accepts it here — the chart archetypes also take a `title` in their own settings, and that one wins where both are given. |
 | `padding` | `padding: <number>` | Margin between the drawing and the canvas edge. |
 | `gap` | `gap: <number>` | Default distance used by anchors that omit `gap`. |
 | `background` | `background: <color>` | Canvas fill. Also backs edge labels so they stay readable. |

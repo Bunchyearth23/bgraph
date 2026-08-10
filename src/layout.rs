@@ -1003,6 +1003,42 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     // After the boxes, so the compartment rules land on top of them.
     nodes.extend(rules);
 
+    // `graph { title }` on a genre that draws boxes rather than a chart. The
+    // chart archetypes each reserve a band and shift their content down; here
+    // nothing needs shifting, because the heading simply sits above the
+    // content and `bounds` already grows the canvas to hold an annotation.
+    // Flush with the left edge of the drawing, as every chart title is.
+    if let Some(title) = opts.title.clone()
+        && let Some(area) = bbox(
+            nodes
+                .iter()
+                .map(|n| n.rect)
+                .chain(groups.iter().map(|g| g.rect)),
+        )
+    {
+        let theme = crate::charts::Theme::of(&opts);
+        annotations.push(Annotation {
+            text: title,
+            x: area.x,
+            // The same two-and-a-half-line clearance the charts use: at less
+            // the heading sits on the top row of boxes and reads as one of
+            // them rather than as a title over them.
+            y: area.y - crate::charts::TITLE_SIZE * 1.5,
+            anchor: Anchor::Start,
+            size: crate::charts::TITLE_SIZE,
+            color: theme.ink.clone(),
+            weight: "600".into(),
+            // Read off the drawing rather than restated here: a diagram that
+            // declares its own font must not get a heading in a different
+            // one, and an empty family falls through to the renderer's serif
+            // default, which is never what the boxes are set in.
+            family: nodes
+                .first()
+                .and_then(|n| n.style.font_family.clone())
+                .unwrap_or_default(),
+        });
+    }
+
     Ok(Layout {
         guides,
         polylines,

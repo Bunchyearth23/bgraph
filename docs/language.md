@@ -367,6 +367,7 @@ outside the shape it belongs to.
 
 ```bgraph
 graph {
+  title: "Order pipeline"  // heading drawn above the diagram
   background: #0b1120   // canvas fill (also backs edge labels)
                         // omit it and the surface is #ffffff, explicitly;
                         // `background: none` gives a transparent SVG
@@ -375,6 +376,10 @@ graph {
   flow: right           // right | left | down | up — for unplaced nodes
 }
 ```
+
+`title` works in every genre. The chart archetypes also take a `title` in
+their own settings — `type pie { title: … }` — and that one wins where both
+are given, being the more specific of the two.
 
 The canvas size is derived from the content: nothing is ever clipped, and
 negative coordinates are fine.

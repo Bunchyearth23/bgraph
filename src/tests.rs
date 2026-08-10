@@ -5931,3 +5931,91 @@ fn the_highlighter_captures_every_kind_of_value() {
         assert!(highlights.contains(field), "`{field}` is not captured");
     }
 }
+
+// ------------------------------------------------- `graph { title }` (I-053)
+
+#[test]
+fn any_genre_can_be_titled() {
+    // The defect I-053 named: `title` lived only in each chart archetype's
+    // own settings, so the genres that draw boxes had no way to say it at
+    // all. One assertion per family, because the free path and the chart
+    // paths reach the heading by different routes.
+    for source in [
+        r#"graph { title: "Heading" }
+           node a "A""#,
+        r#"type class
+           graph { title: "Heading" }
+           class a "A""#,
+        r#"type er
+           graph { title: "Heading" }
+           entity a "A""#,
+    ] {
+        let l = build(source);
+        assert!(
+            l.annotations.iter().any(|a| a.text == "Heading"),
+            "no heading drawn for:\n{source}"
+        );
+    }
+}
+
+#[test]
+fn the_diagram_title_sits_above_every_box() {
+    let l = build(
+        r#"graph { title: "Heading" }
+           node a "A"
+           node b "B" below a"#,
+    );
+    let top = l.nodes.iter().map(|n| n.rect.y).fold(f64::MAX, f64::min);
+    let heading = l
+        .annotations
+        .iter()
+        .find(|a| a.text == "Heading")
+        .expect("the heading should be placed");
+    assert!(
+        heading.y < top,
+        "the heading sits at {} but the topmost box starts at {top}",
+        heading.y
+    );
+}
+
+#[test]
+fn the_diagram_title_wears_the_diagram_font() {
+    // An empty family falls through to the renderer's serif default, which
+    // is never what the boxes are set in — the heading looked pasted on.
+    let l = build(
+        r#"graph { title: "Heading" }
+           node a "A""#,
+    );
+    let heading = l.annotations.iter().find(|a| a.text == "Heading").unwrap();
+    assert_eq!(
+        Some(heading.family.as_str()),
+        l.nodes[0].style.font_family.as_deref(),
+        "the heading is set in a different font from the boxes"
+    );
+}
+
+#[test]
+fn an_archetypes_own_title_beats_the_graph_one() {
+    // Both are legal, and the more specific one wins. Stated as a test
+    // because the fallback is written once per chart function.
+    let l = build(
+        r#"type pie { title: "Specific" }
+           graph { title: "General" }
+           slice a "A" 40"#,
+    );
+    assert!(l.annotations.iter().any(|a| a.text == "Specific"));
+    assert!(
+        !l.annotations.iter().any(|a| a.text == "General"),
+        "the graph-level title should have been overridden, not drawn as well"
+    );
+}
+
+#[test]
+fn a_chart_falls_back_to_the_graph_title() {
+    let l = build(
+        r#"type pie
+           graph { title: "General" }
+           slice a "A" 40"#,
+    );
+    assert!(l.annotations.iter().any(|a| a.text == "General"));
+}
