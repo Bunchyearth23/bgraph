@@ -34,6 +34,10 @@ use minifb::{Key, KeyRepeat, MouseButton, MouseMode, Window, WindowOptions};
 const GROUND: (u8, u8, u8) = (0x1c, 0x1f, 0x26);
 
 /// Open the file in a window and block until it is closed.
+///
+/// **Meant as the last thing a process does.** It deliberately does not tear
+/// the window down — see the note where it returns — so a caller that carries
+/// on afterwards would hold the window's resources until it exits.
 pub fn show(input: PathBuf, data: Option<PathBuf>) -> Result<()> {
     let mut viewer = Viewer::new(input, data);
 
@@ -124,6 +128,16 @@ pub fn show(input: PathBuf, data: Option<PathBuf>) -> Result<()> {
             .context("cannot present the window")?;
     }
 
+    // Dropping the window tears down `minifb`'s Wayland queue while its own
+    // proxies — the registry, the seat, the surfaces — are still attached, and
+    // libwayland says so on stderr in twenty lines. It is a teardown order
+    // inside the dependency, not something this code can sequence.
+    //
+    // So the window is not dropped. The process is exiting; the compositor
+    // reclaims everything the moment the socket closes, which is the same
+    // cleanup a drop would have asked for and without the complaint. This is
+    // why `show` is documented as the last thing a process does.
+    std::mem::forget(window);
     Ok(())
 }
 
@@ -190,6 +204,7 @@ impl Viewer {
 
         let mut options = resvg::usvg::Options::default();
         options.fontdb_mut().load_system_fonts();
+        resolve_generic_families(&mut options);
         self.art = Some(match resvg::usvg::Tree::from_str(&svg, &options) {
             Ok(tree) => Art::Tree(Box::new(tree)),
             Err(err) => Art::Failed(format!("the SVG did not parse: {err}")),
@@ -231,11 +246,22 @@ impl Viewer {
     /// The whole picture on screen, with a margin.
     fn fit(&mut self) {
         let (w, h) = self.art_size();
+        self.fit_to(w, h);
+    }
+
+    /// The arithmetic of [`fit`], apart from the picture — so the rule about
+    /// what a starting zoom may be is testable without a font stack.
+    fn fit_to(&mut self, w: f64, h: f64) {
         if w <= 0.0 || h <= 0.0 {
             return;
         }
         let (vw, vh) = (self.size.0 as f64, self.size.1 as f64);
-        let scale = ((vw - 48.0) / w).min((vh - 48.0) / h).clamp(0.02, 4.0);
+        // Never larger than actual size — a small diagram opens at 100% rather
+        // than blown up to fill the window — and snapped down to a multiple of
+        // 5%, so the number in the title bar is one you can reason about and
+        // step from. 87.3% is a true answer to the wrong question.
+        let room = ((vw - 48.0) / w).min((vh - 48.0) / h).min(1.0);
+        let scale = ((room * 20.0).floor() / 20.0).max(0.05);
         self.view = View {
             scale,
             dx: (vw - w * scale) / 2.0,
@@ -300,6 +326,67 @@ impl Viewer {
     }
 }
 
+/// Tell the renderer what the generic font families mean.
+///
+/// A browser asks fontconfig; `resvg` does not, so `sans-serif` in an SVG
+/// resolves to usvg's built-in guess — and the default stack this project
+/// emits, `Inter, ui-sans-serif, system-ui, sans-serif`, is a *web* stack:
+/// `ui-sans-serif` and `system-ui` are CSS generics that exist in no font
+/// database, and `Inter` is on very few machines. Everything therefore lands
+/// on the generic, and the generic was whatever usvg guessed — which is how a
+/// diagram came out set in a face nothing else on the machine uses.
+///
+/// The lists are ordered by preference and filtered by what is actually
+/// installed, so this states a wish rather than an assumption.
+fn resolve_generic_families(options: &mut resvg::usvg::Options) {
+    const SANS: &[&str] = &[
+        "Inter",
+        "Archivo",
+        "Noto Sans",
+        "DejaVu Sans",
+        "Liberation Sans",
+        "Arial",
+        "Helvetica",
+    ];
+    const SERIF: &[&str] = &["Noto Serif", "DejaVu Serif", "Liberation Serif", "Georgia"];
+    const MONO: &[&str] = &[
+        "JetBrainsMono NFM",
+        "JetBrains Mono",
+        "Noto Sans Mono",
+        "DejaVu Sans Mono",
+        "Liberation Mono",
+    ];
+
+    // Read the installed families once, then hand the database back: the
+    // lookup borrows it and the setters need it mutably.
+    let families: std::collections::HashSet<String> = options
+        .fontdb
+        .faces()
+        .flat_map(|f| f.families.iter().map(|(name, _)| name.clone()))
+        .collect();
+    let installed = |names: &[&str]| -> Option<String> {
+        names
+            .iter()
+            .find(|n| families.contains(**n))
+            .map(|n| n.to_string())
+    };
+
+    let (sans, serif, mono) = (installed(SANS), installed(SERIF), installed(MONO));
+
+    if let Some(sans) = sans {
+        options.fontdb_mut().set_sans_serif_family(sans.clone());
+        // The last resort when a stack names nothing that exists — which is
+        // exactly the case for the stack this project emits.
+        options.font_family = sans;
+    }
+    if let Some(serif) = serif {
+        options.fontdb_mut().set_serif_family(serif);
+    }
+    if let Some(mono) = mono {
+        options.fontdb_mut().set_monospace_family(mono);
+    }
+}
+
 /// Whether a window can be opened at all. A machine with no display — a
 /// container, an ssh session — has to be told, not left waiting for a window
 /// that never appears.
@@ -320,6 +407,27 @@ mod tests {
         let mut v = Viewer::new(PathBuf::from("x.svg"), None);
         v.size = (800, 600);
         v
+    }
+
+    #[test]
+    fn the_opening_zoom_is_a_number_you_can_reason_about() {
+        // 87.3% is a true answer to the wrong question. A picture that fits
+        // opens at 100% rather than blown up, and one that does not opens at a
+        // multiple of 5% — which is also the step, so the numbers line up.
+        let mut v = viewer();
+        v.size = (800, 600);
+
+        for (w, h) in [(200.0, 150.0), (2000.0, 400.0), (900.0, 3000.0)] {
+            v.art = None;
+            v.fit_to(w, h);
+            let percent = v.view.scale * 100.0;
+            assert!(
+                (percent / 5.0).fract().abs() < 1e-9,
+                "{percent}% is not a multiple of five"
+            );
+            assert!(v.view.scale <= 1.0, "never larger than actual size");
+            assert!(v.view.scale >= 0.05);
+        }
     }
 
     #[test]

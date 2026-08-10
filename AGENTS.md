@@ -238,6 +238,14 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   magnitude, and make the step multiplicative so one notch means the same
   thing at 20% as at 800%.
 
+- [2026-08-10] **`resvg` does not consult fontconfig.** The default stack this
+  project emits — `Inter, ui-sans-serif, system-ui, sans-serif` — is a *web*
+  stack: two of those are CSS generics no font database has, and `Inter` is on
+  few machines. So everything lands on the generic, and the generic was
+  whatever usvg guessed, which is how the native window came out set in a face
+  nothing else on the system uses. `window::resolve_generic_families` names
+  the sans, serif and monospace families from what is actually installed.
+
 ### Gotchas
 - [2026-07-31] `template::scan` is textual on purpose, so `{{…}}` written
   inside a **comment** is still a hole. Writing about the syntax in a `.bd`
