@@ -1082,6 +1082,69 @@ field urg   "Urgent pointer"      144 159
 
 </details>
 
+### `type kanban`
+
+A board: `group`s are its columns, in the order they are declared, and the cards inside each one stack in the order they are declared. A column may carry a `limit`, and a column over it is reported — a board nobody is told is over its limit is a board that is only a picture.
+
+```
+card <id> ["label"]
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the board. |
+| `column` | `column: <width>` | Width of one column. 220 by default. |
+
+On a `card` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `limit` | node | `limit: <count>` | The work-in-progress limit of a **column** — the number of cards it is allowed to hold. `check` reports a column over its limit, which is the one thing a board is kept for. Written on the `group`, not on a card; on a card it means nothing and is reported as such. |
+
+<details>
+<summary>A complete file — <code>examples/kanban.bd</code></summary>
+
+```
+// A board: `group`s are the columns, in declaration order, and the cards
+// inside stack in declaration order. A column may carry a WIP `limit` (W-050).
+type kanban {
+  title: "Sprint 14"
+  column: 210
+}
+
+graph { background: #0b1120 padding: 28 }
+
+style card    { fill: #1e293b stroke: #334155 1 radius: 5 font: 12 #e2e8f0 }
+style group   { fill: #0f172a stroke: #1e293b 1 radius: 8 dash: solid font: 12 #94a3b8 }
+style blocked extends card { fill: #422006 stroke: #f59e0b 1 }
+
+group todo "To do" {
+  card ruler   "Byte-granular ruler for wire formats"
+  card venn    "Circle geometry for overlapping sets"
+  card metrics "Real font metrics instead of the estimate"
+}
+
+// Deliberately over its limit: the warning firing is the point of the genre.
+group doing "In progress" {
+  limit: 2
+  card board "Columns of cards, sized by what they hold"
+  card links "Typed relations between requirements"
+  card fonts "Measure text instead of guessing at it" .blocked
+}
+
+group review "In review" {
+  limit: 3
+  card scatter "Coordinates instead of positions"
+}
+
+group done "Done" {
+  card offset "Manual escape hatch out of label placement"
+  card bytes  "Wire formats at byte granularity"
+}
+```
+
+</details>
+
 ### `type requirements`
 
 Requirements and the typed links between them. A bare string in the block is a line of the requirement — its identifier, then what it demands — exactly as in `class`. What this genre adds is the relation vocabulary: a link says what it asserts, read tail to head, and is drawn in guillemets on the line. Placement stays declared, as in `free`.

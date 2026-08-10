@@ -155,6 +155,9 @@ pub struct Style {
     pub verify: Option<String>,
     /// `type requirements` — what a relation asserts, read tail to head.
     pub link: Option<String>,
+    /// `type kanban` — a column's work-in-progress limit. On the cascade like
+    /// any other datum, so a `.class` can carry a board's house limits.
+    pub limit: Option<f64>,
     /// Scheduling: a start day and a length in days.
     pub start: Option<i64>,
     pub length: Option<f64>,
@@ -220,6 +223,7 @@ impl Style {
             risk,
             verify,
             link,
+            limit,
             guard,
             start,
             length,
@@ -418,6 +422,7 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
         "risk" => style.risk = first.and_then(|x| x.as_word()).map(String::from),
         "verify" => style.verify = first.and_then(|x| x.as_word()).map(String::from),
         "link" => style.link = first.and_then(|x| x.as_word()).map(String::from),
+        "limit" => style.limit = first.and_then(|x| x.as_num()),
         "description" | "desc" => {
             style.description = first.and_then(|x| x.as_text()).map(String::from)
         }

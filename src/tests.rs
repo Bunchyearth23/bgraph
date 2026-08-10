@@ -633,6 +633,106 @@ fn a_packet_field_needs_bits() {
     assert!(err("type packet\nnode a \"A\"").contains("has no `bits`"));
 }
 
+// ---------------------------------------------------------------------- W-050
+
+/// Two columns, three cards, written the way the archetype means them.
+#[cfg(test)]
+const BOARD: &str = "type kanban { column: 200 }\n\
+     group todo \"To do\" {\n  card a \"A\"\n  card b \"B\"\n}\n\
+     group done \"Done\" {\n  card c \"C\"\n}\n";
+
+#[test]
+fn a_board_puts_its_columns_in_declaration_order() {
+    // The archetype places everything: a kanban whose columns had to be
+    // anchored by hand would be busywork with nothing gained in the reading.
+    let l = build(BOARD);
+
+    assert_eq!(l.groups.len(), 2);
+    assert!(
+        l.groups[0].rect.x < l.groups[1].rect.x,
+        "left to right in declaration order: {:?}",
+        l.groups.iter().map(|g| g.rect.x).collect::<Vec<_>>()
+    );
+    // Every column is drawn to the same height, or the board reads as ragged
+    // shelves rather than as one thing.
+    assert_eq!(l.groups[0].rect.bottom(), l.groups[1].rect.bottom());
+}
+
+#[test]
+fn cards_stack_inside_their_column() {
+    let l = build(BOARD);
+    assert_eq!(l.nodes.len(), 3);
+
+    let (a, b) = (&l.nodes[0].rect, &l.nodes[1].rect);
+    assert_eq!(a.x, b.x, "one column, one x");
+    assert!(b.y > a.y, "declaration order runs down the column");
+    assert!(b.y >= a.bottom(), "cards do not overlap");
+
+    // The third card is in the second column, so it starts at the top again.
+    assert!(l.nodes[2].rect.x > a.x);
+    assert_eq!(l.nodes[2].rect.y, a.y);
+}
+
+#[test]
+fn a_column_over_its_limit_says_so() {
+    // The one thing a board is kept for. Without this the genre is a `free`
+    // diagram with boxes in rows.
+    let d = diags(
+        "type kanban\ngroup doing \"Doing\" {\n  limit: 2\n  card a\n  card b\n  card c\n}",
+    );
+    assert!(
+        d.iter()
+            .any(|x| x.message.contains("over its limit of 2")),
+        "{d:?}"
+    );
+
+    let d = diags("type kanban\ngroup doing \"Doing\" {\n  limit: 3\n  card a\n  card b\n}");
+    assert!(
+        !d.iter().any(|x| x.message.contains("over its limit")),
+        "within the limit is silent: {d:?}"
+    );
+}
+
+#[test]
+fn the_header_counts_the_cards_against_the_limit() {
+    let l = build("type kanban\ngroup doing \"Doing\" {\n  limit: 3\n  card a\n  card b\n}");
+    let texts: Vec<&str> = l.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert!(texts.contains(&"Doing  2/3"), "{texts:?}");
+
+    // With no limit there is nothing to count against, so only the tally.
+    let l = build("type kanban\ngroup todo \"To do\" {\n  card a\n}");
+    let texts: Vec<&str> = l.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert!(texts.contains(&"To do  1"), "{texts:?}");
+}
+
+#[test]
+fn a_limit_rides_the_cascade_like_any_other_datum() {
+    // Read off the raw props this would be missed, and the common case would
+    // still work — which is how a gap like that stays quiet.
+    let d = diags(
+        "type kanban\nstyle wip { limit: 1 }\n\
+         group doing \"Doing\" .wip {\n  card a\n  card b\n}",
+    );
+    assert!(
+        d.iter().any(|x| x.message.contains("over its limit of 1")),
+        "a limit from a class counts too: {d:?}"
+    );
+}
+
+#[test]
+fn a_card_outside_a_column_is_refused_and_so_is_a_limit_on_one() {
+    let e = err("type kanban\ngroup todo \"To do\" {\n  card a\n}\ncard loose \"Loose\"");
+    assert!(e.contains("is in no column"), "{e}");
+
+    // `limit` must be `Ctx::Node` to be accepted on a group at all, so it is
+    // also accepted on a card — where it means nothing, and says so.
+    let e = err("type kanban\ngroup todo \"To do\" {\n  card a { limit: 2 }\n}");
+    assert!(e.contains("belongs to a column"), "{e}");
+
+    let e = err("type kanban\ngroup todo \"To do\" {\n  limit: 0\n  card a\n}");
+    assert!(e.contains("at least one card"), "{e}");
+}
+
 // ---------------------------------------------------------------------- W-051
 
 #[test]

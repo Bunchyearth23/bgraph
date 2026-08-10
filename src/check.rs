@@ -90,6 +90,8 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "er" => check_er(diagram, &mut out),
         #[cfg(feature = "requirements")]
         "requirements" => check_requirements(diagram, &mut out),
+        #[cfg(feature = "kanban")]
+        "kanban" => check_kanban(diagram, &mut out),
         #[cfg(feature = "block")]
         "block" => check_block(diagram, &mut out),
         #[cfg(feature = "gantt")]
@@ -631,6 +633,24 @@ pub fn base_style(archetype: &str) -> crate::style::Style {
     }
 }
 
+/// The same for groups. A column's limit rides the cascade like any other
+/// datum, so reading it off the raw props would miss one supplied by a class —
+/// the sort of gap that stays quiet because the common case works.
+fn resolved_groups(diagram: &Diagram, base: crate::style::Style) -> Vec<crate::style::Style> {
+    let Ok(registry) = crate::style::Registry::build(&diagram.styles) else {
+        return Vec::new();
+    };
+    diagram
+        .groups
+        .iter()
+        .map(|group| {
+            registry
+                .resolve(base.clone(), "group", &group.classes, &group.props)
+                .unwrap_or_default()
+        })
+        .collect()
+}
+
 fn resolved_nodes(diagram: &Diagram, base: crate::style::Style) -> Vec<crate::style::Style> {
     let Ok(registry) = crate::style::Registry::build(&diagram.styles) else {
         return Vec::new();
@@ -1161,6 +1181,88 @@ fn check_block(diagram: &Diagram, out: &mut Vec<Diag>) {
             out.push(Diag::warn(
                 member.span,
                 "a block carries a `description`, not members".to_string(),
+            ));
+        }
+    }
+}
+
+/// A board is only worth keeping if it says when a column is over its limit —
+/// that is the one thing kanban is *for*, and the reason this genre exists
+/// rather than being a `free` diagram with boxes in rows.
+#[cfg(feature = "kanban")]
+fn check_kanban(diagram: &Diagram, out: &mut Vec<Diag>) {
+    warn_ignored(diagram, "kanban", out);
+
+    if diagram.groups.is_empty() {
+        out.push(Diag::warn(
+            diagram
+                .archetype
+                .as_ref()
+                .map(|a| a.span)
+                .unwrap_or_default(),
+            "no columns — a board's columns are its `group`s".to_string(),
+        ));
+    }
+
+    let in_a_column: HashSet<&str> = diagram
+        .groups
+        .iter()
+        .flat_map(|g| g.members.iter().map(|m| m.as_str()))
+        .collect();
+
+    for node in &diagram.nodes {
+        if !in_a_column.contains(node.id.as_str()) {
+            out.push(Diag::error(
+                node.id.span,
+                format!(
+                    "`{}` is in no column — a card belongs inside a `group`",
+                    node.id.as_str()
+                ),
+            ));
+        }
+        // `limit` has to be `Ctx::Node` to be accepted on a group at all, so
+        // it is also accepted on a card, where it means nothing. Said out
+        // loud rather than ignored, per `D-005`.
+        if let Some(prop) = node.props.iter().find(|p| p.name == "limit") {
+            out.push(Diag::error(
+                prop.name_span,
+                format!(
+                    "`limit` belongs to a column, not to `{}` — write it on the `group`",
+                    node.id.as_str()
+                ),
+            ));
+        }
+    }
+
+    let styles = resolved_groups(diagram, crate::style::Style::group_defaults());
+    for (i, group) in diagram.groups.iter().enumerate() {
+        let Some(n) = styles.get(i).and_then(|s| s.limit) else {
+            continue;
+        };
+        // The span is the declaration's if it was written here, and the
+        // group's name if it arrived through a class.
+        let span = group
+            .props
+            .iter()
+            .find(|p| p.name == "limit")
+            .map_or(group.id.span, |p| p.values_span);
+        if n < 1.0 {
+            out.push(Diag::error(
+                span,
+                "a work-in-progress limit is at least one card".to_string(),
+            ));
+            continue;
+        }
+        let held = group.members.len();
+        if held as f64 > n {
+            out.push(Diag::warn(
+                group.id.span,
+                format!(
+                    "`{}` holds {held} cards, over its limit of {} — that is what the \
+                     limit is for",
+                    group.id.as_str(),
+                    crate::charts::trim_number(n)
+                ),
             ));
         }
     }

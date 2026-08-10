@@ -25,8 +25,8 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**Thirteen chantiers are planned. No question is open and nothing is blocked.**
-Eighteen archetypes ship and the library is embeddable. The parked ideas were
+**Twelve chantiers are planned. No question is open and nothing is blocked.**
+Nineteen archetypes ship and the library is embeddable. The parked ideas were
 reviewed on 2026-08-10 and every one of them moved: what was worth building
 became a work item, what was not was discarded, and the one language question
 the review raised was answered the same day (`D-023`). One idea is still parked,
@@ -39,7 +39,6 @@ Roughly by cost. Nothing here has started.
 
 | id | state | title | notes |
 |---|---|---|---|
-| `W-050` | planned | `type kanban` — columns of cards | Probably the cheapest genre left: a column is a `group` (`W-011`) and a card list is an ordered member list (`W-013`). Mostly vocabulary over two shipped mechanisms. Was `I-019`. |
 | `W-047` | planned | Activation bars for `type sequence` | The box down a lifeline while a call is outstanding. Completes a shipped archetype rather than adding one. Design settled by `D-024`: `activate api { … }` is a group whose `edge_members` are the messages it spans, drawn as a bar rather than a frame. Was `I-016`. |
 | `W-038` | planned | A VS Code extension, beside the Zed one | Same three pieces the Zed extension already has — the tree-sitter grammar, `bgraph-lsp`, and the highlight queries — repackaged for a second editor. VS Code takes a TextMate grammar or a WASM tree-sitter build rather than Zed's git-pinned one, and speaks LSP over a client the extension launches itself, so `src/lsp.rs` is reused unchanged. `X-009` applies here too: the queries are part of the grammar's public surface, and a stale one breaks the language rather than degrading. |
 | `W-044` | planned | `type rack` — server racks, units numbered down a frame | The cheapest of the three infrastructure genres and the one with an immediate use: the estate this project sits beside is documented in machines and cluster nodes. Near enough to a vertical `packet` to borrow its row logic. Was part of `I-010`. |
@@ -107,6 +106,7 @@ not copies.
 
 | id | date | title | commit |
 |---|---|---|---|
+| `W-050` | 2026-08-10 | `type kanban` — a board. Columns are `group`s in declaration order, cards stack inside them, and a column may carry a work-in-progress `limit` that `check` reports when exceeded — the one thing a board is kept for. The count and the limit are drawn in the column header | this commit |
 | `W-051` | 2026-08-10 | `type requirements` — requirements and their typed SysML links. A `class` box plus a relation vocabulary drawn in guillemets; `risk` and `verify` say how likely it is to go unmet and how it will be shown to be met. Made the ruled-compartment flag declarative (`ArchetypeDef::members`) instead of a name list in the layout, and closed a `D-005` hole: positional **edge** data was never validated, so `a -> b nonsense` passed `check` in `er` too | this commit |
 | `W-039` | 2026-08-10 | `type bytefield` — a wire-format diagram at byte granularity. One layout shared with `packet` (`packet_like`), parameterised by a `Granularity`: 16 cells per row instead of 32, a ruler stepping by four instead of eight, and `bytes` in place of `bits`. Seventeen archetypes ship | this commit |
 | `W-048` | 2026-08-10 | True scatter for `type xy`. `scatter s 1 4 3 8` reads coordinates two at a time where `series s 4 8 15` spreads across the axis — the first consumer of `D-023`, and the change that made the *written keyword*, not the archetype's primary form, decide the positional shape everywhere (`NodeDecl::props_for`) | this commit |

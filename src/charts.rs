@@ -362,7 +362,7 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
     })
 }
 
-fn trim_number(v: f64) -> String {
+pub(crate) fn trim_number(v: f64) -> String {
     if v == v.trunc() {
         format!("{}", v as i64)
     } else {
@@ -385,6 +385,149 @@ struct Granularity {
     /// Ruler step, when the row divides by it. Bits group by eight, bytes by
     /// four — that is where a reader's eye already puts the marks.
     step: u32,
+}
+
+/// A board. Columns are `group`s in declaration order and cards stack inside
+/// them in declaration order, so the archetype places everything — a kanban
+/// whose columns had to be anchored by hand would be busywork with no reading
+/// gained. The `group` machinery (`W-011`) supplies the membership; what this
+/// adds is the arrangement and the header.
+#[cfg(feature = "kanban")]
+pub fn kanban(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
+    use std::collections::HashMap;
+
+    let cfg = &diagram.archetype_props;
+    let theme = Theme::of(&opts);
+    let def = crate::check::archetype_of(diagram);
+
+    let col_w = number(cfg, "column", 220.0).max(80.0);
+    let title = text(cfg, "title");
+    let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
+
+    const PAD: f64 = 12.0;
+    const CARD_GAP: f64 = 10.0;
+    const COL_GAP: f64 = 18.0;
+    const HEADER: f64 = 30.0;
+
+    let by_id: HashMap<&str, &crate::ast::NodeDecl> =
+        diagram.nodes.iter().map(|n| (n.id.as_str(), n)).collect();
+
+    let title_h = if title.is_some() {
+        TITLE_SIZE * 2.0
+    } else {
+        0.0
+    };
+
+    let mut nodes = Vec::new();
+    let mut groups = Vec::new();
+    let mut annotations = Vec::new();
+
+    if let Some(title) = title {
+        annotations.push(Annotation {
+            text: title,
+            x: 0.0,
+            y: TITLE_SIZE,
+            anchor: Anchor::Start,
+            size: TITLE_SIZE,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    let mut tallest: f64 = 0.0;
+    for (col, group) in diagram.groups.iter().enumerate() {
+        let x = col as f64 * (col_w + COL_GAP);
+        let top = title_h + HEADER;
+        let mut y = top + PAD;
+        let mut held = 0usize;
+
+        for member in &group.members {
+            let Some(node) = by_id.get(member.as_str()) else {
+                continue;
+            };
+            let style = registry.resolve(
+                chart_defaults(),
+                def.item,
+                &node.classes,
+                &node.props_for(def),
+            )?;
+            let label = node.label.clone().unwrap_or_else(|| node.id.value.clone());
+            let size = style.font_size.unwrap_or(13.0);
+            // A fixed column count, like every other wrap here: the box is
+            // sized from the lines, so measuring against a width the lines
+            // have not produced yet would be circular.
+            let lines = crate::layout::wrap(&label, ((col_w - 2.0 * PAD) / (size * 0.56)) as usize);
+            let h = lines.len() as f64 * size * 1.35 + 2.0 * PAD;
+
+            nodes.push(PlacedNode {
+                lines,
+                rect: Rect {
+                    x: x + PAD,
+                    y,
+                    w: col_w - 2.0 * PAD,
+                    h,
+                },
+                style,
+            });
+            y += h + CARD_GAP;
+            held += 1;
+        }
+
+        let bottom = if held == 0 { top + PAD * 3.0 } else { y - CARD_GAP + PAD };
+        tallest = tallest.max(bottom);
+
+        let name = group
+            .label
+            .clone()
+            .unwrap_or_else(|| group.id.value.clone());
+        // The count against the limit, in the header — the number the board is
+        // kept for, where a reader is already looking.
+        let frame =
+            registry.resolve(Style::group_defaults(), "group", &group.classes, &group.props)?;
+        let limit = frame.limit;
+        annotations.push(Annotation {
+            text: match limit {
+                Some(n) => format!("{name}  {held}/{}", trim_number(n)),
+                None => format!("{name}  {held}"),
+            },
+            x: x + PAD,
+            y: title_h + HEADER - 10.0,
+            anchor: Anchor::Start,
+            size: 12.0,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+
+        groups.push(PlacedGroup {
+            lines: Vec::new(),
+            rect: Rect {
+                x,
+                y: top,
+                w: col_w,
+                h: bottom - top,
+            },
+            style: frame,
+        });
+    }
+
+    // Every column is drawn to the height of the tallest, or the board reads
+    // as ragged shelves rather than as one thing.
+    for frame in &mut groups {
+        frame.rect.h = tallest - frame.rect.y;
+    }
+
+    Ok(Layout {
+        guides: Vec::new(),
+        polylines: Vec::new(),
+        groups,
+        nodes,
+        edges: Vec::new(),
+        opts,
+        chart: Chart::Free,
+        annotations,
+    })
 }
 
 pub fn packet(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {

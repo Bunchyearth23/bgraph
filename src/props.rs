@@ -563,6 +563,37 @@ pub const STATE_ITEM_PROPS: &[PropDef] = &[
 
 /// The SysML relation vocabulary, verb stems. Read tail-to-head:
 /// `r2 -> r1 derive` is r2 derives from r1.
+pub const KANBAN_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the board.",
+    },
+    PropDef {
+        name: "column",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "column: <width>",
+        doc: "Width of one column. 220 by default.",
+    },
+];
+
+pub const KANBAN_ITEM_PROPS: &[PropDef] = &[PropDef {
+    name: "limit",
+    alias: false,
+    ctx: Ctx::Node,
+    words: &[],
+    syntax: "limit: <count>",
+    doc: "The work-in-progress limit of a **column** — the number of cards it \
+          is allowed to hold. `check` reports a column over its limit, which \
+          is the one thing a board is kept for. Written on the `group`, not on \
+          a card; on a card it means nothing and is reported as such.",
+}];
+
 pub const REQ_LINKS: &[&str] = &["derive", "satisfy", "verify", "refine", "trace", "copy"];
 
 pub const REQ_RISKS: &[&str] = &["low", "medium", "high"];
@@ -983,6 +1014,22 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "bits",
             arity: 2,
         }],
+        members: false,
+        alt_items: &[],
+        edge_slots: &[],
+    },
+    #[cfg(feature = "kanban")]
+    ArchetypeDef {
+        name: "kanban",
+        item: "card",
+        doc: "A board: `group`s are its columns, in the order they are \
+              declared, and the cards inside each one stack in the order they \
+              are declared. A column may carry a `limit`, and a column over it \
+              is reported — a board nobody is told is over its limit is a \
+              board that is only a picture.",
+        props: KANBAN_PROPS,
+        item_props: KANBAN_ITEM_PROPS,
+        slots: &[],
         members: false,
         alt_items: &[],
         edge_slots: &[],

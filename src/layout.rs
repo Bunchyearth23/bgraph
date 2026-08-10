@@ -299,7 +299,7 @@ fn block_lines(name: &[String], style: &Style) -> Vec<(String, f64, bool)> {
 /// Greedy wrap at a word boundary. A fixed column rather than a measured one:
 /// the box is sized from these lines, so measuring against a width that does
 /// not exist yet would be circular.
-fn wrap(text: &str, columns: usize) -> Vec<String> {
+pub(crate) fn wrap(text: &str, columns: usize) -> Vec<String> {
     let mut lines = Vec::new();
     let mut current = String::new();
     for word in text.split_whitespace() {
@@ -338,6 +338,8 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         "pie" => return crate::charts::pie(diagram, opts, &registry),
         #[cfg(feature = "packet")]
         "packet" => return crate::charts::packet(diagram, opts, &registry),
+        #[cfg(feature = "kanban")]
+        "kanban" => return crate::charts::kanban(diagram, opts, &registry),
         #[cfg(feature = "bytefield")]
         "bytefield" => return crate::charts::bytefield(diagram, opts, &registry),
         #[cfg(feature = "treemap")]
