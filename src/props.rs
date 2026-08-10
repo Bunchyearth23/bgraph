@@ -565,6 +565,36 @@ pub const STATE_ITEM_PROPS: &[PropDef] = &[
 /// `r2 -> r1 derive` is r2 derives from r1.
 /// What a box on a topology *is*. Drives the shape, so a reader tells a
 /// router from a storage array before reading the label.
+pub const HARNESS_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the diagram.",
+    },
+    PropDef {
+        name: "pin",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "pin: <width> <height>",
+        doc: "Width of a connector body and the height of one pin row.",
+    },
+];
+
+pub const HARNESS_ITEM_PROPS: &[PropDef] = &[PropDef {
+    name: "wire",
+    alias: false,
+    ctx: Ctx::Edge,
+    words: &[],
+    syntax: "wire: <from-pin> <to-pin>",
+    doc: "Which pin at each end a wire lands on, by the number the connector \
+          declares as a member line (`D-025`). Usually written positionally — \
+          `j1 -> j2 \"power\" 1 3`.",
+}];
+
 pub const VENN_PROPS: &[PropDef] = &[
     PropDef {
         name: "title",
@@ -1258,6 +1288,27 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         members: false,
         alt_items: &[],
         edge_slots: &[],
+    },
+    #[cfg(feature = "harness")]
+    ArchetypeDef {
+        name: "harness",
+        item: "connector",
+        doc: "Wiring harnesses. A connector's pins are its member lines — \
+              `- 1: +12V` — and a wire is an edge carrying the pin it lands on \
+              at each end. Both mechanisms already existed; what this genre \
+              adds is that a wire is checked against the pins that are really \
+              there (`D-025`).",
+        props: HARNESS_PROPS,
+        item_props: HARNESS_ITEM_PROPS,
+        slots: &[],
+        members: true,
+        alt_items: &[],
+        edge_slots: &[
+            Slot {
+                prop: "wire",
+                arity: 2,
+            },
+        ],
     },
     #[cfg(feature = "venn")]
     ArchetypeDef {

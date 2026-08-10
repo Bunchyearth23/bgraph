@@ -102,6 +102,8 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "network" => check_network(diagram, &mut out),
         #[cfg(feature = "venn")]
         "venn" => check_venn(diagram, &mut out),
+        #[cfg(feature = "harness")]
+        "harness" => check_harness(diagram, &mut out),
         #[cfg(feature = "block")]
         "block" => check_block(diagram, &mut out),
         #[cfg(feature = "gantt")]
@@ -1237,6 +1239,87 @@ fn check_block(diagram: &Diagram, out: &mut Vec<Diag>) {
                 member.span,
                 "a block carries a `description`, not members".to_string(),
             ));
+        }
+    }
+}
+
+/// A harness is a `class` box with a wire vocabulary. What it adds is the
+/// only check that matters here: a wire must land on a pin the connector
+/// actually declares, and no pin may be wired twice — the two mistakes that
+/// make a harness drawing useless to the person holding the crimp tool.
+#[cfg(feature = "harness")]
+fn check_harness(diagram: &Diagram, out: &mut Vec<Diag>) {
+    check_class(diagram, "connector", out);
+
+    // A member line is `- 1: +12V`; its pin is the number after the marker.
+    let pins: HashMap<&str, HashSet<u32>> = diagram
+        .nodes
+        .iter()
+        .map(|node| {
+            let set = node
+                .members
+                .iter()
+                .filter_map(|m| {
+                    m.as_str()
+                        .trim_start_matches(['-', '+'])
+                        .trim()
+                        .split([':', ' '])
+                        .next()
+                        .and_then(|n| n.parse::<u32>().ok())
+                })
+                .collect();
+            (node.id.as_str(), set)
+        })
+        .collect();
+
+    let def = archetype_of(diagram);
+    let mut taken: HashSet<(&str, u32)> = HashSet::new();
+
+    for edge in &diagram.edges {
+        let props = edge.effective_props(def.edge_slots);
+        let numbers: Vec<u32> = props
+            .iter()
+            .filter(|p| p.name == "wire")
+            .flat_map(|p| p.values.iter())
+            .filter_map(|v| v.as_num())
+            .map(|n| n.max(0.0) as u32)
+            .collect();
+
+        let (Some(&from), Some(&to)) = (numbers.first(), numbers.get(1)) else {
+            out.push(Diag::warn(
+                edge.positional_span,
+                format!(
+                    "`{} -> {}` names no pins — a wire that does not say where it \
+                     lands cannot be made",
+                    edge.from.as_str(),
+                    edge.to.as_str()
+                ),
+            ));
+            continue;
+        };
+
+        for (end, pin) in [(&edge.from, from), (&edge.to, to)] {
+            let Some(declared) = pins.get(end.as_str()) else {
+                continue;
+            };
+            if !declared.is_empty() && !declared.contains(&pin) {
+                out.push(Diag::error(
+                    edge.positional_span,
+                    format!(
+                        "`{}` has no pin {pin} — its pins are the numbers it declares \
+                         as member lines",
+                        end.as_str()
+                    ),
+                ));
+            } else if !taken.insert((end.as_str(), pin)) {
+                out.push(Diag::error(
+                    edge.positional_span,
+                    format!(
+                        "pin {pin} of `{}` is already wired; a pin takes one wire",
+                        end.as_str()
+                    ),
+                ));
+            }
         }
     }
 }

@@ -633,6 +633,52 @@ fn a_packet_field_needs_bits() {
     assert!(err("type packet\nnode a \"A\"").contains("has no `bits`"));
 }
 
+// ---------------------------------------------------------------------- W-045
+
+#[cfg(test)]
+const LOOM: &str = "type harness\n\
+     connector j1 \"J1\" {\n  - 1: +12V\n  - 2: GND\n}\n\
+     connector j2 \"J2\" right-of j1 {\n  - 1: VCC\n  - 2: RETURN\n}\n";
+
+#[test]
+fn a_wire_states_the_pins_it_lands_on() {
+    // The line joins the two connectors, so the mapping has to be written on
+    // it — implied by where it touches would be implied by nothing.
+    let l = build(&format!("{LOOM}j1 -> j2 \"power\" 1 1"));
+    assert_eq!(l.edges[0].label.as_deref(), Some("power\n1 → 1"));
+
+    let l = build(&format!("{LOOM}j1 -> j2 2 2"));
+    assert_eq!(l.edges[0].label.as_deref(), Some("2 → 2"));
+}
+
+#[test]
+fn a_wire_must_land_on_a_pin_that_exists() {
+    // The two mistakes that make a harness drawing useless to the person
+    // holding the crimp tool.
+    let e = err(&format!("{LOOM}j1 -> j2 \"x\" 9 1"));
+    assert!(e.contains("has no pin 9"), "{e}");
+
+    let e = err(&format!("{LOOM}j1 -> j2 \"a\" 1 1\nj1 -> j2 \"b\" 1 2"));
+    assert!(e.contains("already wired"), "{e}");
+}
+
+#[test]
+fn a_wire_with_no_pins_is_reported() {
+    let d = diags(&format!("{LOOM}j1 -> j2 \"power\""));
+    assert!(
+        d.iter().any(|x| x.message.contains("names no pins")),
+        "{d:?}"
+    );
+}
+
+#[test]
+fn a_connector_is_a_ruled_box_of_its_pins() {
+    let l = build(&format!("{LOOM}j1 -> j2 1 1"));
+    let texts: Vec<&str> = l.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert!(texts.contains(&"- 1: +12V"), "{texts:?}");
+    assert!(texts.contains(&"- 2: RETURN"), "{texts:?}");
+}
+
 // ---------------------------------------------------------------------- W-053
 
 #[test]
@@ -1393,6 +1439,7 @@ fn each_data_property_belongs_to_exactly_the_genres_that_read_it() {
         ("bits", &["packet"]),
         ("bytes", &["bytefield"]),
         ("u", &["rack"]),
+        ("wire", &["harness"]),
         ("count", &["venn"]),
         ("shared", &["venn"]),
         ("role", &["network"]),

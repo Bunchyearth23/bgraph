@@ -1087,6 +1087,68 @@ field urg   "Urgent pointer"      144 159
 
 </details>
 
+### `type harness`
+
+Wiring harnesses. A connector's pins are its member lines — `- 1: +12V` — and a wire is an edge carrying the pin it lands on at each end. Both mechanisms already existed; what this genre adds is that a wire is checked against the pins that are really there (`D-025`).
+
+```
+connector <id> ["label"]
+```
+
+```
+<from> -> <to> ["label"] <wire> <wire>
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+| `pin` | `pin: <width> <height>` | Width of a connector body and the height of one pin row. |
+
+On a `connector` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `wire` | edge | `wire: <from-pin> <to-pin>` | Which pin at each end a wire lands on, by the number the connector declares as a member line (`D-025`). Usually written positionally — `j1 -> j2 "power" 1 3`. |
+
+<details>
+<summary>A complete file — <code>examples/harness.bd</code></summary>
+
+```
+// A connector's pins are its member lines; a wire is an edge carrying the pin
+// it lands on at each end (D-025, W-045).
+type harness { title: "Sensor loom — J1 to J2" }
+graph { background: #0b1120 padding: 32 gap: 160 }
+
+style connector { fill: #1e293b stroke: #38bdf8 1.4 font: 12 #e2e8f0 radius: 5 padding: 12 }
+style edge      { stroke: #64748b 1.3 font: 10 #94a3b8 head: none }
+style power     { stroke: #f43f5e 1.6 font: 10 #fda4af head: none }
+style ground    { stroke: #64748b 1.6 font: 10 #94a3b8 head: none dash: dashed }
+
+connector j1 "J1 — MOLEX 4-way" at (0, 0) {
+  - 1: +12V
+  - 2: GND
+  - 3: SIG_A
+  - 4: SIG_B
+}
+
+connector j2 "J2 — JST 6-way" right-of j1 {
+  - 1: VCC
+  - 2: RETURN
+  - 3: IN_A
+  - 4: IN_B
+  - 5: SHIELD
+  - 6: n/c
+}
+
+// `<from> -> <to> ["label"] <from-pin> <to-pin>`
+j1 -> j2 "power"  .power  1 1
+j1 -> j2 "ground" .ground 2 2
+j1 -> j2 "sig A"          3 3
+j1 -> j2 "sig B"          4 4
+```
+
+</details>
+
 ### `type venn`
 
 Overlapping sets. Two or three of them: with two, the lens is solved so its **area** is the number you wrote; with three the overlaps are labelled but arranged rather than solved, because three circles cannot in general honour all seven regions at once. Four is refused rather than drawn wrongly.

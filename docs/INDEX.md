@@ -25,8 +25,8 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**Six chantiers are planned. No question is open and nothing is blocked.**
-Twenty-five archetypes ship and the library is embeddable. The parked ideas were
+**Five chantiers are planned. No question is open and nothing is blocked.**
+Twenty-six archetypes ship and the library is embeddable. The parked ideas were
 reviewed on 2026-08-10 and every one of them moved: what was worth building
 became a work item, what was not was discarded, and the one language question
 the review raised was answered the same day (`D-023`). One idea is still parked,
@@ -42,7 +42,6 @@ Roughly by cost. Nothing here has started.
 | `W-038` | planned | A VS Code extension, beside the Zed one | Same three pieces the Zed extension already has — the tree-sitter grammar, `bgraph-lsp`, and the highlight queries — repackaged for a second editor. VS Code takes a TextMate grammar or a WASM tree-sitter build rather than Zed's git-pinned one, and speaks LSP over a client the extension launches itself, so `src/lsp.rs` is reused unchanged. `X-009` applies here too: the queries are part of the grammar's public surface, and a stale one breaks the language rather than degrading. |
 | `W-040` | planned | Real font metrics instead of the estimate | **The only planned item that closes an open risk** — `X-005`. Every auto-sized box, every edge-label plate and every `check_contrast` measurement rests on `0.56 × font-size` per character today. Was `I-008`. |
 | `W-041` | planned | A tree layout engine — mindmap, treeview, org chart | Three genres for one engine, which is what makes it worth the cost. Hierarchy from group nesting already exists; `W-020` consumes it. Was `I-011`. |
-| `W-045` | planned | `type harness` — wiring harnesses: connectors, pins, cable runs | The WireViz territory, and the least like anything shipped: a pin-to-pin mapping is not a node-and-edge graph wearing a costume. Addressing settled by `D-025`: a pin is a member line, a wire carries its pins as positional data, and no grammar moves. Was part of `I-010`. |
 | `W-049` | planned | `type gitgraph` — commits, branches and merges | Expressible as nodes and edges, but the layout is the genre: branch rails, merge points, topological order. Its own placement engine, sharing nothing with `W-041`'s tree engine. Was `I-014`. |
 | `W-042` | planned | PNG and PDF export, from the CLI **and** from the library | The largest surface here. `D-014` is what makes it more than a convenience: a program embedding the library should not be forced to ship an SVG renderer to get a picture. Merges `I-007` and `I-015`, which were the same work seen from two ends. |
 
@@ -56,6 +55,7 @@ Known ways this goes wrong. `X-005` now has a chantier; the rest do not, because
 | `X-002` | mitigated | The two grammars can drift apart | `W-008` cross-checks them on every `cargo test` — but only when the `tree-sitter` CLI is on PATH; without it the test says SKIPPED and passes. |
 | `X-010` | mitigated | `tree-sitter test`'s summary line counts parses, not expectation matches | It read "failed parses: 0" while seven corpus expectations were stale across the `W-029` rename. `the_grammar_corpus_expectations_still_hold` now asserts the **exit code** on each `cargo test`, but only when the CLI is on PATH. |
 | `X-006` | mitigated | Edge labels avoid lines, not each other's readability | `W-010` scores candidates; `W-022` made the node and label penalties proportional to the overlapped area and distance a real cost, which stopped labels fleeing three rows from their own edge. Still local: nothing guarantees the best global arrangement — `W-037` adds the escape hatch (`label-offset`) rather than a better solver, because the author can see what the cost function cannot. |
+| `X-016` | open | A harness wire joins the connectors, not the pin rows | `W-045` states the mapping on the wire (`1 → 3`) and `check` proves the pins exist, so nothing is wrong — but the line does not *touch* the pin it names, which is what a WireViz drawing gives you. Landing an endpoint at a row inside a box needs a per-edge endpoint offset the renderer has no notion of; `label-offset` moves labels, not endpoints. |
 | `X-004` | open | Orthogonal routing ignores obstacles | An `ortho` edge can pass straight through a node. No diagnostic. |
 | `X-008` | open | `D-016` removed `opacity`, which is a breaking change | Any file using `opacity: 0.5` now fails with `unknown property`. The repo's own files carried none, and the message names the fix — but nothing migrates it automatically. |
 | `X-005` | open | Text width is estimated, not measured | `0.56 × font-size` per character. Auto-sized boxes are slightly wrong for narrow or wide fonts, and edge-label plates with them. `W-040` is the chantier that would retire this. |
@@ -100,6 +100,7 @@ not copies.
 
 | id | date | title | commit |
 |---|---|---|---|
+| `W-045` | 2026-08-10 | `type harness` — connectors whose pins are member lines, wires that carry the pin they land on at each end (`D-025`). No grammar moved. A wire is checked against the pins that are really there and against being wired twice — the two mistakes that make a harness drawing useless to whoever is holding the crimp tool. The line joins the connectors rather than the pin rows: `X-016` | this commit |
 | `W-053` | 2026-08-10 | `type venn` — overlapping sets. With **two** the centre distance is solved by bisection so the lens area is the number written; with **three** the overlaps are labelled but arranged, and `check` says so out loud; **four is refused**, naming an upset plot as the honest picture. Circles scale by area, not radius | this commit |
 | `W-043` | 2026-08-10 | `type network` — topology on the free path, per the `W-022` precedent: the archetype supplies the vocabulary, the shapes and the diagnostics, and the anchors still place. A `role` picks the outline and deliberately **not** the fill; `addr` is a line of the box, `speed` a line of the link; a `group` is a segment, and a host on no link and in no segment is reported | this commit |
 | `W-047` | 2026-08-10 | Activation bars for `type sequence`, per `D-024`. `activate` is `group` under a second word, in both grammars — its identifier **references** a participant instead of declaring one, which is the only reason it needed its own word: a group id and an item id share one namespace. `frame_names` keeps an activation out of the frame namespace everywhere, so a message touching that participant stays a message | this commit |

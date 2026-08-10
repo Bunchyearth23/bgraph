@@ -169,6 +169,8 @@ pub struct Style {
     pub verify: Option<String>,
     /// `type requirements` — what a relation asserts, read tail to head.
     pub link: Option<String>,
+    /// `type harness` — the pin a wire lands on at each end.
+    pub wire: Option<(u32, u32)>,
     /// `type venn` — how many things are in a set, and how many two share.
     pub set_size: Option<f64>,
     pub shared: Option<f64>,
@@ -250,6 +252,7 @@ impl Style {
             risk,
             verify,
             link,
+            wire,
             set_size,
             shared,
             role,
@@ -458,6 +461,14 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
         "link" => style.link = first.and_then(|x| x.as_word()).map(String::from),
         "limit" => style.limit = first.and_then(|x| x.as_num()),
         "scores" => style.scores = Some(v.iter().filter_map(|x| x.as_num()).collect()),
+        "wire" => {
+            let a = first.and_then(|x| x.as_num()).unwrap_or(0.0).max(0.0) as u32;
+            let b = v
+                .get(1)
+                .and_then(|x| x.as_num())
+                .map_or(a, |n| n.max(0.0) as u32);
+            style.wire = Some((a, b));
+        }
         "count" => style.set_size = first.and_then(|x| x.as_num()),
         "shared" => style.shared = first.and_then(|x| x.as_num()),
         "role" => {

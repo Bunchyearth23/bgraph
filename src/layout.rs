@@ -388,6 +388,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     let machine = item.name == "state";
     let architecture = item.name == "block";
     let topology = item.name == "network";
+    let harness = item.name == "harness";
     let dark = opts
         .background
         .as_deref()
@@ -615,6 +616,15 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             label = Some(match label {
                 Some(text) if !text.is_empty() => format!("{text}\n«{link}»"),
                 _ => format!("«{link}»"),
+            });
+        }
+        // Which pins a wire lands on. The line joins the two connectors, not
+        // the two pin rows — so the mapping is stated on the wire rather than
+        // implied by where it touches (see the risk this genre carries).
+        if harness && let Some((from, to)) = style.wire {
+            label = Some(match label {
+                Some(text) if !text.is_empty() => format!("{text}\n{from} → {to}"),
+                _ => format!("{from} → {to}"),
             });
         }
         // What a link runs at, bracketed under its label — the same shape the
