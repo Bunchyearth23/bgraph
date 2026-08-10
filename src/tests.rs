@@ -633,6 +633,48 @@ fn a_packet_field_needs_bits() {
     assert!(err("type packet\nnode a \"A\"").contains("has no `bits`"));
 }
 
+// ---------------------------------------------------------------------- W-040
+
+#[test]
+fn text_is_measured_per_character_not_by_counting_them() {
+    // A flat ratio charged `l` and `W` the same, which is wrong by a factor of
+    // four — the larger of the two errors in `X-005`, and the only one that
+    // can be fixed without the font file.
+    let thin = crate::layout::advance("llllllllll", 14.0);
+    let wide = crate::layout::advance("WWWWWWWWWW", 14.0);
+    assert!(
+        wide / thin > 3.5,
+        "ten Ws against ten ls: {wide} vs {thin}"
+    );
+
+    // A space is not free and not full width either.
+    let with = crate::layout::advance("a a", 14.0);
+    let without = crate::layout::advance("aa", 14.0);
+    assert!(with > without && with < without * 1.6, "{with} {without}");
+}
+
+#[test]
+fn a_box_is_sized_for_its_widest_line_not_its_longest() {
+    // These used to be the same question, because width was character count.
+    // `WWW` is three characters and far wider than the eleven in `lllllllllll`.
+    let short_but_wide = build("node a \"WWWWWWW\"");
+    let long_but_thin = build("node a \"lllllllllllllll\"");
+    assert!(
+        short_but_wide.nodes[0].rect.w > long_but_thin.nodes[0].rect.w,
+        "seven Ws are wider than fifteen ls: {} vs {}",
+        short_but_wide.nodes[0].rect.w,
+        long_but_thin.nodes[0].rect.w
+    );
+}
+
+#[test]
+fn text_outside_printable_ascii_keeps_the_flat_estimate() {
+    // A table for one Latin typeface has nothing to say about CJK or emoji,
+    // and pretending otherwise would be a worse guess than admitting it.
+    let cjk = crate::layout::advance("日本語", 10.0);
+    assert!((cjk - 3.0 * 0.56 * 10.0).abs() < 0.01, "{cjk}");
+}
+
 // ---------------------------------------------------------------------- W-049
 
 #[cfg(test)]
@@ -2567,9 +2609,13 @@ fn a_label_that_does_not_fit_degrades_rather_than_lying() {
     );
     assert!(wide.annotations.iter().any(|a| a.text.contains("100")));
 
+    // Narrow enough that the pair genuinely does not fit. The threshold moved
+    // when `W-040` replaced the flat 0.56 with real per-character advances —
+    // this label is mostly thin letters, so it now needs less room than the
+    // old estimate charged it for.
     let narrow = build(
         r#"
-        type treemap { size: 160 300 labels: both }
+        type treemap { size: 120 300 labels: both }
         box only "a-very-long-tile-name" 100
     "#,
     );

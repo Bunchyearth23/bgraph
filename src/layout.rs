@@ -166,11 +166,51 @@ const MIN_WIDTH: f64 = 76.0;
 const MIN_HEIGHT: f64 = 44.0;
 const LINE_HEIGHT: f64 = 1.35;
 
-/// Rough advance width for a proportional sans-serif — enough to size a box
-/// around its label without shipping font metrics.
+/// Advance width per printable ASCII character, in thousandths of an em, for a
+/// Helvetica-class proportional sans — which is what the default stack
+/// resolves to almost everywhere.
+///
+/// Indexed from `0x20`. This is what replaced a flat `0.56` for every glyph:
+/// `l` is a fifth of an em and `W` is nearly a whole one, so a label of thin
+/// letters was being given half again the room it needs and a label of wide
+/// ones was overflowing its box.
+const ADVANCE: [u16; 95] = [
+    278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278, // ␣ ! " # $ % & ' ( ) * + , - . /
+    556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, // 0-9 : ; < = > ?
+    1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, // @ A-O
+    667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556, // P-Z [ \ ] ^ _
+    333, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, // ` a-o
+    556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584, // p-z { | } ~
+];
+
+/// Width of a run of text at a given size.
+///
+/// **Still an estimate, and it cannot stop being one** (`X-005`): the SVG names
+/// a font by family and whoever renders it decides what that resolves to, so
+/// measuring against any particular file would only be right by luck. What this
+/// does remove is the larger of the two errors — the variation *within* a
+/// typeface, which is a factor of four between `l` and `W`.
+pub fn advance(text: &str, font_size: f64) -> f64 {
+    let em: f64 = text
+        .chars()
+        .map(|c| match c as u32 {
+            code @ 0x20..=0x7e => ADVANCE[(code - 0x20) as usize] as f64 / 1000.0,
+            // Anything outside printable ASCII keeps the old flat guess: a
+            // table for one typeface has nothing to say about CJK or emoji.
+            _ => 0.56,
+        })
+        .sum();
+    em * font_size
+}
+
+/// The widest of a set of lines. Character *count* used to stand in for width
+/// here, which meant the longest line and the widest line could be different
+/// lines — and the box was sized for the wrong one.
 pub fn text_width(lines: &[String], font_size: f64) -> f64 {
-    let longest = lines.iter().map(|l| l.chars().count()).max().unwrap_or(0);
-    longest as f64 * font_size * 0.56
+    lines
+        .iter()
+        .map(|l| advance(l, font_size))
+        .fold(0.0_f64, f64::max)
 }
 
 /// Round shapes need extra room: their corners cut into the text box. Shared,
@@ -531,7 +571,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             let rows = block_lines(&lines, &style);
             let widest = rows
                 .iter()
-                .map(|(text, scale, _)| text.chars().count() as f64 * font * scale * 0.56)
+                .map(|(text, scale, _)| advance(text, font * scale))
                 .fold(0.0, f64::max);
             let tall: f64 = rows.iter().map(|(_, scale, _)| font * scale * 1.45).sum();
             let (w, h) = shape_allowance(

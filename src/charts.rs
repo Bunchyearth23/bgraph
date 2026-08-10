@@ -1814,7 +1814,10 @@ pub fn kanban(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             // A fixed column count, like every other wrap here: the box is
             // sized from the lines, so measuring against a width the lines
             // have not produced yet would be circular.
-            let lines = crate::layout::wrap(&label, ((col_w - 2.0 * PAD) / (size * 0.56)) as usize);
+            // The wrap column is still a character count, so it uses the
+            // average advance rather than a per-character measure — the
+            // lines it produces are then sized properly by `advance`.
+            let lines = crate::layout::wrap(&label, ((col_w - 2.0 * PAD) / (size * 0.52)) as usize);
             let h = lines.len() as f64 * size * 1.35 + 2.0 * PAD;
 
             nodes.push(PlacedNode {
