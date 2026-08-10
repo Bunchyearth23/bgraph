@@ -251,8 +251,9 @@ Nothing is marked `landed` without a commit to point at.
 | `I-022` | promoted | `type requirements` — became `W-051` |
 
 Thirty-nine were put one by one on 2026-08-10, against what Mermaid, PlantUML,
-D2, Graphviz, Structurizr and Excalidraw do. Thirty were kept, eight refused,
-one left undecided. A refusal is recorded with its reason, so it is not
+D2, Graphviz, Structurizr and Excalidraw do. Twenty-nine were kept and ten
+refused — the one left undecided, `I-042`, was settled the same day once
+`include` and components made the alternative real. A refusal is recorded with its reason, so it is not
 proposed again from scratch.
 
 | id | state | title |
@@ -276,7 +277,7 @@ proposed again from scratch.
 | `I-039` | discarded | Tooltips — refused for the same reason as `I-038` |
 | `I-040` | done · `W-085` | **Accessibility** — `<title>`, `<desc>` and ARIA derived from what the file already says, so a screen reader can read a diagram, plus a general `description` property for what a shape *means*. No competitor does this seriously, and it suits a project that already refuses unreadable colour |
 | `I-041` | done · `W-077` | **PNG**, behind its own `png` feature — `resvg` is already in the tree for the window, and someone rendering images in CI does not need a window. Would narrow `X-017` |
-| `I-042` | parked | **Layers and steps** — a diagram told in stages. **Undecided**, honestly: neither promoted nor refused |
+| `I-042` | discarded | Layers and steps — a diagram told in stages. Decided on 2026-08-10, after `W-081` and `W-083` made the alternative real: **`include` already does it, and better.** A step is a file that includes the one before it and adds what is new, which composes, renders on its own, and needs no new concept. A `step` keyword would instead make **one input produce n outputs** — `-o` becomes a pattern, `watch` has to decide which step to show, `check` has to say which step a diagnostic belongs to — a change to the shape of every command, for a case a file per step already covers. `I-038` and `I-039` were refused because the output is not interactive; this is the same fact seen from the other side |
 | `I-043` | parked | **Sketch mode** — `graph { sketch: on }`. A sketched architecture says "this is a proposal" where a crisp one says "this is decided", which is information rather than only style. The noise must be **deterministic**, or the same file renders to different bytes — a bug this project has already had once |
 | `I-044` | discarded | DOT or TikZ output — SVG and PDF cover screen and print; DOT would throw away the declared placement that is the point |
 | `I-045` | done · `W-078` | **Layout as JSON** — the solved rectangles, routed edges and placed labels, so another program can consume the geometry without knowing the language. Extends the embedding promise |
