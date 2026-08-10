@@ -2316,6 +2316,13 @@ pub const KEYWORDS: &[(&str, &str)] = &[
          name must be unique across the set; a clash names both files.",
     ),
     (
+        "note",
+        "Text that belongs to no box: `note \"Figures are March\" below api gap 20`. \
+         Placed by the same anchors as everything else, and it declares no name \
+         — so nothing can point at it, which is the whole difference between a \
+         note and a box with no border.",
+    ),
+    (
         "align-group",
         "Give a set of boxes one cross-axis coordinate: `align-group top a b c`. \
          A pass over the solved layout, never a reordering — the first name \

@@ -7329,3 +7329,94 @@ fn an_undescribed_diagram_gains_no_empty_attributes() {
     assert!(!svg.contains("role="), "{svg}");
     assert!(!svg.contains("<title>"), "{svg}");
 }
+
+// ------------------------------------------------- the note statement (I-054)
+
+#[test]
+fn a_note_is_drawn_where_its_anchor_puts_it() {
+    let l = build(
+        r#"node api "API"
+           note "Figures are March." right-of api gap 30"#,
+    );
+    let note = l
+        .annotations
+        .iter()
+        .find(|a| a.text == "Figures are March.")
+        .expect("the note should be drawn");
+    assert!(
+        note.x > l.nodes[0].rect.right(),
+        "the note sits at {} but `api` ends at {}",
+        note.x,
+        l.nodes[0].rect.right()
+    );
+}
+
+#[test]
+fn a_note_is_not_a_box_and_cannot_be_pointed_at() {
+    // The whole difference between a note and a box with no border: it
+    // declares no name, so there is nothing for an edge to land on.
+    let l = build(r#"node a "A""#);
+    let before = l.nodes.len();
+    let l = build(
+        r#"node a "A"
+           note "An aside." below a"#,
+    );
+    assert_eq!(l.nodes.len(), before, "the note became a box");
+
+    // …and naming it is an unknown-name error, not a silent link.
+    let message = err(r#"node a "A"
+           note "An aside." below a
+           a -> aside"#);
+    assert!(message.contains("aside"), "{message}");
+}
+
+#[test]
+fn a_note_takes_a_style_class() {
+    let l = build(
+        r#"style caption { font: 11 #b45309 }
+           node a "A"
+           note "An aside." .caption below a"#,
+    );
+    let note = l
+        .annotations
+        .iter()
+        .find(|a| a.text == "An aside.")
+        .unwrap();
+    assert_eq!(note.color, "#b45309");
+    assert_eq!(note.size, 11.0);
+}
+
+#[test]
+fn a_note_anchored_to_nothing_is_left_out_rather_than_drawn_at_the_origin() {
+    // `check` has already reported the unknown name; drawing the note in the
+    // corner would add a second wrong thing to look at.
+    let source = r#"node a "A"
+                    note "An aside." below ghost"#;
+    let diagram = parse_diagram(source).expect("it parses");
+    let l = layout::solve(&diagram);
+    // The unknown anchor is an error, so this does not solve at all — which
+    // is the stronger form of the same answer.
+    assert!(l.is_err(), "an unknown anchor should be refused");
+}
+
+#[test]
+fn a_note_follows_a_box_a_constraint_moved() {
+    // Solved last, against the boxes as they finally sit.
+    let l = build(
+        r#"node a "A" at (0, 0) { size: 80 40 }
+           node b "B" at (200, 90) { size: 80 40 }
+           align-group top a b
+           note "Beside B." right-of b gap 20"#,
+    );
+    let b = l.nodes[1].rect;
+    let note = l
+        .annotations
+        .iter()
+        .find(|a| a.text == "Beside B.")
+        .unwrap();
+    assert_eq!(b.y, 0.0, "the constraint did not run");
+    assert!(
+        (note.y - b.cy()).abs() < b.h,
+        "the note stayed beside where `b` used to be"
+    );
+}

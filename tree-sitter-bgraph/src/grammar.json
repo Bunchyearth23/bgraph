@@ -67,6 +67,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "note_declaration"
+        },
+        {
+          "type": "SYMBOL",
           "name": "constraint_declaration"
         },
         {
@@ -174,6 +178,66 @@
                   }
                 }
               ]
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        }
+      ]
+    },
+    "note_declaration": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "note"
+        },
+        {
+          "type": "FIELD",
+          "name": "text",
+          "content": {
+            "type": "SYMBOL",
+            "name": "string"
+          }
+        },
+        {
+          "type": "REPEAT",
+          "content": {
+            "type": "FIELD",
+            "name": "class",
+            "content": {
+              "type": "SYMBOL",
+              "name": "class_reference"
+            }
+          }
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "placement",
+              "content": {
+                "type": "SYMBOL",
+                "name": "_placement"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "body",
+              "content": {
+                "type": "SYMBOL",
+                "name": "block"
+              }
             },
             {
               "type": "BLANK"

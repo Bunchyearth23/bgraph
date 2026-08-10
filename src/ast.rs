@@ -55,6 +55,22 @@ pub struct Diagram {
     pub uses: Vec<UseDecl>,
     /// Adjustments applied to the solved layout, in declaration order.
     pub constraints: Vec<ConstraintDecl>,
+    /// Free text placed by the ordinary anchors, belonging to no box.
+    pub notes: Vec<NoteDecl>,
+}
+
+/// `note "Figures are March" below api gap 20`.
+///
+/// It declares **no identifier**, and that is the design rather than an
+/// omission: a note is not a thing the diagram can point at, so there is
+/// nothing for an edge to land on and no way to write one that tries.
+#[derive(Debug)]
+pub struct NoteDecl {
+    pub text: String,
+    pub classes: Vec<Spanned<String>>,
+    pub placement: Option<Placement>,
+    pub props: Vec<Prop>,
+    pub span: Span,
 }
 
 /// `align-group left a b c`, `same-width a b c`.

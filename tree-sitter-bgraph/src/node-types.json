@@ -322,6 +322,10 @@
           "named": true
         },
         {
+          "type": "note_declaration",
+          "named": true
+        },
+        {
           "type": "property",
           "named": true
         },
@@ -568,6 +572,56 @@
     }
   },
   {
+    "type": "note_declaration",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "class": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "class_reference",
+            "named": true
+          }
+        ]
+      },
+      "placement": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "absolute_position",
+            "named": true
+          },
+          {
+            "type": "relative_position",
+            "named": true
+          }
+        ]
+      },
+      "text": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "point",
     "named": true,
     "fields": {
@@ -722,6 +776,10 @@
         },
         {
           "type": "item_declaration",
+          "named": true
+        },
+        {
+          "type": "note_declaration",
           "named": true
         },
         {
@@ -978,6 +1036,10 @@
   },
   {
     "type": "middle",
+    "named": false
+  },
+  {
+    "type": "note",
     "named": false
   },
   {

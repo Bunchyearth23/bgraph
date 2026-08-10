@@ -37,6 +37,7 @@ module.exports = grammar({
     _statement: ($) =>
       choice(
         $.include_declaration,
+        $.note_declaration,
         $.constraint_declaration,
         $.component_declaration,
         $.use_declaration,
@@ -58,6 +59,17 @@ module.exports = grammar({
     // come in under a prefix (`D-029`).
     include_declaration: ($) =>
       seq('include', field('path', $.string), optional(seq('as', field('prefix', $.identifier)))),
+
+    // Text that belongs to no box. It declares no name, which is what stops
+    // anything referring to it.
+    note_declaration: ($) =>
+      seq(
+        'note',
+        field('text', $.string),
+        repeat(field('class', $.class_reference)),
+        optional(field('placement', $._placement)),
+        optional(field('body', $.block)),
+      ),
 
     // A constraint adjusts one axis of already-placed boxes and never their
     // order, which is what keeps the layout declared (`D-031`).

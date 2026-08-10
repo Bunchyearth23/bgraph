@@ -1037,6 +1037,65 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     // After the boxes, so the compartment rules land on top of them.
     nodes.extend(rules);
 
+    // Notes: free text placed by the ordinary anchors. Solved last, against
+    // the boxes as they finally sit, because a note anchored to something the
+    // constraints moved must move with it.
+    for note in &diagram.notes {
+        let style = registry.resolve(node_base.clone(), "note", &note.classes, &note.props)?;
+        let size = style.font_size.unwrap_or(12.0);
+        let lines: Vec<String> = note.text.split('\n').map(|l| l.to_string()).collect();
+        let w = text_width(&lines, size);
+        let h = lines.len() as f64 * size * LINE_HEIGHT;
+
+        let rect = match note.placement.as_ref().map(|p| p.resolved(opts.grid)) {
+            Some(Placement::At { x, y }) => Rect { x, y, w, h },
+            Some(Placement::Rel {
+                dir,
+                ref anchor,
+                gap,
+                align,
+            }) => {
+                let found = index.get(anchor.as_str()).and_then(|entity| match entity {
+                    Entity::Node(i) => nodes.get(*i).map(|n| n.rect),
+                    Entity::Group(g) => groups.get(*g).map(|f| f.rect),
+                });
+                // An anchor that does not resolve has already been reported by
+                // `check`; drawing the note at the origin would add a second
+                // wrong thing to look at, so it is left out.
+                let Some(anchor_rect) = found else { continue };
+                offset_from(&anchor_rect, dir, gap.unwrap_or(opts.gap), align, w, h)
+            }
+            // Unreachable — `resolved` leaves no cells — and answered rather
+            // than panicked, as everywhere else.
+            Some(Placement::Cell { col, row }) => Rect {
+                x: col,
+                y: row,
+                w,
+                h,
+            },
+            None => continue,
+        };
+
+        for (i, line) in lines.iter().enumerate() {
+            annotations.push(Annotation {
+                text: line.clone(),
+                x: rect.x,
+                y: rect.y + (i as f64 + 0.5) * size * LINE_HEIGHT,
+                anchor: Anchor::Start,
+                size,
+                color: style.font_color.clone().unwrap_or_else(|| {
+                    if dark {
+                        "#cbd5e1".into()
+                    } else {
+                        "#52514e".into()
+                    }
+                }),
+                weight: "400".into(),
+                family: style.font_family.clone().unwrap_or_default(),
+            });
+        }
+    }
+
     // `graph { title }` on a genre that draws boxes rather than a chart. The
     // chart archetypes each reserve a band and shift their content down; here
     // nothing needs shifting, because the heading simply sits above the

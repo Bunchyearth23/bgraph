@@ -212,6 +212,7 @@ fn build(file: Pair<Rule>, input: &str) -> Result<Diagram> {
             }
             Rule::include_decl => diagram.includes.push(parse_include(pair)?),
             Rule::constraint_decl => diagram.constraints.push(parse_constraint(pair)?),
+            Rule::note_decl => diagram.notes.push(parse_note(pair)?),
             Rule::component_decl => diagram.components.push(parse_component(pair, input)?),
             Rule::use_decl => diagram.uses.push(parse_use(pair)?),
             Rule::style_decl => diagram.styles.push(parse_style(pair)?),
@@ -246,6 +247,31 @@ fn spanned(pair: &Pair<Rule>) -> Spanned<String> {
         value: pair.as_str().to_string(),
         span: span_of(pair),
     }
+}
+
+fn parse_note(pair: Pair<Rule>) -> Result<crate::ast::NoteDecl> {
+    let span = span_of(&pair);
+    let mut text = String::new();
+    let mut classes = Vec::new();
+    let mut placement = None;
+    let mut props = Vec::new();
+
+    for part in pair.into_inner() {
+        match part.as_rule() {
+            Rule::string => text = unescape(part),
+            Rule::class_ref => classes.push(class_name(part)),
+            Rule::block => props = parse_block(part)?,
+            _ => placement = Some(parse_placement(part)?),
+        }
+    }
+
+    Ok(crate::ast::NoteDecl {
+        text,
+        classes,
+        placement,
+        props,
+        span,
+    })
 }
 
 fn parse_constraint(pair: Pair<Rule>) -> Result<crate::ast::ConstraintDecl> {

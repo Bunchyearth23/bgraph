@@ -90,6 +90,31 @@ cases that need one.
 
 The whole example is in [`examples/components.bd`](../examples/components.bd).
 
+### Notes
+
+Text that belongs to no box — a caption, a warning, an aside:
+
+```bgraph
+style caption { font: 11 #b45309 }
+
+node api "API"
+node db "Database" below api gap 60
+
+note "Figures are March; April is not in yet." .caption right-of api gap 30
+note "Replica, not the primary." below db gap 14
+```
+
+It is placed by the same anchors as everything else, so it costs no new
+placement vocabulary, and it takes a style class the same way a box does.
+
+A note **declares no name**. That is the design rather than an omission: it is
+not a thing the diagram can point at, so there is nothing for an edge to land
+on and no way to write one that tries. An anchor that names nothing is an
+error, as everywhere else.
+
+Notes are solved last, against the boxes as they finally sit — so a note
+anchored to something a constraint moved moves with it.
+
 ### Saying what something is
 
 `description` is one property with one meaning: what this is, in a sentence.
