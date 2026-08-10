@@ -591,7 +591,31 @@ fn run() -> Result<i32> {
     }
     let mut layout = layout::solve(&composed.diagram)?;
     if let Some(path) = &cli.embed_font {
-        let bytes = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+        let whole = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+        // Only the glyphs the diagram draws. The text is gathered from the
+        // solved layout rather than from the source, so a label the renderer
+        // never draws costs nothing and one it invents — a percentage, an
+        // axis tick — is not left out.
+        let mut drawn = String::new();
+        for node in &layout.nodes {
+            for line in &node.lines {
+                drawn.push_str(line);
+            }
+        }
+        for group in &layout.groups {
+            for line in &group.lines {
+                drawn.push_str(line);
+            }
+        }
+        for annotation in &layout.annotations {
+            drawn.push_str(&annotation.text);
+        }
+        for edge in &layout.edges {
+            if let Some(label) = &edge.label {
+                drawn.push_str(label);
+            }
+        }
+        let bytes = bgraph::subset::keep_glyphs_for(&whole, &drawn);
         // Named after the file, because that is what the diagram's own
         // `font:` will be asking for — a family invented here would be one
         // nothing referred to.

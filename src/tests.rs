@@ -8361,3 +8361,109 @@ fn the_typst_package_calls_the_entry_point_that_exists() {
         "the package loads a module its build script does not write"
     );
 }
+
+// ------------------------------------------------- font subsetting (I-058)
+
+/// Any TrueType font on this machine. Every platform this builds on ships
+/// some; a machine with none is a machine this test cannot speak about, and
+/// saying so beats passing silently.
+fn some_font() -> (std::path::PathBuf, Vec<u8>) {
+    let roots = [
+        "/usr/share/fonts",
+        "/usr/local/share/fonts",
+        "/System/Library/Fonts",
+        "C:\\Windows\\Fonts",
+    ];
+    let mut stack: Vec<std::path::PathBuf> = roots.iter().map(std::path::PathBuf::from).collect();
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().is_some_and(|e| e == "ttf")
+                && let Ok(bytes) = std::fs::read(&path)
+                // A collection and a CFF font are both `.ttf` sometimes, and
+                // neither is what this subsets.
+                && bytes.starts_with(&[0x00, 0x01, 0x00, 0x00])
+            {
+                return (path, bytes);
+            }
+        }
+    }
+    panic!("no TrueType font found under {roots:?} — this test cannot run here");
+}
+
+#[test]
+fn a_subset_font_is_smaller_and_still_a_font() {
+    let (path, font) = some_font();
+    let subset = crate::subset::keep_glyphs_for(&font, "Ligature: office");
+
+    assert!(
+        subset.len() < font.len(),
+        "{} did not shrink: {} → {}",
+        path.display(),
+        font.len(),
+        subset.len()
+    );
+    assert_eq!(&subset[..4], &font[..4], "the version was rewritten");
+
+    // The table directory must still be sorted by tag and point inside the
+    // file. A reader may find a table by binary search, and one that walks off
+    // the end reads whatever follows.
+    let count = u16::from_be_bytes([subset[4], subset[5]]) as usize;
+    let mut previous = [0u8; 4];
+    for i in 0..count {
+        let at = 12 + i * 16;
+        let tag: [u8; 4] = subset[at..at + 4].try_into().unwrap();
+        assert!(tag > previous, "the directory is out of order at {i}");
+        previous = tag;
+        let offset = u32::from_be_bytes(subset[at + 8..at + 12].try_into().unwrap()) as usize;
+        let length = u32::from_be_bytes(subset[at + 12..at + 16].try_into().unwrap()) as usize;
+        assert!(
+            offset + length <= subset.len(),
+            "table {} runs past the end of the file",
+            String::from_utf8_lossy(&tag)
+        );
+    }
+}
+
+#[test]
+fn every_table_the_reader_needs_survives() {
+    // Nothing is renumbered, so nothing may be dropped either: `cmap` still
+    // maps characters to the ids `hmtx` still gives widths for.
+    let (_, font) = some_font();
+    let subset = crate::subset::keep_glyphs_for(&font, "abc");
+
+    let tags = |bytes: &[u8]| -> Vec<String> {
+        let count = u16::from_be_bytes([bytes[4], bytes[5]]) as usize;
+        (0..count)
+            .map(|i| String::from_utf8_lossy(&bytes[12 + i * 16..16 + i * 16]).into_owned())
+            .collect()
+    };
+    let mut before = tags(&font);
+    let mut after = tags(&subset);
+    before.sort();
+    after.sort();
+    assert_eq!(before, after, "a table went missing");
+}
+
+#[test]
+fn anything_it_does_not_understand_comes_back_whole() {
+    // A font that is a little too large is a nuisance. A font that renders
+    // the wrong glyph is a lie, so anything unfamiliar is handed back.
+    for bytes in [
+        b"OTTO\x00\x00\x00\x00".to_vec(), // CFF outlines
+        b"ttcf\x00\x01\x00\x00".to_vec(), // a collection
+        b"not a font at all".to_vec(),
+        Vec::new(),
+    ] {
+        assert_eq!(
+            crate::subset::keep_glyphs_for(&bytes, "abc"),
+            bytes,
+            "something unfamiliar was rewritten"
+        );
+    }
+}

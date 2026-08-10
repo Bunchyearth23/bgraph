@@ -147,6 +147,7 @@ pub mod render_svg;
 pub mod report;
 #[allow(missing_docs)]
 pub mod style;
+pub mod subset;
 #[allow(missing_docs)]
 pub mod themes;
 #[allow(missing_docs)]
