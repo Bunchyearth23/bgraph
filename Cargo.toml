@@ -14,17 +14,23 @@ publish = false
 [lib]
 name = "bgraph"
 path = "src/lib.rs"
+# `rlib` is what the binaries and other crates link against; `cdylib` is what
+# a wasm build needs to emit a module at all. Both, so one manifest serves
+# both without a second profile to keep in step.
+crate-type = ["cdylib", "rlib"]
 
 [[bin]]
 name = "bgraph"
 path = "src/main.rs"
+required-features = ["cli"]
 
 [[bin]]
 name = "bgraph-lsp"
 path = "src/bin/bgraph-lsp.rs"
+required-features = ["cli"]
 
 [features]
-default = ["all-archetypes", "pdf", "json", "csv", "completions"]
+default = ["cli", "all-archetypes", "pdf", "json", "csv", "completions"]
 all-archetypes = [
     "pie",
     "packet",
@@ -125,11 +131,23 @@ png = ["dep:resvg", "dep:tiny-skia"]
 # one small crate. Both are binary-only, so the library a caller embeds is
 # untouched — and `--no-default-features`, which CI builds, still resolves to
 # the five this crate promises.
-completions = ["dep:clap_complete", "dep:clap_mangen"]
+completions = ["cli", "dep:clap_complete", "dep:clap_mangen"]
+
+# The two binaries. Optional so a *library* consumer — and the wasm build in
+# particular — does not compile an argument parser it will never call. The
+# binaries declare it in `required-features`, so `cargo build` still builds
+# them and `cargo build --no-default-features` builds only the library.
+cli = ["dep:clap"]
+
+# The wasm entry points: a handful of `extern "C"` functions over a linear
+# memory, hand-rolled for the same reason everything else here is. No
+# `wasm-bindgen`, which would be a dependency and a build step for four
+# functions whose whole job is to move bytes.
+wasm = []
 
 [dependencies]
 anyhow = "1.0.104"
-clap = { version = "4.6.4", features = ["derive"] }
+clap = { version = "4.6.4", features = ["derive"], optional = true }
 pest = "2.8.8"
 pest_derive = "2.8.8"
 serde_json = "1.0"

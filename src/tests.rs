@@ -5565,12 +5565,12 @@ fn every_archetype_has_a_feature_and_every_feature_an_archetype() {
         .take_while(|l| !l.starts_with('['))
         .filter_map(|l| l.split_once(" = []"))
         .map(|(name, _)| name.trim())
-        // `pdf` gates an output format, `json` and `csv` input ones — not
-        // genres.
+        // `pdf` gates an output format, `json` and `csv` input ones, `wasm`
+        // the four entry points a browser calls — none of them genres.
         // They are named here rather
         // than filtered by a pattern, so a second non-archetype feature has to
         // be justified in this list instead of slipping past a wildcard.
-        .filter(|name| !matches!(*name, "pdf" | "json" | "csv"))
+        .filter(|name| !matches!(*name, "pdf" | "json" | "csv" | "wasm"))
         .collect();
 
     let mut archetypes: Vec<&str> = crate::props::ARCHETYPES
@@ -8173,4 +8173,59 @@ fn a_diagram_with_no_embedded_font_carries_no_style_block() {
     // is a price only the person handing the file over should pay.
     let svg = crate::render_source(r#"node a "A""#).unwrap();
     assert!(!svg.contains("@font-face"), "{svg}");
+}
+
+// ------------------------------------------------- the wasm build (I-024)
+
+#[test]
+fn the_library_needs_no_argument_parser() {
+    // What makes a wasm build sane: a page has no argv, and a library
+    // consumer should not compile a parser it will never call. The binaries
+    // declare `cli` in `required-features`, so `cargo build` still builds
+    // them and `--no-default-features` resolves to four dependencies.
+    let manifest = include_str!("../Cargo.toml");
+
+    let clap = manifest
+        .lines()
+        .find(|l| l.starts_with("clap = "))
+        .expect("clap is in the manifest");
+    assert!(clap.contains("optional = true"), "{clap}");
+
+    assert_eq!(
+        manifest.matches("required-features = [\"cli\"]").count(),
+        2,
+        "both binaries must declare the feature that gives them their parser"
+    );
+
+    // And the library must emit a module at all, or there is nothing to load.
+    assert!(
+        manifest.contains("crate-type = [\"cdylib\", \"rlib\"]"),
+        "the library cannot produce a wasm module"
+    );
+}
+
+#[test]
+fn the_playground_loads_the_module_the_build_script_writes() {
+    // Two files that have to agree on a name, in two languages, and neither
+    // would fail loudly — the page would simply show nothing.
+    let page = include_str!("../playground/index.html");
+    let script = include_str!("../playground/build.sh");
+
+    assert!(page.contains("./bgraph.wasm"), "the page loads no module");
+    assert!(
+        script.contains("playground/bgraph.wasm"),
+        "the build script writes somewhere else"
+    );
+    for name in [
+        "bgraph_alloc",
+        "bgraph_free",
+        "bgraph_render",
+        "bgraph_result_len",
+    ] {
+        assert!(page.contains(name), "the page never calls `{name}`");
+        assert!(
+            include_str!("wasm.rs").contains(name),
+            "`{name}` is not exported"
+        );
+    }
 }

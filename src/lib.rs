@@ -1,4 +1,7 @@
-#![forbid(unsafe_code)]
+// `unsafe` is forbidden everywhere except the wasm boundary, where four
+// functions have to hand raw pointers to a caller that is not Rust. Scoped to
+// that module rather than lifted for the crate.
+#![cfg_attr(not(feature = "wasm"), forbid(unsafe_code))]
 #![warn(missing_docs)]
 
 //! `bgraph` — stylable diagrams from a layout-first DSL.
@@ -146,6 +149,9 @@ pub mod report;
 pub mod style;
 #[allow(missing_docs)]
 pub mod themes;
+#[allow(missing_docs)]
+#[cfg(feature = "wasm")]
+pub mod wasm;
 
 // Support for the `bgraph` and `bgraph-lsp` binaries, not part of the library.
 #[allow(missing_docs)]

@@ -52,6 +52,23 @@ bgraph docs -o docs/reference.md   # regenerate the reference manual
   [`editors/README.md`](editors/README.md). Diagnostics, context-aware
   completion, hover with resolved geometry, go-to-definition, outline.
 
+## In a browser
+
+The core is four dependencies of pure Rust and the SVG writer is hand-written,
+so the renderer compiles to wasm nearly as it stands:
+
+```sh
+./playground/build.sh --inline   # → playground/standalone.html, open it
+```
+
+Source on the left, SVG on the right, no server. The wasm boundary is four
+`extern "C"` functions over linear memory — no `wasm-bindgen`, which would be
+a dependency and a build step for four functions whose job is to move bytes.
+
+`include` and `from:` are refused there: both need a path to resolve against
+and a page has no disk, which is why the wasm build exposes `render_source`
+and nothing that touches a filesystem.
+
 ## Other archetypes
 
 `type`, declared once at the top of a file, picks the genre. `free` — nodes
