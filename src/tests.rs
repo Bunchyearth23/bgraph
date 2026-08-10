@@ -6567,3 +6567,154 @@ fn every_editor_the_repository_ships_is_in_the_guide() {
         );
     }
 }
+
+// ------------------------------------------------- error recovery (I-055)
+
+#[test]
+fn a_mistake_on_line_three_does_not_cost_line_fifty() {
+    // The whole point. Before this, one bad separator threw away the
+    // diagnostics and the highlighting of everything after it — at exactly
+    // the moment both were wanted.
+    let source = "node a \"A\"\nnode b \"B\" right-of a\nnode ??? bad\nnode d \"D\" below b\n";
+    let (diagram, errors) = crate::parser::parse_recovering(source);
+
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    let diagram = diagram.expect("the sound statements should survive");
+    let ids: Vec<&str> = diagram.nodes.iter().map(|n| n.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        ["a", "b", "d"],
+        "a statement past the mistake was lost"
+    );
+}
+
+#[test]
+fn the_recovered_error_points_where_the_mistake_is() {
+    // An error reported at the top of the file is an error nobody can act on.
+    let source = "node a \"A\"\nnode ??? bad\n";
+    let (_, errors) = crate::parser::parse_recovering(source);
+
+    let span = errors.first().expect("an error").span;
+    assert!(
+        span.start >= 11,
+        "the error is reported at byte {} — before the second line even \
+         starts",
+        span.start
+    );
+}
+
+#[test]
+fn several_mistakes_are_all_reported() {
+    let source = "node ?? one\nnode b \"B\"\nnode ?? two\n";
+    let (diagram, errors) = crate::parser::parse_recovering(source);
+
+    assert_eq!(errors.len(), 2, "{errors:?}");
+    assert_eq!(diagram.expect("`b` should survive").nodes.len(), 1);
+}
+
+#[test]
+fn a_sound_file_pays_nothing_and_reports_nothing() {
+    let source = "node a \"A\"\nnode b \"B\" right-of a\na -> b\n";
+    let (diagram, errors) = crate::parser::parse_recovering(source);
+
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(diagram.expect("it parses").nodes.len(), 2);
+}
+
+#[test]
+fn a_block_spanning_lines_is_one_statement() {
+    // A statement ends at a newline *at depth zero*. Treating every line as a
+    // statement would cut a block in half and report three mistakes where
+    // there are none.
+    let source = "node a \"A\" {\n  fill: #fff\n  stroke: #000\n}\nnode ?? bad\n";
+    let (diagram, errors) = crate::parser::parse_recovering(source);
+
+    assert_eq!(errors.len(), 1, "the block was cut up: {errors:?}");
+    let diagram = diagram.expect("the block should survive");
+    assert_eq!(diagram.nodes.len(), 1);
+    assert_eq!(
+        diagram.nodes[0].props.len(),
+        2,
+        "the block lost its content"
+    );
+}
+
+#[test]
+fn a_trailing_comment_does_not_drag_the_next_statement_down_with_it() {
+    // The comment scanner must leave the newline behind, or the two lines
+    // become one chunk and a mistake in either blanks both.
+    let source = "node a \"A\" // fine\nnode ?? bad\n";
+    let (diagram, errors) = crate::parser::parse_recovering(source);
+
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert_eq!(
+        diagram
+            .expect("`a` should survive its own comment")
+            .nodes
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn an_unclosed_block_costs_only_what_is_inside_it() {
+    // A block that never closes swallows the rest of the file — depth never
+    // returns to zero, so everything after the `{` is one statement. That is
+    // the right answer rather than a shortcoming: what precedes it is still
+    // sound and still reported, and nothing inside is guessed at.
+    let source = "node a \"A\"\nnode b \"B\" {\nnode c \"C\"\n";
+    let (diagram, errors) = crate::parser::parse_recovering(source);
+
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    let diagram = diagram.expect("the statement before the block should survive");
+    let ids: Vec<&str> = diagram.nodes.iter().map(|n| n.id.as_str()).collect();
+    assert_eq!(ids, ["a"]);
+}
+
+#[test]
+fn nesting_past_the_cap_is_reported_rather_than_recovered_from() {
+    // The one case where recovery is refused: past `MAX_NESTING` every
+    // boundary is a guess, and the guard exists to stop a stack overflow
+    // rather than to improve a message.
+    let source = "node a ".to_string() + &"{ x: ".repeat(MAX_NESTING + 2);
+    let (diagram, errors) = crate::parser::parse_recovering(&source);
+
+    assert!(diagram.is_none(), "a file past the nesting cap was parsed");
+    assert_eq!(errors.len(), 1, "{errors:?}");
+    assert!(
+        errors[0].message.contains("nested"),
+        "{}",
+        errors[0].message
+    );
+}
+
+#[test]
+fn a_syntax_error_no_longer_hides_the_rest_of_the_file() {
+    // The reason recovery was worth building. Three different kinds of
+    // problem, on three different lines, all reported in one pass — where
+    // before the first one silenced the other two until it was fixed.
+    let source = concat!(
+        "node a \"A\"\n",
+        "node ??? bad\n",
+        "node c \"C\" { fil: #fff }\n",
+        "c -> ghost\n",
+    );
+    let reported = crate::lsp::diagnostics(source);
+    let messages: Vec<String> = reported
+        .iter()
+        .filter_map(|d| d["message"].as_str().map(String::from))
+        .collect();
+
+    assert!(
+        messages.iter().any(|m| m.contains("syntax error")),
+        "{messages:?}"
+    );
+    assert!(
+        messages.iter().any(|m| m.contains("`fil`")),
+        "a property mistake after a syntax error went unreported: {messages:?}"
+    );
+    assert!(
+        messages.iter().any(|m| m.contains("ghost")),
+        "an unknown name after a syntax error went unreported: {messages:?}"
+    );
+}

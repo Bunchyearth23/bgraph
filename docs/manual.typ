@@ -658,6 +658,12 @@ here is hand-rolled, but a raster means zlib and a rasteriser means text
 shaping and antialiasing. `--scale 2` doubles the diagram's own size — a scale
 rather than a pixel width, since the layout already decided the shape.
 
+`check` reports every mistake rather than the first. A statement ends at a
+newline, so where to resume after a syntax error is not a guess — the sound
+statements are still parsed, still checked, and still reported on. Before that,
+one missed separator on line 3 silenced the diagnostics for everything after
+it, at exactly the moment they were wanted.
+
 `check` exits non-zero on an error. At a terminal it shows the offending line
 with a caret under it; redirected — or with `--ci` — it prints
 `file:line:col: severity: message`, the form editors and build systems already

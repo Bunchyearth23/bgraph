@@ -647,3 +647,133 @@ fn unescape(pair: Pair<Rule>) -> String {
 
     out
 }
+
+// ------------------------------------------------------- error recovery
+
+/// Parse, and keep going past the first mistake.
+///
+/// A statement ends at a newline, so where to resume is not a guess — which is
+/// what makes this worth doing here rather than in the grammar. Without it, a
+/// missing separator on line 3 costs the diagnostics *and* the semantic
+/// highlighting of the fifty lines after it, which is precisely the moment
+/// both were wanted.
+///
+/// Returns whatever could be understood alongside every problem found. The
+/// diagram is `None` only when nothing at all could be salvaged.
+///
+/// The sound path is untouched: a file with no mistake is parsed once, exactly
+/// as [`parse`] does, and pays nothing for this.
+pub fn parse_recovering(input: &str) -> (Option<Diagram>, Vec<ParseError>) {
+    match parse(input) {
+        Ok(diagram) => return (Some(diagram), Vec::new()),
+        Err(first) => {
+            // An unbalanced brace is not a statement-shaped mistake: every
+            // boundary after it is a guess, so the one honest answer is the
+            // error itself.
+            if check_nesting(input).is_err() {
+                return (None, vec![first]);
+            }
+        }
+    }
+
+    let mut errors = Vec::new();
+    // Spaces rather than deletion, so every span in what is left still points
+    // where the reader's cursor is.
+    let mut repaired: Vec<u8> = input.as_bytes().to_vec();
+
+    for (start, chunk) in statements(input) {
+        let Err(err) = parse(chunk) else {
+            continue;
+        };
+        errors.push(ParseError {
+            message: err.message,
+            span: Span {
+                start: start + err.span.start,
+                end: start + err.span.end.max(err.span.start),
+            },
+        });
+        for byte in &mut repaired[start..start + chunk.len()] {
+            if *byte != b'\n' {
+                *byte = b' ';
+            }
+        }
+    }
+
+    if errors.is_empty() {
+        // Every statement parses on its own but the file does not: the
+        // mistake is *between* two of them rather than inside one, and
+        // blanking a statement at random would be a worse answer than simply
+        // reporting what the whole-file parse said.
+        return (None, parse(input).err().into_iter().collect());
+    }
+
+    let salvaged = String::from_utf8(repaired)
+        .ok()
+        .and_then(|text| parse(&text).ok());
+    (salvaged, errors)
+}
+
+/// The top-level statements, each with its byte offset.
+///
+/// A statement runs to the newline that returns brace depth to zero, so a
+/// block spanning ten lines is one statement rather than ten. The scanning
+/// rules are [`check_nesting`]'s: a brace inside a string, a comment or a
+/// `{{hole}}` is not structure.
+fn statements(input: &str) -> Vec<(usize, &str)> {
+    let mut out = Vec::new();
+    let mut chars = input.char_indices().peekable();
+    let mut depth = 0usize;
+    let mut start = 0usize;
+
+    while let Some((i, c)) = chars.next() {
+        match c {
+            '"' => {
+                while let Some((_, c)) = chars.next() {
+                    match c {
+                        '\\' => {
+                            chars.next();
+                        }
+                        '"' | '\n' => break,
+                        _ => {}
+                    }
+                }
+            }
+            // The newline is left for the loop below, unlike in
+            // `check_nesting`: consuming it here would weld a statement with
+            // a trailing comment onto the next one, and a mistake in either
+            // would then blank both.
+            '/' if chars.peek().map(|&(_, c)| c) == Some('/') => {
+                while let Some(&(_, c)) = chars.peek() {
+                    if c == '\n' {
+                        break;
+                    }
+                    chars.next();
+                }
+            }
+            '{' if chars.peek().map(|&(_, c)| c) == Some('{') => {
+                chars.next();
+                let mut prev = None;
+                for (_, c) in chars.by_ref() {
+                    if prev == Some('}') && c == '}' {
+                        break;
+                    }
+                    prev = Some(c);
+                }
+            }
+            '{' => depth += 1,
+            '}' => depth = depth.saturating_sub(1),
+            '\n' if depth == 0 => {
+                if !input[start..i].trim().is_empty() {
+                    out.push((start, &input[start..i]));
+                }
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+
+    if !input[start..].trim().is_empty() {
+        out.push((start, &input[start..]));
+    }
+    out
+}

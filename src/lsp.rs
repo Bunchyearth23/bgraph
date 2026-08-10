@@ -910,24 +910,34 @@ impl Server {
 
 // ------------------------------------------------------------ diagnostics
 
-fn diagnostics(text: &str) -> Vec<Value> {
+pub(crate) fn diagnostics(text: &str) -> Vec<Value> {
     let index = LineIndex::new(text);
 
-    let diags = match crate::parser::parse(text) {
-        Ok(diagram) => check::check(&diagram),
-        Err(err) => vec![check::Diag {
+    // Recovering rather than stopping at the first mistake: this is the
+    // place it matters most. One missed separator used to blank the
+    // diagnostics for everything after it, so the file being edited went
+    // quiet at exactly the moment it should have been loudest.
+    let (diagram, syntax) = crate::parser::parse_recovering(text);
+
+    let mut diags: Vec<check::Diag> = syntax
+        .into_iter()
+        .map(|err| check::Diag {
             severity: Severity::Error,
             message: err.message,
             span: err.span,
-        }],
-    };
+        })
+        .collect();
 
-    // And the ones that need the boxes to have been placed.
-    let mut diags = diags;
-    if let Ok(diagram) = crate::parser::parse(text)
-        && let Ok(layout) = crate::layout::solve(&diagram)
-    {
-        diags.extend(check::after_layout(&layout));
+    if let Some(diagram) = &diagram {
+        // What survived is still checked. A file with a syntax error in one
+        // statement still has an unknown property in another, and hiding it
+        // until the first is fixed makes for two rounds instead of one.
+        diags.extend(check::check(diagram));
+
+        // And the ones that need the boxes to have been placed.
+        if let Ok(layout) = crate::layout::solve(diagram) {
+            diags.extend(check::after_layout(&layout));
+        }
     }
 
     // A template's rules are the template's, and nothing was running them

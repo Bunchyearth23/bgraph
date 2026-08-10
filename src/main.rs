@@ -506,21 +506,26 @@ fn check_file(input: &PathBuf, ci: bool) -> Result<i32> {
         fs::read_to_string(input).with_context(|| format!("cannot read {}", input.display()))?;
     let index = LineIndex::new(&source);
 
-    let mut diagnostics = match parser::parse(&source) {
-        Ok(diagram) => bgraph::check::check(&diagram),
-        Err(err) => vec![bgraph::check::Diag {
+    // Every mistake, not the first: a person fixing a file wants the list,
+    // and a build log that stops at line 3 hides what is on line 40.
+    let (diagram, syntax) = parser::parse_recovering(&source);
+
+    let mut diagnostics: Vec<bgraph::check::Diag> = syntax
+        .into_iter()
+        .map(|err| bgraph::check::Diag {
             severity: Severity::Error,
             message: err.message,
             span: err.span,
-        }],
-    };
+        })
+        .collect();
 
-    // The ones that need the boxes placed. `check` is still the only
-    // validator; this is its second pass, not a second one.
-    if let Ok(diagram) = parser::parse(&source)
-        && let Ok(solved) = layout::solve(&diagram)
-    {
-        diagnostics.extend(bgraph::check::after_layout(&solved));
+    if let Some(diagram) = &diagram {
+        diagnostics.extend(bgraph::check::check(diagram));
+        // The ones that need the boxes placed. `check` is still the only
+        // validator; this is its second pass, not a second validator.
+        if let Ok(solved) = layout::solve(diagram) {
+            diagnostics.extend(bgraph::check::after_layout(&solved));
+        }
     }
     diagnostics.sort_by_key(|d| (d.span.start, d.span.end));
 
