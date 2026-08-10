@@ -633,6 +633,93 @@ fn a_packet_field_needs_bits() {
     assert!(err("type packet\nnode a \"A\"").contains("has no `bits`"));
 }
 
+// ---------------------------------------------------------------------- W-041
+
+#[cfg(test)]
+// `node` is the universal synonym, so one tree serves all three genres —
+// which is the claim under test.
+const TREE: &str = "node a \"A\"\nnode b \"B\"\nnode c \"C\"\nnode d \"D\"\n\
+     a -> b\na -> c\nb -> d\n";
+
+#[test]
+fn a_parent_sits_over_the_middle_of_what_it_holds() {
+    // The whole engine in one assertion: subtrees take disjoint spans, and a
+    // parent is centred on the span it was given.
+    let l = build(&format!("type orgchart {{ row: 100 spacing: 20 }}\n{TREE}"));
+    let mid = |i: usize| l.nodes[i].rect.x + l.nodes[i].rect.w / 2.0;
+
+    // B and C are siblings; A is centred between them.
+    assert!(mid(1) < mid(2), "declaration order runs left to right");
+    assert!(
+        (mid(0) - (mid(1) + mid(2)) / 2.0).abs() < 1.0,
+        "A at {} between {} and {}",
+        mid(0),
+        mid(1),
+        mid(2)
+    );
+    // D hangs under B, not under A.
+    assert!((mid(3) - mid(1)).abs() < 1.0);
+}
+
+#[test]
+fn depth_is_the_row_in_an_orgchart_and_the_indent_in_a_treeview() {
+    // One tree, two readings — which is what makes the engine worth writing
+    // once for three genres.
+    let org = build(&format!("type orgchart {{ row: 100 }}\n{TREE}"));
+    assert_eq!(org.nodes[0].rect.y, 0.0);
+    assert!(org.nodes[1].rect.y >= 100.0, "a level down is a row down");
+    assert!(org.nodes[3].rect.y >= 200.0, "two levels, two rows");
+
+    let view = build(&format!("type treeview {{ row: 20 spacing: 10 }}\n{TREE}"));
+    // Pre-order, one row each: A, B, D, C.
+    assert_eq!(view.nodes[0].rect.y, 0.0);
+    assert_eq!(view.nodes[1].rect.y, 20.0);
+    assert_eq!(view.nodes[3].rect.y, 40.0, "D follows B");
+    assert_eq!(view.nodes[2].rect.y, 60.0, "C comes after B's subtree");
+    assert!(view.nodes[1].rect.x > view.nodes[0].rect.x, "depth indents");
+}
+
+#[test]
+fn a_mindmap_puts_branches_on_both_sides_of_its_root() {
+    // The point of the shape: the root stays central however lopsided the
+    // tree is.
+    let l = build(
+        "type mindmap { row: 120 spacing: 20 }\n\
+         node r \"R\"\nnode a \"A\"\nnode b \"B\"\n\
+         r -> a\nr -> b\n",
+    );
+    let mid = |i: usize| l.nodes[i].rect.y + l.nodes[i].rect.h / 2.0;
+    assert!(
+        (mid(1) < mid(0)) != (mid(2) < mid(0)),
+        "one branch each way: {} {} {}",
+        mid(0),
+        mid(1),
+        mid(2)
+    );
+}
+
+#[test]
+fn every_link_is_drawn() {
+    // Structure declared and not drawn would leave a reader inventing it.
+    let l = build(&format!("type orgchart\n{TREE}"));
+    assert_eq!(l.polylines.len(), 3, "three edges, three connectors");
+}
+
+#[test]
+fn a_tree_reports_what_stops_it_being_one() {
+    let e = err("type orgchart\nnode a \"A\"\nnode b \"B\"\nnode c \"C\"\na -> c\nb -> c");
+    assert!(e.contains("already reports to"), "{e}");
+
+    let e = err("type orgchart\nnode a \"A\"\nnode b \"B\"\na -> b\nb -> a");
+    assert!(e.contains("has no root") || e.contains("cycle"), "{e}");
+
+    let d = diags("type orgchart\nnode a \"A\"\nnode b \"B\"");
+    assert!(
+        d.iter().any(|x| x.message.contains("separate trees")),
+        "{d:?}"
+    );
+}
+
 // ---------------------------------------------------------------------- W-045
 
 #[cfg(test)]

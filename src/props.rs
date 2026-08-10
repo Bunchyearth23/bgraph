@@ -565,6 +565,35 @@ pub const STATE_ITEM_PROPS: &[PropDef] = &[
 /// `r2 -> r1 derive` is r2 derives from r1.
 /// What a box on a topology *is*. Drives the shape, so a reader tells a
 /// router from a storage array before reading the label.
+/// One engine, three genres. The settings are shared because the differences
+/// are in the arrangement, not in what an author has to say about it.
+pub const TREE_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the diagram.",
+    },
+    PropDef {
+        name: "row",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "row: <number>",
+        doc: "Distance between one level and the next.",
+    },
+    PropDef {
+        name: "spacing",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "spacing: <number>",
+        doc: "Distance between two siblings.",
+    },
+];
+
 pub const HARNESS_PROPS: &[PropDef] = &[
     PropDef {
         name: "title",
@@ -1285,6 +1314,48 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "bits",
             arity: 2,
         }],
+        members: false,
+        alt_items: &[],
+        edge_slots: &[],
+    },
+    #[cfg(feature = "orgchart")]
+    ArchetypeDef {
+        name: "orgchart",
+        item: "position",
+        doc: "Reporting lines, laid out top-down. The hierarchy comes from the \
+              edges — `ceo -> cto` — and the archetype places every box, so \
+              adding a report never means renumbering anything.",
+        props: TREE_PROPS,
+        item_props: &[],
+        slots: &[],
+        members: false,
+        alt_items: &[],
+        edge_slots: &[],
+    },
+    #[cfg(feature = "mindmap")]
+    ArchetypeDef {
+        name: "mindmap",
+        item: "topic",
+        doc: "A root with branches either side of it. The same tree the \
+              orgchart draws, arranged outward instead of downward, so the \
+              root stays central however lopsided the tree is.",
+        props: TREE_PROPS,
+        item_props: &[],
+        slots: &[],
+        members: false,
+        alt_items: &[],
+        edge_slots: &[],
+    },
+    #[cfg(feature = "treeview")]
+    ArchetypeDef {
+        name: "treeview",
+        item: "entry",
+        doc: "The same tree as indented rows, one per line — a file listing, a \
+              menu, a taxonomy. Depth is the indent and order is the order \
+              written.",
+        props: TREE_PROPS,
+        item_props: &[],
+        slots: &[],
         members: false,
         alt_items: &[],
         edge_slots: &[],

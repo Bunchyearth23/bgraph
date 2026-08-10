@@ -1,0 +1,24 @@
+// The hierarchy is the edges; the archetype places every box, so adding a
+// report never means renumbering anything (W-041).
+type orgchart { title: "Broadcast engineering" row: 96 spacing: 26 }
+graph { background: #0b1120 padding: 30 }
+style position { fill: #1e293b stroke: #38bdf8 1.3 font: 12 #e2e8f0 radius: 6 padding: 12 }
+
+position cto  "CTO"
+position plat "Platform lead"
+position sig  "DSP lead"
+position ops  "Operations lead"
+position k8s  "Kubernetes"
+position api  "Backend"
+position dsp1 "Signal chain"
+position dsp2 "Capture"
+position noc  "NOC"
+
+cto -> plat
+cto -> sig
+cto -> ops
+plat -> k8s
+plat -> api
+sig -> dsp1
+sig -> dsp2
+ops -> noc

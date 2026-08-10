@@ -348,6 +348,18 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         "rack" => return crate::charts::rack(diagram, opts, &registry),
         #[cfg(feature = "venn")]
         "venn" => return crate::charts::venn(diagram, opts, &registry),
+        #[cfg(feature = "orgchart")]
+        "orgchart" => {
+            return crate::charts::tree(diagram, opts, &registry, crate::charts::TreeKind::Org);
+        }
+        #[cfg(feature = "mindmap")]
+        "mindmap" => {
+            return crate::charts::tree(diagram, opts, &registry, crate::charts::TreeKind::Mind);
+        }
+        #[cfg(feature = "treeview")]
+        "treeview" => {
+            return crate::charts::tree(diagram, opts, &registry, crate::charts::TreeKind::View);
+        }
         #[cfg(feature = "bytefield")]
         "bytefield" => return crate::charts::bytefield(diagram, opts, &registry),
         #[cfg(feature = "treemap")]

@@ -387,6 +387,287 @@ struct Granularity {
     step: u32,
 }
 
+/// Which arrangement a tree is drawn in. The engine below is one; only the
+/// axes and the starting point change (`W-041`).
+#[cfg(any(feature = "orgchart", feature = "mindmap", feature = "treeview"))]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum TreeKind {
+    /// Layered top-down, parents centred over their children.
+    Org,
+    /// A root with branches either side, growing outward.
+    Mind,
+    /// Indented rows, one per line.
+    View,
+}
+
+/// A tree, from the edges.
+///
+/// The hierarchy is the edges rather than group nesting: an org chart is
+/// written `ceo -> cto`, and asking an author to nest a manager inside a group
+/// *and* declare them as a box would be two statements for one fact.
+///
+/// The engine is the classic subtree-width pass — measure every subtree
+/// bottom-up, then hand each child its slice of the parent's span. No threads
+/// or contours: siblings are placed in disjoint spans by construction, so they
+/// cannot overlap and there is nothing to repair afterwards.
+#[cfg(any(feature = "orgchart", feature = "mindmap", feature = "treeview"))]
+pub fn tree(
+    diagram: &Diagram,
+    opts: GraphOpts,
+    registry: &Registry,
+    kind: TreeKind,
+) -> Result<Layout> {
+    use std::collections::HashMap;
+
+    let cfg = &diagram.archetype_props;
+    let theme = Theme::of(&opts);
+    let def = crate::check::archetype_of(diagram);
+
+    let row = number(cfg, "row", if kind == TreeKind::View { 26.0 } else { 92.0 }).max(12.0);
+    let spacing = number(cfg, "spacing", 24.0).max(0.0);
+    let title = text(cfg, "title");
+    let base = registry.resolve(Style::node_defaults(), def.item, &[], &[])?;
+
+    let index: HashMap<&str, usize> = diagram
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.id.as_str(), i))
+        .collect();
+
+    let mut styles = Vec::new();
+    let mut sizes = Vec::new();
+    let mut labels = Vec::new();
+    for node in &diagram.nodes {
+        let style = registry.resolve(
+            Style::node_defaults(),
+            def.item,
+            &node.classes,
+            &node.props_for(def),
+        )?;
+        let label = node.label.clone().unwrap_or_else(|| node.id.value.clone());
+        let font = style.font_size.unwrap_or(14.0);
+        let pad = style.padding.unwrap_or(14.0);
+        let w = style
+            .width
+            .unwrap_or(text_width(std::slice::from_ref(&label), font) + pad * 2.0);
+        let h = style.height.unwrap_or(font * 1.45 + pad * 1.4);
+        sizes.push((w, h));
+        labels.push(label);
+        styles.push(style);
+    }
+
+    // Children in declaration order, so the picture reads in the order the
+    // file does.
+    let mut children: Vec<Vec<usize>> = vec![Vec::new(); diagram.nodes.len()];
+    let mut has_parent = vec![false; diagram.nodes.len()];
+    for edge in &diagram.edges {
+        if let (Some(&a), Some(&b)) = (index.get(edge.from.as_str()), index.get(edge.to.as_str()))
+            && !has_parent[b]
+        {
+            children[a].push(b);
+            has_parent[b] = true;
+        }
+    }
+    let roots: Vec<usize> = (0..diagram.nodes.len())
+        .filter(|i| !has_parent[*i])
+        .collect();
+
+    // Bottom-up: a subtree is as wide as its children laid side by side, or as
+    // wide as its own box, whichever is more.
+    fn measure(
+        i: usize,
+        children: &[Vec<usize>],
+        sizes: &[(f64, f64)],
+        spacing: f64,
+        out: &mut [f64],
+    ) -> f64 {
+        let kids = &children[i];
+        let own = sizes[i].0;
+        let span = if kids.is_empty() {
+            own
+        } else {
+            let total: f64 = kids
+                .iter()
+                .map(|k| measure(*k, children, sizes, spacing, out))
+                .sum::<f64>()
+                + spacing * (kids.len() - 1) as f64;
+            total.max(own)
+        };
+        out[i] = span;
+        span
+    }
+
+    let mut span = vec![0.0; diagram.nodes.len()];
+    for r in &roots {
+        measure(*r, &children, &sizes, spacing, &mut span);
+    }
+
+    // Top-down: each child takes its slice of the parent's span, and the
+    // parent sits over the middle of what it holds.
+    #[allow(clippy::too_many_arguments)]
+    fn place(
+        i: usize,
+        left: f64,
+        depth: usize,
+        children: &[Vec<usize>],
+        sizes: &[(f64, f64)],
+        span: &[f64],
+        spacing: f64,
+        row: f64,
+        pos: &mut [(f64, f64)],
+    ) {
+        let mut cursor = left;
+        for k in &children[i] {
+            place(
+                *k,
+                cursor,
+                depth + 1,
+                children,
+                sizes,
+                span,
+                spacing,
+                row,
+                pos,
+            );
+            cursor += span[*k] + spacing;
+        }
+        let centre = left + span[i] / 2.0;
+        pos[i] = (centre - sizes[i].0 / 2.0, depth as f64 * row);
+    }
+
+    let mut pos = vec![(0.0, 0.0); diagram.nodes.len()];
+    let mut cursor = 0.0;
+    for r in &roots {
+        place(
+            *r, cursor, 0, &children, &sizes, &span, spacing, row, &mut pos,
+        );
+        cursor += span[*r] + spacing * 2.0;
+    }
+
+    // The three arrangements are the same tree read on different axes.
+    match kind {
+        TreeKind::Org => {}
+        TreeKind::View => {
+            // Depth is the indent, order is pre-order, one row each.
+            fn walk(i: usize, depth: usize, children: &[Vec<usize>], order: &mut Vec<(usize, usize)>) {
+                order.push((i, depth));
+                for k in &children[i] {
+                    walk(*k, depth + 1, children, order);
+                }
+            }
+            let mut order = Vec::new();
+            for r in &roots {
+                walk(*r, 0, &children, &mut order);
+            }
+            for (line, (i, depth)) in order.iter().enumerate() {
+                pos[*i] = (*depth as f64 * (spacing + 14.0), line as f64 * row);
+            }
+        }
+        TreeKind::Mind => {
+            // Half the root's branches each way. The root stays central
+            // however lopsided the tree is, which is the point of the shape.
+            for r in &roots {
+                let kids = children[*r].clone();
+                let half = kids.len().div_ceil(2);
+                for (n, k) in kids.iter().enumerate() {
+                    let side = if n < half { 1.0 } else { -1.0 };
+                    mirror(*k, side, &children, &mut pos);
+                }
+                let _ = half;
+            }
+            // Swap the axes: depth runs horizontally, siblings vertically.
+            for p in pos.iter_mut() {
+                *p = (p.1 * 1.4, p.0 * 0.55);
+            }
+        }
+    }
+
+    #[cfg(any(feature = "orgchart", feature = "mindmap", feature = "treeview"))]
+    fn mirror(i: usize, side: f64, children: &[Vec<usize>], pos: &mut [(f64, f64)]) {
+        pos[i].1 *= side;
+        for k in &children[i] {
+            mirror(*k, side, children, pos);
+        }
+    }
+
+    let title_h = if title.is_some() {
+        TITLE_SIZE * 2.0
+    } else {
+        0.0
+    };
+    let min_x = pos.iter().map(|(x, _)| *x).fold(f64::MAX, f64::min);
+    let min_y = pos.iter().map(|(_, y)| *y).fold(f64::MAX, f64::min);
+    let shift = |(x, y): (f64, f64)| (x - min_x, y - min_y + title_h);
+
+    let mut nodes = Vec::new();
+    let mut polylines = Vec::new();
+    let mut annotations = Vec::new();
+
+    if let Some(title) = title {
+        annotations.push(Annotation {
+            text: title,
+            x: 0.0,
+            y: TITLE_SIZE,
+            anchor: Anchor::Start,
+            size: TITLE_SIZE,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        let _ = node;
+        let (x, y) = shift(pos[i]);
+        nodes.push(PlacedNode {
+            lines: vec![labels[i].clone()],
+            rect: Rect {
+                x,
+                y,
+                w: sizes[i].0,
+                h: sizes[i].1,
+            },
+            style: styles[i].clone(),
+        });
+    }
+
+    // Connectors, drawn as plain lines rather than routed edges: a tree's
+    // links are structure, and an arrowhead on every one of them is noise.
+    let link = if theme.dark { "#334155" } else { "#d4d4d8" };
+    for (parent, kids) in children.iter().enumerate() {
+        for k in kids {
+            let a = &nodes[parent].rect;
+            let b = &nodes[*k].rect;
+            let (from, to) = match kind {
+                TreeKind::Org => ((a.x + a.w / 2.0, a.bottom()), (b.x + b.w / 2.0, b.y)),
+                _ if b.x >= a.x => ((a.right(), a.y + a.h / 2.0), (b.x, b.y + b.h / 2.0)),
+                _ => ((a.x, a.y + a.h / 2.0), (b.right(), b.y + b.h / 2.0)),
+            };
+            polylines.push(Polyline {
+                points: vec![from, to],
+                closed: false,
+                fill: None,
+                stroke: Some(link.to_string()),
+                width: 1.4,
+                head: None,
+                dash: None,
+            });
+        }
+    }
+
+    Ok(Layout {
+        guides: Vec::new(),
+        polylines,
+        groups: Vec::new(),
+        nodes,
+        edges: Vec::new(),
+        opts,
+        chart: Chart::Free,
+        annotations,
+    })
+}
+
 /// The area of the lens between two circles of radii `a` and `b` whose centres
 /// are `d` apart. The standard two-circle formula; it is what makes the
 /// two-set case *solvable* rather than merely arranged.

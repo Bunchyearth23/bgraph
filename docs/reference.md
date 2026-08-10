@@ -1087,6 +1087,146 @@ field urg   "Urgent pointer"      144 159
 
 </details>
 
+### `type orgchart`
+
+Reporting lines, laid out top-down. The hierarchy comes from the edges — `ceo -> cto` — and the archetype places every box, so adding a report never means renumbering anything.
+
+```
+position <id> ["label"]
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+| `row` | `row: <number>` | Distance between one level and the next. |
+| `spacing` | `spacing: <number>` | Distance between two siblings. |
+
+<details>
+<summary>A complete file — <code>examples/orgchart.bd</code></summary>
+
+```
+// The hierarchy is the edges; the archetype places every box, so adding a
+// report never means renumbering anything (W-041).
+type orgchart { title: "Broadcast engineering" row: 96 spacing: 26 }
+graph { background: #0b1120 padding: 30 }
+style position { fill: #1e293b stroke: #38bdf8 1.3 font: 12 #e2e8f0 radius: 6 padding: 12 }
+
+position cto  "CTO"
+position plat "Platform lead"
+position sig  "DSP lead"
+position ops  "Operations lead"
+position k8s  "Kubernetes"
+position api  "Backend"
+position dsp1 "Signal chain"
+position dsp2 "Capture"
+position noc  "NOC"
+
+cto -> plat
+cto -> sig
+cto -> ops
+plat -> k8s
+plat -> api
+sig -> dsp1
+sig -> dsp2
+ops -> noc
+```
+
+</details>
+
+### `type mindmap`
+
+A root with branches either side of it. The same tree the orgchart draws, arranged outward instead of downward, so the root stays central however lopsided the tree is.
+
+```
+topic <id> ["label"]
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+| `row` | `row: <number>` | Distance between one level and the next. |
+| `spacing` | `spacing: <number>` | Distance between two siblings. |
+
+<details>
+<summary>A complete file — <code>examples/mindmap.bd</code></summary>
+
+```
+// The same tree as the orgchart, arranged outward — the root stays central
+// however lopsided the branches are (W-041).
+type mindmap { title: "What a diagram tool has to get right" row: 150 spacing: 22 }
+graph { background: #0b1120 padding: 30 }
+style topic { fill: #1e293b stroke: #38bdf8 1.3 font: 12 #e2e8f0 radius: 14 padding: 11 }
+
+topic root "A diagram tool"
+topic lay  "Layout"
+topic sty  "Style"
+topic chk  "Diagnostics"
+topic edit "Editor"
+topic decl "Declared, not solved"
+topic anch "Relative anchors"
+topic casc "A real cascade"
+topic hard "Unknown names are errors"
+topic span "Every error has a span"
+topic lsp  "One validator, two front ends"
+
+root -> lay
+root -> sty
+root -> chk
+root -> edit
+lay -> decl
+lay -> anch
+sty -> casc
+chk -> hard
+chk -> span
+edit -> lsp
+```
+
+</details>
+
+### `type treeview`
+
+The same tree as indented rows, one per line — a file listing, a menu, a taxonomy. Depth is the indent and order is the order written.
+
+```
+entry <id> ["label"]
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+| `row` | `row: <number>` | Distance between one level and the next. |
+| `spacing` | `spacing: <number>` | Distance between two siblings. |
+
+<details>
+<summary>A complete file — <code>examples/treeview.bd</code></summary>
+
+```
+// The same tree as indented rows — depth is the indent, order is the order
+// written (W-041).
+type treeview { title: "src/" row: 26 spacing: 14 }
+graph { background: #0b1120 padding: 28 }
+style entry { fill: #1e293b stroke: #334155 1 font: 12 #e2e8f0 radius: 4 padding: 8 }
+
+entry src     "src/"
+entry lib     "lib.rs"
+entry parser  "parser.rs"
+entry check   "check.rs"
+entry layout  "layout.rs"
+entry charts  "charts.rs"
+entry render  "render_svg.rs"
+entry lsp     "lsp.rs"
+
+src -> lib
+src -> parser
+src -> check
+src -> layout
+layout -> charts
+layout -> render
+src -> lsp
+```
+
+</details>
+
 ### `type harness`
 
 Wiring harnesses. A connector's pins are its member lines — `- 1: +12V` — and a wire is an edge carrying the pin it lands on at each end. Both mechanisms already existed; what this genre adds is that a wire is checked against the pins that are really there (`D-025`).

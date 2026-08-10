@@ -104,6 +104,8 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "venn" => check_venn(diagram, &mut out),
         #[cfg(feature = "harness")]
         "harness" => check_harness(diagram, &mut out),
+        #[cfg(any(feature = "orgchart", feature = "mindmap", feature = "treeview"))]
+        "orgchart" | "mindmap" | "treeview" => check_tree(diagram, &mut out),
         #[cfg(feature = "block")]
         "block" => check_block(diagram, &mut out),
         #[cfg(feature = "gantt")]
@@ -676,7 +678,8 @@ fn awaits_binding(node: &NodeDecl, def: &'static props::ArchetypeDef, name: &str
 /// boxes; the chart archetypes draw marks and take no box defaults.
 pub fn base_style(archetype: &str) -> crate::style::Style {
     match archetype {
-        "free" | "packet" | "bytefield" | "rack" | "network" => {
+        "free" | "packet" | "bytefield" | "rack" | "network" | "orgchart" | "mindmap"
+        | "treeview" => {
             crate::style::Style::node_defaults()
         }
         _ => crate::charts::chart_defaults(),
@@ -1241,6 +1244,80 @@ fn check_block(diagram: &Diagram, out: &mut Vec<Diag>) {
             ));
         }
     }
+}
+
+/// One engine, three genres, one set of things that stop it being a tree
+/// (`W-041`): a second parent, a cycle, or nothing to start from.
+#[cfg(any(feature = "orgchart", feature = "mindmap", feature = "treeview"))]
+fn check_tree(diagram: &Diagram, out: &mut Vec<Diag>) {
+    let archetype = archetype_of(diagram).name;
+    for node in &diagram.nodes {
+        if node.placement.is_some() {
+            out.push(Diag::warn(
+                node.span,
+                format!("`type {archetype}` places its own items; the placement is ignored"),
+            ));
+        }
+    }
+
+    let mut parent: HashMap<&str, &str> = HashMap::new();
+    let known: HashSet<&str> = diagram.nodes.iter().map(|n| n.id.as_str()).collect();
+
+    for edge in &diagram.edges {
+        let (from, to) = (edge.from.as_str(), edge.to.as_str());
+        if !known.contains(from) || !known.contains(to) {
+            continue;
+        }
+        if let Some(first) = parent.get(to) {
+            out.push(Diag::error(
+                edge.span,
+                format!(
+                    "`{to}` already reports to `{first}` — a tree gives each item one \
+                     parent, and the second line is the one nothing can draw"
+                ),
+            ));
+        } else {
+            parent.insert(to, from);
+        }
+    }
+
+    let roots: Vec<&str> = diagram
+        .nodes
+        .iter()
+        .map(|n| n.id.as_str())
+        .filter(|id| !parent.contains_key(id))
+        .collect();
+
+    if diagram.nodes.is_empty() {
+        return;
+    }
+    if roots.is_empty() {
+        out.push(Diag::error(
+            diagram
+                .archetype
+                .as_ref()
+                .map(|a| a.span)
+                .unwrap_or_default(),
+            "every item has a parent, so the hierarchy is a cycle and has no root"
+                .to_string(),
+        ));
+    } else if roots.len() > 1 && diagram.nodes.len() > 1 {
+        out.push(Diag::warn(
+            diagram
+                .archetype
+                .as_ref()
+                .map(|a| a.span)
+                .unwrap_or_default(),
+            format!(
+                "{} items have no parent ({}) — they are drawn as separate trees \
+                 side by side",
+                roots.len(),
+                roots.join(", ")
+            ),
+        ));
+    }
+
+    check_cycles_free(diagram, out);
 }
 
 /// A harness is a `class` box with a wire vocabulary. What it adds is the

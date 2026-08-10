@@ -1,0 +1,22 @@
+// The same tree as indented rows — depth is the indent, order is the order
+// written (W-041).
+type treeview { title: "src/" row: 26 spacing: 14 }
+graph { background: #0b1120 padding: 28 }
+style entry { fill: #1e293b stroke: #334155 1 font: 12 #e2e8f0 radius: 4 padding: 8 }
+
+entry src     "src/"
+entry lib     "lib.rs"
+entry parser  "parser.rs"
+entry check   "check.rs"
+entry layout  "layout.rs"
+entry charts  "charts.rs"
+entry render  "render_svg.rs"
+entry lsp     "lsp.rs"
+
+src -> lib
+src -> parser
+src -> check
+src -> layout
+layout -> charts
+layout -> render
+src -> lsp

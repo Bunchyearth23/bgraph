@@ -25,8 +25,8 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**Five chantiers are planned. No question is open and nothing is blocked.**
-Twenty-six archetypes ship and the library is embeddable. The parked ideas were
+**Four chantiers are planned. No question is open and nothing is blocked.**
+Twenty-nine archetypes ship and the library is embeddable. The parked ideas were
 reviewed on 2026-08-10 and every one of them moved: what was worth building
 became a work item, what was not was discarded, and the one language question
 the review raised was answered the same day (`D-023`). One idea is still parked,
@@ -41,7 +41,6 @@ Roughly by cost. Nothing here has started.
 |---|---|---|---|
 | `W-038` | planned | A VS Code extension, beside the Zed one | Same three pieces the Zed extension already has — the tree-sitter grammar, `bgraph-lsp`, and the highlight queries — repackaged for a second editor. VS Code takes a TextMate grammar or a WASM tree-sitter build rather than Zed's git-pinned one, and speaks LSP over a client the extension launches itself, so `src/lsp.rs` is reused unchanged. `X-009` applies here too: the queries are part of the grammar's public surface, and a stale one breaks the language rather than degrading. |
 | `W-040` | planned | Real font metrics instead of the estimate | **The only planned item that closes an open risk** — `X-005`. Every auto-sized box, every edge-label plate and every `check_contrast` measurement rests on `0.56 × font-size` per character today. Was `I-008`. |
-| `W-041` | planned | A tree layout engine — mindmap, treeview, org chart | Three genres for one engine, which is what makes it worth the cost. Hierarchy from group nesting already exists; `W-020` consumes it. Was `I-011`. |
 | `W-049` | planned | `type gitgraph` — commits, branches and merges | Expressible as nodes and edges, but the layout is the genre: branch rails, merge points, topological order. Its own placement engine, sharing nothing with `W-041`'s tree engine. Was `I-014`. |
 | `W-042` | planned | PNG and PDF export, from the CLI **and** from the library | The largest surface here. `D-014` is what makes it more than a convenience: a program embedding the library should not be forced to ship an SVG renderer to get a picture. Merges `I-007` and `I-015`, which were the same work seen from two ends. |
 
@@ -100,6 +99,7 @@ not copies.
 
 | id | date | title | commit |
 |---|---|---|---|
+| `W-041` | 2026-08-10 | A tree layout engine, and the three genres over it — `orgchart`, `mindmap`, `treeview`. Hierarchy from **edges**, not group nesting: an org chart is written `ceo -> cto`, and nesting a manager in a group *and* declaring them as a box would be two statements for one fact. The engine is the subtree-width pass — measure bottom-up, hand each child a disjoint slice — so siblings cannot overlap by construction and there is nothing to repair. One cargo feature each, per `W-028` | this commit |
 | `W-045` | 2026-08-10 | `type harness` — connectors whose pins are member lines, wires that carry the pin they land on at each end (`D-025`). No grammar moved. A wire is checked against the pins that are really there and against being wired twice — the two mistakes that make a harness drawing useless to whoever is holding the crimp tool. The line joins the connectors rather than the pin rows: `X-016` | this commit |
 | `W-053` | 2026-08-10 | `type venn` — overlapping sets. With **two** the centre distance is solved by bisection so the lens area is the number written; with **three** the overlaps are labelled but arranged, and `check` says so out loud; **four is refused**, naming an upset plot as the honest picture. Circles scale by area, not radius | this commit |
 | `W-043` | 2026-08-10 | `type network` — topology on the free path, per the `W-022` precedent: the archetype supplies the vocabulary, the shapes and the diagnostics, and the anchors still place. A `role` picks the outline and deliberately **not** the fill; `addr` is a line of the box, `speed` a line of the link; a `group` is a segment, and a host on no link and in no segment is reported | this commit |

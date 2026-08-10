@@ -48,6 +48,9 @@ all-archetypes = [
     "network",
     "venn",
     "harness",
+    "orgchart",
+    "mindmap",
+    "treeview",
     "class",
     "state",
 ]
@@ -73,6 +76,9 @@ rack = []
 network = []
 venn = []
 harness = []
+orgchart = []
+mindmap = []
+treeview = []
 class = []
 state = []
 

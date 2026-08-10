@@ -1,0 +1,28 @@
+// The same tree as the orgchart, arranged outward — the root stays central
+// however lopsided the branches are (W-041).
+type mindmap { title: "What a diagram tool has to get right" row: 150 spacing: 22 }
+graph { background: #0b1120 padding: 30 }
+style topic { fill: #1e293b stroke: #38bdf8 1.3 font: 12 #e2e8f0 radius: 14 padding: 11 }
+
+topic root "A diagram tool"
+topic lay  "Layout"
+topic sty  "Style"
+topic chk  "Diagnostics"
+topic edit "Editor"
+topic decl "Declared, not solved"
+topic anch "Relative anchors"
+topic casc "A real cascade"
+topic hard "Unknown names are errors"
+topic span "Every error has a span"
+topic lsp  "One validator, two front ends"
+
+root -> lay
+root -> sty
+root -> chk
+root -> edit
+lay -> decl
+lay -> anch
+sty -> casc
+chk -> hard
+chk -> span
+edit -> lsp
