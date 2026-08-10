@@ -55,3 +55,81 @@ function deactivate() {
 }
 
 module.exports = { activate, deactivate };
+
+// ---------------------------------------------------------- markdown preview
+
+/// A ```bgraph fence, rendered in the Markdown preview.
+///
+/// The single largest reason Mermaid gets used instead of something better:
+/// a diagram you can only see by leaving the document is one you stop keeping
+/// current.
+///
+/// It renders through the **wasm module bundled beside this file**, not
+/// through a `bgraph` on `PATH`. A preview that worked only for people who had
+/// already installed the CLI would miss exactly the readers it is for. The
+/// module is instantiated synchronously — `markdown-it`'s fence rule has no
+/// way to await — which the non-streaming `WebAssembly.Module` constructor
+/// allows in the extension host.
+let render;
+
+function loadRenderer() {
+  if (render !== undefined) return render;
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const bytes = fs.readFileSync(path.join(__dirname, '..', 'bgraph.wasm'));
+    const instance = new WebAssembly.Instance(new WebAssembly.Module(bytes), {});
+    const api = instance.exports;
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+
+    render = (source) => {
+      const input = encoder.encode(source);
+      const ptr = api.bgraph_alloc(input.length);
+      // A fresh view every call: the module's memory may have grown, and a
+      // view onto a detached buffer throws rather than reading stale bytes.
+      new Uint8Array(api.memory.buffer, ptr, input.length).set(input);
+      const at = api.bgraph_render(ptr, input.length);
+      const len = api.bgraph_result_len();
+      const answer = decoder.decode(new Uint8Array(api.memory.buffer, at, len));
+      api.bgraph_free(ptr, input.length);
+      return answer;
+    };
+  } catch (err) {
+    // No module bundled, or it failed to load. The fence falls back to a code
+    // block, which is what it was before — a preview that threw would take the
+    // whole document's rendering with it.
+    render = null;
+  }
+  return render;
+}
+
+function escapeHtml(text) {
+  return text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+}
+
+function extendMarkdownIt(md) {
+  const fallback = md.renderer.rules.fence.bind(md.renderer.rules);
+
+  md.renderer.rules.fence = (tokens, index, options, env, self) => {
+    const token = tokens[index];
+    if ((token.info || '').trim().split(/\s+/)[0] !== 'bgraph') {
+      return fallback(tokens, index, options, env, self);
+    }
+
+    const draw = loadRenderer();
+    if (!draw) return fallback(tokens, index, options, env, self);
+
+    const answer = draw(token.content);
+    // One channel, so there is nothing to forget to check: an error announces
+    // itself in the text the renderer returned.
+    if (answer.startsWith('error:')) {
+      return `<pre class="bgraph-error">${escapeHtml(answer)}</pre>`;
+    }
+    return `<div class="bgraph">${answer}</div>`;
+  };
+
+  return md;
+}
+
+module.exports.extendMarkdownIt = extendMarkdownIt;

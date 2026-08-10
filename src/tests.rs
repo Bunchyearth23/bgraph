@@ -8277,3 +8277,47 @@ fn the_manifest_still_refuses_to_publish_itself() {
     let manifest = include_str!("../Cargo.toml");
     assert!(manifest.contains("publish = false"), "{manifest}");
 }
+
+// ------------------------------------------------- Markdown preview (I-023)
+
+#[test]
+fn the_vs_code_extension_renders_a_bgraph_fence() {
+    // The single largest reason Mermaid gets used instead of something
+    // better: a diagram you can only see by leaving the document is one you
+    // stop keeping current.
+    let manifest = include_str!("../editors/vscode/package.json");
+    let extension = include_str!("../editors/vscode/src/extension.js");
+
+    assert!(
+        manifest.contains("\"markdown.markdownItPlugins\": true"),
+        "the extension does not offer itself to the Markdown preview"
+    );
+    assert!(
+        manifest.contains("onLanguage:markdown"),
+        "it would never activate on a Markdown file"
+    );
+    assert!(
+        extension.contains("extendMarkdownIt"),
+        "nothing is exported for the preview to call"
+    );
+}
+
+#[test]
+fn the_preview_renders_through_the_bundled_module_not_a_binary() {
+    // A preview that only worked for people who had already installed the CLI
+    // would miss exactly the readers it is for.
+    let extension = include_str!("../editors/vscode/src/extension.js");
+    let packaging = include_str!("../editors/vscode/package.sh");
+
+    assert!(extension.contains("bgraph.wasm"), "{extension}");
+    assert!(
+        packaging.contains("bgraph.wasm"),
+        "the VSIX would ship without the renderer"
+    );
+    // And a missing module must degrade to a code block rather than take the
+    // document's rendering down with it.
+    assert!(
+        extension.contains("fallback(tokens, index, options, env, self)"),
+        "there is no fallback for a fence it cannot draw"
+    );
+}

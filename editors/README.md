@@ -52,9 +52,23 @@ cd editors/vscode
 code --install-extension bgraph-0.1.0.vsix
 ```
 
+### Diagrams in the Markdown preview
+
+A ` ```bgraph ` fence is drawn in VS Code's Markdown preview. It renders
+through the wasm module bundled in the extension, not through a `bgraph` on
+`PATH` — a preview that only worked for people who had already installed the
+CLI would miss exactly the readers it is for. `package.sh` builds and bundles
+that module; without it the fence quietly falls back to a code block rather
+than taking the document's rendering down.
+
 ## Zed
 
 Packaged in `editors/zed`. See its own README.
+
+**No Markdown preview there.** Zed's extension API has no hook for extending
+its Markdown rendering, so this is a limit of the editor rather than a piece
+of work left undone — writing it is not possible today. `bgraph watch` beside
+the editor is the answer meanwhile.
 
 ---
 

@@ -24,3 +24,4 @@
 /out
 playground/bgraph.wasm
 playground/standalone.html
+editors/vscode/bgraph.wasm
