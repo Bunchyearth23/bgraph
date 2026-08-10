@@ -123,6 +123,7 @@ const EXAMPLES: &[(&str, &str)] = &[
     ("network", include_str!("../examples/network.bd")),
     ("venn", include_str!("../examples/venn.bd")),
     ("harness", include_str!("../examples/harness.bd")),
+    ("gitgraph", include_str!("../examples/gitgraph.bd")),
     ("orgchart", include_str!("../examples/orgchart.bd")),
     ("mindmap", include_str!("../examples/mindmap.bd")),
     ("treeview", include_str!("../examples/treeview.bd")),

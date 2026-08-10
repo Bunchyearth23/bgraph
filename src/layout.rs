@@ -348,6 +348,8 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         "rack" => return crate::charts::rack(diagram, opts, &registry),
         #[cfg(feature = "venn")]
         "venn" => return crate::charts::venn(diagram, opts, &registry),
+        #[cfg(feature = "gitgraph")]
+        "gitgraph" => return crate::charts::gitgraph(diagram, opts, &registry),
         #[cfg(feature = "orgchart")]
         "orgchart" => {
             return crate::charts::tree(diagram, opts, &registry, crate::charts::TreeKind::Org);

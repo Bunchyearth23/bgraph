@@ -1087,6 +1087,63 @@ field urg   "Urgent pointer"      144 159
 
 </details>
 
+### `type gitgraph`
+
+Commits, branches and merges. Parentage is the edges — `c1 -> c2` is c2's parent — and a commit with two parents is a merge. The rails are the archetype's to assign; what the author declares is which branch a commit is on and what came before it.
+
+```
+commit <id> ["label"] <branch>
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+| `branches` | `branches: "<name>" "<name>" …` | The rails, top to bottom. A commit on a branch not named here gets a rail of its own at the bottom, in the order first seen. |
+| `spacing` | `spacing: <along> <between>` | Distance between two commits on a rail, and between two rails. |
+
+On a `commit` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `branch` | node | `branch: "<name>"` | Which rail the commit sits on. Usually written positionally — `commit c3 "Fix the ruler" "main"`. |
+| `tag` | node | `tag: "<name>"` | A label drawn beside the commit — a release, a marker. |
+
+<details>
+<summary>A complete file — <code>examples/gitgraph.bd</code></summary>
+
+```
+// Parentage is the edges; the rails are the archetype's to assign. The author
+// still declares every commit and what came before it (W-049).
+type gitgraph {
+  title: "A release, with a hotfix"
+  branches: "main" "feature" "hotfix"
+  spacing: 96 62
+}
+
+graph { background: #0b1120 padding: 30 }
+style commit { font: 11 #e2e8f0 }
+
+// `commit <id> ["message"] <branch>`
+commit c1 "init"        "main"
+commit c2 "parser"      "main" { tag: "v0.1" }
+commit f1 "scatter"     "feature"
+commit f2 "radar"       "feature"
+commit c3 "merge"       "main"
+commit h1 "fix the U1"  "hotfix"
+commit c4 "merge fix"   "main" { tag: "v0.2" }
+
+c1 -> c2
+c2 -> f1
+f1 -> f2
+c2 -> c3
+f2 -> c3
+c3 -> h1
+c3 -> c4
+h1 -> c4
+```
+
+</details>
+
 ### `type orgchart`
 
 Reporting lines, laid out top-down. The hierarchy comes from the edges — `ceo -> cto` — and the archetype places every box, so adding a report never means renumbering anything.

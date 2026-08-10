@@ -48,6 +48,7 @@ all-archetypes = [
     "network",
     "venn",
     "harness",
+    "gitgraph",
     "orgchart",
     "mindmap",
     "treeview",
@@ -76,6 +77,7 @@ rack = []
 network = []
 venn = []
 harness = []
+gitgraph = []
 orgchart = []
 mindmap = []
 treeview = []

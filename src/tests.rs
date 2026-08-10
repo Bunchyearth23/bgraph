@@ -633,6 +633,62 @@ fn a_packet_field_needs_bits() {
     assert!(err("type packet\nnode a \"A\"").contains("has no `bits`"));
 }
 
+// ---------------------------------------------------------------------- W-049
+
+#[cfg(test)]
+const HISTORY: &str = "type gitgraph { branches: \"main\" \"side\" spacing: 100 60 }\n\
+     commit c1 \"one\" \"main\"\ncommit s1 \"two\" \"side\"\ncommit c2 \"merge\" \"main\"\n\
+     c1 -> s1\nc1 -> c2\ns1 -> c2\n";
+
+#[test]
+fn a_commit_sits_one_step_past_its_latest_parent() {
+    // A merge has to land after *both* sides of it, or the picture shows
+    // history arriving before what it merges.
+    let l = build(HISTORY);
+    let x = |i: usize| l.nodes[i].rect.x;
+    assert!(x(1) > x(0), "s1 follows c1");
+    assert!(x(2) > x(1), "the merge follows both parents");
+}
+
+#[test]
+fn a_branch_is_a_rail_and_the_rails_are_declared_order() {
+    let l = build(HISTORY);
+    let y = |i: usize| l.nodes[i].rect.y;
+    assert_eq!(y(0), y(2), "c1 and c2 share the main rail");
+    assert!(y(1) > y(0), "side sits below main, as `branches` lists them");
+
+    // A branch nobody declared still gets a rail, at the bottom.
+    let l = build(
+        "type gitgraph { branches: \"main\" }\n\
+         commit a \"a\" \"main\"\ncommit b \"b\" \"other\"\na -> b\n",
+    );
+    assert!(l.nodes[1].rect.y > l.nodes[0].rect.y);
+}
+
+#[test]
+fn a_merge_is_two_parents_and_two_lines() {
+    let l = build(HISTORY);
+    assert_eq!(l.polylines.len(), 3, "three parent links");
+}
+
+#[test]
+fn a_history_written_backwards_is_refused() {
+    // The layout numbers steps in declaration order, so a parent written
+    // after its child would be measured against a depth that does not exist.
+    let e = err(
+        "type gitgraph\ncommit b \"b\" \"main\"\ncommit a \"a\" \"main\"\na -> b\n",
+    );
+    assert!(e.contains("declared after it"), "{e}");
+
+    let d = diags(
+        "type gitgraph\ncommit a \"a\" \"main\"\ncommit b \"b\" \"main\"\n",
+    );
+    assert!(
+        d.iter().any(|x| x.message.contains("no parent")),
+        "{d:?}"
+    );
+}
+
 // ---------------------------------------------------------------------- W-041
 
 #[cfg(test)]
@@ -1527,6 +1583,8 @@ fn each_data_property_belongs_to_exactly_the_genres_that_read_it() {
         ("bytes", &["bytefield"]),
         ("u", &["rack"]),
         ("wire", &["harness"]),
+        ("branch", &["gitgraph"]),
+        ("tag", &["gitgraph"]),
         ("count", &["venn"]),
         ("shared", &["venn"]),
         ("role", &["network"]),

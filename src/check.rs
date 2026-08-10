@@ -106,6 +106,8 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "harness" => check_harness(diagram, &mut out),
         #[cfg(any(feature = "orgchart", feature = "mindmap", feature = "treeview"))]
         "orgchart" | "mindmap" | "treeview" => check_tree(diagram, &mut out),
+        #[cfg(feature = "gitgraph")]
+        "gitgraph" => check_gitgraph(diagram, &mut out),
         #[cfg(feature = "block")]
         "block" => check_block(diagram, &mut out),
         #[cfg(feature = "gantt")]
@@ -679,7 +681,7 @@ fn awaits_binding(node: &NodeDecl, def: &'static props::ArchetypeDef, name: &str
 pub fn base_style(archetype: &str) -> crate::style::Style {
     match archetype {
         "free" | "packet" | "bytefield" | "rack" | "network" | "orgchart" | "mindmap"
-        | "treeview" => {
+        | "treeview" | "harness" => {
             crate::style::Style::node_defaults()
         }
         _ => crate::charts::chart_defaults(),
@@ -1243,6 +1245,64 @@ fn check_block(diagram: &Diagram, out: &mut Vec<Diag>) {
                 "a block carries a `description`, not members".to_string(),
             ));
         }
+    }
+}
+
+/// A history has one rule the picture cannot survive breaking: a commit must
+/// come after its parents. Everything else — how many parents, which rail — is
+/// the author's business (`W-049`).
+#[cfg(feature = "gitgraph")]
+fn check_gitgraph(diagram: &Diagram, out: &mut Vec<Diag>) {
+    warn_ignored_placement(diagram, "gitgraph", out);
+    check_cycles_free(diagram, out);
+
+    let order: HashMap<&str, usize> = diagram
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.id.as_str(), i))
+        .collect();
+
+    let mut parents: HashMap<&str, usize> = HashMap::new();
+    for edge in &diagram.edges {
+        let (Some(&parent), Some(&child)) = (
+            order.get(edge.from.as_str()),
+            order.get(edge.to.as_str()),
+        ) else {
+            continue;
+        };
+        // The layout walks commits in declaration order to number the steps,
+        // so a parent written after its child would be measured against a
+        // depth that does not exist yet — and the picture would show history
+        // running backwards.
+        if parent >= child {
+            out.push(Diag::error(
+                edge.span,
+                format!(
+                    "`{}` is a parent of `{}` but is declared after it — write a \
+                     history in the order it happened",
+                    edge.from.as_str(),
+                    edge.to.as_str()
+                ),
+            ));
+        }
+        *parents.entry(edge.to.as_str()).or_insert(0) += 1;
+    }
+
+    let roots = diagram
+        .nodes
+        .iter()
+        .filter(|n| !parents.contains_key(n.id.as_str()))
+        .count();
+    if roots > 1 {
+        out.push(Diag::warn(
+            diagram
+                .archetype
+                .as_ref()
+                .map(|a| a.span)
+                .unwrap_or_default(),
+            format!("{roots} commits have no parent — a history usually has one root"),
+        ));
     }
 }
 

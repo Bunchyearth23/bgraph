@@ -169,6 +169,9 @@ pub struct Style {
     pub verify: Option<String>,
     /// `type requirements` — what a relation asserts, read tail to head.
     pub link: Option<String>,
+    /// `type gitgraph` — which rail a commit sits on, and any tag beside it.
+    pub branch: Option<String>,
+    pub tag: Option<String>,
     /// `type harness` — the pin a wire lands on at each end.
     pub wire: Option<(u32, u32)>,
     /// `type venn` — how many things are in a set, and how many two share.
@@ -252,6 +255,8 @@ impl Style {
             risk,
             verify,
             link,
+            branch,
+            tag,
             wire,
             set_size,
             shared,
@@ -461,6 +466,8 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
         "link" => style.link = first.and_then(|x| x.as_word()).map(String::from),
         "limit" => style.limit = first.and_then(|x| x.as_num()),
         "scores" => style.scores = Some(v.iter().filter_map(|x| x.as_num()).collect()),
+        "branch" => style.branch = first.and_then(|x| x.as_text()).map(String::from),
+        "tag" => style.tag = first.and_then(|x| x.as_text()).map(String::from),
         "wire" => {
             let a = first.and_then(|x| x.as_num()).unwrap_or(0.0).max(0.0) as u32;
             let b = v

@@ -34,6 +34,7 @@ type rack       // device srv "Compute" 38 41 — U38 to U41
 type network    // host fw "Firewall" firewall
 type venn       // set a "A" 210, then a -> b 85
 type harness    // connector j1 "J1" { - 1: +12V }, then j1 -> j2 1 3
+type gitgraph   // commit c1 "init" "main", then c1 -> c2
 type orgchart   // position cto "CTO", then cto -> lead
 type mindmap    // topic root "Root", then root -> branch
 type treeview   // entry src "src/", then src -> lib

@@ -567,6 +567,54 @@ pub const STATE_ITEM_PROPS: &[PropDef] = &[
 /// router from a storage array before reading the label.
 /// One engine, three genres. The settings are shared because the differences
 /// are in the arrangement, not in what an author has to say about it.
+pub const GITGRAPH_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the diagram.",
+    },
+    PropDef {
+        name: "branches",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "branches: \"<name>\" \"<name>\" …",
+        doc: "The rails, top to bottom. A commit on a branch not named here \
+              gets a rail of its own at the bottom, in the order first seen.",
+    },
+    PropDef {
+        name: "spacing",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "spacing: <along> <between>",
+        doc: "Distance between two commits on a rail, and between two rails.",
+    },
+];
+
+pub const GITGRAPH_ITEM_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "branch",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "branch: \"<name>\"",
+        doc: "Which rail the commit sits on. Usually written positionally — \
+              `commit c3 \"Fix the ruler\" \"main\"`.",
+    },
+    PropDef {
+        name: "tag",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "tag: \"<name>\"",
+        doc: "A label drawn beside the commit — a release, a marker.",
+    },
+];
+
 pub const TREE_PROPS: &[PropDef] = &[
     PropDef {
         name: "title",
@@ -1313,6 +1361,24 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         slots: &[Slot {
             prop: "bits",
             arity: 2,
+        }],
+        members: false,
+        alt_items: &[],
+        edge_slots: &[],
+    },
+    #[cfg(feature = "gitgraph")]
+    ArchetypeDef {
+        name: "gitgraph",
+        item: "commit",
+        doc: "Commits, branches and merges. Parentage is the edges — \
+              `c1 -> c2` is c2's parent — and a commit with two parents is a \
+              merge. The rails are the archetype's to assign; what the author \
+              declares is which branch a commit is on and what came before it.",
+        props: GITGRAPH_PROPS,
+        item_props: GITGRAPH_ITEM_PROPS,
+        slots: &[Slot {
+            prop: "branch",
+            arity: 1,
         }],
         members: false,
         alt_items: &[],

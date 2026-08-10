@@ -387,6 +387,240 @@ struct Granularity {
     step: u32,
 }
 
+/// Commits on rails, with the lines between them.
+///
+/// Parentage is the edges — `c1 -> c2` makes c1 the parent — and a commit with
+/// two parents is a merge. The **rails** are the archetype's to assign, which
+/// is the only auto-placement here: the author still declares every commit,
+/// its branch and what came before it. That is the line `D-001` draws, and it
+/// is why this is not `I-004` in disguise.
+#[cfg(feature = "gitgraph")]
+pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
+    use std::collections::HashMap;
+
+    let cfg = &diagram.archetype_props;
+    let theme = Theme::of(&opts);
+    let def = crate::check::archetype_of(diagram);
+    let palette = theme.palette();
+
+    let along = setting(cfg, "spacing")
+        .and_then(|v| v.first())
+        .and_then(|v| v.as_num())
+        .unwrap_or(78.0)
+        .max(24.0);
+    let between = setting(cfg, "spacing")
+        .and_then(|v| v.get(1))
+        .and_then(|v| v.as_num())
+        .unwrap_or(58.0)
+        .max(20.0);
+    let title = text(cfg, "title");
+    let declared: Vec<String> = setting(cfg, "branches")
+        .map(|v| {
+            v.iter()
+                .filter_map(|x| x.as_text())
+                .map(String::from)
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
+
+    // Rails: the declared order first, then any branch met along the way, in
+    // the order it is first seen — so a file that names none still reads in
+    // the order it was written.
+    let mut rails: Vec<String> = declared.clone();
+    let mut commits = Vec::new();
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        let style = registry.resolve(
+            chart_defaults(),
+            def.item,
+            &node.classes,
+            &node.props_for(def),
+        )?;
+        let branch = style.branch.clone().unwrap_or_else(|| "main".to_string());
+        if !rails.contains(&branch) {
+            rails.push(branch.clone());
+        }
+        let label = node.label.clone().unwrap_or_else(|| node.id.value.clone());
+        commits.push((node.id.value.clone(), label, branch, style, i));
+    }
+
+    let rail_of: HashMap<&str, usize> = rails
+        .iter()
+        .enumerate()
+        .map(|(i, name)| (name.as_str(), i))
+        .collect();
+    let index: HashMap<&str, usize> = commits
+        .iter()
+        .enumerate()
+        .map(|(i, (id, _, _, _, _))| (id.as_str(), i))
+        .collect();
+
+    // Topological order along the rail: a commit sits one step past its
+    // latest parent, so a merge lands after both sides of it.
+    let mut parents: Vec<Vec<usize>> = vec![Vec::new(); commits.len()];
+    for edge in &diagram.edges {
+        if let (Some(&a), Some(&b)) = (index.get(edge.from.as_str()), index.get(edge.to.as_str())) {
+            parents[b].push(a);
+        }
+    }
+    let mut step = vec![0usize; commits.len()];
+    // Declaration order is a valid topological order for any graph `check`
+    // accepts, since it refuses a parent declared after its child.
+    for i in 0..commits.len() {
+        step[i] = parents[i]
+            .iter()
+            .map(|p| step[*p] + 1)
+            .max()
+            .unwrap_or(0);
+    }
+
+    let title_h = if title.is_some() {
+        TITLE_SIZE * 2.0
+    } else {
+        0.0
+    };
+    let gutter = rails
+        .iter()
+        .map(|r| text_width(std::slice::from_ref(r), 11.0))
+        .fold(0.0_f64, f64::max)
+        + 16.0;
+    const DOT: f64 = 13.0;
+
+    let at = |i: usize| -> (f64, f64) {
+        let rail = rail_of
+            .get(commits[i].2.as_str())
+            .copied()
+            .unwrap_or(0);
+        (
+            gutter + step[i] as f64 * along + DOT / 2.0,
+            title_h + 18.0 + rail as f64 * between,
+        )
+    };
+
+    let mut polylines = Vec::new();
+    let mut nodes = Vec::new();
+    let mut annotations = Vec::new();
+
+    if let Some(title) = title {
+        annotations.push(Annotation {
+            text: title,
+            x: 0.0,
+            y: TITLE_SIZE,
+            anchor: Anchor::Start,
+            size: TITLE_SIZE,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    // The rail names, down the left.
+    for (r, name) in rails.iter().enumerate() {
+        annotations.push(Annotation {
+            text: name.clone(),
+            x: gutter - 10.0,
+            y: title_h + 22.0 + r as f64 * between,
+            anchor: Anchor::End,
+            size: 11.0,
+            color: palette[r.min(palette.len() - 1)].to_string(),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    // Parent lines first, so a dot always sits on top of the line into it.
+    for (child, ps) in parents.iter().enumerate() {
+        for parent in ps {
+            let (px, py) = at(*parent);
+            let (cx, cy) = at(child);
+            let rail = rail_of
+                .get(commits[child].2.as_str())
+                .copied()
+                .unwrap_or(0);
+            let colour = palette[rail.min(palette.len() - 1)].to_string();
+            // An elbow when the rails differ: a straight diagonal across three
+            // rails reads as touching every one it crosses.
+            let points = if (py - cy).abs() < 0.5 {
+                vec![(px, py), (cx, cy)]
+            } else {
+                vec![(px, py), (cx - along * 0.45, py), (cx, cy)]
+            };
+            polylines.push(Polyline {
+                points,
+                closed: false,
+                fill: None,
+                stroke: Some(colour),
+                width: 1.6,
+                head: None,
+                dash: None,
+            });
+        }
+    }
+
+    for (i, (_, label, branch, style, _)) in commits.iter().enumerate() {
+        let (x, y) = at(i);
+        let rail = rail_of.get(branch.as_str()).copied().unwrap_or(0);
+        let colour = style
+            .fill
+            .clone()
+            .unwrap_or_else(|| palette[rail.min(palette.len() - 1)].to_string());
+
+        nodes.push(PlacedNode {
+            lines: Vec::new(),
+            rect: Rect {
+                x: x - DOT / 2.0,
+                y: y - DOT / 2.0,
+                w: DOT,
+                h: DOT,
+            },
+            style: Style {
+                fill: Some(colour.clone()),
+                stroke: Some(theme.surface.clone()),
+                stroke_width: Some(2.0),
+                shape: Some(Shape::Ellipse),
+                ..style.clone()
+            },
+        });
+
+        // The message above the dot, any tag below it — two lines that never
+        // compete for the same place.
+        annotations.push(Annotation {
+            text: label.clone(),
+            x,
+            y: y - DOT,
+            anchor: Anchor::Middle,
+            size: 11.0,
+            color: ink(&base, &theme),
+            weight: "400".into(),
+            family: family(&base),
+        });
+        if let Some(tag) = &style.tag {
+            annotations.push(Annotation {
+                text: format!("⌾ {tag}"),
+                x,
+                y: y + DOT + 6.0,
+                anchor: Anchor::Middle,
+                size: 10.0,
+                color: colour,
+                weight: "600".into(),
+                family: family(&base),
+            });
+        }
+    }
+
+    Ok(Layout {
+        guides: Vec::new(),
+        polylines,
+        groups: Vec::new(),
+        nodes,
+        edges: Vec::new(),
+        opts,
+        chart: Chart::Free,
+        annotations,
+    })
+}
+
 /// Which arrangement a tree is drawn in. The engine below is one; only the
 /// axes and the starting point change (`W-041`).
 #[cfg(any(feature = "orgchart", feature = "mindmap", feature = "treeview"))]
