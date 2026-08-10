@@ -186,6 +186,7 @@ impl State {
         self.text.push('\n');
 
         expand(&mut diagram, &path)?;
+        read_data(&mut diagram, &path)?;
         shift(&mut diagram, base);
         if let Some(prefix) = prefix {
             qualify(&mut diagram, prefix);
@@ -248,6 +249,129 @@ impl State {
         d.edges.extend(other.edges);
         Ok(())
     }
+}
+
+/// `type pie { from: "sales.csv" }` — read the items from a table.
+///
+/// The short path for the plain case. The template engine already reads CSV
+/// and fills holes, and that stays the answer when the *shape* varies; this is
+/// for when only the rows do.
+///
+/// Resolved here rather than in the layout because this is where a file has a
+/// path to resolve against, and because `D-029` keeps `render_source` free of
+/// the filesystem. The consequence is worth stating rather than discovering:
+/// **a diagram that reads the disk at render time is no longer autonomous** —
+/// `check` can pass on the text and the render still fail because the table
+/// moved. The diagnostic names the file, which is the least this owes.
+#[cfg(feature = "csv")]
+fn read_data(diagram: &mut Diagram, from: &Path) -> Result<()> {
+    use crate::ast::{NodeDecl, Span, Spanned, Value};
+
+    let Some(prop) = diagram
+        .archetype_props
+        .iter()
+        .find(|p| p.name == "from")
+        .cloned()
+    else {
+        return Ok(());
+    };
+    let Some(Value::Str(file)) = prop.values.first().cloned() else {
+        bail!("`from` needs a file name in quotes");
+    };
+
+    let def = crate::check::archetype_of(diagram);
+    let target = from.parent().unwrap_or_else(|| Path::new(".")).join(&file);
+    let raw = std::fs::read_to_string(&target)
+        .with_context(|| format!("`from: \"{file}\"` in {}", from.display()))?;
+
+    let mut lines = raw.lines().filter(|l| !l.trim().is_empty());
+    let header: Vec<String> = lines
+        .next()
+        .map(|l| l.split(',').map(|c| c.trim().to_lowercase()).collect())
+        .unwrap_or_default();
+    if header.is_empty() {
+        bail!(
+            "{} is empty — the first line names the columns",
+            target.display()
+        );
+    }
+
+    let column = |want: &str| header.iter().position(|c| c == want);
+    // By header name, which is the least surprising rule: a table whose
+    // columns are in a different order still reads correctly, and one missing
+    // a column says which.
+    let name_at = column("name")
+        .or_else(|| column("label"))
+        .or_else(|| column("id"));
+    let Some(name_at) = name_at else {
+        bail!(
+            "{} has no `name` column — its columns are: {}",
+            target.display(),
+            header.join(", ")
+        );
+    };
+
+    let mut wanted = Vec::new();
+    for slot in def.slots {
+        let Some(at) = column(slot.prop) else {
+            bail!(
+                "{} has no `{}` column, which `type {}` needs — its columns are: {}",
+                target.display(),
+                slot.prop,
+                def.name,
+                header.join(", ")
+            );
+        };
+        wanted.push(at);
+    }
+
+    for (n, line) in lines.enumerate() {
+        let cells: Vec<&str> = line.split(',').map(|c| c.trim()).collect();
+        let Some(label) = cells.get(name_at) else {
+            bail!("{}: row {} is short of the header", target.display(), n + 1);
+        };
+        let positional: Vec<Value> = wanted
+            .iter()
+            .filter_map(|at| cells.get(*at))
+            .map(|cell| match cell.parse::<f64>() {
+                Ok(n) => Value::Num(n),
+                Err(_) => Value::Word(cell.to_string()),
+            })
+            .collect();
+
+        // The span of the `from` property: every row came from one statement,
+        // and pointing a diagnostic at it is pointing at the truth.
+        let at = |value: String| Spanned {
+            value,
+            span: prop.span,
+        };
+        diagram.nodes.push(NodeDecl {
+            keyword: at(def.item.to_string()),
+            // Row-numbered rather than derived from the label: a label may
+            // repeat, contain spaces, or be empty, and none of those may
+            // become an identifier collision.
+            id: at(format!("row{}", n + 1)),
+            label: Some(label.to_string()),
+            positional,
+            positional_span: prop.span,
+            classes: Vec::new(),
+            placement: None,
+            props: Vec::new(),
+            members: Vec::new(),
+            span: prop.span,
+        });
+    }
+
+    let _ = Span::default();
+    Ok(())
+}
+
+#[cfg(not(feature = "csv"))]
+fn read_data(diagram: &mut Diagram, _from: &Path) -> Result<()> {
+    if diagram.archetype_props.iter().any(|p| p.name == "from") {
+        bail!("this build has no CSV reader — rebuild with the `csv` feature");
+    }
+    Ok(())
 }
 
 /// Place every `use`, and drop the `component` declarations that fed them.

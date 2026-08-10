@@ -7781,3 +7781,93 @@ fn a_box_nudged_by_a_neighbours_label_is_not_called_moved() {
         "a still diagram reported a move"
     );
 }
+
+// ------------------------------------------------- reading a table (I-048)
+
+#[cfg(feature = "csv")]
+#[test]
+fn a_chart_can_read_its_rows_from_a_table() {
+    let dir = scratch("from-csv");
+    std::fs::write(
+        dir.join("sales.csv"),
+        "name,value\nOrganic search,4820\nDirect,2410\nReferral,1180\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("main.bd"),
+        "type pie { title: \"From a table\" from: \"sales.csv\" }\n",
+    )
+    .unwrap();
+
+    let composed = crate::compose::load(&dir.join("main.bd")).expect("it composes");
+    assert_eq!(composed.diagram.nodes.len(), 3);
+    let l = crate::layout::solve(&composed.diagram).expect("it draws");
+    assert!(
+        l.annotations.iter().any(|a| a.text.starts_with("Organic")),
+        "the labels did not come through"
+    );
+}
+
+#[cfg(feature = "csv")]
+#[test]
+fn columns_are_matched_by_name_and_not_by_position() {
+    // A table whose columns are in a different order still reads correctly,
+    // which is the whole reason the header is the contract.
+    let dir = scratch("from-order");
+    std::fs::write(dir.join("t.csv"), "value,name\n40,A\n60,B\n").unwrap();
+    std::fs::write(dir.join("main.bd"), "type pie { from: \"t.csv\" }\n").unwrap();
+
+    let composed = crate::compose::load(&dir.join("main.bd")).expect("it composes");
+    assert_eq!(composed.diagram.nodes[0].label.as_deref(), Some("A"));
+}
+
+#[cfg(feature = "csv")]
+#[test]
+fn a_missing_column_says_which_and_lists_what_is_there() {
+    let dir = scratch("from-missing");
+    std::fs::write(dir.join("t.csv"), "label,amount\nA,1\n").unwrap();
+    std::fs::write(dir.join("main.bd"), "type pie { from: \"t.csv\" }\n").unwrap();
+
+    let message = format!(
+        "{:#}",
+        crate::compose::load(&dir.join("main.bd")).expect_err("no `value` column")
+    );
+    assert!(message.contains("value"), "{message}");
+    assert!(message.contains("amount"), "{message}");
+}
+
+#[cfg(feature = "csv")]
+#[test]
+fn a_missing_table_names_the_file_that_asked_for_it() {
+    // The consequence this feature accepts: a diagram that reads the disk at
+    // render time is no longer autonomous, so the diagnostic owes the reader
+    // both names.
+    let dir = scratch("from-gone");
+    std::fs::write(dir.join("main.bd"), "type pie { from: \"nope.csv\" }\n").unwrap();
+
+    let message = format!(
+        "{:#}",
+        crate::compose::load(&dir.join("main.bd")).expect_err("no such table")
+    );
+    assert!(message.contains("nope.csv"), "{message}");
+    assert!(message.contains("main.bd"), "{message}");
+}
+
+#[cfg(feature = "csv")]
+#[test]
+fn rows_are_numbered_rather_than_named_after_their_labels() {
+    // A label may repeat, contain spaces or be empty. None of those may
+    // become an identifier collision.
+    let dir = scratch("from-ids");
+    std::fs::write(dir.join("t.csv"), "name,value\nA,1\nA,2\n").unwrap();
+    std::fs::write(dir.join("main.bd"), "type pie { from: \"t.csv\" }\n").unwrap();
+
+    let composed = crate::compose::load(&dir.join("main.bd")).expect("duplicate labels are fine");
+    let ids: Vec<&str> = composed
+        .diagram
+        .nodes
+        .iter()
+        .map(|n| n.id.as_str())
+        .collect();
+    assert_eq!(ids, ["row1", "row2"]);
+}

@@ -1661,6 +1661,18 @@ pub const TOGGLE: &[&str] = &["on", "off", "true", "false"];
 
 pub const PIE_PROPS: &[PropDef] = &[
     PropDef {
+        name: "from",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "from: \"<file.csv>\"",
+        doc: "Read the slices from a CSV, resolved relative to this file. The \
+              header names the columns: `name` (or `label`) and `value`. \
+              Carries a consequence worth knowing — a file that reads the disk \
+              at render time is no longer autonomous, so `check` can pass and \
+              the render still fail.",
+    },
+    PropDef {
         name: "top",
         alias: false,
         ctx: Ctx::Both,

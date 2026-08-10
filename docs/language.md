@@ -278,6 +278,28 @@ Angles are hard to compare. `check` warns when a pie has fewer than three
 slices — a bar or a single number reads better — and when it has more than
 eight, which exhausts the palette.
 
+A pie can also read its slices from a table:
+
+```bgraph
+type pie { title: "Traffic sources" from: "sales.csv" }
+```
+
+```
+name,value
+Organic search,4820
+Direct,2410
+```
+
+Columns are matched by **header name**, not by position, so a table whose
+columns are in a different order still reads correctly and one missing a
+column says which. The path resolves relative to the file that wrote it.
+
+This carries a consequence worth knowing rather than discovering: a diagram
+that reads the disk at render time is **no longer autonomous**. `check` can
+pass on the text and the render still fail because the table moved — so the
+diagnostic names both files. The template engine remains the answer when the
+*shape* varies; `from` is for when only the rows do.
+
 `top: 8` takes that advice for you: the largest eight are kept and the rest
 are folded into one slice, named `"Other"` unless `other:` says otherwise.
 The total stays honest, and the fold is the same on every run — sorted by

@@ -320,6 +320,7 @@ slice <id> ["label"] <value>
 
 | Setting | Syntax | Meaning |
 |---|---|---|
+| `from` | `from: "<file.csv>"` | Read the slices from a CSV, resolved relative to this file. The header names the columns: `name` (or `label`) and `value`. Carries a consequence worth knowing — a file that reads the disk at render time is no longer autonomous, so `check` can pass and the render still fail. |
 | `top` | `top: <number>` | Keep the largest n slices and fold the rest into one. The palette has eight colours and `check` already advises this when a pie has more; `top` is what lets the file do it instead of someone doing the arithmetic by hand outside the tool. |
 | `other` | `other: <text>` | What the folded slice is called. `"Other"` unless the file says otherwise. |
 | `title` | `title: <text>` | Heading drawn above the chart. |
