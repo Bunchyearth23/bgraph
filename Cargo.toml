@@ -40,6 +40,7 @@ all-archetypes = [
     "timeline",
     "block",
     "er",
+    "requirements",
     "class",
     "state",
 ]
@@ -57,6 +58,7 @@ gantt = []
 timeline = []
 block = []
 er = []
+requirements = []
 class = []
 state = []
 

@@ -561,6 +561,55 @@ pub const STATE_ITEM_PROPS: &[PropDef] = &[
     },
 ];
 
+/// The SysML relation vocabulary, verb stems. Read tail-to-head:
+/// `r2 -> r1 derive` is r2 derives from r1.
+pub const REQ_LINKS: &[&str] = &["derive", "satisfy", "verify", "refine", "trace", "copy"];
+
+pub const REQ_RISKS: &[&str] = &["low", "medium", "high"];
+
+pub const REQ_VERIFY: &[&str] = &["analysis", "demonstration", "inspection", "test"];
+
+pub const REQUIREMENT_PROPS: &[PropDef] = &[PropDef {
+    name: "title",
+    alias: false,
+    ctx: Ctx::Both,
+    words: &[],
+    syntax: "title: <text>",
+    doc: "Heading drawn above the diagram.",
+}];
+
+pub const REQUIREMENT_ITEM_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "risk",
+        alias: false,
+        ctx: Ctx::Node,
+        words: REQ_RISKS,
+        syntax: "risk: <low|medium|high>",
+        doc: "How likely this requirement is to go unmet. Drawn under the \
+              name, not as a colour — risk is ordinal and the categorical \
+              palette would imply it is not.",
+    },
+    PropDef {
+        name: "verify",
+        alias: false,
+        ctx: Ctx::Node,
+        words: REQ_VERIFY,
+        syntax: "verify: <analysis|demonstration|inspection|test>",
+        doc: "How the requirement will be shown to be met. A requirement with \
+              no stated method is one nobody has planned to check.",
+    },
+    PropDef {
+        name: "link",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: REQ_LINKS,
+        syntax: "link: <derive|satisfy|verify|refine|trace|copy>",
+        doc: "What the relation asserts, read tail to head — `r2 -> r1 derive` \
+              is r2 derives from r1. Drawn in guillemets on the line. Usually \
+              written positionally.",
+    },
+];
+
 pub const ER_ITEM_PROPS: &[PropDef] = &[
     PropDef {
         name: "from-card",
@@ -604,6 +653,11 @@ pub struct ArchetypeDef {
     /// Values written after the label, in order, and the property each one
     /// fills. `slice a "A" 4820` is sugar for `slice a "A" { value: 4820 }`.
     pub slots: &'static [Slot],
+    /// Whether an item in this genre carries **member lines** — a `- ` or `+ `
+    /// line in its block — drawn as a ruled compartment under the name.
+    /// Declared here rather than checked against a list of archetype names in
+    /// the layout, because such a list is one nobody remembers to extend.
+    pub members: bool,
     /// Further keywords, each carrying its own positional shape (`D-023`).
     /// The form is chosen by the **word the author wrote**, never by how many
     /// values follow it: two shapes of the same length would be
@@ -665,6 +719,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         props: &[],
         item_props: &[],
         slots: &[],
+        members: false,
         alt_items: &[],
         edge_slots: &[],
     },
@@ -680,6 +735,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "value",
             arity: 1,
         }],
+        members: false,
         alt_items: &[],
         edge_slots: &[],
     },
@@ -695,6 +751,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "start",
             arity: 2,
         }],
+        members: false,
         alt_items: &[],
         edge_slots: &[],
     },
@@ -707,6 +764,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         props: CLASS_PROPS,
         item_props: &[],
         slots: &[],
+        members: true,
         alt_items: &[],
         edge_slots: &[],
     },
@@ -723,6 +781,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "date",
             arity: 1,
         }],
+        members: false,
         alt_items: &[],
         edge_slots: &[],
     },
@@ -740,6 +799,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "kind",
             arity: 1,
         }],
+        members: false,
         alt_items: &[],
         edge_slots: &[],
     },
@@ -755,6 +815,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         props: ER_PROPS,
         item_props: ER_ITEM_PROPS,
         slots: &[],
+        members: true,
         alt_items: &[],
         edge_slots: &[
             Slot {
@@ -777,6 +838,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         props: STATE_PROPS,
         item_props: STATE_ITEM_PROPS,
         slots: &[],
+        members: false,
         alt_items: &[],
         edge_slots: &[],
     },
@@ -789,6 +851,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         props: SEQUENCE_PROPS,
         item_props: &[],
         slots: &[],
+        members: false,
         alt_items: &[],
         edge_slots: &[],
     },
@@ -805,6 +868,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "points",
             arity: VARIADIC,
         }],
+        members: false,
         alt_items: &[AltItem {
             item: "scatter",
             doc: "The same plot, read as coordinates: values are taken two at \
@@ -831,6 +895,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "points",
             arity: VARIADIC,
         }],
+        members: false,
         alt_items: &[],
         edge_slots: &[],
     },
@@ -844,6 +909,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         props: SANKEY_PROPS,
         item_props: SANKEY_ITEM_PROPS,
         slots: &[],
+        members: false,
         alt_items: &[],
         edge_slots: &[Slot {
             prop: "value",
@@ -862,6 +928,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "wave",
             arity: 1,
         }],
+        members: false,
         alt_items: &[],
         edge_slots: &[],
     },
@@ -883,6 +950,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
                 arity: 1,
             },
         ],
+        members: false,
         alt_items: &[],
         edge_slots: &[],
     },
@@ -899,6 +967,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "value",
             arity: 1,
         }],
+        members: false,
         alt_items: &[],
         edge_slots: &[],
     },
@@ -914,8 +983,29 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "bits",
             arity: 2,
         }],
+        members: false,
         alt_items: &[],
         edge_slots: &[],
+    },
+    #[cfg(feature = "requirements")]
+    ArchetypeDef {
+        name: "requirements",
+        item: "requirement",
+        doc: "Requirements and the typed links between them. A bare string in \
+              the block is a line of the requirement — its identifier, then \
+              what it demands — exactly as in `class`. What this genre adds is \
+              the relation vocabulary: a link says what it asserts, read tail \
+              to head, and is drawn in guillemets on the line. Placement stays \
+              declared, as in `free`.",
+        props: REQUIREMENT_PROPS,
+        item_props: REQUIREMENT_ITEM_PROPS,
+        slots: &[],
+        members: true,
+        alt_items: &[],
+        edge_slots: &[Slot {
+            prop: "link",
+            arity: 1,
+        }],
     },
     #[cfg(feature = "bytefield")]
     ArchetypeDef {
@@ -931,6 +1021,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "bytes",
             arity: 2,
         }],
+        members: false,
         alt_items: &[],
         edge_slots: &[],
     },

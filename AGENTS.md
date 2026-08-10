@@ -57,7 +57,7 @@ disagree.
 - `cargo run --bin bgraph -- watch examples/groups.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check examples/groups.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (266 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (273 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
 - `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (27 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
@@ -198,6 +198,13 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   so a caller cannot reach past it; that is the same shape of fix as deleting
   `relevant_here` — make the wrong thing unsayable rather than remembering not
   to say it.
+
+- [2026-08-10] **`check_edges` validated the inline block only.** Positional
+  edge data is folded into named properties by `effective_props`, and that
+  folded form was never checked — so `a -> b nonsense` passed `check` in `er`
+  as well as in `requirements`, which is `D-005` broken in exactly the form the
+  language calls idiomatic. Any new validation over properties must run on the
+  **folded** props, never on `.props`.
 
 ### Gotchas
 - [2026-07-31] `template::scan` is textual on purpose, so `{{…}}` written

@@ -633,6 +633,115 @@ fn a_packet_field_needs_bits() {
     assert!(err("type packet\nnode a \"A\"").contains("has no `bits`"));
 }
 
+// ---------------------------------------------------------------------- W-051
+
+#[test]
+fn a_requirement_is_a_ruled_box_with_its_text_inside() {
+    // The same picture `class` and `er` draw. Asserted rather than assumed,
+    // because "it reuses the class box" is the claim that goes quiet.
+    let l = build(
+        r#"
+        type requirements
+        requirement r1 "Stopping distance" {
+          verify: test
+          - REQ-001
+          - The vehicle shall stop within 40 m.
+        }
+    "#,
+    );
+
+    let texts: Vec<&str> = l.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert!(texts.contains(&"- REQ-001"), "{texts:?}");
+    assert!(
+        texts.contains(&"- The vehicle shall stop within 40 m."),
+        "{texts:?}"
+    );
+    // The name's box, plus the thin node that rules off the members.
+    assert!(l.nodes.len() >= 2, "{}", l.nodes.len());
+}
+
+#[test]
+fn compartments_are_asked_of_the_archetype_not_matched_by_name() {
+    // This was a hand-written `name == "class" || name == "er"` in the layout,
+    // which is the shape of list nobody remembers to extend — so it is a flag
+    // on the archetype now, and that is what this pins.
+    for genre in ["class", "er", "requirements"] {
+        assert!(
+            crate::props::archetype(genre).expect("exists").members,
+            "{genre} carries member lines"
+        );
+    }
+    for genre in ["pie", "packet", "xy", "state", "block"] {
+        assert!(
+            !crate::props::archetype(genre).expect("exists").members,
+            "{genre} does not"
+        );
+    }
+}
+
+#[test]
+fn a_link_is_drawn_in_guillemets_and_shares_the_line_with_a_label() {
+    // A relation whose kind is declared and never drawn would be worse than
+    // one that is refused: the reader would be guessing from the arrow alone.
+    // A member line runs to the end of the line, so it cannot share one with
+    // the closing brace — the same trap a doc example fell into once.
+    const TWO: &str = "type requirements\nrequirement a {\n  - A\n}\nrequirement b {\n  - B\n}\n";
+
+    let bare = build(&format!("{TWO}a -> b derive"));
+    assert_eq!(bare.edges[0].label.as_deref(), Some("«derive»"));
+
+    let named = build(&format!("{TWO}a -> b \"why\" satisfy"));
+    assert_eq!(named.edges[0].label.as_deref(), Some("why\n«satisfy»"));
+}
+
+#[test]
+fn positional_edge_data_is_validated_like_any_other_property() {
+    // `check_edges` looked at the inline block only, so a bad word written
+    // *positionally* — the idiomatic form — went through untouched. `er` had
+    // the hole too: `one many` is checked, `nonsense` was not.
+    let e = err("type er\nentity a \"A\"\nentity b \"B\"\na -> b nonsense one");
+    assert!(e.contains("nonsense"), "{e}");
+    assert!(e.contains("from-card"), "{e}");
+}
+
+#[test]
+fn an_unknown_link_is_a_hard_error() {
+    // D-005: a silent no-op would hide the typo in a file you cannot compile.
+    let e = err("type requirements\nrequirement a {\n  - A\n}\nrequirement b {\n  - B\n}\na -> b implies");
+    assert!(e.contains("implies"), "{e}");
+}
+
+#[test]
+fn a_requirements_view_says_what_it_cannot_check() {
+    // Both halves of this genre can be silently empty, and both are the
+    // failure it exists to make visible.
+    let d = diags("type requirements\nrequirement a {\n  - A\n}\nrequirement b {\n  - B\n}\na -> b");
+    assert!(
+        d.iter().any(|x| x.message.contains("what it asserts")),
+        "a link with no kind: {d:?}"
+    );
+
+    let d = diags("type requirements\nrequirement a \"A\" {\n  - A\n}");
+    assert!(
+        d.iter().any(|x| x.message.contains("has no `verify`")),
+        "a requirement nobody plans to check: {d:?}"
+    );
+}
+
+#[test]
+fn requirement_words_belong_to_this_genre_alone() {
+    // `link`, `risk` and `verify` are its own; written elsewhere they are
+    // unknown properties whose message names the genre that does read them.
+    for source in [
+        "node a\nnode b\na -> b { link: derive }",
+        "node a { risk: high }",
+        "node a { verify: test }",
+    ] {
+        let e = err(source);
+        assert!(e.contains("`type requirements`"), "{source}: {e}");
+    }
+}
+
 // ---------------------------------------------------------------------- W-039
 
 #[test]

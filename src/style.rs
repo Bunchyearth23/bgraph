@@ -149,6 +149,12 @@ pub struct Style {
     pub tech: Option<String>,
     /// `type block` — a sentence under the technology line.
     pub description: Option<String>,
+    /// `type requirements` — how likely it is to go unmet, and how it will be
+    /// shown to be met. Kept as words: both are drawn, neither is computed.
+    pub risk: Option<String>,
+    pub verify: Option<String>,
+    /// `type requirements` — what a relation asserts, read tail to head.
+    pub link: Option<String>,
     /// Scheduling: a start day and a length in days.
     pub start: Option<i64>,
     pub length: Option<f64>,
@@ -211,6 +217,9 @@ impl Style {
             block_kind,
             tech,
             description,
+            risk,
+            verify,
+            link,
             guard,
             start,
             length,
@@ -404,6 +413,11 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
             }
         }
         "tech" | "technology" => style.tech = first.and_then(|x| x.as_text()).map(String::from),
+        // Three words `check` has already closed the set of; this only reads
+        // them, and keeps them as written so the renderer can print them.
+        "risk" => style.risk = first.and_then(|x| x.as_word()).map(String::from),
+        "verify" => style.verify = first.and_then(|x| x.as_word()).map(String::from),
+        "link" => style.link = first.and_then(|x| x.as_word()).map(String::from),
         "description" | "desc" => {
             style.description = first.and_then(|x| x.as_text()).map(String::from)
         }

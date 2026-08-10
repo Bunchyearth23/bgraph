@@ -381,8 +381,10 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         .background
         .as_deref()
         .is_some_and(crate::charts::is_dark);
-    // An entity box is a class box: a name over a ruled list of columns.
-    let compartments = item.name == "class" || item.name == "er";
+    // An entity box is a class box: a name over a ruled list of members. Asked
+    // of the archetype rather than matched against a list of names here — a
+    // list like that is one nobody remembers to extend.
+    let compartments = item.members;
     // A base that leaves `shape` unset, so a declared one is distinguishable
     // from the default and a state can fall back to a rounded box.
     let node_base = if machine {
@@ -566,6 +568,14 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             label = Some(match label {
                 Some(text) => format!("{text}\n[{tech}]"),
                 None => format!("[{tech}]"),
+            });
+        }
+        // What the relation asserts, in guillemets — the notation SysML uses,
+        // and the only thing on the line if no label was written.
+        if let Some(link) = &style.link {
+            label = Some(match label {
+                Some(text) if !text.is_empty() => format!("{text}\n«{link}»"),
+                _ => format!("«{link}»"),
             });
         }
         if let Some(guard) = &style.guard {

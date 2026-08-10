@@ -111,6 +111,10 @@ const EXAMPLES: &[(&str, &str)] = &[
     ("timeline", include_str!("../examples/timeline.bd")),
     ("block", include_str!("../examples/block.bd")),
     ("er", include_str!("../examples/er.bd")),
+    (
+        "requirements",
+        include_str!("../examples/requirements.bd"),
+    ),
     ("class", include_str!("../examples/class.bd")),
     ("state", include_str!("../examples/state.bd")),
 ];

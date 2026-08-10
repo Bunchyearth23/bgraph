@@ -88,6 +88,8 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "class" => check_class(diagram, "class", &mut out),
         #[cfg(feature = "er")]
         "er" => check_er(diagram, &mut out),
+        #[cfg(feature = "requirements")]
+        "requirements" => check_requirements(diagram, &mut out),
         #[cfg(feature = "block")]
         "block" => check_block(diagram, &mut out),
         #[cfg(feature = "gantt")]
@@ -536,8 +538,14 @@ fn check_edges(diagram: &Diagram, def: &'static props::ArchetypeDef, nodes: &Has
             }
         }
 
+        // The **folded** form, not `edge.props`: positional edge data is sugar
+        // for the named property, so validating only the inline block let
+        // `a -> b nonsense` through `check` entirely. It reached `style.rs`,
+        // which bails without a span for the cardinalities and not at all for
+        // a word nothing parses — so a typo in the one place this genre puts
+        // its meaning was silent, against `D-005`.
         check_props_refined(
-            &edge.props,
+            &edge.effective_props(def.edge_slots),
             Some(Ctx::Edge),
             def.item_props,
             props::PROPS,
@@ -1153,6 +1161,48 @@ fn check_block(diagram: &Diagram, out: &mut Vec<Diag>) {
             out.push(Diag::warn(
                 member.span,
                 "a block carries a `description`, not members".to_string(),
+            ));
+        }
+    }
+}
+
+/// A requirements view is a `class` box with a relation vocabulary. What it
+/// adds on top is that both halves of the picture can be *silently empty*:
+/// a requirement with no text says nothing, and a relation with no kind is a
+/// line whose meaning the reader has to guess.
+#[cfg(feature = "requirements")]
+fn check_requirements(diagram: &Diagram, out: &mut Vec<Diag>) {
+    check_class(diagram, "requirement", out);
+
+    let def = archetype_of(diagram);
+    for edge in &diagram.edges {
+        let props = edge.effective_props(def.edge_slots);
+        if !props.iter().any(|p| p.name == "link") {
+            out.push(Diag::warn(
+                edge.positional_span,
+                format!(
+                    "`{} -> {}` says nothing about what it asserts — write one \
+                     of {}",
+                    edge.from.as_str(),
+                    edge.to.as_str(),
+                    props::REQ_LINKS.join(", ")
+                ),
+            ));
+        }
+    }
+
+    // A requirement nobody has planned to check is the failure this genre
+    // exists to make visible, so it is said out loud rather than left to the
+    // reader to notice by its absence.
+    let styles = resolved_nodes(diagram, base_style("requirements"));
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        if styles.get(i).is_some_and(|s| s.verify.is_none()) {
+            out.push(Diag::warn(
+                node.id.span,
+                format!(
+                    "`{}` has no `verify` — nothing says how it will be shown to be met",
+                    node.id.as_str()
+                ),
             ));
         }
     }

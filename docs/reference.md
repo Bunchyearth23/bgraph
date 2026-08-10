@@ -1082,6 +1082,79 @@ field urg   "Urgent pointer"      144 159
 
 </details>
 
+### `type requirements`
+
+Requirements and the typed links between them. A bare string in the block is a line of the requirement — its identifier, then what it demands — exactly as in `class`. What this genre adds is the relation vocabulary: a link says what it asserts, read tail to head, and is drawn in guillemets on the line. Placement stays declared, as in `free`.
+
+```
+requirement <id> ["label"]
+```
+
+```
+<from> -> <to> ["label"] <link>
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+
+On a `requirement` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `risk` | node | `risk: <low\|medium\|high>` | How likely this requirement is to go unmet. Drawn under the name, not as a colour — risk is ordinal and the categorical palette would imply it is not. |
+| `verify` | node | `verify: <analysis\|demonstration\|inspection\|test>` | How the requirement will be shown to be met. A requirement with no stated method is one nobody has planned to check. |
+| `link` | edge | `link: <derive\|satisfy\|verify\|refine\|trace\|copy>` | What the relation asserts, read tail to head — `r2 -> r1 derive` is r2 derives from r1. Drawn in guillemets on the line. Usually written positionally. |
+
+<details>
+<summary>A complete file — <code>examples/requirements.bd</code></summary>
+
+```
+// `requirements` is a class box with a relation vocabulary: a bare line in the
+// block is a line of the requirement, and a link says what it asserts (W-051).
+type requirements { title: "Braking system" }
+graph { background: #0b1120 padding: 32 gap: 64 }
+
+style requirement { fill: #1e293b stroke: #38bdf8 1.4 font: 13 #e2e8f0 radius: 6 padding: 14 }
+style edge        { stroke: #64748b 1.4 font: 11 #94a3b8 head: open dash: dashed }
+
+requirement stop "Stopping distance" at (0, 0) {
+  - REQ-001
+  - The vehicle shall stop within 40 m from 100 km/h on dry asphalt.
+  risk: high
+  verify: test
+}
+
+requirement fade "Fade resistance" below stop gap 56 {
+  - REQ-002
+  - Braking performance shall not drop by more than 10% over ten consecutive stops.
+  risk: medium
+  verify: test
+}
+
+requirement pedal "Pedal force" right-of stop gap 150 {
+  - REQ-003
+  - Full braking shall require no more than 500 N of pedal force.
+  risk: low
+  verify: demonstration
+}
+
+requirement adas "Emergency assist" below pedal gap 56 {
+  - REQ-004
+  - The assist shall command full braking within 150 ms of a detected obstacle.
+  risk: high
+  verify: analysis
+}
+
+// `<from> -> <to> ["label"] <link>` — read tail to head.
+fade  -> stop  derive
+pedal -> stop  refine
+adas  -> stop  satisfy
+adas  -> pedal trace
+```
+
+</details>
+
 ### `type bytefield`
 
 A wire-format diagram at byte granularity — `packet` with the ruler counting bytes rather than bits. Each field needs an inclusive byte range; one crossing a row boundary is split across rows.

@@ -37,6 +37,7 @@ type wave       // signal s "clk" "p...."
 type gantt      // task a "A" 2026-01-01 5d
 type class      // class a "A", then `- id: Uuid` on its own line
 type er         // entity a "A", then a -> b "places" one many
+type requirements // requirement r "R", then r2 -> r derive
 type block      // block api "API" container { tech: "Rust" }
 type timeline   // event launch "Launch" 2026-03-15
 type state      // state a "A"
