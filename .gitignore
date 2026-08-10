@@ -12,3 +12,10 @@
 
 # your scratch file — yours, not the repo's
 /test.bd
+
+# The VS Code extension's build inputs and outputs. `node_modules` is fetched
+# by package.sh and bundled into the archive; the archive itself is a build
+# artefact, not a source.
+/editors/vscode/node_modules
+/editors/vscode/package-lock.json
+/editors/vscode/*.vsix

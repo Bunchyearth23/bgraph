@@ -5,12 +5,27 @@
 // this file; VS Code needs no parser of its own for that.
 
 const { workspace, window } = require('vscode');
-const { LanguageClient, TransportKind } = require('vscode-languageclient/node');
 
 let client;
 
 function activate() {
   const command = workspace.getConfiguration('bgraph').get('server.path', 'bgraph-lsp');
+
+  // Required inside `activate`, not at the top of the file, so a package built
+  // without `node_modules` still activates and still highlights. Failing to
+  // load the module at import time would take the whole extension down and
+  // leave a `.bd` file looking like plain text for a reason nobody could see.
+  let LanguageClient;
+  let TransportKind;
+  try {
+    ({ LanguageClient, TransportKind } = require('vscode-languageclient/node'));
+  } catch (error) {
+    window.showWarningMessage(
+      'bgraph: highlighting only — this build has no language client, so there are no ' +
+        'diagnostics or completion. Rebuild the package after `npm install`.',
+    );
+    return;
+  }
 
   client = new LanguageClient(
     'bgraph',

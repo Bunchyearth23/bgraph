@@ -57,12 +57,12 @@ disagree.
 - `cargo run --bin bgraph -- watch examples/groups.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check examples/groups.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (335 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (336 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
 - `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (27 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`
 - `./editors/zed/install.sh` — installs the server, regenerates + pins the grammar
-- `cd editors/vscode && npm install` — the VS Code client's one dependency
+- `./editors/vscode/package.sh` — builds `bgraph-<version>.vsix` (`--no-server` skips npm)
 
 ## Architecture
 | Path | Purpose |

@@ -14,17 +14,40 @@ The server is the same binary the Zed extension talks to, and it reuses the
 front half of the compiler — so the editor and `bgraph check` can never
 disagree about what a file means.
 
-## Installing
+## Building a package
 
 ```sh
-cargo install --path ../..          # puts `bgraph-lsp` on PATH
-cd editors/vscode && npm install    # vscode-languageclient
+./package.sh              # fetches the language client if needed, bundles it
+./package.sh --no-server  # highlighting only; no npm, no network
 ```
 
-Then run the extension from VS Code (F5), or copy this directory into
-`~/.vscode/extensions/bgraph`.
+Both write `bgraph-<version>.vsix` beside this file. Install it with:
 
-If `bgraph-lsp` is not on `PATH`, point `bgraph.server.path` at it.
+```sh
+code --install-extension bgraph-0.1.0.vsix
+```
+
+A VSIX is a zip with an OPC content-types part and a manifest, so `package.sh`
+builds one with `zip` rather than fetching `@vscode/vsce` — the same call this
+project makes for its SVG writer, its HTTP server and its PDF writer. Every
+fact the manifest repeats — name, version, publisher, engine range — is read
+back out of `package.json`, and a test fails if any of them is written twice.
+
+The `--no-server` package still highlights: `src/extension.js` requires the
+language client *inside* `activate`, so a build without `node_modules` says so
+once instead of failing to activate and leaving `.bd` files looking like plain
+text.
+
+## The server
+
+```sh
+cargo install --path ../..   # puts `bgraph-lsp` on PATH
+```
+
+If it is not on `PATH`, point `bgraph.server.path` at it. Without it you get
+highlighting and nothing else — no diagnostics, no completion.
+
+For development, open this directory in VS Code and press F5.
 
 ## Keeping the grammar honest
 

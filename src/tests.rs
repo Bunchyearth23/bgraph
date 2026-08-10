@@ -778,6 +778,38 @@ fn the_textmate_grammar_knows_every_word_the_compiler_does() {
 }
 
 #[test]
+fn the_packaging_script_takes_every_fact_from_the_manifest() {
+    // A VSIX carries the name, the version, the publisher and the engine
+    // range a second time. Every one of them is read out of `package.json` by
+    // the script rather than written into it — a version in two files is a
+    // version that is wrong in one of them.
+    let script = include_str!("../editors/vscode/package.sh");
+    let manifest = include_str!("../editors/vscode/package.json");
+
+    for field in ["p.name", "p.version", "p.publisher", "p.engines.vscode"] {
+        assert!(script.contains(field), "the script does not read `{field}`");
+    }
+
+    // The one version string in the manifest must not also appear in the
+    // script — if it does, someone has written it down twice.
+    let version = manifest
+        .split_once("\"version\": \"")
+        .and_then(|(_, tail)| tail.split_once('"'))
+        .expect("a version")
+        .0;
+    assert!(
+        !script.contains(version),
+        "`{version}` is hardcoded in package.sh as well as package.json"
+    );
+
+    // The archive layout VS Code requires, so a rename cannot quietly produce
+    // a file no editor will open.
+    for part in ["[Content_Types].xml", "extension.vsixmanifest", "extension/package.json"] {
+        assert!(script.contains(part), "the archive is missing `{part}`");
+    }
+}
+
+#[test]
 fn the_vscode_manifest_claims_the_language_this_project_is() {
     // The three facts a manifest can get wrong in a way that only shows up on
     // someone else's machine: the extension, the scope name the grammar
