@@ -92,6 +92,8 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "requirements" => check_requirements(diagram, &mut out),
         #[cfg(feature = "kanban")]
         "kanban" => check_kanban(diagram, &mut out),
+        #[cfg(feature = "journey")]
+        "journey" => check_journey(diagram, &mut out),
         #[cfg(feature = "block")]
         "block" => check_block(diagram, &mut out),
         #[cfg(feature = "gantt")]
@@ -1182,6 +1184,93 @@ fn check_block(diagram: &Diagram, out: &mut Vec<Diag>) {
                 member.span,
                 "a block carries a `description`, not members".to_string(),
             ));
+        }
+    }
+}
+
+/// A journey's scores are read positionally against `actors`, so the two can
+/// silently disagree — the same failure `bar` has against `categories`, and
+/// the same answer: say which step, and how many were expected.
+#[cfg(feature = "journey")]
+fn check_journey(diagram: &Diagram, out: &mut Vec<Diag>) {
+    warn_ignored(diagram, "journey", out);
+
+    let cfg = &diagram.archetype_props;
+    let actors = cfg
+        .iter()
+        .find(|p| p.name == "actors")
+        .map_or(0, |p| p.values.len());
+
+    if actors == 0 {
+        out.push(Diag::warn(
+            diagram
+                .archetype
+                .as_ref()
+                .map(|a| a.span)
+                .unwrap_or_default(),
+            "no `actors`, so the scores stand for nobody and nothing is drawn".to_string(),
+        ));
+    }
+
+    let (lo, hi) = match cfg.iter().find(|p| p.name == "range") {
+        Some(p) if p.values.len() == 2 => (
+            p.values[0].as_num().unwrap_or(1.0),
+            p.values[1].as_num().unwrap_or(5.0),
+        ),
+        Some(p) => {
+            out.push(Diag::error(
+                p.values_span,
+                "`range` takes a low and a high score".to_string(),
+            ));
+            (1.0, 5.0)
+        }
+        None => (1.0, 5.0),
+    };
+
+    let styles = resolved_nodes(diagram, base_style("journey"));
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        let scores = styles.get(i).and_then(|s| s.scores.as_ref());
+        let Some(scores) = scores.filter(|s| !s.is_empty()) else {
+            if !awaits_binding(node, archetype_of(diagram), "scores") {
+                out.push(Diag::error(
+                    node.id.span,
+                    format!(
+                        "`{}` has no scores — `step {} [\"label\"] <n> <n> …`, one per actor",
+                        node.id.as_str(),
+                        node.id.as_str()
+                    ),
+                ));
+            }
+            continue;
+        };
+
+        if actors > 0 && scores.len() != actors {
+            out.push(Diag::warn(
+                node.id.span,
+                format!(
+                    "`{}` has {} score{} for {actors} actor{} — a missing one leaves \
+                     that actor's line with a gap here",
+                    node.id.as_str(),
+                    scores.len(),
+                    if scores.len() == 1 { "" } else { "s" },
+                    if actors == 1 { "" } else { "s" }
+                ),
+            ));
+        }
+
+        for score in scores {
+            if *score < lo.min(hi) || *score > hi.max(lo) {
+                out.push(Diag::warn(
+                    node.id.span,
+                    format!(
+                        "`{}` scores {} on a {}–{} scale; it is drawn clamped to the axis",
+                        node.id.as_str(),
+                        crate::charts::trim_number(*score),
+                        crate::charts::trim_number(lo),
+                        crate::charts::trim_number(hi)
+                    ),
+                ));
+            }
         }
     }
 }

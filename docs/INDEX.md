@@ -25,8 +25,8 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**Twelve chantiers are planned. No question is open and nothing is blocked.**
-Nineteen archetypes ship and the library is embeddable. The parked ideas were
+**Eleven chantiers are planned. No question is open and nothing is blocked.**
+Twenty archetypes ship and the library is embeddable. The parked ideas were
 reviewed on 2026-08-10 and every one of them moved: what was worth building
 became a work item, what was not was discarded, and the one language question
 the review raised was answered the same day (`D-023`). One idea is still parked,
@@ -43,7 +43,6 @@ Roughly by cost. Nothing here has started.
 | `W-038` | planned | A VS Code extension, beside the Zed one | Same three pieces the Zed extension already has — the tree-sitter grammar, `bgraph-lsp`, and the highlight queries — repackaged for a second editor. VS Code takes a TextMate grammar or a WASM tree-sitter build rather than Zed's git-pinned one, and speaks LSP over a client the extension launches itself, so `src/lsp.rs` is reused unchanged. `X-009` applies here too: the queries are part of the grammar's public surface, and a stale one breaks the language rather than degrading. |
 | `W-044` | planned | `type rack` — server racks, units numbered down a frame | The cheapest of the three infrastructure genres and the one with an immediate use: the estate this project sits beside is documented in machines and cluster nodes. Near enough to a vertical `packet` to borrow its row logic. Was part of `I-010`. |
 | `W-046` | planned | `type radar` — axes radiating from a centre, one polygon per series | Reuses `W-012`'s scales and the series notion `bar` and `xy` already carry. Split out of `I-012`. |
-| `W-052` | planned | `type journey` — steps along a line, a satisfaction score per actor | `timeline` (`W-032`) supplies the line and the staggered label packing; what it adds is a series over the steps. Was `I-020`. |
 | `W-040` | planned | Real font metrics instead of the estimate | **The only planned item that closes an open risk** — `X-005`. Every auto-sized box, every edge-label plate and every `check_contrast` measurement rests on `0.56 × font-size` per character today. Was `I-008`. |
 | `W-043` | planned | `type network` — topology: hosts, links, segments | `free` with its own vocabulary, shapes and diagnostics — the nwdiag territory. `W-022` is the precedent: an archetype may supply words and shapes without taking over placement. Was part of `I-010`. |
 | `W-041` | planned | A tree layout engine — mindmap, treeview, org chart | Three genres for one engine, which is what makes it worth the cost. Hierarchy from group nesting already exists; `W-020` consumes it. Was `I-011`. |
@@ -106,6 +105,7 @@ not copies.
 
 | id | date | title | commit |
 |---|---|---|---|
+| `W-052` | 2026-08-10 | `type journey` — steps in the order they are taken, one line per actor. Scores are positional against `actors`, exactly as `bar`'s points are against `categories`; `group`s become the sections banded above the steps they hold. The axis is labelled at every whole score rather than by `nice_scale`, because a satisfaction score has no meaning between two of them | this commit |
 | `W-050` | 2026-08-10 | `type kanban` — a board. Columns are `group`s in declaration order, cards stack inside them, and a column may carry a work-in-progress `limit` that `check` reports when exceeded — the one thing a board is kept for. The count and the limit are drawn in the column header | this commit |
 | `W-051` | 2026-08-10 | `type requirements` — requirements and their typed SysML links. A `class` box plus a relation vocabulary drawn in guillemets; `risk` and `verify` say how likely it is to go unmet and how it will be shown to be met. Made the ruled-compartment flag declarative (`ArchetypeDef::members`) instead of a name list in the layout, and closed a `D-005` hole: positional **edge** data was never validated, so `a -> b nonsense` passed `check` in `er` too | this commit |
 | `W-039` | 2026-08-10 | `type bytefield` — a wire-format diagram at byte granularity. One layout shared with `packet` (`packet_like`), parameterised by a `Granularity`: 16 cells per row instead of 32, a ruler stepping by four instead of eight, and `bytes` in place of `bits`. Seventeen archetypes ship | this commit |

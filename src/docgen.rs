@@ -117,6 +117,7 @@ const EXAMPLES: &[(&str, &str)] = &[
     ),
     ("class", include_str!("../examples/class.bd")),
     ("kanban", include_str!("../examples/kanban.bd")),
+    ("journey", include_str!("../examples/journey.bd")),
     ("state", include_str!("../examples/state.bd")),
 ];
 

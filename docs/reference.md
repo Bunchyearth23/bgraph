@@ -1082,6 +1082,63 @@ field urg   "Urgent pointer"      144 159
 
 </details>
 
+### `type journey`
+
+A user journey: steps in the order they are taken, and how each actor felt at each one. `group`s are its sections, drawn as a band above the steps they hold. One line per actor, so the place where two people diverge is the thing you see first.
+
+```
+step <id> ["label"] <scores> …
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+| `actors` | `actors: "<name>" "<name>" …` | Who is being followed through the journey, in the order their scores are written on each step. One line per actor is drawn. |
+| `size` | `size: <width> <height>` | How wide the journey runs and how tall the score band is. |
+| `range` | `range: <low> <high>` | The score scale. `1 5` by default; the axis is labelled at every whole step, because a satisfaction score has no meaning between two of them. |
+| `legend` | `legend: <on\|off>` | Name the actors beside the diagram. On when there is more than one. |
+
+On a `step` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `scores` | node | `scores: <n> <n> …` | One score per actor, in the order `actors` declares them. Usually written positionally — `step pay "Pay" 2 4`. |
+
+<details>
+<summary>A complete file — <code>examples/journey.bd</code></summary>
+
+```
+// Steps in the order they are taken, one line per actor — the point being the
+// step where two people diverge (W-052).
+type journey {
+  title: "Returning an order"
+  actors: "Customer" "Support agent"
+  size: 620 200
+  range: 1 5
+}
+
+graph { background: #0b1120 padding: 30 }
+style step { font: 11 #cbd5e1 }
+style group { stroke: #334155 1 fill: #1e293b60 radius: 5 font: 11 #94a3b8 dash: solid }
+
+group find "Find the order" {
+  step login  "Sign in"          4 5
+  step locate "Locate the order" 3 5
+}
+
+group ask "Ask for the return" {
+  step form   "Fill the form"    2 4
+  step wait   "Wait for a reply" 1 3
+}
+
+group close "Close it" {
+  step label  "Print the label"  3 4
+  step refund "Refund lands"     5 5
+}
+```
+
+</details>
+
 ### `type kanban`
 
 A board: `group`s are its columns, in the order they are declared, and the cards inside each one stack in the order they are declared. A column may carry a `limit`, and a column over it is reported — a board nobody is told is over its limit is a board that is only a picture.

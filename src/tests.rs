@@ -633,6 +633,92 @@ fn a_packet_field_needs_bits() {
     assert!(err("type packet\nnode a \"A\"").contains("has no `bits`"));
 }
 
+// ---------------------------------------------------------------------- W-052
+
+#[cfg(test)]
+const JOURNEY: &str = "type journey { actors: \"A\" \"B\" size: 400 200 legend: off }\n\
+     step one \"One\" 1 5\n\
+     step two \"Two\" 5 1\n";
+
+#[test]
+fn a_journey_draws_one_line_per_actor() {
+    // The whole point of the genre: the step where two people diverge is the
+    // thing you see first, which needs both lines to exist.
+    let l = build(JOURNEY);
+    assert_eq!(l.polylines.len(), 2, "one line each");
+    assert_eq!(l.nodes.len(), 4, "a mark per actor per step");
+
+    // Scores are read in the order `actors` declares them, so the two lines
+    // must cross: A goes 1→5 while B goes 5→1.
+    let (a, b) = (&l.polylines[0].points, &l.polylines[1].points);
+    assert!(a[0].1 > a[1].1, "A climbs: {a:?}");
+    assert!(b[0].1 < b[1].1, "B falls: {b:?}");
+}
+
+#[test]
+fn a_journey_labels_every_whole_score() {
+    // A satisfaction score has no meaning between two whole steps, so the axis
+    // is not handed to `nice_scale`.
+    let l = build(JOURNEY);
+    let ticks: Vec<&str> = l
+        .annotations
+        .iter()
+        .map(|a| a.text.as_str())
+        .filter(|t| t.parse::<u32>().is_ok())
+        .collect();
+    for want in ["1", "2", "3", "4", "5"] {
+        assert!(ticks.contains(&want), "{want} missing from {ticks:?}");
+    }
+}
+
+#[test]
+fn sections_band_over_the_steps_they_hold() {
+    let l = build(
+        "type journey { actors: \"A\" size: 400 200 legend: off }\n\
+         group early \"Early\" {\n  step one \"One\" 3\n  step two \"Two\" 4\n}\n\
+         step three \"Three\" 5\n",
+    );
+
+    assert_eq!(l.groups.len(), 1);
+    let band = &l.groups[0];
+    assert_eq!(band.lines, vec!["Early"]);
+    // It spans the first two steps and stops short of the third.
+    let third = l.nodes.iter().map(|n| n.rect.x).fold(0.0_f64, f64::max);
+    assert!(band.rect.right() < third, "{:?} vs {third}", band.rect);
+}
+
+#[test]
+fn a_journey_reports_what_it_cannot_draw() {
+    // Scores are positional against `actors`, so the two can silently
+    // disagree — the same failure `bar` has against `categories`.
+    let d = diags("type journey { actors: \"A\" \"B\" }\nstep one \"One\" 3");
+    assert!(
+        d.iter().any(|x| x.message.contains("for 2 actors")),
+        "{d:?}"
+    );
+
+    let d = diags("type journey\nstep one \"One\" 3");
+    assert!(
+        d.iter().any(|x| x.message.contains("stand for nobody")),
+        "{d:?}"
+    );
+
+    let d = diags("type journey { actors: \"A\" }\nstep one \"One\" 9");
+    assert!(
+        d.iter().any(|x| x.message.contains("on a 1–5 scale")),
+        "{d:?}"
+    );
+
+    let e = err("type journey { actors: \"A\" }\nstep one \"One\"");
+    assert!(e.contains("has no scores"), "{e}");
+}
+
+#[test]
+fn scores_belong_to_the_journey_alone() {
+    let e = err("node a { scores: 1 2 }");
+    assert!(e.contains("`type journey`"), "{e}");
+}
+
 // ---------------------------------------------------------------------- W-050
 
 /// Two columns, three cards, written the way the archetype means them.

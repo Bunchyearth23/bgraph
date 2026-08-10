@@ -155,6 +155,8 @@ pub struct Style {
     pub verify: Option<String>,
     /// `type requirements` — what a relation asserts, read tail to head.
     pub link: Option<String>,
+    /// `type journey` — one score per actor, in the order `actors` names them.
+    pub scores: Option<Vec<f64>>,
     /// `type kanban` — a column's work-in-progress limit. On the cascade like
     /// any other datum, so a `.class` can carry a board's house limits.
     pub limit: Option<f64>,
@@ -223,6 +225,7 @@ impl Style {
             risk,
             verify,
             link,
+            scores,
             limit,
             guard,
             start,
@@ -423,6 +426,7 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
         "verify" => style.verify = first.and_then(|x| x.as_word()).map(String::from),
         "link" => style.link = first.and_then(|x| x.as_word()).map(String::from),
         "limit" => style.limit = first.and_then(|x| x.as_num()),
+        "scores" => style.scores = Some(v.iter().filter_map(|x| x.as_num()).collect()),
         "description" | "desc" => {
             style.description = first.and_then(|x| x.as_text()).map(String::from)
         }

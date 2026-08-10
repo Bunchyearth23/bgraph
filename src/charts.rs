@@ -387,6 +387,255 @@ struct Granularity {
     step: u32,
 }
 
+/// A user journey: steps in the order they are taken, one line per actor.
+/// `timeline` supplies the idea of a run of things along an axis and `xy` the
+/// idea of a series over it; what this adds is that the two are read together
+/// — the point of a journey is the step where two people diverge.
+#[cfg(feature = "journey")]
+pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
+    use std::collections::HashMap;
+
+    let cfg = &diagram.archetype_props;
+    let theme = Theme::of(&opts);
+    let def = crate::check::archetype_of(diagram);
+    let palette = theme.palette();
+
+    let width = setting(cfg, "size")
+        .and_then(|v| v.first())
+        .and_then(|v| v.as_num())
+        .unwrap_or(620.0)
+        .max(160.0);
+    let height = setting(cfg, "size")
+        .and_then(|v| v.get(1))
+        .and_then(|v| v.as_num())
+        .unwrap_or(220.0)
+        .max(80.0);
+    let title = text(cfg, "title");
+    let actors: Vec<String> = setting(cfg, "actors")
+        .map(|v| {
+            v.iter()
+                .filter_map(|x| x.as_text())
+                .map(String::from)
+                .collect()
+        })
+        .unwrap_or_default();
+    let (lo, hi) = match setting(cfg, "range") {
+        Some(v) if v.len() == 2 => (
+            v[0].as_num().unwrap_or(1.0),
+            v[1].as_num().unwrap_or(5.0),
+        ),
+        _ => (1.0, 5.0),
+    };
+
+    let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
+
+    let mut steps = Vec::new();
+    for node in &diagram.nodes {
+        let style = registry.resolve(
+            chart_defaults(),
+            def.item,
+            &node.classes,
+            &node.props_for(def),
+        )?;
+        let label = node.label.clone().unwrap_or_else(|| node.id.value.clone());
+        let scores = style.scores.clone().unwrap_or_default();
+        steps.push((node.id.value.clone(), label, scores));
+    }
+
+    // A satisfaction score has no meaning between two whole steps, so the axis
+    // is labelled at each one rather than at a "nice" interval.
+    let scale = Scale {
+        min: lo.min(hi),
+        max: hi.max(lo + 1.0),
+        ticks: {
+            let (a, b) = (lo.min(hi).ceil() as i64, hi.max(lo).floor() as i64);
+            (a..=b).map(|n| n as f64).collect()
+        },
+    };
+
+    let title_h = if title.is_some() {
+        TITLE_SIZE * 2.0
+    } else {
+        0.0
+    };
+    const SECTION_H: f64 = 24.0;
+    let band = if diagram.groups.is_empty() {
+        0.0
+    } else {
+        SECTION_H
+    };
+    let gutter = scale
+        .ticks
+        .iter()
+        .map(|t| text_width(&[trim_number(*t)], 11.0))
+        .fold(0.0_f64, f64::max)
+        + 14.0;
+    let plot = Rect {
+        x: gutter,
+        y: title_h + band,
+        w: width,
+        h: height,
+    };
+
+    // Steps sit on the plot's edges, as an `xy` series does: a line has to
+    // reach both ends or it reads as clipped.
+    let at = |i: usize| -> f64 {
+        if steps.len() <= 1 {
+            0.5
+        } else {
+            i as f64 / (steps.len() - 1) as f64
+        }
+    };
+
+    let mut guides = Vec::new();
+    let mut polylines = Vec::new();
+    let mut nodes = Vec::new();
+    let mut groups = Vec::new();
+    let mut annotations = Vec::new();
+
+    if let Some(title) = title {
+        annotations.push(Annotation {
+            text: title,
+            x: 0.0,
+            y: TITLE_SIZE,
+            anchor: Anchor::Start,
+            size: TITLE_SIZE,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    let x_labels: Vec<(f64, String)> = steps
+        .iter()
+        .enumerate()
+        .map(|(i, (_, label, _))| (at(i), label.clone()))
+        .collect();
+    draw_frame(
+        plot,
+        &scale,
+        &x_labels,
+        &theme,
+        &base,
+        &mut guides,
+        &mut annotations,
+    );
+
+    // One line per actor. The count comes from `actors`, so a step that wrote
+    // too few scores simply has no point on the lines it left out — `check`
+    // is what says so.
+    for (a, name) in actors.iter().enumerate() {
+        let colour = palette[a.min(palette.len() - 1)].to_string();
+        let path: Vec<(f64, f64)> = steps
+            .iter()
+            .enumerate()
+            .filter_map(|(i, (_, _, scores))| {
+                scores.get(a).map(|s| {
+                    (
+                        plot.x + at(i) * plot.w,
+                        plot.bottom() - scale.fraction(*s) * plot.h,
+                    )
+                })
+            })
+            .collect();
+
+        if path.len() >= 2 {
+            polylines.push(Polyline {
+                points: path.clone(),
+                closed: false,
+                fill: None,
+                stroke: Some(colour.clone()),
+                width: 2.0,
+                head: None,
+                dash: None,
+            });
+        }
+        for (x, y) in path {
+            nodes.push(PlacedNode {
+                lines: Vec::new(),
+                rect: Rect {
+                    x: x - 4.5,
+                    y: y - 4.5,
+                    w: 9.0,
+                    h: 9.0,
+                },
+                style: Style {
+                    fill: Some(colour.clone()),
+                    stroke: Some(theme.surface.clone()),
+                    stroke_width: Some(1.5),
+                    shape: Some(Shape::Ellipse),
+                    ..base.clone()
+                },
+            });
+        }
+        let _ = name;
+    }
+
+    // Sections, as a band above the steps they hold — the same `group`
+    // machinery kanban uses for its columns.
+    let index: HashMap<&str, usize> = steps
+        .iter()
+        .enumerate()
+        .map(|(i, (id, _, _))| (id.as_str(), i))
+        .collect();
+    for group in &diagram.groups {
+        let held: Vec<usize> = group
+            .members
+            .iter()
+            .filter_map(|m| index.get(m.as_str()).copied())
+            .collect();
+        let (Some(first), Some(last)) = (held.iter().min(), held.iter().max()) else {
+            continue;
+        };
+        let x0 = plot.x + at(*first) * plot.w;
+        let x1 = plot.x + at(*last) * plot.w;
+        let style =
+            registry.resolve(Style::group_defaults(), "group", &group.classes, &group.props)?;
+        groups.push(PlacedGroup {
+            lines: vec![
+                group
+                    .label
+                    .clone()
+                    .unwrap_or_else(|| group.id.value.clone()),
+            ],
+            rect: Rect {
+                x: x0 - 8.0,
+                y: title_h,
+                w: (x1 - x0) + 16.0,
+                h: SECTION_H - 6.0,
+            },
+            style,
+        });
+    }
+
+    if toggle(cfg, "legend", actors.len() > 1) && !actors.is_empty() {
+        let colours: Vec<String> = (0..actors.len())
+            .map(|a| palette[a.min(palette.len() - 1)].to_string())
+            .collect();
+        draw_legend(
+            &actors,
+            &colours,
+            plot.right() + 18.0,
+            plot.y,
+            &theme,
+            &base,
+            &mut nodes,
+            &mut annotations,
+        );
+    }
+
+    Ok(Layout {
+        guides,
+        polylines,
+        groups,
+        nodes,
+        edges: Vec::new(),
+        opts,
+        chart: Chart::Free,
+        annotations,
+    })
+}
+
 /// A board. Columns are `group`s in declaration order and cards stack inside
 /// them in declaration order, so the archetype places everything — a kanban
 /// whose columns had to be anchored by hand would be busywork with no reading

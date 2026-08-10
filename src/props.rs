@@ -563,6 +563,62 @@ pub const STATE_ITEM_PROPS: &[PropDef] = &[
 
 /// The SysML relation vocabulary, verb stems. Read tail-to-head:
 /// `r2 -> r1 derive` is r2 derives from r1.
+pub const JOURNEY_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the diagram.",
+    },
+    PropDef {
+        name: "actors",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "actors: \"<name>\" \"<name>\" …",
+        doc: "Who is being followed through the journey, in the order their \
+              scores are written on each step. One line per actor is drawn.",
+    },
+    PropDef {
+        name: "size",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "size: <width> <height>",
+        doc: "How wide the journey runs and how tall the score band is.",
+    },
+    PropDef {
+        name: "range",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "range: <low> <high>",
+        doc: "The score scale. `1 5` by default; the axis is labelled at every \
+              whole step, because a satisfaction score has no meaning between \
+              two of them.",
+    },
+    PropDef {
+        name: "legend",
+        alias: false,
+        ctx: Ctx::Both,
+        words: TOGGLE,
+        syntax: "legend: <on|off>",
+        doc: "Name the actors beside the diagram. On when there is more than one.",
+    },
+];
+
+pub const JOURNEY_ITEM_PROPS: &[PropDef] = &[PropDef {
+    name: "scores",
+    alias: false,
+    ctx: Ctx::Node,
+    words: &[],
+    syntax: "scores: <n> <n> …",
+    doc: "One score per actor, in the order `actors` declares them. Usually \
+          written positionally — `step pay \"Pay\" 2 4`.",
+}];
+
 pub const KANBAN_PROPS: &[PropDef] = &[
     PropDef {
         name: "title",
@@ -1013,6 +1069,24 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         slots: &[Slot {
             prop: "bits",
             arity: 2,
+        }],
+        members: false,
+        alt_items: &[],
+        edge_slots: &[],
+    },
+    #[cfg(feature = "journey")]
+    ArchetypeDef {
+        name: "journey",
+        item: "step",
+        doc: "A user journey: steps in the order they are taken, and how each \
+              actor felt at each one. `group`s are its sections, drawn as a \
+              band above the steps they hold. One line per actor, so the place \
+              where two people diverge is the thing you see first.",
+        props: JOURNEY_PROPS,
+        item_props: JOURNEY_ITEM_PROPS,
+        slots: &[Slot {
+            prop: "scores",
+            arity: VARIADIC,
         }],
         members: false,
         alt_items: &[],

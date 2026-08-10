@@ -28,6 +28,7 @@ type free       // implicit; nodes and edges placed by anchors
 type pie        // slice a "A" 42
 type packet     // field a "A" 0 7        — bits
 type kanban     // group todo "To do" { card a "A" }
+type journey    // step pay "Pay" 2 4        — one score per actor
 type bytefield  // field a "A" 0 3        — bytes
 type treemap    // box a "A" 42
 type quadrant   // point a "A" 0.8 0.2

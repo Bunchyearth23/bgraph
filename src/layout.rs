@@ -340,6 +340,8 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         "packet" => return crate::charts::packet(diagram, opts, &registry),
         #[cfg(feature = "kanban")]
         "kanban" => return crate::charts::kanban(diagram, opts, &registry),
+        #[cfg(feature = "journey")]
+        "journey" => return crate::charts::journey(diagram, opts, &registry),
         #[cfg(feature = "bytefield")]
         "bytefield" => return crate::charts::bytefield(diagram, opts, &registry),
         #[cfg(feature = "treemap")]
