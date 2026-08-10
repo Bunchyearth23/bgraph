@@ -376,7 +376,10 @@ pub(crate) fn trim_number(v: f64) -> String {
 
 // ---------------------------------------------------------------- packet
 
-#[cfg(feature = "packet")]
+// Both genres need it, so it survives as long as either does. Gating it on
+// `packet` alone left `bytefield` — and the featureless build — referring to
+// a struct that was no longer compiled.
+#[cfg(any(feature = "packet", feature = "bytefield"))]
 /// `packet` and `bytefield` are one layout at two granularities (`W-039`).
 /// Only the unit changes: the default row width, the ruler step, and which
 /// property carries the range. Everything below — splitting a field across a
@@ -1948,6 +1951,7 @@ pub fn kanban(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
     })
 }
 
+#[cfg(feature = "packet")]
 pub fn packet(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
     let unit = Granularity {
         per_row: 32.0,
@@ -1965,6 +1969,7 @@ pub fn bytefield(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Res
     packet_like(diagram, opts, registry, unit)
 }
 
+#[cfg(any(feature = "packet", feature = "bytefield"))]
 fn packet_like(
     diagram: &Diagram,
     opts: GraphOpts,

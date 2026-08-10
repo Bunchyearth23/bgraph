@@ -637,6 +637,7 @@ bgraph diagram.bd -o diagram.pdf
 bgraph watch diagram.bd
 bgraph check diagram.bd
 bgraph fmt diagram.bd
+bgraph completions fish
 ```
 
 The output extension picks the writer. A flag would be a second way of saying
@@ -650,6 +651,10 @@ lines. It leaves columns lined up by hand exactly as written — indentation is
 structural and so its business, alignment is taste and is not. `--check`
 reports instead of writing, and exits non-zero, so one command serves a person
 and a build.
+
+`completions` writes a shell script — or the man page, with `completions man` —
+generated from the same flag definitions the binary parses with, so neither can
+describe an option it does not have.
 
 *The live preview*
 

@@ -28,6 +28,8 @@ bgraph report.bd --set year=2026    # …or bind a scalar on the command line
 bgraph report.bd --rows r=sales.csv # …or one hole from the rows of a CSV
 bgraph watch report.bd --data q3.json  # live preview of a filled template
 bgraph fmt diagram.bd               # reformat; --check reports instead
+bgraph completions fish             # a completion script; bash|zsh|fish|elvish|powershell
+bgraph completions man              # …or the man page, from the same flags
 bgraph docs -o docs/reference.md    # regenerate this file
 bgraph-lsp                          # language server, LSP over stdin/stdout
 ```

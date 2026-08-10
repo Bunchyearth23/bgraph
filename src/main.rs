@@ -85,6 +85,37 @@ enum Command {
         #[arg(long)]
         check: bool,
     },
+    /// Write a shell completion script, or the man page, to standard output
+    #[cfg(feature = "completions")]
+    Completions {
+        /// bash | elvish | fish | powershell | zsh | man
+        shell: String,
+    },
+}
+
+/// Completions and the man page, both written from the `Cli` struct above
+/// rather than from a second description of the flags — a hand-kept
+/// completion script is one that is wrong about a flag added last week.
+#[cfg(feature = "completions")]
+fn completions(shell: &str) -> Result<i32> {
+    use clap::CommandFactory;
+
+    let mut command = Cli::command();
+    let mut out = std::io::stdout();
+
+    // `man` is not a shell, and it is here anyway: someone who wants one of
+    // these wants the other, and a separate subcommand for a single page
+    // would be a second thing to remember for no gain.
+    if shell == "man" {
+        clap_mangen::Man::new(command).render(&mut out)?;
+        return Ok(0);
+    }
+
+    let generator: clap_complete::Shell = shell
+        .parse()
+        .map_err(|_| anyhow::anyhow!("unknown shell `{shell}` (try bash, fish, zsh, or man)"))?;
+    clap_complete::generate(generator, &mut command, "bgraph", &mut out);
+    Ok(0)
 }
 
 /// Reformat, or report what would change.
@@ -178,6 +209,8 @@ fn run() -> Result<i32> {
         }) => return show_or_serve(input, data, port, server),
         Some(Command::Check { input }) => return check_file(&input),
         Some(Command::Fmt { inputs, check }) => return format_files(&inputs, check),
+        #[cfg(feature = "completions")]
+        Some(Command::Completions { shell }) => return completions(&shell),
         Some(Command::Docs { output }) => {
             let manual = bgraph::docgen::reference();
             match output {
@@ -247,7 +280,12 @@ fn run() -> Result<i32> {
                 }
             }
             #[cfg(not(feature = "csv"))]
-            bail!("this build has no CSV reader — rebuild with the `csv` feature");
+            {
+                // Named even here, so the featureless build is warning-free
+                // and the message still says what was asked for.
+                let _ = spec;
+                bail!("this build has no CSV reader — rebuild with the `csv` feature");
+            }
         }
 
         for pair in &cli.set {

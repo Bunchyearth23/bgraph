@@ -6019,3 +6019,49 @@ fn a_chart_falls_back_to_the_graph_title() {
     );
     assert!(l.annotations.iter().any(|a| a.text == "General"));
 }
+
+// ------------------------------------------------- completions (I-056)
+
+#[test]
+fn completions_are_on_by_default_and_cost_the_core_nothing() {
+    // The opposite call from `window`, and it needs stating for the same
+    // reason. `clap_complete` adds no dependency beyond the `clap` already
+    // here and `clap_mangen` brings one small crate, both binary-only — so
+    // this is on by default, where the window cannot be. What must stay
+    // true is that they are optional, so `--no-default-features` still
+    // resolves to the five dependencies this crate promises.
+    let manifest = include_str!("../Cargo.toml");
+
+    let defaults = manifest
+        .split_once("default = [")
+        .and_then(|(_, tail)| tail.split_once(']'))
+        .expect("a default feature list")
+        .0;
+    assert!(
+        defaults.contains("completions"),
+        "completions are not on by default: {defaults}"
+    );
+
+    for crate_name in ["clap_complete", "clap_mangen"] {
+        let line = manifest
+            .lines()
+            .find(|l| l.trim_start().starts_with(crate_name))
+            .unwrap_or_else(|| panic!("`{crate_name}` is not in the manifest"));
+        assert!(
+            line.contains("optional = true"),
+            "`{crate_name}` is not optional: {line}"
+        );
+    }
+}
+
+#[test]
+fn the_generated_reference_lists_the_completions_command() {
+    // The reference's command list is hand-written prose in `docgen.rs`,
+    // unlike the property tables — so it is the one part that can fall
+    // behind a subcommand, and only a test notices.
+    let manual = crate::docgen::reference();
+    assert!(
+        manual.contains("bgraph completions"),
+        "the reference does not mention `completions`"
+    );
+}

@@ -24,7 +24,7 @@ name = "bgraph-lsp"
 path = "src/bin/bgraph-lsp.rs"
 
 [features]
-default = ["all-archetypes", "pdf", "json", "csv"]
+default = ["all-archetypes", "pdf", "json", "csv", "completions"]
 all-archetypes = [
     "pie",
     "packet",
@@ -106,12 +106,26 @@ csv = []
 #   cargo build --features window
 window = ["dep:minifb", "dep:resvg", "dep:tiny-skia"]
 
+# Shell completions and a man page, generated from the same `Cli` struct clap
+# parses with — so they cannot describe flags the binary does not have.
+#
+# On by default, unlike `window`, because the cost is honest: `clap_complete`
+# has no dependency beyond the `clap` already here, and `clap_mangen` brings
+# one small crate. Both are binary-only, so the library a caller embeds is
+# untouched — and `--no-default-features`, which CI builds, still resolves to
+# the five this crate promises.
+completions = ["dep:clap_complete", "dep:clap_mangen"]
+
 [dependencies]
 anyhow = "1.0.104"
 clap = { version = "4.6.4", features = ["derive"] }
 pest = "2.8.8"
 pest_derive = "2.8.8"
 serde_json = "1.0"
+
+# Only with `--features completions`, and binary-only either way.
+clap_complete = { version = "4", optional = true }
+clap_mangen = { version = "0.2", optional = true }
 
 # Only with `--features window`; see the note above. `minifb` is a window and a
 # pixel buffer in one crate, which is why this costs 128 packages where
