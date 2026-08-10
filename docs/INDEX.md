@@ -25,22 +25,47 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**One chantier is planned and nothing is blocked.** Sixteen archetypes ship, the
-library is embeddable, and the two questions that needed a human are answered
-(`D-020`, `D-021`). `W-038` carries the editor support to a second editor. The
-rest are open **risks** — known ways the renderer is imperfect, each with no
-work item because none has been worth the cost yet.
+**Ten chantiers are planned, one question is open, nothing is blocked.** Sixteen
+archetypes ship and the library is embeddable. The parked ideas were reviewed on
+2026-08-10 and the ones worth building became work items; what stayed an idea
+stayed one on purpose.
+
+### Questions
 
 | id | state | title | notes |
 |---|---|---|---|
+| `Q-004` | open | How does an archetype declare a **second** slot form? | `D-015` gives each archetype one positional shape, taken in order. A true scatter (`I-017`) wants arbitrary `(x, y)` pairs, which is a different shape for the same keyword — and the answer lands in `props.rs`, both grammars and completion at once. It is a language decision, so it is a question before it is a chantier. |
+
+### Work planned
+
+Roughly by cost. Nothing here has started.
+
+| id | state | title | notes |
+|---|---|---|---|
+| `W-039` | planned | `type bytefield` — `packet` with a byte-granular ruler | The cheapest item on this page: configuration over an archetype that already emits one `PlacedNode` per row segment. Was `I-009`. |
+| `W-047` | planned | Activation bars for `type sequence` | The box down a lifeline while a call is outstanding. Completes a shipped archetype rather than adding one; the open question is how an author says where a bar opens and closes. Was `I-016`. |
 | `W-038` | planned | A VS Code extension, beside the Zed one | Same three pieces the Zed extension already has — the tree-sitter grammar, `bgraph-lsp`, and the highlight queries — repackaged for a second editor. VS Code takes a TextMate grammar or a WASM tree-sitter build rather than Zed's git-pinned one, and speaks LSP over a client the extension launches itself, so `src/lsp.rs` is reused unchanged. `X-009` applies here too: the queries are part of the grammar's public surface, and a stale one breaks the language rather than degrading. |
-| `X-009` | mitigated | Editor queries can name node types the grammar has dropped | It broke once — `W-029` renamed `node_declaration` and Zed stopped recognising `.bd` entirely. `the_editor_queries_match_the_grammar` compiles every `.scm` against the generated parser, but only when the `tree-sitter` CLI is on PATH. |
+| `W-044` | planned | `type rack` — server racks, units numbered down a frame | The cheapest of the three infrastructure genres and the one with an immediate use: the estate this project sits beside is documented in machines and cluster nodes. Near enough to a vertical `packet` to borrow its row logic. Was part of `I-010`. |
+| `W-046` | planned | `type radar` — axes radiating from a centre, one polygon per series | Reuses `W-012`'s scales and the series notion `bar` and `xy` already carry. Split out of `I-012`; the venn half shares nothing with it and stayed an idea (`I-018`). |
+| `W-040` | planned | Real font metrics instead of the estimate | **The only planned item that closes an open risk** — `X-005`. Every auto-sized box, every edge-label plate and every `check_contrast` measurement rests on `0.56 × font-size` per character today. Was `I-008`. |
+| `W-043` | planned | `type network` — topology: hosts, links, segments | `free` with its own vocabulary, shapes and diagnostics — the nwdiag territory. `W-022` is the precedent: an archetype may supply words and shapes without taking over placement. Was part of `I-010`. |
+| `W-041` | planned | A tree layout engine — mindmap, treeview, org chart | Three genres for one engine, which is what makes it worth the cost. Hierarchy from group nesting already exists; `W-020` consumes it. Was `I-011`. |
+| `W-045` | planned | `type harness` — wiring harnesses: connectors, pins, cable runs | The WireViz territory, and the least like anything shipped: a pin-to-pin mapping is not a node-and-edge graph wearing a costume. Was part of `I-010`. |
+| `W-042` | planned | PNG and PDF export, from the CLI **and** from the library | The largest surface here. `D-014` is what makes it more than a convenience: a program embedding the library should not be forced to ship an SVG renderer to get a picture. Merges `I-007` and `I-015`, which were the same work seen from two ends. |
+
+### Risks
+
+Known ways this goes wrong. `X-005` now has a chantier; the rest do not, because none has been worth the cost yet.
+
+| id | state | title | notes |
+|---|---|---|---|
+| `X-009` | mitigated | Editor queries can name node types the grammar has dropped | It broke once — `W-029` renamed `node_declaration` and Zed stopped recognising `.bd` entirely. `the_editor_queries_match_the_grammar` compiles every `.scm` against the generated parser, but only when the `tree-sitter` CLI is on PATH. `W-038` doubles the surface this applies to. |
 | `X-002` | mitigated | The two grammars can drift apart | `W-008` cross-checks them on every `cargo test` — but only when the `tree-sitter` CLI is on PATH; without it the test says SKIPPED and passes. |
 | `X-010` | mitigated | `tree-sitter test`'s summary line counts parses, not expectation matches | It read "failed parses: 0" while seven corpus expectations were stale across the `W-029` rename. `the_grammar_corpus_expectations_still_hold` now asserts the **exit code** on each `cargo test`, but only when the CLI is on PATH. |
 | `X-006` | mitigated | Edge labels avoid lines, not each other's readability | `W-010` scores candidates; `W-022` made the node and label penalties proportional to the overlapped area and distance a real cost, which stopped labels fleeing three rows from their own edge. Still local: nothing guarantees the best global arrangement — `W-037` adds the escape hatch (`label-offset`) rather than a better solver, because the author can see what the cost function cannot. |
 | `X-004` | open | Orthogonal routing ignores obstacles | An `ortho` edge can pass straight through a node. No diagnostic. |
 | `X-008` | open | `D-016` removed `opacity`, which is a breaking change | Any file using `opacity: 0.5` now fails with `unknown property`. The repo's own files carried none, and the message names the fix — but nothing migrates it automatically. |
-| `X-005` | open | Text width is estimated, not measured | `0.56 × font-size` per character. Auto-sized boxes are slightly wrong for narrow or wide fonts, and edge-label plates with them. |
+| `X-005` | open | Text width is estimated, not measured | `0.56 × font-size` per character. Auto-sized boxes are slightly wrong for narrow or wide fonts, and edge-label plates with them. `W-040` is the chantier that would retire this. |
 
 ---
 
@@ -145,17 +170,22 @@ Nothing is marked `landed` without a commit to point at.
 | `I-001` | discarded | Absolute coordinates only — rejected in favour of `D-001`; every insertion would renumber its neighbours |
 | `I-002` | discarded | Grid layout as the core model — too rigid for organic diagrams |
 | `I-003` | discarded | Auto-layout with per-node overrides — reintroduces the very fight with the engine the project exists to end |
-| `I-004` | parked | Auto-placement archetypes (`flow` layered from edges, `tree`, `grid`) — proposed, then set aside when `type` turned out to mean genre, not layout |
+| `I-004` | discarded | Auto-placement archetypes (`flow` layered from edges, `tree`, `grid`) — set aside when `type` turned out to mean genre, then **discarded 2026-08-10**: it reintroduces the very fight with the engine `D-001` exists to end, which is what killed `I-001` … `I-003` too |
 | `I-005` | promoted | Further chart genres — surveyed against Mermaid, Kroki, WaveDrom and Vega-Lite, then split into `W-016` … `W-026` |
 | `I-006` | promoted | Containers and subgraphs — became `W-011`, landed |
-| `I-007` | parked | PNG and PDF export |
-| `I-008` | parked | Real font metrics instead of the estimate in `X-005` |
-| `I-009` | parked | `type bytefield` — `packet` with a byte-granular ruler; a variant of `W-005`, not a chantier of its own |
-| `I-010` | parked | Infrastructure genres: network topology, server racks, wiring harnesses (the nwdiag / rackdiag / WireViz territory) |
-| `I-011` | parked | Tree genres: mindmap, treeview, org chart — all one tree-layout engine, which `W-020` will need anyway |
-| `I-012` | parked | `type radar` and `type venn` — both want `W-012`'s scales; radar needs a series notion |
-| `I-013` | parked | Process and planning genres: kanban, user journey, BPMN, C4, requirement diagrams |
+| `I-007` | promoted | PNG and PDF export — became `W-042`, which absorbed `I-015`: exporting from the CLI and exporting from the library are one job |
+| `I-008` | promoted | Real font metrics instead of the estimate in `X-005` — became `W-040` |
+| `I-009` | promoted | `type bytefield` — `packet` with a byte-granular ruler — became `W-039` |
+| `I-010` | promoted | Infrastructure genres (the nwdiag / rackdiag / WireViz territory) — split by genre, since they share a subject and not an engine: `W-043` network, `W-044` rack, `W-045` harness |
+| `I-011` | promoted | Tree genres: mindmap, treeview, org chart — one tree-layout engine, became `W-041` |
+| `I-012` | promoted | `type radar` and `type venn` — split 2026-08-10: radar reuses `W-012`'s scales and the series notion, and became `W-046`; venn is circle geometry with nothing in common with a plot frame, and stayed an idea as `I-018` |
+| `I-013` | discarded | Process and planning genres — a catch-all, and a catch-all never gets decided because one member always holds the others back. C4 had already shipped as `W-025`; the rest split into `I-019` … `I-022` on 2026-08-10 |
 | `I-014` | parked | `type gitgraph` — commits, branches and merges; expressible as nodes and edges, but the layout is its own problem |
-| `I-015` | parked | Raster and PDF export from the library (`W-027`), so an embedding program is not forced to ship an SVG renderer |
-| `I-016` | parked | Activation bars for `type sequence` — the box down a lifeline while a call is outstanding. Needs a way to say where one opens and closes |
-| `I-017` | parked | True scatter for `type xy` — arbitrary `(x, y)` pairs rather than points spread evenly across the axis. Needs a second slot form, which is its own decision |
+| `I-015` | discarded | Raster and PDF export from the library — the same work as `I-007` seen from the embedding end; merged into `W-042` rather than tracked twice |
+| `I-016` | promoted | Activation bars for `type sequence` — became `W-047` |
+| `I-017` | parked | True scatter for `type xy` — arbitrary `(x, y)` pairs rather than points spread evenly across the axis. **Waits on `Q-004`**: it needs a second slot form, which is a language decision, not a chantier |
+| `I-018` | parked | `type venn` — overlapping sets. Circle geometry and label placement inside intersections; shares nothing with `W-012`. Split out of `I-012` |
+| `I-019` | parked | `type kanban` — columns of cards. Close to a group per column with an ordered member list |
+| `I-020` | parked | `type journey` — user journey: steps along a line with a satisfaction score per actor |
+| `I-021` | parked | `type bpmn` — the notation is large and mostly ceremony; the useful subset would have to be chosen before anything is built |
+| `I-022` | parked | `type requirements` — requirements and the links between them (satisfies, derives, verifies). Nodes and typed edges, so mostly vocabulary |

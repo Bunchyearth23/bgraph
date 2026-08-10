@@ -26,7 +26,7 @@ orders  -> db      "sql"
 orders  -> cache   "read-through" { router: ortho }
 ```
 
-```
+```sh
 bgraph diagram.bd -o diagram.svg
 bgraph watch diagram.bd            # live preview on :7878, reloads on save
 bgraph check diagram.bd            # diagnostics as file:line:col
@@ -55,7 +55,7 @@ bgraph docs -o docs/reference.md   # regenerate the reference manual
 `type`, declared once at the top of a file, picks the genre. `free` — nodes
 and edges — is the default; the others read the same statements as data.
 
-```
+```bgraph
 type pie { title: "Traffic sources" donut: 0.55 }
 
 node organic "Organic search" { value: 4820 }
@@ -63,7 +63,7 @@ node direct  "Direct"         { value: 2410 }
 node paid    "Paid"           { value: 410 }
 ```
 
-```
+```bgraph
 type packet { title: "TCP header" width: 32 }
 
 node sport "Source port"      { bits: 0 15 }
@@ -78,7 +78,7 @@ Worked examples: [`diagram.bd`](diagram.bd), [`examples/`](examples).
 
 ## Build
 
-```
+```sh
 cargo build --release        # bgraph and bgraph-lsp
 cargo test
 ./editors/zed/install.sh     # editor support
