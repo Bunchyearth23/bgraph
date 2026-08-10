@@ -226,7 +226,9 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
 
     let total: f64 = entries.iter().map(|(_, v, _)| *v).sum();
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };
@@ -472,7 +474,9 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
     }
 
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };
@@ -529,12 +533,14 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             let (cx, cy) = at(child);
             let rail = rail_of.get(commits[child].2.as_str()).copied().unwrap_or(0);
             let colour = palette[rail.min(palette.len() - 1)].to_string();
-            // An elbow when the rails differ: a straight diagonal across three
-            // rails reads as touching every one it crosses.
+            // A right angle, not a diagonal into the dot: the message sits
+            // above its commit, and a line rising into it crosses the text.
+            // The turn happens between the two commits, where nothing is.
             let points = if (py - cy).abs() < 0.5 {
                 vec![(px, py), (cx, cy)]
             } else {
-                vec![(px, py), (cx - along * 0.45, py), (cx, cy)]
+                let turn = cx - along * 0.45;
+                vec![(px, py), (turn, py), (turn, cy), (cx, cy)]
             };
             polylines.push(Polyline {
                 points,
@@ -789,8 +795,13 @@ pub fn tree(
             for r in &roots {
                 walk(*r, 0, &children, &mut order);
             }
+            // A row has to clear the box that sits on it. `row` is a
+            // *minimum*: asking for 26 with a 29-tall box drew every entry
+            // over the one above it, which is illegible rather than tight.
+            let tallest = sizes.iter().map(|(_, h)| *h).fold(0.0_f64, f64::max);
+            let step = row.max(tallest + 6.0);
             for (line, (i, depth)) in order.iter().enumerate() {
-                pos[*i] = (*depth as f64 * (spacing + 14.0), line as f64 * row);
+                pos[*i] = (*depth as f64 * (spacing + 14.0), line as f64 * step);
             }
         }
         TreeKind::Mind => {
@@ -821,7 +832,9 @@ pub fn tree(
     }
 
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };
@@ -983,7 +996,11 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         .enumerate()
         .map(|(i, (id, _, _, _, _))| (id.as_str(), i))
         .collect();
-    let mut shared: HashMap<(usize, usize), f64> = HashMap::new();
+    // Ordered, not hashed: iterating a `HashMap` emitted the overlap labels in
+    // a different order on different runs, so the same file rendered to
+    // different bytes. The golden test caught it; nothing else would have.
+    let mut shared: std::collections::BTreeMap<(usize, usize), f64> =
+        std::collections::BTreeMap::new();
     for edge in &diagram.edges {
         let (Some(&a), Some(&b)) = (index.get(edge.from.as_str()), index.get(edge.to.as_str()))
         else {
@@ -1010,13 +1027,17 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
             vec![(0.0, 0.0), (d, 0.0)]
         }
         _ => {
-            // Three on an equilateral triangle, sized so each pair overlaps
-            // visibly. Arranged, not solved — and the docs say so.
-            let r = sets
-                .iter()
-                .map(|(_, _, c, _, _)| radius(*c))
-                .fold(0.0_f64, f64::max);
-            let d = r * 1.1;
+            // Three on an equilateral triangle. The radius is set by the
+            // *tightest* pair, not the largest circle: three points at 120°
+            // sit √3·R apart, so R has to be under (rᵢ + rⱼ)/√3 for every pair
+            // or the smallest two never meet — which is a Venn diagram with no
+            // intersections in it. Arranged, not solved; the docs say so.
+            let radii: Vec<f64> = sets.iter().map(|(_, _, c, _, _)| radius(*c)).collect();
+            let tightest = (0..radii.len())
+                .flat_map(|i| ((i + 1)..radii.len()).map(move |j| (i, j)))
+                .map(|(i, j)| radii[i] + radii[j])
+                .fold(f64::MAX, f64::min);
+            let d = tightest / 3.0_f64.sqrt() * 0.72;
             (0..sets.len())
                 .map(|i| {
                     let a = -std::f64::consts::FRAC_PI_2
@@ -1028,7 +1049,9 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
     };
 
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };
@@ -1155,12 +1178,16 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
 
     let base = registry.resolve(Style::node_defaults(), def.item, &[], &[])?;
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };
     let gutter = if ruler {
-        text_width(&[format!("{units}")], 9.0) + 10.0
+        // Room for the widest number *and* air between it and the rail. Four
+        // pixels put the digits under the frame's own border.
+        text_width(&[format!("{units}")], 9.0) + 20.0
     } else {
         0.0
     };
@@ -1206,7 +1233,7 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
             // you count against when you are holding a server.
             annotations.push(Annotation {
                 text: format!("{u}"),
-                x: gutter - 4.0,
+                x: gutter - 9.0,
                 y: y + unit_h * 0.5 + 3.0,
                 anchor: Anchor::End,
                 size: 9.0,
@@ -1326,7 +1353,9 @@ pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
     };
 
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };
@@ -1559,7 +1588,9 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
     };
 
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };
@@ -1771,7 +1802,9 @@ pub fn kanban(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
         diagram.nodes.iter().map(|n| (n.id.as_str(), n)).collect();
 
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };
@@ -1961,7 +1994,9 @@ fn packet_like(
 
     let ruler_h = if ruler { 16.0 } else { 0.0 };
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };
@@ -2130,7 +2165,9 @@ pub fn treemap(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
     let roots = build_tiles(diagram, registry, def, None)?;
 
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };
@@ -2543,7 +2580,9 @@ pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
 
     let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };
@@ -2809,7 +2848,9 @@ pub fn wave(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         .unwrap_or(0);
 
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };
@@ -3207,7 +3248,9 @@ pub fn sankey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
         .max(0.0);
 
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };
@@ -3646,7 +3689,9 @@ pub fn bar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
     };
 
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };
@@ -3900,7 +3945,9 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
     };
 
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };
@@ -4097,7 +4144,9 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
 
     let base = registry.resolve(Style::node_defaults(), def.item, &[], &[])?;
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };
@@ -4253,8 +4302,20 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         )?;
         // The frame sits between the message before it and the one after,
         // never a whole row above — that would swallow the previous message.
-        let above = row * 0.62;
+        // Its title needs a band of its own inside that, or it lands on the
+        // first message and on the lifeline it crosses.
+        let above = row * 0.62 + 14.0;
         let below = row * 0.42;
+
+        // Wide enough to carry its own title clear of the first lifeline it
+        // spans. A plate cannot help here: an activation bar is a node and is
+        // drawn after the frame, so it would cover the plate as well.
+        let title_w = group
+            .label
+            .as_ref()
+            .map(|l| text_width(std::slice::from_ref(l), 12.0) + 26.0)
+            .unwrap_or(0.0);
+        let left = (centre(lo) - column * 0.36).min(centre(lo) - title_w);
 
         groups.push(PlacedGroup {
             lines: group
@@ -4263,9 +4324,9 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
                 .map(|l| vec![l])
                 .unwrap_or_else(|| vec![group.id.value.clone()]),
             rect: Rect {
-                x: centre(lo) - column * 0.36,
+                x: left,
                 y: first_row + first as f64 * row - above,
-                w: (centre(hi) - centre(lo)) + column * 0.72,
+                w: (centre(hi) - left) + column * 0.36,
                 h: (last - first) as f64 * row + above + below,
             },
             style,
@@ -4419,7 +4480,7 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
         .iter()
         .map(|g| {
             let label = g.label.clone().unwrap_or_else(|| g.id.value.clone());
-            text_width(std::slice::from_ref(&label), 11.0) + 16.0
+            text_width(std::slice::from_ref(&label), 11.0) + 24.0
         })
         .fold(0.0_f64, f64::max);
     let names_w = section_w
@@ -4430,7 +4491,9 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
         + 18.0;
 
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };
@@ -4718,7 +4781,9 @@ pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
     }
 
     let title_h = if title.is_some() {
-        TITLE_SIZE * 2.0
+        // Two and a half lines, not two: at two the heading sat on the top
+        // gridline and read as part of the chart rather than above it.
+        TITLE_SIZE * 2.5
     } else {
         0.0
     };

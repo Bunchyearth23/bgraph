@@ -1446,11 +1446,18 @@ fn depth_is_the_row_in_an_orgchart_and_the_indent_in_a_treeview() {
     assert!(org.nodes[3].rect.y >= 200.0, "two levels, two rows");
 
     let view = build(&format!("type treeview {{ row: 20 spacing: 10 }}\n{TREE}"));
-    // Pre-order, one row each: A, B, D, C.
+    // Pre-order, one row each: A, B, D, C. `row` is a *minimum* — asking for
+    // 20 with a taller box drew every entry over the one above it, which is
+    // illegible rather than tight, so the step clears the box.
+    let step = view.nodes[1].rect.y - view.nodes[0].rect.y;
+    assert!(step >= view.nodes[0].rect.h, "a row clears its box: {step}");
     assert_eq!(view.nodes[0].rect.y, 0.0);
-    assert_eq!(view.nodes[1].rect.y, 20.0);
-    assert_eq!(view.nodes[3].rect.y, 40.0, "D follows B");
-    assert_eq!(view.nodes[2].rect.y, 60.0, "C comes after B's subtree");
+    assert_eq!(view.nodes[3].rect.y, step * 2.0, "D follows B");
+    assert_eq!(
+        view.nodes[2].rect.y,
+        step * 3.0,
+        "C comes after B's subtree"
+    );
     assert!(view.nodes[1].rect.x > view.nodes[0].rect.x, "depth indents");
 }
 
@@ -3061,9 +3068,18 @@ fn a_group_is_sized_by_its_members() {
 
     assert_eq!(l.groups.len(), 1);
     let r = l.groups[0].rect;
-    // Members span (0,0)..(150,100); the frame adds its padding all round.
-    assert_eq!((r.x, r.y, r.w, r.h), (-10.0, -10.0, 170.0, 120.0));
+    // Members span (0,0)..(150,100); the frame adds its padding all round, and
+    // a *titled* group reserves a band at the top for the name — without it
+    // the title had nowhere to go but across the border or onto the first
+    // member.
+    assert_eq!((r.x, r.y, r.w, r.h), (-10.0, -26.0, 170.0, 136.0));
     assert_eq!(l.groups[0].lines, vec!["Box"]);
+
+    // Untitled, the band is not reserved: the size is the members plus the
+    // padding and nothing else.
+    let bare = build("group box {\n  padding: 10\n  node a at (0, 0) { size: 50 40 }\n}");
+    let r = bare.groups[0].rect;
+    assert_eq!((r.x, r.y, r.w, r.h), (-10.0, -10.0, 70.0, 60.0));
 }
 
 #[test]

@@ -1,15 +1,19 @@
-// Two sets, so the lens is *solved*: its area is the number written, not a
-// distance chosen by eye (W-053).
+// Three sets. With two the lens is *solved* to the number written; with three
+// the overlaps are labelled but arranged, and `check` says so — three circles
+// cannot honour all seven regions at once (W-053).
 type venn {
-  title: "Rust users, by what they build"
-  radius: 120
+  title: "Who reads which diagram"
+  radius: 105
 }
 
-graph { background: #0b1120 padding: 32 }
-style set { font: 12 #e2e8f0 }
+graph { background: #ffffff padding: 34 }
+style set { font: 12 "Archivo" #1a1a1a }
 
-set embedded "Embedded" 210
-set web      "Web"      340
+set dev  "Developers" 420
+set ops  "Operations" 260
+set arch "Architects" 180
 
-// `<from> -> <to> <shared>` — how many are in both.
-embedded -> web 85
+// `<from> -> <to> <shared>` — how many things the two sets have in common.
+dev  -> ops  120
+ops  -> arch  70
+dev  -> arch 140

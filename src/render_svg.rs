@@ -69,7 +69,7 @@ pub fn render(layout: &Layout) -> String {
         body.push_str(&free_polyline(shape));
     }
     for group in &layout.groups {
-        body.push_str(&group_frame(group));
+        body.push_str(&group_frame(group, &layout.opts.background));
     }
 
     for (edge, route) in layout.edges.iter().zip(&routed) {
@@ -550,7 +550,7 @@ fn free_polyline(p: &Polyline) -> String {
 }
 
 /// A frame and its name, set into the top-left of the border.
-fn group_frame(group: &PlacedGroup) -> String {
+fn group_frame(group: &PlacedGroup, background: &Option<String>) -> String {
     let s = &group.style;
     let r = &group.rect;
 
@@ -574,16 +574,36 @@ fn group_frame(group: &PlacedGroup) -> String {
     if group.lines.iter().any(|l| !l.is_empty()) {
         let size = s.font_size.unwrap_or(12.0);
         let (ox, oy) = s.label_offset.unwrap_or((0.0, 0.0));
+        let text = group.lines.join(" ");
+
+        // A plate of the background, as edge labels get. A frame's title can
+        // sit over a lifeline or a gridline it has no way to avoid, and this
+        // is what already makes every other label readable when it does.
+        if let Some(fill) = background.as_deref().filter(|b| *b != "none") {
+            let w = text_width(std::slice::from_ref(&text), size);
+            let _ = write!(
+                out,
+                r#"<rect x="{}" y="{}" width="{}" height="{}" fill="{}" />"#,
+                n(r.x + 12.0 + ox - 3.0),
+                n(r.y + size * 1.3 + oy - size * 0.72),
+                n(w + 6.0),
+                n(size * 1.4),
+                esc(fill)
+            );
+        }
+
         let _ = write!(
             out,
             r#"<text x="{}" y="{}" text-anchor="start" dominant-baseline="central" font-family="{}" font-size="{}" font-weight="{}"{}>{}</text>"#,
-            n(r.x + 10.0 + ox),
-            n(r.y + size + oy),
+            n(r.x + 12.0 + ox),
+            // In the band the layout reserves for it, clear of both the
+            // frame's own border and the first thing inside.
+            n(r.y + size * 1.3 + oy),
             esc(s.font_family.as_deref().unwrap_or("sans-serif")),
             n(size),
             esc(s.font_weight.as_deref().unwrap_or("600")),
             paint("fill", s.font_color.as_deref().unwrap_or("#64748b")),
-            esc(&group.lines.join(" "))
+            esc(&text)
         );
     }
 

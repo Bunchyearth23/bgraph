@@ -233,7 +233,12 @@ fn shape_allowance(shape: Option<Shape>, mut w: f64, mut h: f64) -> (f64, f64) {
             w *= 1.55;
             h *= 1.55;
         }
-        Shape::Hexagon => w *= 1.20,
+        // The slanted sides eat width at the top and bottom of the text box,
+        // which a single line never reaches and a second one does.
+        Shape::Hexagon => {
+            w *= 1.34;
+            h += 6.0;
+        }
         Shape::Cylinder => h += 14.0,
         _ => {}
     }
@@ -756,12 +761,30 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
 
             // The name heads the box; taking it out of `lines` stops the
             // renderer centring it over the members.
+            // A name centred in a box far wider than itself floats away from
+            // the left-aligned lines beneath it. Past twice its own width the
+            // box is being sized by its content, so the name joins it.
+            let widest = placed
+                .lines
+                .iter()
+                .map(|l| text_width(std::slice::from_ref(l), font))
+                .fold(0.0_f64, f64::max);
+            let adrift = placed.rect.w > widest * 2.0 + pad * 2.0;
+
             for (i, line) in std::mem::take(&mut placed.lines).into_iter().enumerate() {
                 annotations.push(Annotation {
                     text: line,
-                    x: placed.rect.cx(),
+                    x: if adrift {
+                        placed.rect.x + pad
+                    } else {
+                        placed.rect.cx()
+                    },
                     y: placed.rect.y + pad + (i as f64 + 0.5) * font * 1.45,
-                    anchor: Anchor::Middle,
+                    anchor: if adrift {
+                        Anchor::Start
+                    } else {
+                        Anchor::Middle
+                    },
                     size: font,
                     color: s.font_color.clone().unwrap_or_else(|| "#111827".into()),
                     weight: s.font_weight.clone().unwrap_or_else(|| "600".into()),
@@ -881,6 +904,8 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             })
             .collect();
 
+        let wires = diagram.edges.len().max(1);
+        let mut drawn = 0usize;
         for (edge, placed) in diagram.edges.iter().zip(edges.iter()) {
             let (Some(&a), Some(&b)) = (by_id.get(edge.from.as_str()), by_id.get(edge.to.as_str()))
             else {
@@ -917,7 +942,14 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             } else {
                 (ba.x, bb.right(), -14.0)
             };
-            let mid = (xa + out + xb - out) / 2.0;
+            // Each wire turns in its own column. Sharing one put every vertical
+            // segment on top of the others, which is a bundle of wires drawn as
+            // a single unreadable line — the opposite of what a loom drawing is
+            // for. They fan across the gap in declaration order.
+            let span = (xb - out) - (xa + out);
+            let lane = (drawn as f64 + 1.0) / (wires as f64 + 1.0);
+            let mid = xa + out + span * lane;
+            drawn += 1;
 
             polylines.push(Polyline {
                 points: vec![
@@ -938,12 +970,20 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
 
             // The pin pair is no longer written: the wire touches both, which
             // says it better than a label beside the line ever did.
+            //
+            // The name goes just clear of the shell, above the horizontal run
+            // it leaves on — at the elbow it sat across the vertical segment,
+            // which is the one place on the wire that is already busy.
             if let Some(label) = edge.label.as_ref().filter(|l| !l.is_empty()) {
                 annotations.push(Annotation {
                     text: label.clone(),
-                    x: mid,
-                    y: (ya + yb) / 2.0 - 4.0,
-                    anchor: Anchor::Middle,
+                    x: xa + out * 1.4,
+                    y: ya - 4.0,
+                    anchor: if out > 0.0 {
+                        Anchor::Start
+                    } else {
+                        Anchor::End
+                    },
                     size: placed.style.font_size.unwrap_or(11.0),
                     color: placed
                         .style
@@ -1152,11 +1192,15 @@ fn place_all(
                 continue;
             };
 
+            // A titled group reserves a band at the top for its name. Without
+            // it the title had nowhere to go: on the border it crossed the
+            // frame, and inside it landed on the first member.
+            let title = if group.label.is_some() { 16.0 } else { 0.0 };
             let frame = Rect {
                 x: inner.x - padding,
-                y: inner.y - padding,
+                y: inner.y - padding - title,
                 w: inner.w + padding * 2.0,
-                h: inner.h + padding * 2.0,
+                h: inner.h + padding * 2.0 + title,
             };
 
             let (frame, delta) = match &group.placement {
