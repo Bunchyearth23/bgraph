@@ -54,6 +54,20 @@ The library keeps the split: `render_source` takes text and refuses an
 the semver promise both rest on it doing no I/O. `render_file` takes a path
 and resolves them.
 
+### Named themes
+
+`--theme light`, `--theme dark`, `--theme print`. A theme **is** a style
+file — the same `.bds` source, parsed by the same parser — laid *underneath*
+what the diagram declares, so `--theme dark` on a file that colours one box
+red gives a dark diagram with a red box. A theme that overrode the file would
+make the flag destructive rather than useful.
+
+The theme also supplies a `background`, but only when the file did not, for
+the same reason.
+
+`print` is the one worth knowing about: black and white, every distinction
+carried by the stroke, so it survives a grayscale printer.
+
 ---
 
 ## Archetypes
@@ -440,6 +454,7 @@ Label text is XML-escaped on output, so `<`, `&` and quotes are safe.
 bgraph diagram.bd -o diagram.svg    # render once
 bgraph diagram.bd -o diagram.png    # …with the `png` feature; --scale 2 for twice the size
 bgraph diagram.bd -o diagram.json   # the solved geometry, for another program
+bgraph diagram.bd --theme dark      # a named palette under the file's own styles
 bgraph watch diagram.bd             # show it, and reload when it changes
 bgraph watch diagram.svg            # …a picture works too; the extension decides
 bgraph watch diagram.bd --server    # …the browser preview rather than a window

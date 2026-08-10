@@ -6941,3 +6941,87 @@ fn the_composed_example_set_still_draws() {
     let alone = crate::compose::load(&dir.join("core.bd")).expect("core.bd composes alone");
     crate::layout::solve(&alone.diagram).expect("and draws alone");
 }
+
+// ------------------------------------------------- named themes (I-029)
+
+#[test]
+fn every_theme_is_a_style_file_that_parses_and_resolves() {
+    // A theme *is* a `.bds`, run through the same parser and registry as one
+    // somebody writes. If that stopped being true, this is where it shows.
+    for theme in crate::themes::THEMES {
+        let parsed = parse_diagram(theme.styles)
+            .unwrap_or_else(|e| panic!("theme `{}` does not parse: {e:#}", theme.name));
+        crate::style::Registry::build(&parsed.styles)
+            .unwrap_or_else(|e| panic!("theme `{}` does not resolve: {e:#}", theme.name));
+        assert!(
+            parsed.nodes.is_empty() && parsed.edges.is_empty(),
+            "theme `{}` declares more than styles",
+            theme.name
+        );
+    }
+}
+
+#[test]
+fn every_theme_is_readable() {
+    // Validated for contrast the way the categorical palette already is: a
+    // theme that ships text nobody can read is worse than no theme.
+    for theme in crate::themes::THEMES {
+        let mut diagram = parse_diagram("node a \"A\"\nnode b \"B\" right-of a\na -> b\n").unwrap();
+        crate::themes::apply(&mut diagram, theme.name).expect("it applies");
+
+        let unreadable: Vec<String> = crate::check::check(&diagram)
+            .into_iter()
+            .filter(|d| d.message.contains("contrast"))
+            .map(|d| d.message)
+            .collect();
+        assert!(
+            unreadable.is_empty(),
+            "theme `{}`: {unreadable:?}",
+            theme.name
+        );
+    }
+}
+
+#[test]
+fn a_theme_goes_underneath_the_file_rather_than_over_it() {
+    // A theme that overrode the file would make `--theme` destructive rather
+    // than useful: it would silently discard the one box the author coloured
+    // on purpose.
+    let mut diagram = parse_diagram("node a \"A\" { fill: #f43f5e }\n").unwrap();
+    crate::themes::apply(&mut diagram, "dark").unwrap();
+    let l = crate::layout::solve(&diagram).unwrap();
+    assert_eq!(l.nodes[0].style.fill.as_deref(), Some("#f43f5e"));
+
+    // …and a named style the file declares wins over the theme's of the same
+    // name, which is the same rule one level up.
+    let mut diagram = parse_diagram("style node { fill: #ffffff }\nnode a \"A\"\n").unwrap();
+    crate::themes::apply(&mut diagram, "dark").unwrap();
+    let l = crate::layout::solve(&diagram).unwrap();
+    assert_eq!(l.nodes[0].style.fill.as_deref(), Some("#ffffff"));
+}
+
+#[test]
+fn a_declared_background_beats_the_themes() {
+    let mut diagram = parse_diagram("graph { background: #123456 }\nnode a \"A\"\n").unwrap();
+    crate::themes::apply(&mut diagram, "dark").unwrap();
+    let l = crate::layout::solve(&diagram).unwrap();
+    assert_eq!(l.opts.background.as_deref(), Some("#123456"));
+
+    // …and without one, the theme supplies it.
+    let mut diagram = parse_diagram("node a \"A\"\n").unwrap();
+    crate::themes::apply(&mut diagram, "dark").unwrap();
+    let l = crate::layout::solve(&diagram).unwrap();
+    assert_eq!(l.opts.background.as_deref(), Some("#0b1120"));
+}
+
+#[test]
+fn an_unknown_theme_names_the_ones_that_exist() {
+    let mut diagram = parse_diagram("node a \"A\"\n").unwrap();
+    let message = format!(
+        "{:#}",
+        crate::themes::apply(&mut diagram, "neon").expect_err("`neon` is not a theme")
+    );
+    for name in ["neon", "light", "dark", "print"] {
+        assert!(message.contains(name), "{message}");
+    }
+}

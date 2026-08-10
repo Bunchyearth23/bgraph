@@ -689,6 +689,7 @@ bgraph check diagram.bd
 bgraph fmt diagram.bd
 bgraph completions fish
 bgraph init pie
+bgraph diagram.bd --theme dark
 ```
 
 The output extension picks the writer. A flag would be a second way of saying
@@ -731,6 +732,11 @@ broken file never stops the others — mid-edit that is the normal state of the
 file being worked on. `--follow` additionally opens a window on whichever file
 changed last; it is opt-in, because a window that changes subject on its own is
 one you stop trusting.
+
+`--theme` lays a named palette — `light`, `dark`, `print` — *underneath* what
+the file declares, so the one box coloured on purpose survives it. A theme is
+a style file and nothing more: the same source, the same parser, one mechanism
+rather than two.
 
 `init` writes a working file for a genre — the archetype's shape stated from
 the compiler's own tables, over the genre's example — so the first thing you

@@ -47,6 +47,11 @@ struct Cli {
     /// has no resolution to choose
     #[arg(long, default_value_t = 1.0, value_name = "N")]
     scale: f64,
+
+    /// A named palette laid underneath the file's own styles: light, dark,
+    /// print. What the file declares still wins
+    #[arg(long, value_name = "NAME")]
+    theme: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -445,7 +450,10 @@ fn run() -> Result<i32> {
     // Through the composer rather than the parser, so `include` resolves
     // against the file that wrote it. A file with no includes takes exactly
     // the same path and comes out the same.
-    let composed = bgraph::compose::load(&input)?;
+    let mut composed = bgraph::compose::load(&input)?;
+    if let Some(theme) = &cli.theme {
+        bgraph::themes::apply(&mut composed.diagram, theme)?;
+    }
     let layout = layout::solve(&composed.diagram)?;
 
     // The output extension picks the writer. A flag would be a second way to

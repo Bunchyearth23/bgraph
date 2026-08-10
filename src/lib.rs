@@ -139,6 +139,8 @@ pub mod render_svg;
 pub mod report;
 #[allow(missing_docs)]
 pub mod style;
+#[allow(missing_docs)]
+pub mod themes;
 
 // Support for the `bgraph` and `bgraph-lsp` binaries, not part of the library.
 #[allow(missing_docs)]
