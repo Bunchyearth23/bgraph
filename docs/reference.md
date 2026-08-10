@@ -30,6 +30,7 @@ bgraph watch docs/diagrams          # a directory: build every .bd as it changes
 bgraph watch docs/diagrams --once   # …once, non-zero on failure — a build step
 bgraph check diagram.bd             # diagnostics only; non-zero on error
 bgraph check diagram.bd --ci        # …the flat form, whatever stdout is
+bgraph diff old.bd new.bd -o d.svg  # what appeared, what left, what moved
 bgraph report.bd --data q3.json     # fill a template's holes from JSON
 bgraph report.bd --set year=2026    # …or bind a scalar on the command line
 bgraph report.bd --rows r=sales.csv # …or one hole from the rows of a CSV

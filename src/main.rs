@@ -128,6 +128,17 @@ enum Command {
         /// bash | elvish | fish | powershell | zsh | man
         shell: String,
     },
+    /// Draw two versions of a diagram as one picture: what appeared, what
+    /// left, what moved
+    Diff {
+        /// The earlier file
+        before: PathBuf,
+        /// The later one
+        after: PathBuf,
+
+        #[arg(short, long, default_value = "diff.svg")]
+        output: PathBuf,
+    },
     /// Write a working file for a genre; omit the genre to list them
     Init {
         /// The archetype: pie, gantt, er, sequence, … — `free` for the
@@ -185,6 +196,29 @@ fn watch_dir(
     }
 
     watch::build_dir(dir, out, once)?;
+    Ok(0)
+}
+
+/// Two versions of a diagram, drawn as one.
+///
+/// Matched by identifier, which the language already gives every box — so
+/// this is a set difference on the solved geometry rather than an image
+/// comparison, and it stays vector and deterministic.
+fn diff_files(before: &std::path::Path, after: &std::path::Path, output: &PathBuf) -> Result<i32> {
+    let old = layout::solve(&bgraph::compose::load(before)?.diagram)
+        .with_context(|| format!("in {}", before.display()))?;
+    let new = layout::solve(&bgraph::compose::load(after)?.diagram)
+        .with_context(|| format!("in {}", after.display()))?;
+
+    let picture = bgraph::diff::compare(&old, &new);
+    fs::write(output, render_svg::render(&picture))
+        .with_context(|| format!("cannot write {}", output.display()))?;
+    println!(
+        "{} → {} → {}",
+        before.display(),
+        after.display(),
+        output.display()
+    );
     Ok(0)
 }
 
@@ -346,6 +380,11 @@ fn run() -> Result<i32> {
         #[cfg(feature = "completions")]
         Some(Command::Completions { shell }) => return completions(&shell),
         Some(Command::Init { genre, output }) => return init(genre, output),
+        Some(Command::Diff {
+            before,
+            after,
+            output,
+        }) => return diff_files(&before, &after, &output),
         Some(Command::Docs { output }) => {
             let manual = bgraph::docgen::reference();
             match output {

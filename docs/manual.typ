@@ -710,6 +710,7 @@ bgraph diagram.bd -o big.pdf --page a4
 bgraph watch diagram.bd
 bgraph watch docs/diagrams
 bgraph check diagram.bd
+bgraph diff old.bd new.bd
 bgraph fmt diagram.bd
 bgraph completions fish
 bgraph init pie
@@ -768,6 +769,12 @@ one you stop trusting.
 the file declares, so the one box coloured on purpose survives it. A theme is
 a style file and nothing more: the same source, the same parser, one mechanism
 rather than two.
+
+`diff` draws two versions of a diagram as one picture: green for what
+appeared, amber with a ghost for what moved, and what is gone in a row
+underneath. Matched by identifier — which the language already gives every
+box — so it is a set difference on the solved geometry rather than an image
+comparison, and it stays vector and deterministic.
 
 `init` writes a working file for a genre — the archetype's shape stated from
 the compiler's own tables, over the genre's example — so the first thing you

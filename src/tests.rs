@@ -7701,3 +7701,83 @@ fn sheets_overlap_so_a_seam_is_readable() {
         "sheets advance by {step}, which leaves no overlap"
     );
 }
+
+// ------------------------------------------------- visual diff (I-050)
+
+fn diff_of(before: &str, after: &str) -> Layout {
+    crate::diff::compare(&build(before), &build(after))
+}
+
+#[test]
+fn an_added_box_is_green_and_a_removed_one_is_red() {
+    let l = diff_of(
+        "node a \"A\"\nnode gone \"Gone\" right-of a",
+        "node a \"A\"\nnode fresh \"Fresh\" right-of a",
+    );
+    let fresh = l.nodes.iter().find(|n| n.lines == ["Fresh"]).unwrap();
+    let gone = l.nodes.iter().find(|n| n.lines == ["Gone"]).unwrap();
+    assert_eq!(fresh.style.stroke.as_deref(), Some("#16a34a"));
+    assert_eq!(gone.style.stroke.as_deref(), Some("#dc2626"));
+}
+
+#[test]
+fn a_removed_box_goes_below_rather_than_under_what_replaced_it() {
+    // The first attempt drew removals in place. Something new usually takes
+    // the space, and the two labels then sat on top of each other — the test
+    // render read "Qaeuhee". A gutter never collides.
+    let l = diff_of(
+        "node a \"A\"\nnode cache \"Cache\" right-of a",
+        "node a \"A\"\nnode queue \"Queue\" right-of a",
+    );
+    let queue = l.nodes.iter().find(|n| n.lines == ["Queue"]).unwrap();
+    let cache = l.nodes.iter().find(|n| n.lines == ["Cache"]).unwrap();
+    assert!(
+        cache.rect.y > queue.rect.bottom(),
+        "the removed box is still on top of its replacement"
+    );
+}
+
+#[test]
+fn a_moved_box_keeps_a_ghost_of_where_it_was() {
+    // The pair is what says "moved" — either alone reads as removed or added.
+    let l = diff_of(
+        "node a \"A\"\nnode b \"B\" below a gap 40",
+        "node a \"A\"\nnode b \"B\" below a gap 120",
+    );
+    let b = l.nodes.iter().find(|n| n.lines == ["B"]).unwrap();
+    assert_eq!(b.style.stroke.as_deref(), Some("#d97706"));
+    assert!(
+        l.nodes
+            .iter()
+            .any(|n| n.lines.is_empty() && n.style.stroke.as_deref() == Some("#d97706")),
+        "no ghost was left where the box used to be"
+    );
+}
+
+#[test]
+fn an_unchanged_diagram_shows_nothing_but_itself() {
+    let source = "node a \"A\"\nnode b \"B\" right-of a\na -> b";
+    let l = diff_of(source, source);
+    assert!(
+        l.nodes
+            .iter()
+            .all(|n| n.style.stroke.as_deref() == Some("#94a3b8")),
+        "an unchanged diagram reported a change"
+    );
+}
+
+#[test]
+fn a_box_nudged_by_a_neighbours_label_is_not_called_moved() {
+    // Half a pixel, not zero: reporting every fractional shift would make
+    // each diff say everything moved, and nobody reads a diff like that.
+    let l = diff_of(
+        "node a \"A\"\nnode b \"B\" right-of a",
+        "node a \"A\"\nnode b \"B\" right-of a",
+    );
+    assert!(
+        !l.nodes
+            .iter()
+            .any(|n| n.style.stroke.as_deref() == Some("#d97706")),
+        "a still diagram reported a move"
+    );
+}
