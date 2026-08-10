@@ -3,7 +3,6 @@ name = "zed_bgraph"
 version = "0.1.0"
 edition = "2024"
 publish = false
-# Proprietary, like the crate it ships — see ../../LICENSE (D-020).
 license-file = "../../LICENSE"
 
 [lib]
