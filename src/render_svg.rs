@@ -209,6 +209,18 @@ fn place_label(
     let (anchor, (dx, dy)) = label_anchor(&routed[index].points);
     let (w, h) = label_size(text, style);
 
+    // A declared offset is a decision. Honour it exactly — measured from the
+    // default anchor, not from wherever the solver would have run to, so the
+    // same source always puts the label in the same place.
+    if let Some((ox, oy)) = style.label_offset {
+        return Rect {
+            x: anchor.0 + ox - w / 2.0,
+            y: anchor.1 + oy - h / 2.0,
+            w,
+            h,
+        };
+    }
+
     // Perpendicular to the segment the label sits on.
     let len = (dx * dx + dy * dy).sqrt().max(1e-6);
     let (px, py) = (-dy / len, dx / len);
@@ -370,6 +382,41 @@ fn segments_cross(p1: (f64, f64), p2: (f64, f64), p3: (f64, f64), p4: (f64, f64)
     ((d1 > 0.0) != (d2 > 0.0)) && ((d3 > 0.0) != (d4 > 0.0))
 }
 
+/// Where a node's label ends up once it has been moved — `None` while it sits
+/// in its shape, which the bounds already cover.
+fn moved_node_label(node: &PlacedNode) -> Option<Rect> {
+    let (dx, dy) = node.style.label_offset?;
+    if node.lines.iter().all(|l| l.is_empty()) {
+        return None;
+    }
+    let font_size = node.style.font_size.unwrap_or(14.0);
+    let (w, h) = (
+        text_width(&node.lines, font_size),
+        node.lines.len() as f64 * font_size * 1.3,
+    );
+    Some(Rect {
+        x: node.rect.cx() + dx - w / 2.0,
+        y: node.rect.cy() + dy - h / 2.0,
+        w,
+        h,
+    })
+}
+
+/// The same for a group's title, which hangs off the top-left of its frame.
+fn moved_group_label(group: &PlacedGroup) -> Option<Rect> {
+    let (dx, dy) = group.style.label_offset?;
+    if group.lines.iter().all(|l| l.is_empty()) {
+        return None;
+    }
+    let size = group.style.font_size.unwrap_or(12.0);
+    Some(Rect {
+        x: group.rect.x + 10.0 + dx,
+        y: group.rect.y + size / 2.0 + dy,
+        w: text_width(&[group.lines.join(" ")], size),
+        h: size,
+    })
+}
+
 fn bounds(layout: &Layout, routed: &[Routed]) -> (f64, f64, f64, f64) {
     let mut min_x = f64::MAX;
     let mut min_y = f64::MAX;
@@ -400,6 +447,9 @@ fn bounds(layout: &Layout, routed: &[Routed]) -> (f64, f64, f64, f64) {
     }
     boxes.extend(layout.annotations.iter().map(annotation_bounds));
     boxes.extend(routed.iter().filter_map(|r| r.label.as_ref().map(|l| l.1)));
+    // A label the author moved can leave the shape it belongs to entirely.
+    boxes.extend(layout.nodes.iter().filter_map(moved_node_label));
+    boxes.extend(layout.groups.iter().filter_map(moved_group_label));
 
     // Edge geometry can leave the nodes' box entirely — a self-loop does.
     for route in routed {
@@ -504,11 +554,12 @@ fn group_frame(group: &PlacedGroup) -> String {
 
     if group.lines.iter().any(|l| !l.is_empty()) {
         let size = s.font_size.unwrap_or(12.0);
+        let (ox, oy) = s.label_offset.unwrap_or((0.0, 0.0));
         let _ = write!(
             out,
             r#"<text x="{}" y="{}" text-anchor="start" dominant-baseline="central" font-family="{}" font-size="{}" font-weight="{}"{}>{}</text>"#,
-            n(r.x + 10.0),
-            n(r.y + size),
+            n(r.x + 10.0 + ox),
+            n(r.y + size + oy),
             esc(s.font_family.as_deref().unwrap_or("sans-serif")),
             n(size),
             esc(s.font_weight.as_deref().unwrap_or("600")),
@@ -731,11 +782,13 @@ fn node_label(node: &PlacedNode) -> String {
     let s = &node.style;
     let font_size = s.font_size.unwrap_or(14.0);
     let line_h = font_size * 1.3;
-    let start = node.rect.cy() - (node.lines.len() as f64 - 1.0) * line_h / 2.0;
+    let (ox, oy) = s.label_offset.unwrap_or((0.0, 0.0));
+    let cx = node.rect.cx() + ox;
+    let start = node.rect.cy() + oy - (node.lines.len() as f64 - 1.0) * line_h / 2.0;
 
     let mut out = format!(
         r#"<text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" font-family="{}" font-size="{}" font-weight="{}"{}>"#,
-        n(node.rect.cx()),
+        n(cx),
         n(start),
         esc(s.font_family.as_deref().unwrap_or("sans-serif")),
         n(font_size),
@@ -747,7 +800,7 @@ fn node_label(node: &PlacedNode) -> String {
         let _ = write!(
             out,
             r#"<tspan x="{}" dy="{}">{}</tspan>"#,
-            n(node.rect.cx()),
+            n(cx),
             if i == 0 { "0".to_string() } else { n(line_h) },
             esc(line)
         );

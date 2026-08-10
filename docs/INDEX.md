@@ -25,18 +25,19 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**Nothing is planned and nothing is blocked.** Sixteen archetypes ship, the
+**One chantier is planned and nothing is blocked.** Sixteen archetypes ship, the
 library is embeddable, and the two questions that needed a human are answered
-(`D-020`, `D-021`). What remains are three open **risks** — known ways the
-renderer is imperfect, each with no work item because none has been worth the
-cost yet.
+(`D-020`, `D-021`). `W-038` carries the editor support to a second editor. The
+rest are open **risks** — known ways the renderer is imperfect, each with no
+work item because none has been worth the cost yet.
 
 | id | state | title | notes |
 |---|---|---|---|
+| `W-038` | planned | A VS Code extension, beside the Zed one | Same three pieces the Zed extension already has — the tree-sitter grammar, `bgraph-lsp`, and the highlight queries — repackaged for a second editor. VS Code takes a TextMate grammar or a WASM tree-sitter build rather than Zed's git-pinned one, and speaks LSP over a client the extension launches itself, so `src/lsp.rs` is reused unchanged. `X-009` applies here too: the queries are part of the grammar's public surface, and a stale one breaks the language rather than degrading. |
 | `X-009` | mitigated | Editor queries can name node types the grammar has dropped | It broke once — `W-029` renamed `node_declaration` and Zed stopped recognising `.bd` entirely. `the_editor_queries_match_the_grammar` compiles every `.scm` against the generated parser, but only when the `tree-sitter` CLI is on PATH. |
 | `X-002` | mitigated | The two grammars can drift apart | `W-008` cross-checks them on every `cargo test` — but only when the `tree-sitter` CLI is on PATH; without it the test says SKIPPED and passes. |
 | `X-010` | mitigated | `tree-sitter test`'s summary line counts parses, not expectation matches | It read "failed parses: 0" while seven corpus expectations were stale across the `W-029` rename. `the_grammar_corpus_expectations_still_hold` now asserts the **exit code** on each `cargo test`, but only when the CLI is on PATH. |
-| `X-006` | mitigated | Edge labels avoid lines, not each other's readability | `W-010` scores candidates; `W-022` made the node and label penalties proportional to the overlapped area and distance a real cost, which stopped labels fleeing three rows from their own edge. Still local: nothing guarantees the best global arrangement. |
+| `X-006` | mitigated | Edge labels avoid lines, not each other's readability | `W-010` scores candidates; `W-022` made the node and label penalties proportional to the overlapped area and distance a real cost, which stopped labels fleeing three rows from their own edge. Still local: nothing guarantees the best global arrangement — `W-037` adds the escape hatch (`label-offset`) rather than a better solver, because the author can see what the cost function cannot. |
 | `X-004` | open | Orthogonal routing ignores obstacles | An `ortho` edge can pass straight through a node. No diagnostic. |
 | `X-008` | open | `D-016` removed `opacity`, which is a breaking change | Any file using `opacity: 0.5` now fails with `unknown property`. The repo's own files carried none, and the message names the fix — but nothing migrates it automatically. |
 | `X-005` | open | Text width is estimated, not measured | `0.56 × font-size` per character. Auto-sized boxes are slightly wrong for narrow or wide fonts, and edge-label plates with them. |
@@ -78,6 +79,7 @@ not copies.
 
 | id | date | title | commit |
 |---|---|---|---|
+| `W-037` | 2026-08-07 | `label-offset` — the manual escape hatch out of automatic label placement. Moves an edge label, a node's text or a group's title; on an edge it also pins the label, so the solver stops second-guessing a position the author declared. The viewBox follows a label moved outside its shape | this commit |
 | `W-001` | 2026-07-31 | Core language: pest grammar, spanned AST, `check`, anchor solver, style cascade | `1b53ec3` |
 | `W-002` | 2026-07-31 | SVG renderer: 6 shapes, straight and ortho routing, arrow heads, content-derived viewBox | `1b53ec3` |
 | `W-003` | 2026-07-31 | `bgraph watch` — dependency-free live preview | `1b53ec3` |

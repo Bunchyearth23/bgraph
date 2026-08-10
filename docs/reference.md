@@ -207,6 +207,8 @@ Aliases are marked. They behave identically to the property they alias; the edit
 | `font-color` | both | `font-color: <color>` | Text color. |
 | `text-color` *(alias)* | both | `text-color: <color>` | Alias of `font-color`. |
 | `font-weight` | both | `font-weight: <weight>` | Any SVG weight — `400`, `bold`, `600`… |
+| `label-offset` | both | `label-offset: <dx> <dy>` | Move the text by hand, in user units — positive is right and down. `dy` may be omitted. On an edge it also **pins** the label: the automatic avoidance stops moving it, and the offset is measured from the middle of the line. |
+| `text-offset` *(alias)* | both | `text-offset: <dx> <dy>` | Alias of `label-offset`. |
 | `arrow` | edge | `arrow: <solid\|open\|dot\|none>` | Arrow head style. The arrow token decides which ends carry one. |
 | `head` *(alias)* | edge | `head: <solid\|open\|dot\|none>` | Alias of `arrow`. |
 | `router` | edge | `router: <straight\|ortho>` | `straight` draws a direct line; `ortho` draws a right-angled elbow. |
@@ -894,7 +896,7 @@ type wave {
   title: "SPI transfer"
   period: 34
   lane: 26 16
-  every: 4
+  every: 1
 }
 graph { background: #0b1120 padding: 30 }
 style signal { font: 12 #e2e8f0 stroke: #7dd3fc }

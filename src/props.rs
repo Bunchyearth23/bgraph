@@ -242,6 +242,25 @@ pub const PROPS: &[PropDef] = &[
         doc: "Any SVG weight — `400`, `bold`, `600`…",
     },
     PropDef {
+        name: "label-offset",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "label-offset: <dx> <dy>",
+        doc: "Move the text by hand, in user units — positive is right and down. \
+              `dy` may be omitted. On an edge it also **pins** the label: the \
+              automatic avoidance stops moving it, and the offset is measured \
+              from the middle of the line.",
+    },
+    PropDef {
+        name: "text-offset",
+        alias: true,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "text-offset: <dx> <dy>",
+        doc: "Alias of `label-offset`.",
+    },
+    PropDef {
         name: "arrow",
         alias: false,
         ctx: Ctx::Edge,

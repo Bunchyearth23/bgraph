@@ -211,6 +211,7 @@ the compiler's own tables so it cannot drift. The ones you reach for most:
 | `font` | both | size, `"family"`, color, weight — in any order |
 | `arrow` | edges | `solid` \| `open` \| `dot` \| `none` |
 | `router` | edges | `straight` \| `ortho` |
+| `label-offset` | both | two numbers — move the text by hand |
 | `shadow` | nodes | `on` / `off` |
 
 Colors are `#rgb`, `#rgba`, `#rrggbb`, `#rrggbbaa` or an SVG color name
@@ -259,6 +260,44 @@ orders -> billing "charge" .critical { router: ortho, stroke: #f43f5e 2 }
 `router: ortho` produces an elbow (right angles) instead of a straight line.
 Endpoints are clipped against the real shape outline, so arrows meet
 diamonds and ellipses on their edge, not on an invisible bounding box.
+
+### Moving a label
+
+An edge label lands on the middle of its line and slides sideways when that
+would put it on top of a node, another line or a label already placed. The
+solver is good, not clairvoyant — on a busy diagram it eventually runs out of
+room. `label-offset` is the escape hatch:
+
+```bgraph
+node worker "Worker"
+node db "Postgres" below worker gap 80
+
+worker -> db "read / write" { label-offset: -30 12 }   // left 30, down 12
+```
+
+Two numbers, in user units, positive being right and down; the second may be
+omitted for a purely horizontal nudge. On an edge the offset is measured from
+the middle of the line and it **pins** the label — the automatic avoidance
+stops moving it, so the position you write is the position you get, and it
+does not drift when a neighbouring edge changes.
+
+The same property moves a node's label inside its shape, and a group's title
+along its frame:
+
+```bgraph
+group dmz "DMZ" {
+  label-offset: 0 -22                    // title above the frame, not inside it
+  node gateway "Gateway"
+}
+
+node store "PostgreSQL" below gateway gap 80 {
+  shape: cylinder
+  label-offset: 0 8                      // clear of the cylinder's cap
+}
+```
+
+Nothing is clipped for it: the viewBox follows a label that has been moved
+outside the shape it belongs to.
 
 ---
 

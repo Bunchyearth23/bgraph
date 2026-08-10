@@ -2503,6 +2503,148 @@ fn a_label_prefers_clipping_a_node_to_leaving_its_edge() {
     );
 }
 
+/// Centres of the edge-label plates, in source order, in layout coordinates —
+/// the canvas translation is applied by the wrapping `<g>`, not by these
+/// numbers. A plate is the rect carrying `rx="3"`; its attributes are the ones
+/// nearest it.
+fn plate_centres(svg: &str) -> Vec<(f64, f64)> {
+    svg.match_indices(r#" rx="3""#)
+        .map(|(at, _)| {
+            let head = &svg[..at];
+            let attr = |name: &str| -> f64 {
+                head.rsplit(&format!(r#"{name}=""#))
+                    .next()
+                    .and_then(|s| s.split('"').next())
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or_else(|| panic!("the label plate declares {name}"))
+            };
+            (
+                attr("x") + attr("width") / 2.0,
+                attr("y") + attr("height") / 2.0,
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn a_declared_offset_pins_the_edge_label_where_it_says() {
+    // The same crossing that makes `an_edge_label_steps_off_a_line_it_would_sit_on`
+    // move: `a -> b` runs at y=30, `c -> d` crosses it exactly at the midpoint.
+    let crossing = |extra: &str| {
+        format!(
+            r#"
+            node a at (0, 0) {{ size: 60 60 }}
+            node b at (200, 0) {{ size: 60 60 }}
+            node c at (120, -120) {{ size: 20 20 }}
+            node d at (120, 120) {{ size: 20 20 }}
+            a -> b "on the crossing" {{ {extra} }}
+            c -> d
+        "#
+        )
+    };
+
+    // A zero offset is still an offset: it says "leave it alone", and the
+    // avoidance that would otherwise have moved it stops.
+    let pinned = render_svg::render(&build(&crossing("label-offset: 0 0")));
+    let (x, y) = plate_centres(&pinned)[0];
+    assert!(
+        (x - 130.0).abs() < 0.5 && (y - 30.0).abs() < 0.5,
+        "a pinned label must sit on the midpoint, not at ({x}, {y})"
+    );
+
+    // And a real offset is measured from that same midpoint, so it is read
+    // straight off the source rather than off wherever the solver ran to.
+    let moved = render_svg::render(&build(&crossing("label-offset: -24 40")));
+    let (x, y) = plate_centres(&moved)[0];
+    assert!(
+        (x - 106.0).abs() < 0.5 && (y - 70.0).abs() < 0.5,
+        "expected the label at (106, 70), found ({x}, {y})"
+    );
+}
+
+#[test]
+fn a_moved_edge_label_still_pushes_the_next_one_out_of_the_way() {
+    // Pinning one label must not hide it from the solver. `first` is moved
+    // down onto the exact spot `second` would take, so the automatic
+    // placement has to see it there and go elsewhere.
+    let l = build(
+        r#"
+        node a at (0, 0) { size: 40 40 }
+        node b at (240, 0) { size: 40 40 }
+        node c at (0, 100) { size: 40 40 }
+        node d at (240, 100) { size: 40 40 }
+        a -> b "first" { label-offset: 0 100 }
+        c -> d "second"
+    "#,
+    );
+
+    let centres = plate_centres(&render_svg::render(&l));
+    assert_eq!(centres.len(), 2, "both labels are drawn");
+    assert!(
+        (centres[0].1 - 120.0).abs() < 0.5,
+        "the pinned label moved: {:?}",
+        centres[0]
+    );
+    assert!(
+        (centres[1].1 - centres[0].1).abs() > 12.0,
+        "the second label stacked on the pinned one: {centres:?}"
+    );
+}
+
+#[test]
+fn a_moved_node_label_takes_the_canvas_with_it() {
+    let source = |extra: &str| {
+        format!(
+            r#"
+            graph {{ padding: 0 }}
+            node store "PostgreSQL" at (0, 0) {{ size: 60 40 {extra} }}
+        "#
+        )
+    };
+
+    let put = render_svg::render(&build(&source("")));
+    let moved = render_svg::render(&build(&source("label-offset: 0 80")));
+
+    // The label is drawn 80 below the centre of a box that is 40 tall…
+    assert!(
+        moved.contains(r#"<text x="30" y="100""#),
+        "the node label did not move: {moved}"
+    );
+    // …so the drawing is taller by everything the label now sticks out by.
+    let height = |svg: &str| {
+        svg.split(r#"viewBox="0 0 "#)
+            .nth(1)
+            .and_then(|s| s.split('"').next())
+            .and_then(|s| s.split_whitespace().nth(1).map(str::to_string))
+            .and_then(|s| s.parse::<f64>().ok())
+            .expect("a viewBox")
+    };
+    assert!(
+        height(&moved) > height(&put) + 60.0,
+        "the label was left outside the canvas: {} vs {}",
+        height(&moved),
+        height(&put)
+    );
+}
+
+#[test]
+fn a_label_offset_cascades_like_any_other_property() {
+    let l = build(
+        r#"
+        style nudged { label-offset: 12 -4 }
+        node a "A" .nudged at (0, 0)
+        node b "B" at (200, 0)
+        a -> b "edge" .nudged
+    "#,
+    );
+
+    assert_eq!(l.nodes[0].style.label_offset, Some((12.0, -4.0)));
+    assert_eq!(l.edges[0].style.label_offset, Some((12.0, -4.0)));
+    // A single number is a horizontal nudge; the vertical one stays zero.
+    let l = build(r#"node a "A" { label-offset: 9 }"#);
+    assert_eq!(l.nodes[0].style.label_offset, Some((9.0, 0.0)));
+}
+
 // ---------------------------------------------------------------- members
 
 #[test]

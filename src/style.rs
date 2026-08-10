@@ -109,6 +109,10 @@ pub struct Style {
     pub font_family: Option<String>,
     pub font_color: Option<String>,
     pub font_weight: Option<String>,
+    /// Manual nudge of the label, in user units. On an edge it also pins the
+    /// label: a position the author declared is a decision, so the automatic
+    /// avoidance leaves it alone.
+    pub label_offset: Option<(f64, f64)>,
     pub head: Option<Head>,
     /// Cardinality at the tail of an edge — `er` only.
     pub from_card: Option<Head>,
@@ -180,6 +184,7 @@ impl Style {
             font_family,
             font_color,
             font_weight,
+            label_offset,
             head,
             from_card,
             to_card,
@@ -332,6 +337,13 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
             style.font_color = first.and_then(|x| x.as_paint()).map(String::from)
         }
         "font-weight" => style.font_weight = first.and_then(|x| x.as_text()).map(String::from),
+        // `label-offset: 18` is a horizontal nudge; the vertical one is opt-in.
+        "label-offset" | "text-offset" => {
+            style.label_offset = Some((
+                first.and_then(|x| x.as_num()).unwrap_or(0.0),
+                v.get(1).and_then(|x| x.as_num()).unwrap_or(0.0),
+            ))
+        }
         "arrow" | "head" => {
             let word = first.and_then(|x| x.as_word()).unwrap_or_default();
             style.head = Some(match word {
