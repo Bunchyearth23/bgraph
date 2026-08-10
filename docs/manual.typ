@@ -16,7 +16,7 @@
   title: "bgraph",
   subtitle: "A diagram language where you decide the layout",
   author: "Soundnodes",
-  date: "10 August 2026 · version 1.0",
+  date: "10 August 2026 · version 1.1",
 )
 #v(1fr)
 #pagebreak(weak: true)
@@ -636,6 +636,7 @@ bgraph diagram.bd -o diagram.svg
 bgraph diagram.bd -o diagram.pdf
 bgraph watch diagram.bd
 bgraph check diagram.bd
+bgraph fmt diagram.bd
 ```
 
 The output extension picks the writer. A flag would be a second way of saying
@@ -644,12 +645,22 @@ what the filename already says.
 `check` prints `file:line:col: severity: message` and exits non-zero on an
 error — the form editors and build systems already understand.
 
+`fmt` fixes what is structural: indentation, trailing space, runs of blank
+lines. It leaves columns lined up by hand exactly as written — indentation is
+structural and so its business, alignment is taste and is not. `--check`
+reports instead of writing, and exits non-zero, so one command serves a person
+and a build.
+
 *The live preview*
 
 `watch` serves the diagram and reloads on every save, reporting parse and
 layout errors in place so a broken file never costs you the preview. Scroll to
 zoom, drag to pan, `f` to fit, `0` for actual size. The view survives the
 reload, or zooming while editing would be pointless.
+
+`watch --data q3.json` previews a *filled* template, re-reading the data on
+every request — so editing the numbers reloads too. Without data it draws the
+shape, holes and all, which is what you are editing before the data exists.
   ],
   [
 *The editors*
@@ -675,6 +686,11 @@ wrote it.
 
 Colour literals get a swatch and a picker, and an identifier lights up
 everywhere it is written.
+
+In a template it goes further: a hole is offered from the ones the file already
+uses, hovering one says whether it is bound once or once per row, the outline
+lists them as the file's parameters, and a line that would repeat over two
+lists is a squiggle rather than a surprise at render time.
   ],
 )
 ]
@@ -713,8 +729,22 @@ bgraph report.bd --data q3.json -o q3.svg
 ```
 
 An array of objects becomes repeated lines; an array of scalars becomes a list.
+A CSV works too, and maps onto repetition exactly — a header names the fields,
+every other line writes its statement once:
+
+```
+bgraph report.bd --rows source=sales.csv -o q3.svg
+```
   ],
   [
+*A hole may stand where a name goes*
+
+`slice {{r.id}} "…"` is the point of repeating a line per row — the data
+supplies the id of the statement it fills. Both grammars accept it, so the file
+parses and highlights in the editor as well as it renders. Not where the
+archetype goes: the archetype decides which properties exist, so it has to be
+known before anything else can be checked.
+
 *Where a value lands decides how it is written*
 
 Text in an identifier position is written bare, because the grammar wants a
@@ -766,10 +796,11 @@ here.
    removed the larger half of the error; the rest cannot be removed. It does
    not apply to PDF, where the font is guaranteed.],
 
-  [*Orthogonal routing ignores obstacles*],
-  [An `ortho` link can pass straight through a box, with no diagnostic.],
-  [A router that avoids obstacles is a different piece of work. Until then,
-   `router: straight` or a placement change is the answer.],
+  [*Orthogonal routing avoids nothing*],
+  [An `ortho` link can pass straight through a box — but it says so.],
+  [A router that avoids obstacles is a different piece of work. Drawing a wrong
+   picture *in silence* was the part worth fixing first, so the crossing is
+   reported and the message names the ways out.],
 
   [*Edge labels avoid lines, not each other*],
   [On a busy diagram a label can end up somewhere no cost function would have
@@ -803,6 +834,12 @@ positions; the first is a property of the format itself.
 #dtable(
   header: ([Version], [Date], [What changed]),
   columns: (auto, auto, 1fr),
+
+  [*1.1*], [10 August 2026], [Corrected a claim that had become false: an
+   `ortho` link crossing a box is now reported, where this document said there
+   was no diagnostic. Added `bgraph fmt`, `watch --data`, `--rows` for CSV, and
+   the rule that a hole may stand where a name goes — with what the editor now
+   knows about a template.],
 
   [*1.0*], [10 August 2026], [First edition. Written for someone about to write
    `.bd` files: the five statements, placement, the cascade, the twenty-eight
