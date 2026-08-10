@@ -5650,16 +5650,29 @@ fn every_checked_in_svg_is_the_one_the_renderer_produces() {
             continue;
         }
         let source = std::fs::read_to_string(&path).expect("readable");
-        // A template's holes are unbound, so it renders to nothing yet.
-        if source.contains("{{") {
-            continue;
-        }
         let name = path.file_name().unwrap().to_string_lossy().to_string();
+
+        // A template renders once it has data. When a `.json` sits beside it,
+        // that is the rendered form worth checking in — and leaving it out
+        // would mean the one example of the templating flow was the one nobody
+        // could see.
+        let data = path.with_extension("json");
+        let fresh = match (source.contains("{{"), data.exists()) {
+            (true, false) => continue,
+            (true, true) => {
+                let raw = std::fs::read_to_string(&data).expect("readable");
+                let bound = Bindings::from_json(&raw).unwrap_or_else(|e| panic!("{name}: {e:#}"));
+                Template::parse(&source)
+                    .and_then(|t| t.render(&bound))
+                    .unwrap_or_else(|e| panic!("{name}: {e:#}"))
+            }
+            _ => crate::render_source(&source).unwrap_or_else(|e| panic!("{name}: {e:#}")),
+        };
+
         let svg = path.with_extension("svg");
         let Ok(committed) = std::fs::read_to_string(&svg) else {
             panic!("{name} has no rendered .svg beside it");
         };
-        let fresh = crate::render_source(&source).unwrap_or_else(|e| panic!("{name}: {e:#}"));
         assert_eq!(
             committed.trim_end(),
             fresh.trim_end(),
