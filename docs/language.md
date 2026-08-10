@@ -397,6 +397,8 @@ bgraph diagram.bd -o diagram.svg    # render once
 bgraph watch diagram.bd             # http://127.0.0.1:7878, reloads on save
 bgraph watch diagram.bd --port 9000
 bgraph check diagram.bd             # diagnostics only, no output file
+bgraph report.bd --data q3.json     # fill a template from a JSON object
+bgraph report.bd --data - --emit    # …from a pipe, printing the filled source
 bgraph docs -o docs/reference.md    # regenerate the reference manual
 ```
 

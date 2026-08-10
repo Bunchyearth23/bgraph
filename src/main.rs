@@ -27,6 +27,12 @@ struct Cli {
     #[arg(long = "set", value_name = "NAME=VALUE")]
     set: Vec<String>,
 
+    /// Bind holes from a JSON object; `-` reads standard input. Lists and
+    /// arrays of objects become lists and repeated lines, which `--set`
+    /// cannot express.
+    #[arg(long = "data", value_name = "FILE")]
+    data: Option<PathBuf>,
+
     /// Print the filled source instead of rendering it
     #[arg(long)]
     emit: bool,
@@ -98,8 +104,26 @@ fn run() -> Result<i32> {
 
     // A file with holes is a template; one without renders exactly as before.
     let template = bgraph::Template::parse(&source)?;
-    if !template.holes().is_empty() || !cli.set.is_empty() {
-        let mut values = bgraph::Bindings::new();
+    if !template.holes().is_empty() || !cli.set.is_empty() || cli.data.is_some() {
+        // Data first, `--set` after: a flag on the command line is the thing
+        // you are changing right now, so it wins over the file.
+        let mut values = match &cli.data {
+            #[cfg(feature = "json")]
+            Some(path) => {
+                let raw = if path.as_os_str() == "-" {
+                    std::io::read_to_string(std::io::stdin())
+                        .context("cannot read the data from standard input")?
+                } else {
+                    fs::read_to_string(path)
+                        .with_context(|| format!("cannot read {}", path.display()))?
+                };
+                bgraph::Bindings::from_json(&raw)
+                    .with_context(|| format!("in {}", path.display()))?
+            }
+            #[cfg(not(feature = "json"))]
+            Some(_) => bail!("this build has no JSON reader — rebuild with the `json` feature"),
+            None => bgraph::Bindings::new(),
+        };
         for pair in &cli.set {
             let Some((name, raw)) = pair.split_once('=') else {
                 bail!("`--set {pair}` needs a `name=value`");

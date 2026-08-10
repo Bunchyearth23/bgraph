@@ -1,0 +1,10 @@
+{
+  "quarter": "Traffic sources — Q3 2026",
+  "source": [
+    { "id": "organic",  "name": "Organic search", "value": 4820 },
+    { "id": "direct",   "name": "Direct",         "value": 2410 },
+    { "id": "referral", "name": "Referral",       "value": 1180 },
+    { "id": "social",   "name": "Social",         "value": 690 },
+    { "id": "paid",     "name": "Paid",           "value": 410 }
+  ]
+}

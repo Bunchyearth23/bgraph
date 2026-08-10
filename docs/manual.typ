@@ -703,8 +703,25 @@ A line holding a `{{row.field}}` hole is written once per row. The line is the
 unit because a statement already ends at a newline, so it needs no block syntax
 and cannot nest wrongly. A line naming two lists is refused when the template is
 read, not at the first render.
+
+*The same from the command line.* A JSON object binds the holes, so a template
+is filled from a query result or a pipe without writing a program:
+
+```
+bgraph report.bd --data q3.json -o q3.svg
+… | bgraph report.bd --data - --emit
+```
+
+An array of objects becomes repeated lines; an array of scalars becomes a list.
   ],
   [
+*Where a value lands decides how it is written*
+
+Text in an identifier position is written bare, because the grammar wants a
+name there; anywhere else it is quoted, because a bare word would become a
+second statement. Text that cannot be a name is refused *by name*, rather than
+written and left to fail as a parse error further down the file.
+
 *What is promised*
 
 Four things carry a stability promise: rendering a source, the template API,

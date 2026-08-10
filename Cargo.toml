@@ -24,7 +24,7 @@ name = "bgraph-lsp"
 path = "src/bin/bgraph-lsp.rs"
 
 [features]
-default = ["all-archetypes", "pdf"]
+default = ["all-archetypes", "pdf", "json"]
 all-archetypes = [
     "pie",
     "packet",
@@ -87,6 +87,10 @@ state = []
 # PDF is vector output, so it needs no rasteriser and no dependency
 # (`D-027`). On by default; switch it off and the writer is not compiled.
 pdf = []
+
+# Reading bindings from JSON. `serde_json` is already here for the language
+# server's wire format, so this gates code rather than a dependency.
+json = []
 
 [dependencies]
 anyhow = "1.0.104"

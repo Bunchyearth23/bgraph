@@ -17,6 +17,23 @@ use std::fmt::Write;
 
 use anyhow::{Result, bail};
 
+/// Whether text can stand as a bare name. The same rule the grammar uses:
+/// a leading letter or underscore, then letters, digits, underscores and
+/// interior hyphens — a trailing hyphen would make `a-` swallow an arrow.
+fn is_identifier(text: &str) -> bool {
+    let mut chars = text.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !(first.is_ascii_alphabetic() || first == '_') {
+        return false;
+    }
+    !text.ends_with('-')
+        && text
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+}
+
 /// What a program binds to a hole.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -72,6 +89,99 @@ impl<T: Into<Value>> From<Vec<T>> for Value {
     fn from(items: Vec<T>) -> Value {
         Value::List(items.into_iter().map(Into::into).collect())
     }
+}
+
+/// Bindings read from JSON — the shape a program already has its data in.
+///
+/// This exists so the **binary** can do what the library can. `--set` binds a
+/// scalar, which is enough for a title and a year and nothing else: the case
+/// templating was built for is a chart whose number of slices is not known
+/// when the template is written, and that needs a list or a set of rows.
+///
+/// The mapping is total and the refusals are deliberate:
+///
+/// | JSON | becomes |
+/// |---|---|
+/// | string | [`Value::Text`] — escaped for wherever it lands |
+/// | number | [`Value::Number`] |
+/// | `true` / `false` | [`Value::Text`], written as it reads |
+/// | array of scalars | [`Value::List`] |
+/// | array of objects | [`Value::Rows`] |
+/// | anything else | an error naming the hole |
+///
+/// A `null` is refused rather than skipped: a hole nobody filled is exactly
+/// the silent no-op this language does not do anywhere else. A mixed array is
+/// refused because it is ambiguous — one line repeated, or one line of
+/// values? An object nested inside a row is refused because repetition is one
+/// line and one list, with no nesting (`D-021`).
+#[cfg(feature = "json")]
+impl Bindings {
+    /// Read a JSON object into bindings. See the table above for the mapping
+    /// and for what is refused.
+    pub fn from_json(source: &str) -> Result<Bindings> {
+        let parsed: serde_json::Value =
+            serde_json::from_str(source).map_err(|e| anyhow::anyhow!("{e}"))?;
+        let serde_json::Value::Object(map) = parsed else {
+            bail!("the data must be an object of hole names, not a bare value");
+        };
+
+        let mut out = Bindings::new();
+        for (name, value) in map {
+            out.insert(name.clone(), from_json_value(&name, &value, true)?);
+        }
+        Ok(out)
+    }
+}
+
+#[cfg(feature = "json")]
+fn from_json_value(name: &str, value: &serde_json::Value, top: bool) -> Result<Value> {
+    use serde_json::Value as J;
+    Ok(match value {
+        J::String(s) => Value::Text(s.clone()),
+        J::Number(n) => Value::Number(
+            n.as_f64()
+                .ok_or_else(|| anyhow::anyhow!("`{name}` is a number this cannot represent"))?,
+        ),
+        J::Bool(b) => Value::Text(b.to_string()),
+        J::Null => bail!(
+            "`{name}` is null — bind a value or leave the hole out, but do not \
+             ask for nothing to be written"
+        ),
+        J::Array(items) if items.is_empty() => Value::List(Vec::new()),
+        J::Array(items) => {
+            let objects = items.iter().filter(|i| i.is_object()).count();
+            if objects == items.len() {
+                if !top {
+                    bail!("`{name}` nests rows inside rows, and repetition is one line deep");
+                }
+                let mut rows = Vec::with_capacity(items.len());
+                for item in items {
+                    let J::Object(fields) = item else { unreachable!() };
+                    let mut row = Bindings::new();
+                    for (field, value) in fields {
+                        row.insert(field.clone(), from_json_value(field, value, false)?);
+                    }
+                    rows.push(row);
+                }
+                Value::Rows(rows)
+            } else if objects == 0 {
+                let mut list = Vec::with_capacity(items.len());
+                for item in items {
+                    list.push(from_json_value(name, item, false)?);
+                }
+                Value::List(list)
+            } else {
+                bail!(
+                    "`{name}` mixes objects and plain values — one is a set of rows, \
+                     the other a list, and nothing can tell which was meant"
+                );
+            }
+        }
+        J::Object(_) => bail!(
+            "`{name}` is an object; bind its fields separately, or make it an array \
+             of objects to repeat a line"
+        ),
+    })
 }
 
 /// The values a render is given, by hole name.
@@ -253,7 +363,7 @@ fn fill(source: &str, values: &Bindings) -> Result<String> {
     for line in source.split_inclusive('\n') {
         let prefixes = row_prefixes(line, values);
         match prefixes.as_slice() {
-            [] => fill_line(&mut out, line, values, None, &mut in_string),
+            [] => fill_line(&mut out, line, values, None, &mut in_string)?,
             [prefix] => {
                 let Some(Value::Rows(rows)) = values.get(prefix) else {
                     unreachable!("`row_prefixes` only returns bound rows")
@@ -269,7 +379,7 @@ fn fill(source: &str, values: &Bindings) -> Result<String> {
                     if separate && i > 0 {
                         out.push('\n');
                     }
-                    fill_line(&mut out, line, values, Some((prefix, row)), &mut in_string);
+                    fill_line(&mut out, line, values, Some((prefix, row)), &mut in_string)?;
                 }
             }
             many => bail!(
@@ -315,7 +425,7 @@ fn fill_line(
     values: &Bindings,
     row: Option<(&str, &Bindings)>,
     in_string: &mut bool,
-) {
+) -> Result<()> {
     let mut rest = line;
 
     while let Some(open) = rest.find("{{") {
@@ -327,7 +437,7 @@ fn fill_line(
         let Some(close) = body.find("}}") else {
             // An unterminated `{{` is text, not a hole.
             out.push_str(after);
-            return;
+            return Ok(());
         };
 
         let name = body[..close].trim();
@@ -339,7 +449,24 @@ fn fill_line(
             Some(Value::Rows(_)) | None => {
                 let _ = write!(out, "{{{{{name}}}}}");
             }
-            Some(value) => write_value(out, value, *in_string),
+            Some(value) => {
+                let slot = slot_of(before);
+                // A name the grammar cannot read is refused here rather than
+                // written and left to fail as a parse error three lines away,
+                // where nothing points back at the binding that caused it.
+                if slot == Slot::Ident
+                    && !*in_string
+                    && let Value::Text(text) = value
+                    && !is_identifier(text)
+                {
+                    bail!(
+                        "`{name}` is bound to {text:?}, which cannot be a name — this hole \
+                         declares an identifier, and a name is a letter or `_` followed by \
+                         letters, digits, `_` or interior `-`"
+                    );
+                }
+                write_value_at(out, value, *in_string, slot);
+            }
         }
 
         rest = &body[close + 2..];
@@ -347,6 +474,7 @@ fn fill_line(
 
     out.push_str(rest);
     *in_string = string_state(rest, *in_string);
+    Ok(())
 }
 
 /// A hole's value: from the row in scope when it names that row's prefix,
@@ -388,7 +516,47 @@ fn string_state(text: &str, mut inside: bool) -> bool {
     inside
 }
 
-fn write_value(out: &mut String, value: &Value, in_string: bool) {
+/// Where on its line a hole sits, which decides how text is written into it.
+///
+/// A value position quotes text, because a bare word there would have to be an
+/// identifier and `slice a {{name}}` must not become two statements. An
+/// **identifier** position is the opposite: quoting there produces a string
+/// where the grammar wants a name, and the file stops parsing. The two cannot
+/// share a rule, which is why `Template::parse` probes with both.
+#[derive(Clone, Copy, PartialEq)]
+enum Slot {
+    Ident,
+    Value,
+}
+
+/// Which one, from the tokens already on the line.
+///
+/// Positional rather than keyword-based on purpose: a rule that asked "is the
+/// word before this an item keyword?" would misread `node slice {{v}}`, since
+/// nothing stops an item being *named* `slice`.
+fn slot_of(before: &str) -> Slot {
+    let line = before.rsplit('\n').next().unwrap_or(before);
+    let tokens: Vec<&str> = line.split_whitespace().collect();
+
+    match tokens.as_slice() {
+        // First word of a statement: an edge's tail.
+        [] => Slot::Ident,
+        // Second word: the identifier a statement declares — unless the first
+        // was a property key, which owns the rest of the line.
+        [first] if !first.ends_with(':') && !first.contains('{') => Slot::Ident,
+        // The head of an edge.
+        rest if matches!(
+            rest[rest.len() - 1],
+            "->" | "-->" | "..>" | "<->" | "--" | ".."
+        ) =>
+        {
+            Slot::Ident
+        }
+        _ => Slot::Value,
+    }
+}
+
+fn write_value_at(out: &mut String, value: &Value, in_string: bool, slot: Slot) {
     match value {
         Value::Raw(text) => out.push_str(text),
         Value::Number(n) => {
@@ -400,6 +568,12 @@ fn write_value(out: &mut String, value: &Value, in_string: bool) {
             out.push_str(&text);
         }
         Value::Text(text) if in_string => out.push_str(&escape(text)),
+        // In an identifier position the grammar wants a name, so text is
+        // written bare — which is what lets a row of data supply the id of the
+        // statement it fills. `render` is what refuses text that is not a
+        // valid identifier; quoting it here would produce a file that parses
+        // as something else.
+        Value::Text(text) if slot == Slot::Ident && is_identifier(text) => out.push_str(text),
         // In a value position a bare word would have to be an identifier, so
         // text is quoted: `slice a {{name}}` must not become two statements.
         Value::Text(text) => {
@@ -413,7 +587,7 @@ fn write_value(out: &mut String, value: &Value, in_string: bool) {
                 if i > 0 {
                     out.push(' ');
                 }
-                write_value(out, item, in_string);
+                write_value_at(out, item, in_string, slot);
             }
         }
     }

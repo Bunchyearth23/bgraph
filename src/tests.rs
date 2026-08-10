@@ -662,6 +662,103 @@ fn the_manual_names_every_genre_and_its_word() {
     assert!(manual.contains("Twenty-eight genres and `free`"), "the prose count");
 }
 
+// ---------------------------------------------------------------------- W-057
+
+#[cfg(feature = "json")]
+#[test]
+fn json_binds_what_set_cannot() {
+    // The point of the whole thing: `--set` binds a scalar, and the case
+    // templating exists for is a chart whose number of slices is not known
+    // when the template is written.
+    let data = r#"{
+        "quarter": "Q3 2026",
+        "cats": ["a", "b"],
+        "r": [
+            { "id": "north", "name": "North", "value": 10 },
+            { "id": "south", "name": "South", "value": 20 }
+        ]
+    }"#;
+    let bound = Bindings::from_json(data).expect("reads");
+
+    let t = Template::parse("type pie { title: \"{{quarter}}\" }\nslice {{r.id}} \"{{r.name}}\" {{r.value}}")
+        .expect("parses");
+    let filled = t.fill(&bound).expect("fills");
+
+    assert_eq!(
+        filled,
+        "type pie { title: \"Q3 2026\" }\nslice north \"North\" 10\nslice south \"South\" 20",
+        "{filled}"
+    );
+}
+
+#[cfg(feature = "json")]
+#[test]
+fn an_identifier_hole_is_written_bare_and_a_value_hole_is_quoted() {
+    // The two cannot share a rule. A quoted name does not parse; a bare value
+    // becomes a second statement. The position on the line is what decides.
+    let bound = Bindings::from_json(r#"{ "r": [{ "id": "north", "who": "North" }] }"#)
+        .expect("reads");
+
+    // `{{r.id}}` is the second word — an identifier. `{{r.who}}` is data.
+    let t = Template::parse("node {{r.id}} \"x\" .cls\nnode b\n{{r.id}} -> b \"{{r.who}}\"")
+        .expect("parses");
+    let filled = t.fill(&bound).expect("fills");
+
+    assert!(filled.starts_with("node north \"x\""), "{filled}");
+    assert!(filled.contains("north -> b \"North\""), "the head of an edge is a name too: {filled}");
+}
+
+#[cfg(feature = "json")]
+#[test]
+fn a_property_key_does_not_make_the_next_word_a_name() {
+    // `fill: {{c}}` puts the hole second on its line, but the first token owns
+    // the rest of it — the naive "second word is the id" rule got this wrong.
+    let bound = Bindings::from_json(r#"{ "c": "red" }"#).expect("reads");
+    let t = Template::parse("node a {\n  fill: {{c}}\n}").expect("parses");
+    assert!(t.fill(&bound).expect("fills").contains("fill: \"red\""));
+
+    // And an item may be *named* after a keyword, so the rule cannot ask
+    // whether the previous word is one.
+    let bound = Bindings::from_json(r#"{ "v": "text" }"#).expect("reads");
+    let t = Template::parse("node slice {{v}}").expect("parses");
+    assert!(t.fill(&bound).expect("fills").contains("node slice \"text\""));
+}
+
+#[cfg(feature = "json")]
+#[test]
+fn a_name_the_grammar_cannot_read_is_refused_by_name() {
+    // Written and left to fail as a parse error three lines away, nothing
+    // would point back at the binding that caused it.
+    let bound = Bindings::from_json(r#"{ "r": [{ "id": "two words" }] }"#).expect("reads");
+    let t = Template::parse("node {{r.id}} \"x\"").expect("parses");
+    let e = format!("{:#}", t.fill(&bound).expect_err("should refuse"));
+
+    assert!(e.contains("r.id"), "{e}");
+    assert!(e.contains("two words"), "{e}");
+    assert!(e.contains("cannot be a name"), "{e}");
+}
+
+#[cfg(feature = "json")]
+#[test]
+fn json_refuses_what_it_cannot_read_unambiguously() {
+    let cases = [
+        (r#"[1, 2]"#, "must be an object"),
+        (r#"{ "x": null }"#, "is null"),
+        (r#"{ "x": [1, { "a": 2 }] }"#, "mixes objects and plain values"),
+        (r#"{ "x": { "a": 1 } }"#, "is an object"),
+        (r#"{ "x": [{ "a": [{ "b": 1 }] }] }"#, "one line deep"),
+    ];
+    for (source, wanted) in cases {
+        let e = format!("{:#}", Bindings::from_json(source).expect_err(source));
+        assert!(e.contains(wanted), "{source} → {e}");
+    }
+
+    // And the shapes it does read.
+    let ok = Bindings::from_json(r#"{ "a": "x", "b": 2, "c": true, "d": [1, 2], "e": [] }"#)
+        .expect("reads");
+    assert_eq!(ok.get("c"), Some(&crate::template::Value::Text("true".into())));
+}
+
 // ---------------------------------------------------------------------- W-042
 
 #[cfg(feature = "pdf")]
@@ -4976,10 +5073,11 @@ fn every_archetype_has_a_feature_and_every_feature_an_archetype() {
         .take_while(|l| !l.starts_with('['))
         .filter_map(|l| l.split_once(" = []"))
         .map(|(name, _)| name.trim())
-        // `pdf` gates an output format, not a genre. It is named here rather
+        // `pdf` gates an output format and `json` an input one, not a genre.
+        // They are named here rather
         // than filtered by a pattern, so a second non-archetype feature has to
         // be justified in this list instead of slipping past a wildcard.
-        .filter(|name| *name != "pdf")
+        .filter(|name| !matches!(*name, "pdf" | "json"))
         .collect();
 
     let mut archetypes: Vec<&str> = crate::props::ARCHETYPES

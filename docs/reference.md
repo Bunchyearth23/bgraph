@@ -21,6 +21,8 @@ bgraph diagram.bd -o diagram.svg    # render
 bgraph watch diagram.bd             # live preview on :7878, reloads on save
 bgraph watch diagram.bd --port 9000
 bgraph check diagram.bd             # diagnostics only; non-zero on error
+bgraph report.bd --data q3.json     # fill a template's holes from JSON
+bgraph report.bd --set year=2026    # …or bind a scalar on the command line
 bgraph docs -o docs/reference.md    # regenerate this file
 bgraph-lsp                          # language server, LSP over stdin/stdout
 ```

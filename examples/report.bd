@@ -1,0 +1,14 @@
+// A template: the shape is fixed, the data arrives at render time. Fill it
+// with `--data`, or from a program through `Bindings`.
+//
+//   bgraph examples/report.bd --data examples/report.json -o report.svg
+type pie {
+  title: "{{quarter}}"
+  labels: both
+  legend: on
+}
+graph { background: #ffffff padding: 30 }
+style slice { font: 12 "Archivo" #1a1a1a }
+
+// One line, one list: this line is written once per row of `source`.
+slice {{source.id}} "{{source.name}}" {{source.value}}
