@@ -1,4 +1,4 @@
-//! A native window, for `bgraph view` and `bgraph watch`.
+//! A native window, for `bgraph watch`.
 //!
 //! The same viewer as the browser page and the same controls — scroll to zoom,
 //! drag to pan, `f` to fit, `0` for actual size, `r` to reload, and the file
@@ -15,7 +15,7 @@
 //! WebKitGTK installed on whoever runs the binary, to show a page this already
 //! knows how to draw.
 //!
-//! Without the feature, `view` and `watch` serve the HTTP preview instead —
+//! Without the feature, `watch` serves the HTTP preview instead —
 //! which is not a lesser thing, it is what a remote machine and a second
 //! screen both want.
 

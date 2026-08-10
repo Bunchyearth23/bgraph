@@ -16,7 +16,7 @@
   title: "bgraph",
   subtitle: "A diagram language where you decide the layout",
   author: "Soundnodes",
-  date: "10 August 2026 · version 1.1",
+  date: "10 August 2026 · version 1.2",
 )
 #v(1fr)
 #pagebreak(weak: true)
@@ -637,7 +637,6 @@ bgraph diagram.bd -o diagram.pdf
 bgraph watch diagram.bd
 bgraph check diagram.bd
 bgraph fmt diagram.bd
-bgraph view diagram.svg
 ```
 
 The output extension picks the writer. A flag would be a second way of saying
@@ -663,10 +662,16 @@ reload, or zooming while editing would be pointless.
 every request — so editing the numbers reloads too. Without data it draws the
 shape, holes and all, which is what you are editing before the data exists.
 
-`view` is the same page pointed at a picture rather than a source. An `.svg` is
-served as it is, so it works on a file bgraph never wrote — and because the
-reload follows the file's timestamp, it keeps up with whatever is regenerating
-it.
+`watch` takes a picture as readily as a source: an `.svg` is shown as it is, so
+it works on a file bgraph never wrote — and because the reload follows the
+file's timestamp, it keeps up with whatever is regenerating it. The extension
+decides which it is, the same rule `-o` uses.
+
+Built with the `window` feature it opens a *native window* rather than
+serving a page: no port, no browser, and the SVG rasterised directly. That is
+the one place this project takes a dependency tree, which is why it is opt-in.
+`--server` asks for the page instead, and a machine with no display is told
+rather than left waiting.
   ],
   [
 *The editors*
@@ -840,6 +845,11 @@ positions; the first is a property of the format itself.
 #dtable(
   header: ([Version], [Date], [What changed]),
   columns: (auto, auto, 1fr),
+
+  [*1.2*], [10 August 2026], [`watch` shows a picture as readily as a source,
+   and opens a native window when the build has one. Records that the viewer is
+   the one place the project takes a dependency tree, and that it is therefore
+   opt-in.],
 
   [*1.1*], [10 August 2026], [Corrected a claim that had become false: an
    `ortho` link crossing a box is now reported, where this document said there

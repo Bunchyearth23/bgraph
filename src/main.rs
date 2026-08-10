@@ -46,8 +46,8 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Command {
-    /// Serve a live-reloading preview. Takes a `.bd` to render, or an `.svg`
-    /// to show as it is — the same viewer either way
+    /// Show a diagram and reload it when it changes. Takes a `.bd` to render
+    /// or an `.svg` to show as it is — the extension decides
     Watch {
         /// Input `.bd` or `.svg` file
         input: PathBuf,
@@ -75,18 +75,6 @@ enum Command {
     Check {
         /// Input DSL file
         input: PathBuf,
-    },
-    /// Open a picture in the viewer: pan, zoom, fit, reloads on save
-    View {
-        /// Input `.svg` or `.bd` file
-        input: PathBuf,
-
-        /// Serve the preview over HTTP instead of opening a window
-        #[arg(long)]
-        server: bool,
-
-        #[arg(short, long, default_value_t = 7878)]
-        port: u16,
     },
     /// Reformat a file to the canonical shape
     Fmt {
@@ -188,14 +176,6 @@ fn run() -> Result<i32> {
             port,
             server,
         }) => return show_or_serve(input, data, port, server),
-        // The same viewer. `view` exists because that is the word for what you
-        // want when the file is already a picture, and nobody looks for
-        // `watch` to open one.
-        Some(Command::View {
-            input,
-            port,
-            server,
-        }) => return show_or_serve(input, None, port, server),
         Some(Command::Check { input }) => return check_file(&input),
         Some(Command::Fmt { inputs, check }) => return format_files(&inputs, check),
         Some(Command::Docs { output }) => {

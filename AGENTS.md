@@ -55,7 +55,7 @@ disagree.
 - `cargo build` — builds both `bgraph` and `bgraph-lsp`
 - `cargo run --bin bgraph -- examples/groups.bd -o groups.svg` (`.pdf` picks the PDF writer)
 - `cargo run --bin bgraph -- watch examples/groups.bd` → http://127.0.0.1:7878
-- `cargo run --bin bgraph -- view examples/venn.svg` — the same viewer, on a picture
+- `cargo run --bin bgraph -- watch examples/venn.svg` — the same viewer, on a picture
 - `cargo build --features window` — the native window (opt-in: +78 crates)
 - `cargo run --bin bgraph -- check examples/groups.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
