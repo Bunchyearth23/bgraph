@@ -57,7 +57,7 @@ disagree.
 - `cargo run --bin bgraph -- watch examples/groups.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- check examples/groups.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (284 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (288 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo clippy --all-targets` / `cargo fmt`
 - `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (27 corpus cases)
 - `cd editors/zed && cargo build --target wasm32-wasip1`

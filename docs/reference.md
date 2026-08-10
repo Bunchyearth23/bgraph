@@ -1082,6 +1082,50 @@ field urg   "Urgent pointer"      144 159
 
 </details>
 
+### `type radar`
+
+Axes radiating from a centre, one closed polygon per series. Every axis shares one scale: the shape a reader compares is only meaningful if a ring means the same thing all the way round.
+
+```
+series <id> ["label"] <points> …
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+| `categories` | `categories: "<name>" "<name>" …` | One axis per name, clockwise from the top, in the order each series writes its numbers. The same word `bar` uses, because it is the same idea: the named slots the numbers line up with. |
+| `radius` | `radius: <number>` | Distance from the centre to the outer ring. 140 by default. |
+| `range` | `range: <low> <high>` | The scale every axis shares. Taken from the data when it is not written — one scale, because a radar whose axes disagreed about what a ring means would make its shape a lie. |
+| `legend` | `legend: <on\|off>` | Name the series beside the diagram. On when there is more than one. |
+
+On a `series` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `points` | node | `points: <n> <n> …` | One number per category, in order. Usually written positionally — `series north 4 8 15`. |
+
+<details>
+<summary>A complete file — <code>examples/radar.bd</code></summary>
+
+```
+// Axes radiating from a centre, one closed polygon per series. Every axis
+// shares one scale, or the shape a reader compares would be a lie (W-046).
+type radar {
+  title: "Two engine designs"
+  categories: "Power" "Economy" "Range" "Weight" "Cost" "Noise"
+  radius: 140
+  range: 0 100
+}
+
+graph { background: #0b1120 padding: 32 }
+style series { font: 11 #cbd5e1 }
+
+series turbo   "Turbocharged"  92 48 70 55 40 45
+series electric "Electric"     78 95 52 40 62 96
+```
+
+</details>
+
 ### `type journey`
 
 A user journey: steps in the order they are taken, and how each actor felt at each one. `group`s are its sections, drawn as a band above the steps they hold. One line per actor, so the place where two people diverge is the thing you see first.

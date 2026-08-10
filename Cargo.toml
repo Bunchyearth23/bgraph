@@ -43,6 +43,7 @@ all-archetypes = [
     "requirements",
     "kanban",
     "journey",
+    "radar",
     "class",
     "state",
 ]
@@ -63,6 +64,7 @@ er = []
 requirements = []
 kanban = []
 journey = []
+radar = []
 class = []
 state = []
 

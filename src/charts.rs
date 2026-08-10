@@ -387,6 +387,235 @@ struct Granularity {
     step: u32,
 }
 
+/// Axes radiating from a centre, one closed polygon per series.
+///
+/// Every axis shares one scale. A radar whose axes each normalised themselves
+/// would draw a shape nobody could read: the whole device is a *shape* the eye
+/// compares, and that only means something if a ring means the same all the
+/// way round.
+#[cfg(feature = "radar")]
+pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
+    let cfg = &diagram.archetype_props;
+    let theme = Theme::of(&opts);
+    let def = crate::check::archetype_of(diagram);
+    let palette = theme.palette();
+
+    let radius = number(cfg, "radius", 140.0).max(40.0);
+    let title = text(cfg, "title");
+    let axes: Vec<String> = setting(cfg, "categories")
+        .map(|v| {
+            v.iter()
+                .filter_map(|x| x.as_text())
+                .map(String::from)
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
+
+    let mut series = Vec::new();
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        let style = registry.resolve(
+            chart_defaults(),
+            def.item,
+            &node.classes,
+            &node.props_for(def),
+        )?;
+        let Some(points) = style.points.clone().filter(|p| !p.is_empty()) else {
+            continue;
+        };
+        let colour = style
+            .fill
+            .clone()
+            .or_else(|| style.stroke.clone())
+            .unwrap_or_else(|| palette[i.min(palette.len() - 1)].to_string());
+        let name = node.label.clone().unwrap_or_else(|| node.id.value.clone());
+        series.push((name, points, colour, style));
+    }
+
+    let (mut lo, mut hi) = (f64::MAX, f64::MIN);
+    for (_, points, _, _) in &series {
+        for v in points {
+            lo = lo.min(*v);
+            hi = hi.max(*v);
+        }
+    }
+    if series.is_empty() {
+        (lo, hi) = (0.0, 1.0);
+    }
+    // A radar is read from the centre outward, so the floor is 0 unless the
+    // author says otherwise — starting the rings at the smallest value would
+    // exaggerate every difference.
+    let scale = match setting(cfg, "range") {
+        Some(v) if v.len() == 2 => nice_scale(
+            v[0].as_num().unwrap_or(0.0),
+            v[1].as_num().unwrap_or(hi),
+            4,
+        ),
+        _ => nice_scale(lo.min(0.0), hi, 4),
+    };
+
+    let title_h = if title.is_some() {
+        TITLE_SIZE * 2.0
+    } else {
+        0.0
+    };
+    // Room for the axis names, which sit outside the rim.
+    let margin = axes
+        .iter()
+        .map(|name| text_width(std::slice::from_ref(name), 11.0))
+        .fold(0.0_f64, f64::max)
+        + 12.0;
+    let cx = margin + radius;
+    let cy = title_h + margin.min(28.0) + radius;
+
+    let n = axes.len().max(series.iter().map(|(_, p, _, _)| p.len()).max().unwrap_or(0));
+    // Clockwise from the top: the order the axes are written is the order they
+    // are read, and twelve o'clock is where a reader starts.
+    let angle = |i: usize| -> f64 {
+        -std::f64::consts::FRAC_PI_2 + (i as f64) * std::f64::consts::TAU / (n.max(1) as f64)
+    };
+    let point = |i: usize, v: f64| -> (f64, f64) {
+        let r = scale.fraction(v).clamp(0.0, 1.0) * radius;
+        let a = angle(i);
+        (cx + r * a.cos(), cy + r * a.sin())
+    };
+
+    let mut guides = Vec::new();
+    let mut polylines = Vec::new();
+    let mut nodes = Vec::new();
+    let mut annotations = Vec::new();
+
+    if let Some(title) = title {
+        annotations.push(Annotation {
+            text: title,
+            x: 0.0,
+            y: TITLE_SIZE,
+            anchor: Anchor::Start,
+            size: TITLE_SIZE,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    let rule = if theme.dark { "#1e293b" } else { "#e4e4e7" };
+    let axis = if theme.dark { "#334155" } else { "#d4d4d8" };
+
+    // A ring per tick, drawn as the same polygon the data uses — a circle
+    // would suggest a continuum between axes that does not exist.
+    for tick in &scale.ticks {
+        let ring: Vec<(f64, f64)> = (0..n).map(|i| point(i, *tick)).collect();
+        for pair in 0..ring.len() {
+            let from = ring[pair];
+            let to = ring[(pair + 1) % ring.len()];
+            guides.push(Guide {
+                from,
+                to,
+                color: rule.to_string(),
+                width: 1.0,
+                dash: None,
+            });
+        }
+    }
+
+    for i in 0..n {
+        let rim = point(i, scale.max);
+        guides.push(Guide {
+            from: (cx, cy),
+            to: rim,
+            color: axis.to_string(),
+            width: 1.0,
+            dash: None,
+        });
+
+        if let Some(name) = axes.get(i) {
+            let a = angle(i);
+            let (lx, ly) = (cx + (radius + 10.0) * a.cos(), cy + (radius + 10.0) * a.sin());
+            // The label sits outside its spoke and leans away from the centre,
+            // or the names on the left overlap the shape.
+            let anchor = if a.cos() > 0.2 {
+                Anchor::Start
+            } else if a.cos() < -0.2 {
+                Anchor::End
+            } else {
+                Anchor::Middle
+            };
+            annotations.push(Annotation {
+                text: name.clone(),
+                x: lx,
+                y: ly + 4.0,
+                anchor,
+                size: 11.0,
+                color: ink(&base, &theme),
+                weight: "400".into(),
+                family: family(&base),
+            });
+        }
+    }
+
+    for (_, points, colour, style) in &series {
+        let shape: Vec<(f64, f64)> = points.iter().enumerate().map(|(i, v)| point(i, *v)).collect();
+        if shape.len() < 2 {
+            continue;
+        }
+        let (opaque, _) = crate::render_svg::split_alpha(colour);
+        polylines.push(Polyline {
+            points: shape.clone(),
+            closed: true,
+            fill: Some(format!("{opaque}33")),
+            stroke: Some(colour.clone()),
+            width: style.stroke_width.unwrap_or(2.0),
+            head: None,
+            dash: None,
+        });
+        for (x, y) in shape {
+            nodes.push(PlacedNode {
+                lines: Vec::new(),
+                rect: Rect {
+                    x: x - 3.5,
+                    y: y - 3.5,
+                    w: 7.0,
+                    h: 7.0,
+                },
+                style: Style {
+                    fill: Some(colour.clone()),
+                    stroke: Some(theme.surface.clone()),
+                    stroke_width: Some(1.0),
+                    shape: Some(Shape::Ellipse),
+                    ..base.clone()
+                },
+            });
+        }
+    }
+
+    if toggle(cfg, "legend", series.len() > 1) && !series.is_empty() {
+        let names: Vec<String> = series.iter().map(|(n, _, _, _)| n.clone()).collect();
+        let colours: Vec<String> = series.iter().map(|(_, _, c, _)| c.clone()).collect();
+        draw_legend(
+            &names,
+            &colours,
+            cx + radius + margin,
+            cy - radius,
+            &theme,
+            &base,
+            &mut nodes,
+            &mut annotations,
+        );
+    }
+
+    Ok(Layout {
+        guides,
+        polylines,
+        groups: Vec::new(),
+        nodes,
+        edges: Vec::new(),
+        opts,
+        chart: Chart::Free,
+        annotations,
+    })
+}
+
 /// A user journey: steps in the order they are taken, one line per actor.
 /// `timeline` supplies the idea of a run of things along an axis and `xy` the
 /// idea of a series over it; what this adds is that the two are read together

@@ -563,6 +563,53 @@ pub const STATE_ITEM_PROPS: &[PropDef] = &[
 
 /// The SysML relation vocabulary, verb stems. Read tail-to-head:
 /// `r2 -> r1 derive` is r2 derives from r1.
+pub const RADAR_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the diagram.",
+    },
+    PropDef {
+        name: "categories",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "categories: \"<name>\" \"<name>\" …",
+        doc: "One axis per name, clockwise from the top, in the order each \
+              series writes its numbers. The same word `bar` uses, because it \
+              is the same idea: the named slots the numbers line up with.",
+    },
+    PropDef {
+        name: "radius",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "radius: <number>",
+        doc: "Distance from the centre to the outer ring. 140 by default.",
+    },
+    PropDef {
+        name: "range",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "range: <low> <high>",
+        doc: "The scale every axis shares. Taken from the data when it is not \
+              written — one scale, because a radar whose axes disagreed about \
+              what a ring means would make its shape a lie.",
+    },
+    PropDef {
+        name: "legend",
+        alias: false,
+        ctx: Ctx::Both,
+        words: TOGGLE,
+        syntax: "legend: <on|off>",
+        doc: "Name the series beside the diagram. On when there is more than one.",
+    },
+];
+
 pub const JOURNEY_PROPS: &[PropDef] = &[
     PropDef {
         name: "title",
@@ -1069,6 +1116,23 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         slots: &[Slot {
             prop: "bits",
             arity: 2,
+        }],
+        members: false,
+        alt_items: &[],
+        edge_slots: &[],
+    },
+    #[cfg(feature = "radar")]
+    ArchetypeDef {
+        name: "radar",
+        item: "series",
+        doc: "Axes radiating from a centre, one closed polygon per series. \
+              Every axis shares one scale: the shape a reader compares is only \
+              meaningful if a ring means the same thing all the way round.",
+        props: RADAR_PROPS,
+        item_props: SERIES_ITEM_PROPS,
+        slots: &[Slot {
+            prop: "points",
+            arity: VARIADIC,
         }],
         members: false,
         alt_items: &[],

@@ -94,6 +94,8 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "kanban" => check_kanban(diagram, &mut out),
         #[cfg(feature = "journey")]
         "journey" => check_journey(diagram, &mut out),
+        #[cfg(feature = "radar")]
+        "radar" => check_radar(diagram, &mut out),
         #[cfg(feature = "block")]
         "block" => check_block(diagram, &mut out),
         #[cfg(feature = "gantt")]
@@ -1185,6 +1187,92 @@ fn check_block(diagram: &Diagram, out: &mut Vec<Diag>) {
                 "a block carries a `description`, not members".to_string(),
             ));
         }
+    }
+}
+
+/// A radar shares one scale across every axis, so the failures worth naming
+/// are the ones that make the *shape* lie: too few axes for a shape to exist,
+/// and a series that does not reach all the way round.
+#[cfg(feature = "radar")]
+fn check_radar(diagram: &Diagram, out: &mut Vec<Diag>) {
+    warn_ignored(diagram, "radar", out);
+
+    let cfg = &diagram.archetype_props;
+    let axes = cfg
+        .iter()
+        .find(|p| p.name == "categories")
+        .map_or(0, |p| p.values.len());
+    let where_ = diagram
+        .archetype
+        .as_ref()
+        .map(|a| a.span)
+        .unwrap_or_default();
+
+    if axes == 0 {
+        out.push(Diag::error(
+            where_,
+            "a radar needs `categories` — one axis per name, and nothing to \
+             read without them"
+                .to_string(),
+        ));
+    } else if axes < 3 {
+        out.push(Diag::warn(
+            where_,
+            format!("{axes} axes enclose no area; a radar reads as a shape from three"),
+        ));
+    }
+
+    if let Some(prop) = cfg.iter().find(|p| p.name == "range")
+        && prop.values.len() != 2
+    {
+        out.push(Diag::error(
+            prop.values_span,
+            "`range` takes a low and a high".to_string(),
+        ));
+    }
+
+    let styles = resolved_nodes(diagram, base_style("radar"));
+    let mut drawn = 0;
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        let points = styles.get(i).and_then(|s| s.points.as_ref());
+        let Some(points) = points.filter(|p| !p.is_empty()) else {
+            if !awaits_binding(node, archetype_of(diagram), "points") {
+                out.push(Diag::error(
+                    node.id.span,
+                    format!(
+                        "`{}` has no numbers — `series {} [\"label\"] <n> <n> …`, one per axis",
+                        node.id.as_str(),
+                        node.id.as_str()
+                    ),
+                ));
+            }
+            continue;
+        };
+        drawn += 1;
+
+        if axes > 0 && points.len() != axes {
+            out.push(Diag::warn(
+                node.id.span,
+                format!(
+                    "`{}` has {} number{} for {axes} axes — its polygon will not close \
+                     on the same shape as the others",
+                    node.id.as_str(),
+                    points.len(),
+                    if points.len() == 1 { "" } else { "s" }
+                ),
+            ));
+        }
+    }
+
+    if drawn > crate::props::PALETTE_LIGHT.len() {
+        out.push(Diag::warn(
+            where_,
+            format!(
+                "{drawn} series exhaust the categorical palette ({} hues) — and \
+                 overlapping polygons stop being separable well before that",
+                crate::props::PALETTE_LIGHT.len()
+            ),
+        ));
     }
 }
 

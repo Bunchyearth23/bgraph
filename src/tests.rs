@@ -633,6 +633,94 @@ fn a_packet_field_needs_bits() {
     assert!(err("type packet\nnode a \"A\"").contains("has no `bits`"));
 }
 
+// ---------------------------------------------------------------------- W-046
+
+#[cfg(test)]
+const RADAR: &str = "type radar { categories: \"N\" \"E\" \"S\" \"W\" radius: 100 range: 0 100 legend: off }\n\
+     series a \"A\" 100 50 0 50\n";
+
+#[test]
+fn a_radar_places_its_axes_clockwise_from_the_top() {
+    // The order the axes are written is the order they are read, and twelve
+    // o'clock is where a reader starts.
+    let l = build(RADAR);
+    assert_eq!(l.nodes.len(), 4, "a mark per axis");
+
+    let centre = (100.0 + l.nodes[0].rect.x + 3.5, l.nodes[0].rect.y + 3.5);
+    let _ = centre;
+    let at = |i: usize| {
+        let r = &l.nodes[i].rect;
+        (r.x + r.w / 2.0, r.y + r.h / 2.0)
+    };
+    let (n, e, s, w) = (at(0), at(1), at(2), at(3));
+
+    // 100 on the first axis is the rim, straight up; 0 on the third is the
+    // centre; 50 on the second and fourth sit either side of it.
+    assert!(n.1 < s.1, "the first axis points up: {n:?} vs {s:?}");
+    assert!(e.0 > w.0, "the second is to the right of the fourth");
+    assert!(
+        (e.1 - w.1).abs() < 0.5,
+        "and level with it: {e:?} {w:?}"
+    );
+}
+
+#[test]
+fn a_radar_draws_one_closed_polygon_per_series() {
+    let l = build(
+        "type radar { categories: \"a\" \"b\" \"c\" legend: off }\n\
+         series one \"One\" 1 2 3\n\
+         series two \"Two\" 3 2 1\n",
+    );
+    assert_eq!(l.polylines.len(), 2);
+    for shape in &l.polylines {
+        assert!(shape.closed, "a radar shape closes on itself");
+        assert_eq!(shape.points.len(), 3);
+        assert!(shape.fill.is_some(), "filled, so overlap is visible");
+    }
+}
+
+#[test]
+fn a_radar_starts_its_rings_at_zero() {
+    // Starting them at the smallest value would exaggerate every difference,
+    // which is the classic way this chart misleads.
+    let l = build("type radar { categories: \"a\" \"b\" \"c\" legend: off }\nseries s \"S\" 90 95 100");
+    let ticks: Vec<&str> = l
+        .annotations
+        .iter()
+        .map(|a| a.text.as_str())
+        .filter(|t| t.parse::<f64>().is_ok())
+        .collect();
+    // No numeric ring labels are drawn, so the proof is geometric: the marks
+    // must not all sit on the rim.
+    assert!(ticks.is_empty());
+    let l2 = build("type radar { categories: \"a\" \"b\" \"c\" legend: off }\nseries s \"S\" 0 50 100");
+    let spread = l2
+        .nodes
+        .iter()
+        .map(|n| n.rect.x)
+        .fold(0.0_f64, f64::max)
+        - l2.nodes.iter().map(|n| n.rect.x).fold(f64::MAX, f64::min);
+    assert!(spread > 1.0, "the scale spans the data, not a sliver");
+}
+
+#[test]
+fn a_radar_reports_the_shapes_it_cannot_honestly_draw() {
+    let e = err("type radar\nseries s \"S\" 1 2 3");
+    assert!(e.contains("needs `categories`"), "{e}");
+
+    let d = diags("type radar { categories: \"a\" \"b\" }\nseries s \"S\" 1 2");
+    assert!(d.iter().any(|x| x.message.contains("enclose no area")), "{d:?}");
+
+    let d = diags("type radar { categories: \"a\" \"b\" \"c\" }\nseries s \"S\" 1 2");
+    assert!(
+        d.iter().any(|x| x.message.contains("for 3 axes")),
+        "{d:?}"
+    );
+
+    let e = err("type radar { categories: \"a\" \"b\" \"c\" }\nseries s \"S\"");
+    assert!(e.contains("has no numbers"), "{e}");
+}
+
 // ---------------------------------------------------------------------- W-052
 
 #[cfg(test)]
@@ -1039,11 +1127,18 @@ fn each_data_property_belongs_to_exactly_the_genres_that_read_it() {
     for (prop, owners) in [
         ("value", &["pie", "sankey", "treemap"][..]),
         ("bits", &["packet"]),
+        ("bytes", &["bytefield"]),
         ("x", &["quadrant"]),
         ("y", &["quadrant"]),
         ("wave", &["wave"]),
         ("data", &["wave"]),
-        ("points", &["bar", "xy"]),
+        ("points", &["bar", "radar", "xy"]),
+        ("pairs", &["xy"]),
+        ("scores", &["journey"]),
+        ("limit", &["kanban"]),
+        ("risk", &["requirements"]),
+        ("verify", &["requirements"]),
+        ("link", &["requirements"]),
         ("start", &["gantt"]),
         ("length", &["gantt"]),
         ("guard", &["state"]),

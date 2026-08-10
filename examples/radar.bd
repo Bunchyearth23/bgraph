@@ -1,0 +1,14 @@
+// Axes radiating from a centre, one closed polygon per series. Every axis
+// shares one scale, or the shape a reader compares would be a lie (W-046).
+type radar {
+  title: "Two engine designs"
+  categories: "Power" "Economy" "Range" "Weight" "Cost" "Noise"
+  radius: 140
+  range: 0 100
+}
+
+graph { background: #0b1120 padding: 32 }
+style series { font: 11 #cbd5e1 }
+
+series turbo   "Turbocharged"  92 48 70 55 40 45
+series electric "Electric"     78 95 52 40 62 96
