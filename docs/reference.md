@@ -19,7 +19,8 @@ time the diagram grows.
 ```
 bgraph diagram.bd -o diagram.svg    # render
 bgraph watch diagram.bd             # live preview on :7878, reloads on save
-bgraph view diagram.svg             # …or look at a picture, from anywhere
+bgraph view diagram.svg             # a window, when the build has one
+bgraph view diagram.svg --server    # …or the browser preview instead
 bgraph watch diagram.bd --port 9000
 bgraph check diagram.bd             # diagnostics only; non-zero on error
 bgraph report.bd --data q3.json     # fill a template's holes from JSON

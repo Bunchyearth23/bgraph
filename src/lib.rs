@@ -119,6 +119,9 @@ pub mod template;
 pub mod ast;
 #[allow(missing_docs)]
 pub mod charts;
+#[cfg(feature = "window")]
+pub mod window;
+
 pub mod fmt;
 #[allow(missing_docs)]
 pub mod layout;

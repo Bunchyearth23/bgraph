@@ -56,6 +56,7 @@ disagree.
 - `cargo run --bin bgraph -- examples/groups.bd -o groups.svg` (`.pdf` picks the PDF writer)
 - `cargo run --bin bgraph -- watch examples/groups.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- view examples/venn.svg` — the same viewer, on a picture
+- `cargo build --features window` — the native window (opt-in: +78 crates)
 - `cargo run --bin bgraph -- check examples/groups.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
 - `cargo test` (336 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
@@ -83,6 +84,7 @@ disagree.
 | `src/render_svg.rs` | Shapes, edge routing, markers, text |
 | `src/render_pdf.rs` | PDF output, hand-written — vector, so no rasteriser |
 | `src/fmt.rs` | The formatter. Lexical, so comments and blank lines survive |
+| `src/window.rs` | The native viewer. **The only place with a dependency tree**, and opt-in |
 | `src/template.rs` | `{{holes}}` and the values a calling program binds |
 | `src/watch.rs` | Dependency-free HTTP live preview, with pan and zoom |
 | `src/lsp.rs` | Language server + `LineIndex` (byte ↔ UTF-16 position) |

@@ -850,6 +850,53 @@ fn the_extension_decides_what_the_viewer_is_looking_at() {
     assert!(!crate::watch::is_svg(Path::new("svg")));
 }
 
+// ---------------------------------------------------------------------- W-067
+
+#[test]
+fn the_window_is_opt_in_and_the_core_stays_small() {
+    // The whole reason the SVG writer, the HTTP preview and the PDF writer are
+    // hand-rolled. A window is the one thing that cannot be, so it is the one
+    // thing behind a feature — and a manifest that quietly turned it on would
+    // undo every one of those decisions at once.
+    let manifest = include_str!("../Cargo.toml");
+
+    let defaults = manifest
+        .split_once("default = [")
+        .and_then(|(_, tail)| tail.split_once(']'))
+        .expect("a default feature list")
+        .0;
+    assert!(
+        !defaults.contains("window"),
+        "the window is on by default: {defaults}"
+    );
+
+    for crate_name in ["minifb", "resvg", "tiny-skia"] {
+        let line = manifest
+            .lines()
+            .find(|l| l.trim_start().starts_with(crate_name))
+            .unwrap_or_else(|| panic!("`{crate_name}` is not in the manifest"));
+        assert!(
+            line.contains("optional = true"),
+            "`{crate_name}` is not optional: {line}"
+        );
+    }
+}
+
+#[cfg(feature = "window")]
+#[test]
+fn the_window_reads_the_same_picture_the_server_does() {
+    // One source of the picture, two ways of looking at it. A window that
+    // rendered by its own path would be a second renderer.
+    let dir = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/examples"));
+    let svg = crate::watch::render_source(&dir.join("venn.svg"), None).expect("reads");
+    assert!(svg.starts_with("<svg"));
+
+    // And it parses as a picture, which is what the window rasterises.
+    let mut options = resvg::usvg::Options::default();
+    options.fontdb_mut().load_system_fonts();
+    assert!(resvg::usvg::Tree::from_str(&svg, &options).is_ok());
+}
+
 // ---------------------------------------------------------------------- W-062
 
 #[cfg(feature = "csv")]

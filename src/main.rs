@@ -52,6 +52,11 @@ enum Command {
         /// Input `.bd` or `.svg` file
         input: PathBuf,
 
+        /// Serve the preview over HTTP instead of opening a window — for a
+        /// remote machine, a second screen, or a build with no display
+        #[arg(long)]
+        server: bool,
+
         /// Bind a template's holes from a JSON object, re-read on every
         /// request — so editing the data reloads the preview too
         #[arg(long = "data", value_name = "FILE")]
@@ -76,6 +81,10 @@ enum Command {
         /// Input `.svg` or `.bd` file
         input: PathBuf,
 
+        /// Serve the preview over HTTP instead of opening a window
+        #[arg(long)]
+        server: bool,
+
         #[arg(short, long, default_value_t = 7878)]
         port: u16,
     },
@@ -95,6 +104,32 @@ enum Command {
 /// `--check` exits non-zero when a file is not in its canonical shape, so the
 /// same command serves a person and a build — one runs it to fix, the other to
 /// refuse.
+/// A window when there is one to open, the HTTP preview otherwise.
+///
+/// The window is the default because it is what "show me this" means on a
+/// desktop. The server is not an apology — it is what a remote machine and a
+/// second screen both want, and `--server` asks for it outright.
+fn show_or_serve(input: PathBuf, data: Option<PathBuf>, port: u16, server: bool) -> Result<i32> {
+    #[cfg(feature = "window")]
+    if !server {
+        if bgraph::window::available() {
+            bgraph::window::show(input, data)?;
+            return Ok(0);
+        }
+        eprintln!(
+            "bgraph: no display, so {} is served instead of shown",
+            bgraph::window::describe(&input)
+        );
+    }
+    #[cfg(not(feature = "window"))]
+    if !server {
+        eprintln!("bgraph: this build has no window — rebuild with `--features window`");
+    }
+
+    watch::serve(input, data, port)?;
+    Ok(0)
+}
+
 fn format_files(inputs: &[PathBuf], check: bool) -> Result<i32> {
     if inputs.is_empty() {
         bail!("no input file (try `bgraph fmt diagram.bd`)");
@@ -147,17 +182,20 @@ fn run() -> Result<i32> {
     let cli = Cli::parse();
 
     match cli.command {
-        Some(Command::Watch { input, data, port }) => {
-            watch::serve(input, data, port)?;
-            return Ok(0);
-        }
-        // The same server. `view` exists because that is the word for what you
+        Some(Command::Watch {
+            input,
+            data,
+            port,
+            server,
+        }) => return show_or_serve(input, data, port, server),
+        // The same viewer. `view` exists because that is the word for what you
         // want when the file is already a picture, and nobody looks for
         // `watch` to open one.
-        Some(Command::View { input, port }) => {
-            watch::serve(input, None, port)?;
-            return Ok(0);
-        }
+        Some(Command::View {
+            input,
+            port,
+            server,
+        }) => return show_or_serve(input, None, port, server),
         Some(Command::Check { input }) => return check_file(&input),
         Some(Command::Fmt { inputs, check }) => return format_files(&inputs, check),
         Some(Command::Docs { output }) => {

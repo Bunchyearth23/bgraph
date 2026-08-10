@@ -395,7 +395,8 @@ Label text is XML-escaped on output, so `<`, `&` and quotes are safe.
 ```
 bgraph diagram.bd -o diagram.svg    # render once
 bgraph watch diagram.bd             # http://127.0.0.1:7878, reloads on save
-bgraph view diagram.svg             # the same viewer, on a picture it did not draw
+bgraph view diagram.svg             # a native window (build with --features window)
+bgraph view diagram.svg --server    # …or the browser preview, for a remote machine
 bgraph watch diagram.bd --port 9000
 bgraph check diagram.bd             # diagnostics only, no output file
 bgraph report.bd --data q3.json     # fill a template from a JSON object

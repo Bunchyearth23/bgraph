@@ -96,9 +96,32 @@ json = []
 # for the same reason as everything else here: the dialect is twenty lines.
 csv = []
 
+# A native window. **Off by default, and it has to be.** This crate keeps five
+# dependencies on purpose — the SVG writer, the HTTP preview and the PDF writer
+# are all hand-rolled to avoid a tree — and a window plus an SVG rasteriser is
+# seventy-eight more in the build graph. That is a fair price for someone who
+# wants
+# it and an unfair one for someone embedding the library, so it is opt-in:
+#
+#   cargo build --features window
+window = ["dep:minifb", "dep:resvg", "dep:tiny-skia"]
+
 [dependencies]
 anyhow = "1.0.104"
 clap = { version = "4.6.4", features = ["derive"] }
 pest = "2.8.8"
 pest_derive = "2.8.8"
 serde_json = "1.0"
+
+# Only with `--features window`; see the note above. `minifb` is a window and a
+# pixel buffer in one crate, which is why this costs 128 packages where
+# `winit` + `softbuffer` cost 249 — the windowing is the expensive half, not
+# the renderer: 30 crates become 108, where `winit` + `softbuffer` would make
+# them 249. `resvg` drops what a bgraph diagram never uses — it emits no
+# embedded rasters and no gzipped SVG.
+minifb = { version = "0.28", optional = true }
+resvg = { version = "0.48", optional = true, default-features = false, features = [
+    "text",
+    "system-fonts",
+] }
+tiny-skia = { version = "0.12", optional = true }
