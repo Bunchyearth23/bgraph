@@ -276,8 +276,12 @@ is worse than none.
 
 Angles are hard to compare. `check` warns when a pie has fewer than three
 slices — a bar or a single number reads better — and when it has more than
-eight, which exhausts the palette; merge the tail into an `Other` slice
-rather than repeating a hue.
+eight, which exhausts the palette.
+
+`top: 8` takes that advice for you: the largest eight are kept and the rest
+are folded into one slice, named `"Other"` unless `other:` says otherwise.
+The total stays honest, and the fold is the same on every run — sorted by
+value, ties broken by the order written.
 
 ### Activation bars in `type sequence`
 

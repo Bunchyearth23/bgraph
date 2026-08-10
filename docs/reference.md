@@ -318,6 +318,8 @@ slice <id> ["label"] <value>
 
 | Setting | Syntax | Meaning |
 |---|---|---|
+| `top` | `top: <number>` | Keep the largest n slices and fold the rest into one. The palette has eight colours and `check` already advises this when a pie has more; `top` is what lets the file do it instead of someone doing the arithmetic by hand outside the tool. |
+| `other` | `other: <text>` | What the folded slice is called. `"Other"` unless the file says otherwise. |
 | `title` | `title: <text>` | Heading drawn above the chart. |
 | `radius` | `radius: <number>` | Outer radius in user units. |
 | `donut` | `donut: <0..1>` | Inner hole as a fraction of the radius. `0` is a full pie. |

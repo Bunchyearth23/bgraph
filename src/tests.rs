@@ -7512,3 +7512,93 @@ fn no_class_asks_for_a_legend_so_none_is_drawn() {
     );
     assert!(l.annotations.is_empty(), "an empty legend was drawn");
 }
+
+// ------------------------------------------------- `top n` (I-047)
+
+#[test]
+fn top_keeps_the_largest_and_folds_the_rest() {
+    // `check` already advises exactly this when a pie exhausts the palette.
+    // Before, the advice could only be taken by doing the arithmetic by hand
+    // outside the tool.
+    let l = build(
+        r#"type pie { top: 3 }
+           slice a "A" 50
+           slice b "B" 30
+           slice c "C" 10
+           slice d "D" 6
+           slice e "E" 4"#,
+    );
+    let labels: Vec<&str> = l
+        .annotations
+        .iter()
+        .map(|a| a.text.as_str())
+        .filter(|t| t.starts_with(['A', 'B', 'C', 'D', 'E', 'O']))
+        .collect();
+    assert!(labels.iter().any(|t| t.starts_with("Other")), "{labels:?}");
+    assert!(
+        !labels
+            .iter()
+            .any(|t| t.starts_with('D') || t.starts_with('E')),
+        "a folded slice is still listed: {labels:?}"
+    );
+}
+
+#[test]
+fn the_folded_slice_keeps_the_total_honest() {
+    // Folding must not lose a number: the whole is still the whole.
+    let l = build(
+        r#"type pie { top: 2 labels: value }
+           slice a "A" 50
+           slice b "B" 30
+           slice c "C" 12
+           slice d "D" 8"#,
+    );
+    let values: Vec<&str> = l.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert!(
+        values.iter().any(|t| t.contains("20")),
+        "12 and 8 did not add up to 20: {values:?}"
+    );
+}
+
+#[test]
+fn the_folded_slice_can_be_named() {
+    let l = build(
+        r#"type pie { top: 1 other: "Everything else" }
+           slice a "A" 50
+           slice b "B" 30"#,
+    );
+    assert!(
+        l.annotations
+            .iter()
+            .any(|a| a.text.starts_with("Everything else")),
+        "{:?}",
+        l.annotations.iter().map(|a| &a.text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn folding_is_the_same_every_run() {
+    // A chart that reordered itself between runs would defeat the golden
+    // test and, before that, the reader.
+    let source = r#"type pie { top: 2 }
+                    slice a "A" 10
+                    slice b "B" 10
+                    slice c "C" 10
+                    slice d "D" 10"#;
+    let first = crate::render_source(source).unwrap();
+    let second = crate::render_source(source).unwrap();
+    assert_eq!(first, second);
+}
+
+#[test]
+fn top_larger_than_the_data_changes_nothing() {
+    let l = build(
+        r#"type pie { top: 10 }
+           slice a "A" 50
+           slice b "B" 30"#,
+    );
+    assert!(
+        !l.annotations.iter().any(|a| a.text.starts_with("Other")),
+        "a fold happened with nothing to fold"
+    );
+}

@@ -1661,6 +1661,26 @@ pub const TOGGLE: &[&str] = &["on", "off", "true", "false"];
 
 pub const PIE_PROPS: &[PropDef] = &[
     PropDef {
+        name: "top",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "top: <number>",
+        doc: "Keep the largest n slices and fold the rest into one. The \
+              palette has eight colours and `check` already advises this when \
+              a pie has more; `top` is what lets the file do it instead of \
+              someone doing the arithmetic by hand outside the tool.",
+    },
+    PropDef {
+        name: "other",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "other: <text>",
+        doc: "What the folded slice is called. `\"Other\"` unless the file \
+              says otherwise.",
+    },
+    PropDef {
         name: "title",
         alias: false,
         ctx: Ctx::Both,

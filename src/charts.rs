@@ -133,6 +133,15 @@ fn setting<'a>(props: &'a [Prop], name: &str) -> Option<&'a [Value]> {
         .map(|p| p.values.as_slice())
 }
 
+/// A number the file may simply not have written. Distinct from [`number`],
+/// which always has an answer: `top` has to tell "not asked for" apart from
+/// any value it could fall back to.
+fn number_opt(props: &[Prop], name: &str) -> Option<f64> {
+    setting(props, name)
+        .and_then(|v| v.first())
+        .and_then(|v| v.as_num())
+}
+
 fn number(props: &[Prop], name: &str, fallback: f64) -> f64 {
     setting(props, name)
         .and_then(|v| v.first())
@@ -224,6 +233,29 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
         };
         let label = node.label.clone().unwrap_or_else(|| node.id.value.clone());
         entries.push((label, value, style));
+    }
+
+    // `top n` — keep the largest n and fold the rest into one. The palette
+    // runs out at eight and `check` already advises exactly this; without it
+    // the advice could only be taken by doing the arithmetic by hand outside
+    // the tool, which is the state `I-047` recorded.
+    if let Some(keep) = number_opt(cfg, "top")
+        && keep >= 1.0
+        && entries.len() > keep as usize
+    {
+        let keep = keep as usize;
+        // Sorted by value, and ties broken by the order written, so the same
+        // file always folds the same way — a chart that reordered itself
+        // between runs would defeat the golden test and, worse, the reader.
+        entries.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        let tail: f64 = entries[keep..].iter().map(|(_, v, _)| *v).sum();
+        let style = entries[keep].2.clone();
+        entries.truncate(keep);
+        entries.push((
+            text(cfg, "other").unwrap_or_else(|| "Other".into()),
+            tail,
+            style,
+        ));
     }
 
     let total: f64 = entries.iter().map(|(_, v, _)| *v).sum();
