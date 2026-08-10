@@ -6916,3 +6916,28 @@ fn a_qualified_name_does_not_swallow_a_class_reference() {
     let l = build("style card { fill: #123456 }\nnode a \"A\" .card\n");
     assert_eq!(l.nodes[0].style.fill.as_deref(), Some("#123456"));
 }
+
+#[test]
+fn the_composed_example_set_still_draws() {
+    // `examples/compose/` is what a bgraph-tagged fence cannot be: three
+    // files that are one diagram. That fence promises a complete current
+    // file, so the multi-file case is verified here rather than documented
+    // and never run.
+    let dir = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/examples/compose"));
+
+    let composed = crate::compose::load(&dir.join("main.bd")).expect("main.bd composes");
+    let ids: Vec<&str> = composed
+        .diagram
+        .nodes
+        .iter()
+        .map(|n| n.id.as_str())
+        .collect();
+    assert!(ids.contains(&"core.api"), "{ids:?}");
+    assert!(ids.contains(&"ui"), "{ids:?}");
+    crate::layout::solve(&composed.diagram).expect("and it draws");
+
+    // …and the included file is a diagram in its own right, which is the
+    // claim its own comment makes.
+    let alone = crate::compose::load(&dir.join("core.bd")).expect("core.bd composes alone");
+    crate::layout::solve(&alone.diagram).expect("and draws alone");
+}

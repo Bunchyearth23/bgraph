@@ -22,7 +22,9 @@ a -> b "carries"
 `include` merges another file whole, resolved relative to the file that wrote
 it.
 
-```bgraph
+```
+// main.bd — a bgraph-tagged fence promises one complete file, and this is
+// three. The whole set is in examples/compose/, and a test renders it.
 include "house.bds"          // a shared palette: styles only
 include "core.bd" as core    // a diagram, under a namespace
 
