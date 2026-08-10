@@ -25,16 +25,13 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**Ten chantiers are planned, one question is open, nothing is blocked.** Sixteen
-archetypes ship and the library is embeddable. The parked ideas were reviewed on
-2026-08-10 and the ones worth building became work items; what stayed an idea
-stayed one on purpose.
-
-### Questions
-
-| id | state | title | notes |
-|---|---|---|---|
-| `Q-004` | open | How does an archetype declare a **second** slot form? | `D-015` gives each archetype one positional shape, taken in order. A true scatter (`I-017`) wants arbitrary `(x, y)` pairs, which is a different shape for the same keyword — and the answer lands in `props.rs`, both grammars and completion at once. It is a language decision, so it is a question before it is a chantier. |
+**Sixteen chantiers are planned. No question is open and nothing is blocked.**
+Sixteen archetypes ship and the library is embeddable. The parked ideas were
+reviewed on 2026-08-10 and every one of them moved: what was worth building
+became a work item, what was not was discarded, and the one language question
+the review raised was answered the same day (`D-023`). One idea is still parked,
+on purpose — `I-021`, because nobody has chosen which part of BPMN is the useful
+part, and that has to be decided before it can be costed.
 
 ### Work planned
 
@@ -42,15 +39,21 @@ Roughly by cost. Nothing here has started.
 
 | id | state | title | notes |
 |---|---|---|---|
+| `W-048` | planned | True scatter for `type xy` — a second keyword carrying `(x, y)` | The first chantier to use `D-023`: `point a "A" 3` keeps spreading across the axis, `pair a "A" 3 7` reads coordinates. Cheap because the two-coordinate slot form already exists — `quadrant` has read it since `W-019`. Was `I-017`. |
+| `W-050` | planned | `type kanban` — columns of cards | Probably the cheapest genre left: a column is a `group` (`W-011`) and a card list is an ordered member list (`W-013`). Mostly vocabulary over two shipped mechanisms. Was `I-019`. |
+| `W-051` | planned | `type requirements` — requirements and their typed links | `satisfies`, `derives`, `verifies` on edges. Nodes and typed edges, so almost all vocabulary and diagnostics and almost no layout. Aims at `D-014`'s embedded audience. Was `I-022`. |
 | `W-039` | planned | `type bytefield` — `packet` with a byte-granular ruler | The cheapest item on this page: configuration over an archetype that already emits one `PlacedNode` per row segment. Was `I-009`. |
 | `W-047` | planned | Activation bars for `type sequence` | The box down a lifeline while a call is outstanding. Completes a shipped archetype rather than adding one; the open question is how an author says where a bar opens and closes. Was `I-016`. |
 | `W-038` | planned | A VS Code extension, beside the Zed one | Same three pieces the Zed extension already has — the tree-sitter grammar, `bgraph-lsp`, and the highlight queries — repackaged for a second editor. VS Code takes a TextMate grammar or a WASM tree-sitter build rather than Zed's git-pinned one, and speaks LSP over a client the extension launches itself, so `src/lsp.rs` is reused unchanged. `X-009` applies here too: the queries are part of the grammar's public surface, and a stale one breaks the language rather than degrading. |
 | `W-044` | planned | `type rack` — server racks, units numbered down a frame | The cheapest of the three infrastructure genres and the one with an immediate use: the estate this project sits beside is documented in machines and cluster nodes. Near enough to a vertical `packet` to borrow its row logic. Was part of `I-010`. |
-| `W-046` | planned | `type radar` — axes radiating from a centre, one polygon per series | Reuses `W-012`'s scales and the series notion `bar` and `xy` already carry. Split out of `I-012`; the venn half shares nothing with it and stayed an idea (`I-018`). |
+| `W-046` | planned | `type radar` — axes radiating from a centre, one polygon per series | Reuses `W-012`'s scales and the series notion `bar` and `xy` already carry. Split out of `I-012`. |
+| `W-052` | planned | `type journey` — steps along a line, a satisfaction score per actor | `timeline` (`W-032`) supplies the line and the staggered label packing; what it adds is a series over the steps. Was `I-020`. |
 | `W-040` | planned | Real font metrics instead of the estimate | **The only planned item that closes an open risk** — `X-005`. Every auto-sized box, every edge-label plate and every `check_contrast` measurement rests on `0.56 × font-size` per character today. Was `I-008`. |
 | `W-043` | planned | `type network` — topology: hosts, links, segments | `free` with its own vocabulary, shapes and diagnostics — the nwdiag territory. `W-022` is the precedent: an archetype may supply words and shapes without taking over placement. Was part of `I-010`. |
 | `W-041` | planned | A tree layout engine — mindmap, treeview, org chart | Three genres for one engine, which is what makes it worth the cost. Hierarchy from group nesting already exists; `W-020` consumes it. Was `I-011`. |
+| `W-053` | planned | `type venn` — overlapping sets | Circle geometry, not vocabulary: sizing circles so the overlaps carry the right areas, and fitting a label inside an intersection. Shares nothing with `W-012`, which is why it was split out of `I-012` as `I-018` before being promoted. |
 | `W-045` | planned | `type harness` — wiring harnesses: connectors, pins, cable runs | The WireViz territory, and the least like anything shipped: a pin-to-pin mapping is not a node-and-edge graph wearing a costume. Was part of `I-010`. |
+| `W-049` | planned | `type gitgraph` — commits, branches and merges | Expressible as nodes and edges, but the layout is the genre: branch rails, merge points, topological order. Its own placement engine, sharing nothing with `W-041`'s tree engine. Was `I-014`. |
 | `W-042` | planned | PNG and PDF export, from the CLI **and** from the library | The largest surface here. `D-014` is what makes it more than a convenience: a program embedding the library should not be forced to ship an SVG renderer to get a picture. Merges `I-007` and `I-015`, which were the same work seen from two ends. |
 
 ### Risks
@@ -74,6 +77,7 @@ Known ways this goes wrong. `X-005` now has a chantier; the rest do not, because
 ### Decisions
 | id | state | date | title | was |
 |---|---|---|---|---|
+| `D-023` | active | 2026-08-10 | **One keyword per slot form.** An archetype that needs a second positional shape declares a second word for it — `point a "A" 3` spreads across the axis, `pair a "A" 3 7` reads coordinates — rather than picking a shape from how many values were written, or from a mode set elsewhere in the file. Arity-dispatch cannot tell two forms of the same length apart and leaves the error message unable to say which was meant; a mode property makes one line mean two things depending on a setting written somewhere else, which is what `D-005` refuses everywhere else. This is `D-015` applied *inside* one archetype instead of only between them, so it costs a word of vocabulary and nothing in either grammar. Answers `Q-004`; `W-048` is the first to use it | |
 | `D-022` | active | 2026-07-31 | **Every data property lives with the genre that reads it.** The thirteen archetype-specific properties left on the shared table (`value`, `bits`, `x`, `y`, `wave`, `data`, `points`, `start`, `length`, `kind`, `guard`, `from-card`, `to-card`) moved into `item_props`. Completion is then right by construction rather than by a filter someone has to remember, and a property written in the wrong genre is an unknown property whose message names the genre that does read it. Completes `D-019` | |
 | `D-020` | active | 2026-07-31 | **Proprietary, all rights reserved, and not published.** `LICENSE` grants nothing; `Cargo.toml` carries `license-file` and `publish = false`, so `cargo publish` refuses on that line rather than on a comment. The Archmagos chose AGPL and then changed it to proprietary the same day | |
 | `D-021` | active | 2026-07-31 | **Repetition in templates is one line, one list.** A line holding `{{row.field}}` is written once per row — the line is the unit because a statement already ends at a newline, so it needs no block syntax and cannot nest wrongly. No conditions, no expressions, no nesting: that would be a template language, and a much larger promise. A line naming two lists is refused when the template is read | |
@@ -94,7 +98,7 @@ Known ways this goes wrong. `X-005` now has a chantier; the rest do not, because
 | `D-013` | active | 2026-07-31 | The four statement keywords (`type`, `graph`, `style`, `node`) are **reserved** and cannot name a node — found by `W-008`, which caught pest accepting `style -> a` where tree-sitter could not | |
 | `D-017` | active | 2026-07-31 | The library is embedded by **templating**: a `.bd` file holds the diagram's shape and the calling program binds `{{holes}}`. Not a typed builder — a program that needs to build a diagram from nothing can already write the source text, and holes earn their keep exactly where the shape is fixed and only values vary | |
 | `D-016` | active | 2026-07-31 | **Alpha rides on the color**, as its fourth channel, defaulting to `ff`. The `opacity` property is removed: transparency belongs to the paint, which is what lets a shape keep an opaque border over a translucent fill. Emitted as a separate SVG attribute, since several SVG-to-PDF paths drop inline eight-digit hex | |
-| `D-015` | active | 2026-07-31 | Each archetype gets its **own keyword and positional data** — `slice organic "Organic search" 4820` — over one shared statement form, so the grammars, the validator and the editor stay written once. Seven rules and the reasoning in [`vocabulary.md`](vocabulary.md) | |
+| `D-015` | amended | 2026-07-31 | Each archetype gets its **own keyword and positional data** — `slice organic "Organic search" 4820` — over one shared statement form, so the grammars, the validator and the editor stay written once. Seven rules and the reasoning in [`vocabulary.md`](vocabulary.md). Amended by `D-023`: an archetype may declare **more than one** keyword, one per positional shape | |
 | `D-014` | active | 2026-07-31 | The target is **four audiences — stats, dev, embedded and data** — and, at the end of it, an **embeddable Rust library** that other programs call to generate documents on the fly. The archetype survey in *Open* is scoped to that, and `W-027` is the library itself | |
 
 The full reasoning for each lives in `AGENTS.md` and `docs/reference.md`; these lines are pointers,
@@ -148,7 +152,9 @@ Nothing is marked `landed` without a commit to point at.
 | id | date | title | became | was |
 |---|---|---|---|---|
 | `Q-001` | 2026-07-31 | What does `type` select — a placement strategy or a diagram genre? | `D-007` | |
+| `Q-002` | 2026-07-31 | Which archetype after `pie` and `packet`? | answered by the work — `W-016` … `W-026` all landed, so the ordering question stopped having a subject | **Restored 2026-08-10.** This line had been *deleted* rather than closed, which is exactly what the rule at the top of this file forbids: an identifier never changes and is never reused, and state is explicit. A deleted question reads as a question that was never asked. Its last recorded note said the survey had answered it in part and what remained was the order, naming `W-019`, `W-024`, `W-018` and `W-016` as the ones with no prerequisite |
 | `Q-003` | 2026-07-31 | What shape should the embeddable API take? | `D-017` | |
+| `Q-004` | 2026-08-10 | How does an archetype declare a **second** slot form? | `D-023` | Raised by the idea review the same day: a true scatter for `xy` wants `(x, y)` pairs, which `D-015` had no way to express inside one archetype. Asked before it was built, because the answer lands in `props.rs`, both grammars and completion at once |
 
 ### Risks retired
 
@@ -180,12 +186,12 @@ Nothing is marked `landed` without a commit to point at.
 | `I-011` | promoted | Tree genres: mindmap, treeview, org chart — one tree-layout engine, became `W-041` |
 | `I-012` | promoted | `type radar` and `type venn` — split 2026-08-10: radar reuses `W-012`'s scales and the series notion, and became `W-046`; venn is circle geometry with nothing in common with a plot frame, and stayed an idea as `I-018` |
 | `I-013` | discarded | Process and planning genres — a catch-all, and a catch-all never gets decided because one member always holds the others back. C4 had already shipped as `W-025`; the rest split into `I-019` … `I-022` on 2026-08-10 |
-| `I-014` | parked | `type gitgraph` — commits, branches and merges; expressible as nodes and edges, but the layout is its own problem |
+| `I-014` | promoted | `type gitgraph` — commits, branches and merges — became `W-049`. The layout being its own problem is the cost, not a reason to refuse: unlike `I-004`, the author still declares *what* is there, and only the rails are computed |
 | `I-015` | discarded | Raster and PDF export from the library — the same work as `I-007` seen from the embedding end; merged into `W-042` rather than tracked twice |
 | `I-016` | promoted | Activation bars for `type sequence` — became `W-047` |
-| `I-017` | parked | True scatter for `type xy` — arbitrary `(x, y)` pairs rather than points spread evenly across the axis. **Waits on `Q-004`**: it needs a second slot form, which is a language decision, not a chantier |
-| `I-018` | parked | `type venn` — overlapping sets. Circle geometry and label placement inside intersections; shares nothing with `W-012`. Split out of `I-012` |
-| `I-019` | parked | `type kanban` — columns of cards. Close to a group per column with an ordered member list |
-| `I-020` | parked | `type journey` — user journey: steps along a line with a satisfaction score per actor |
-| `I-021` | parked | `type bpmn` — the notation is large and mostly ceremony; the useful subset would have to be chosen before anything is built |
-| `I-022` | parked | `type requirements` — requirements and the links between them (satisfies, derives, verifies). Nodes and typed edges, so mostly vocabulary |
+| `I-017` | promoted | True scatter for `type xy` — became `W-048` once `Q-004` was answered by `D-023`. What held it back was a language decision, not effort |
+| `I-018` | promoted | `type venn` — became `W-053`. Split out of `I-012` first, which is what made it visible that it is a geometry problem and not a chart |
+| `I-019` | promoted | `type kanban` — became `W-050` |
+| `I-020` | promoted | `type journey` — became `W-052` |
+| `I-021` | parked | `type bpmn` — the notation is large and mostly ceremony. **The only idea still parked**, and deliberately: which part of it is the useful part has to be chosen before the work can be costed, and nobody has chosen |
+| `I-022` | promoted | `type requirements` — became `W-051` |
