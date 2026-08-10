@@ -112,27 +112,88 @@ next statement? — and tree-sitter refuses to generate a parser at all. Both
 grammars now require a separator, which also means `node a node b` on one line
 is a single item with two stray values rather than two items.
 
-## Keywords, as currently planned
+## An archetype may declare a second word
 
-| Archetype | Keyword | Positional slots |
+Written after the fact, when `xy` needed one (`D-023`).
+
+Seven rules were not quite enough. An archetype sometimes has **one picture and
+two shapes of data**: an `xy` plot whose numbers are spread across the axis, and
+the same plot whose numbers are coordinates. Rule 2 says positional data is
+sugar for the named property — but which property, when the same statement
+could fill either?
+
+The answer is a second **word**, not a second reading of the same one:
+
+```
+series north 4 8 15        // spread across the axis
+scatter north 1 4  3 8     // read two at a time, as coordinates
+```
+
+`ArchetypeDef::alt_items` carries it. **The word decides the shape, never the
+number of values written** — two shapes of the same length would be
+indistinguishable, and the error message could not say which one it thought you
+meant. That is the same reasoning as rule 1, applied inside an archetype rather
+than only between them, which is why `D-015` is `amended` rather than replaced.
+
+Neither grammar moved for it: `item_keyword` is an identifier in both, so a new
+word is not a new token.
+
+## A hole may stand where a name goes
+
+Also after the fact (`W-058`). A template writes the id of the statement it
+fills:
+
+```
+slice {{row.id}} "{{row.name}}" {{row.value}}
+```
+
+So a name is `ident | placeholder` in both grammars, everywhere a name is
+declared or referenced — an item's id, both ends of an edge, an anchor, a
+group. **Not where the archetype goes**: the archetype decides which properties
+exist and which word names an item, so nothing else in the file is checkable
+until it is known.
+
+This one is only visible from an editor. Substitution happens before parsing,
+so the renderer never sees a hole in a name position — the grammars refused it
+while the command line was perfectly happy, and the two disagreed about what a
+file *is* for as long as templating had existed.
+
+## Keywords, as they actually are
+
+Generated from the same table the compiler reads; a test asserts this document
+still lists every one.
+
+| Archetype | Keyword | Positional data |
 |---|---|---|
-| `free` | `node` | — (placement is separate) |
-| `pie` | `slice` | `value` — one number ✔ |
-| `packet` | `field` | `bits` — two numbers ✔ |
-| `wave` | `signal` | `wave` — one string ✔ |
-| `bar` | `series` | `points` — a number list ✔ |
-| `xy` | `series` | `points` — a number list ✔ |
-| `quadrant` | `point` | `x`, `y` — two numbers ✔ |
-| `sankey` | `node` | — the value is an **edge** slot: `a -> b 40` ✔ |
-| `state` | `state` | — ✔ |
-| `sequence` | `participant` | — ✔ |
-| `class` | `class` | — members are `- ` / `+ ` lines ✔ |
-| `er` (`W-031`) | `entity` | — members, plus cardinality on the arrows |
-| `treemap` | `box` | `value` — one number ✔ |
-| `gantt` | `task` | `start` — a date, then a date or a duration ✔ |
-| `timeline` (`W-032`) | `event` | a date |
-| `block` (`W-025`) | `block` | — |
+| `free` | `node` | — |
+| `pie` | `slice` | `value` |
+| `gantt` | `task` | `start` — 2 values |
+| `class` | `class` | — |
+| `timeline` | `event` | `date` |
+| `block` | `block` | `kind` |
+| `er` | `entity` | on the **edge**: `from-card`, `to-card` |
+| `state` | `state` | — |
+| `sequence` | `participant` | — |
+| `xy` | `series` · `scatter` | `points` — a list, `pairs` — a list |
+| `bar` | `series` | `points` — a list |
+| `sankey` | `node` | on the **edge**: `value` |
+| `wave` | `signal` | `wave` |
+| `quadrant` | `point` | `x`, `y` |
+| `treemap` | `box` | `value` |
+| `packet` | `field` | `bits` — 2 values |
+| `gitgraph` | `commit` | `branch` |
+| `orgchart` | `position` | — |
+| `mindmap` | `topic` | — |
+| `treeview` | `entry` | — |
+| `harness` | `connector` | on the **edge**: `wire` — 2 values |
+| `venn` | `set` | `count`; on the **edge**: `shared` |
+| `network` | `host` | `role`; on the **edge**: `speed` |
+| `rack` | `device` | `u` — 2 values |
+| `radar` | `series` | `points` — a list |
+| `journey` | `step` | `scores` — a list |
+| `kanban` | `card` | — |
+| `requirements` | `requirement` | on the **edge**: `link` |
+| `bytefield` | `field` | `bytes` — 2 values |
 
-✔ marks what is implemented. The rest is the shape the survey suggests, to be
-confirmed as each archetype is built — and each costs one `item` and one
-`slots` line, with neither grammar touched.
+`node` remains a universal synonym in every genre, and every positional value
+can be written as its named property instead. Twenty-eight genres and `free`.

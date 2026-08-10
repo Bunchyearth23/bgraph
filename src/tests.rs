@@ -634,6 +634,30 @@ fn a_packet_field_needs_bits() {
 }
 
 #[test]
+fn the_design_note_still_lists_every_keyword() {
+    // `vocabulary.md` is what `D-015` sends a reader to for the reasoning, and
+    // it had gone a month without noticing that an archetype may now declare a
+    // *second* word. A design note nobody checks describes the design as it
+    // was when someone last remembered it.
+    let note = include_str!("../docs/vocabulary.md");
+
+    for def in crate::props::ARCHETYPES {
+        assert!(
+            note.contains(&format!("| `{}` |", def.name)),
+            "`type {}` is missing from the design note's table",
+            def.name
+        );
+        for item in def.items() {
+            assert!(
+                note.contains(&format!("`{item}`")),
+                "`{item}` is `type {}`'s word and the note does not give it",
+                def.name
+            );
+        }
+    }
+}
+
+#[test]
 fn the_manual_names_every_genre_and_its_word() {
     // The manual carries a table of every `type` and the word it calls its
     // items. That table is a copy of `props.rs`, and a copy is a thing that
@@ -5381,6 +5405,43 @@ fn a_row_value_is_escaped_for_where_it_lands() {
         .expect("fills");
     let d = parse_diagram(&filled).unwrap_or_else(|e| panic!("{e}\n{filled}"));
     assert_eq!(d.nodes.len(), 1, "{filled}");
+}
+
+#[test]
+fn every_checked_in_svg_is_the_one_the_renderer_produces() {
+    // Thirty-three rendered files sat in the tree with nothing comparing them.
+    // They all moved when `W-040` changed how text is measured, and only a
+    // manual regeneration caught it — a checked-in artefact nobody checks is a
+    // file that can quietly stop being true.
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/examples");
+    let mut seen = 0;
+
+    for entry in std::fs::read_dir(dir).unwrap_or_else(|e| panic!("cannot read {dir}: {e}")) {
+        let path = entry.expect("readable entry").path();
+        if path.extension().is_none_or(|e| e != "bd") {
+            continue;
+        }
+        let source = std::fs::read_to_string(&path).expect("readable");
+        // A template's holes are unbound, so it renders to nothing yet.
+        if source.contains("{{") {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        let svg = path.with_extension("svg");
+        let Ok(committed) = std::fs::read_to_string(&svg) else {
+            panic!("{name} has no rendered .svg beside it");
+        };
+        let fresh = crate::render_source(&source).unwrap_or_else(|e| panic!("{name}: {e:#}"));
+        assert_eq!(
+            committed.trim_end(),
+            fresh.trim_end(),
+            "{name} is stale — regenerate it with `bgraph {name} -o {}`",
+            svg.file_name().unwrap().to_string_lossy()
+        );
+        seen += 1;
+    }
+
+    assert!(seen >= 25, "only {seen} rendered examples found");
 }
 
 #[test]
