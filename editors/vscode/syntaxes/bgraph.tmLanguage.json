@@ -55,7 +55,7 @@
     "statement": {
       "comment": "The statement keywords, and each archetype's word for its items. Derived from props.rs; a test re-derives it and fails on drift.",
       "name": "keyword.control.bgraph",
-      "match": "(?<![\\w-])(include|component|use|note|align-group|same-width|same-height|type|graph|style|group|activate|block|box|card|class|commit|connector|device|entity|entry|event|field|host|node|participant|point|position|requirement|scatter|series|set|signal|slice|state|step|task|topic)(?![\\w-])"
+      "match": "(?<![\\w-])(include|component|use|note|legend|align-group|same-width|same-height|type|graph|style|group|activate|block|box|card|class|commit|connector|device|entity|entry|event|field|host|node|participant|point|position|requirement|scatter|series|set|signal|slice|state|step|task|topic)(?![\\w-])"
     },
     "placement": {
       "name": "keyword.other.placement.bgraph",

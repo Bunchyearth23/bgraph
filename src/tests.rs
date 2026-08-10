@@ -7420,3 +7420,95 @@ fn a_note_follows_a_box_a_constraint_moved() {
         "the note stayed beside where `b` used to be"
     );
 }
+
+#[test]
+fn every_style_field_is_inherited() {
+    // `overlay!` names its fields by hand, so a field added to `Style` and
+    // forgotten here is silently never inherited — a class sets it, the
+    // cascade drops it, and nothing says a word. That is exactly how the
+    // `legend` property arrived born broken.
+    let source = include_str!("style.rs");
+    let fields: Vec<&str> = source
+        .split_once("pub struct Style {")
+        .expect("the Style struct")
+        .1
+        .split_once("\n}")
+        .expect("its closing brace")
+        .0
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("pub "))
+        .filter_map(|l| l.split_once(':'))
+        .map(|(name, _)| name.trim())
+        .collect();
+
+    let listed = source
+        .split_once("overlay!(")
+        .expect("the overlay call")
+        .1
+        .split_once(");")
+        .expect("its close")
+        .0;
+
+    for field in &fields {
+        assert!(
+            listed
+                .lines()
+                .any(|l| l.trim().trim_end_matches(',') == *field),
+            "`Style::{field}` is never inherited — add it to `overlay!`"
+        );
+    }
+    assert!(fields.len() > 20, "only {} fields found", fields.len());
+}
+
+// ------------------------------------------------- a general legend (I-060)
+
+#[test]
+fn a_legend_lists_only_the_classes_that_asked_to_be_in_it() {
+    // Derived from what the file says rather than from the colours on the
+    // page: a legend built from every class would list the ones that only
+    // round a corner, and one built from the colours in use would have
+    // nothing to call them.
+    let l = build(
+        r#"style healthy { fill: #dcfce7 stroke: #16a34a legend: "Healthy" }
+           style down    { fill: #fee2e2 stroke: #dc2626 legend: "Down" }
+           style plain   { radius: 2 }
+           node a "A" .healthy
+           node b "B" .down below a
+           legend right-of a gap 40"#,
+    );
+    let texts: Vec<&str> = l.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert!(texts.contains(&"Healthy"), "{texts:?}");
+    assert!(texts.contains(&"Down"), "{texts:?}");
+    assert_eq!(
+        texts.len(),
+        2,
+        "something unasked-for got listed: {texts:?}"
+    );
+}
+
+#[test]
+fn a_swatch_carries_the_stroke_as_well_as_the_fill() {
+    // A status colour is usually a pale tint with the meaning in the border,
+    // so a swatch drawn from the fill alone is a key nobody can read.
+    let l = build(
+        r#"style healthy { fill: #dcfce7 stroke: #16a34a legend: "Healthy" }
+           node a "A" .healthy
+           legend right-of a gap 40"#,
+    );
+    let swatch = l
+        .nodes
+        .iter()
+        .find(|n| n.style.fill.as_deref() == Some("#dcfce7") && n.lines.is_empty())
+        .expect("a swatch should be drawn");
+    assert_eq!(swatch.style.stroke.as_deref(), Some("#16a34a"));
+}
+
+#[test]
+fn no_class_asks_for_a_legend_so_none_is_drawn() {
+    let l = build(
+        r#"style plain { radius: 2 }
+           node a "A" .plain
+           legend right-of a gap 40"#,
+    );
+    assert!(l.annotations.is_empty(), "an empty legend was drawn");
+}

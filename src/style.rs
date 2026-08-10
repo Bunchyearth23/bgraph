@@ -161,6 +161,11 @@ pub struct Style {
     pub block_kind: Option<BlockKind>,
     /// `type block` — the technology line, drawn in brackets under the name.
     pub tech: Option<String>,
+    /// The text this class shows in a `legend`. Its presence is what opts a
+    /// class into one: a legend derived from every class in the file would
+    /// list the ones that only round a corner, and one derived from the
+    /// colours in use would have nothing to call them.
+    pub legend: Option<String>,
     /// What this is, in a sentence.
     ///
     /// One property, one meaning. `type block` draws it under the technology
@@ -263,6 +268,7 @@ impl Style {
             block_kind,
             tech,
             description,
+            legend,
             risk,
             verify,
             link,
@@ -350,6 +356,7 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
     let first = v.first();
 
     match prop.name.as_str() {
+        "legend" => style.legend = first.and_then(|x| x.as_text()).map(String::from),
         "fill" | "background" => style.fill = first.and_then(|x| x.as_paint()).map(String::from),
         "stroke" | "border" | "color" => {
             // `stroke: #38bdf8 2px dashed` — paint, then optional width, then pattern.

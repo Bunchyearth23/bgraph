@@ -213,6 +213,7 @@ fn build(file: Pair<Rule>, input: &str) -> Result<Diagram> {
             Rule::include_decl => diagram.includes.push(parse_include(pair)?),
             Rule::constraint_decl => diagram.constraints.push(parse_constraint(pair)?),
             Rule::note_decl => diagram.notes.push(parse_note(pair)?),
+            Rule::legend_decl => diagram.legends.push(parse_note(pair)?),
             Rule::component_decl => diagram.components.push(parse_component(pair, input)?),
             Rule::use_decl => diagram.uses.push(parse_use(pair)?),
             Rule::style_decl => diagram.styles.push(parse_style(pair)?),
@@ -249,6 +250,9 @@ fn spanned(pair: &Pair<Rule>) -> Spanned<String> {
     }
 }
 
+/// A `note` or a `legend`. They differ in what is drawn, not in how they are
+/// written — both are placed by the ordinary anchors, both take classes, and
+/// neither declares a name.
 fn parse_note(pair: Pair<Rule>) -> Result<crate::ast::NoteDecl> {
     let span = span_of(&pair);
     let mut text = String::new();

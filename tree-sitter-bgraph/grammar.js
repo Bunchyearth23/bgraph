@@ -38,6 +38,7 @@ module.exports = grammar({
       choice(
         $.include_declaration,
         $.note_declaration,
+        $.legend_declaration,
         $.constraint_declaration,
         $.component_declaration,
         $.use_declaration,
@@ -66,6 +67,15 @@ module.exports = grammar({
       seq(
         'note',
         field('text', $.string),
+        repeat(field('class', $.class_reference)),
+        optional(field('placement', $._placement)),
+        optional(field('body', $.block)),
+      ),
+
+    // A key to the colours, for the genres with no chart to build one from.
+    legend_declaration: ($) =>
+      seq(
+        'legend',
         repeat(field('class', $.class_reference)),
         optional(field('placement', $._placement)),
         optional(field('body', $.block)),

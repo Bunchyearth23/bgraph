@@ -115,6 +115,31 @@ error, as everywhere else.
 Notes are solved last, against the boxes as they finally sit — so a note
 anchored to something a constraint moved moves with it.
 
+### A legend
+
+The chart archetypes build a key from their own series. Every other genre had
+no way to declare one:
+
+```bgraph
+style healthy  { fill: #dcfce7 stroke: #16a34a legend: "Healthy" }
+style degraded { fill: #fef3c7 stroke: #d97706 legend: "Degraded" }
+style plain    { radius: 2 }
+
+node api "API" .healthy
+node jobs "Workers" .degraded below api
+
+legend right-of api gap 70
+```
+
+It lists the style classes that declare a `legend:` text — nothing else. A
+legend built from every class would list the ones that only round a corner,
+and one built from the colours on the page would have nothing to call them.
+So the file says which classes mean something, and the legend can only ever
+describe a colour the file actually used.
+
+The swatch carries the class's stroke as well as its fill, because a status
+colour is usually a pale tint with the meaning in the border.
+
 ### Saying what something is
 
 `description` is one property with one meaning: what this is, in a sentence.

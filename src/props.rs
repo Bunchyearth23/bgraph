@@ -72,6 +72,18 @@ pub const CARDINALITIES: &[&str] = &[
 
 pub const PROPS: &[PropDef] = &[
     PropDef {
+        name: "legend",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "legend: <text>",
+        doc: "What this style class is called in a `legend` statement. Its \
+              presence is what puts the class in one — a legend built from \
+              every class would list the ones that only round a corner, and \
+              one built from the colours in use would have nothing to call \
+              them.",
+    },
+    PropDef {
         name: "description",
         alias: false,
         ctx: Ctx::Both,
@@ -2314,6 +2326,13 @@ pub const KEYWORDS: &[(&str, &str)] = &[
         "Merge another file — `include \"house.bds\"`, or `include \"core.bd\" \
          as core` to bring its names in under a prefix. Without a prefix every \
          name must be unique across the set; a clash names both files.",
+    ),
+    (
+        "legend",
+        "A key to the colours: `legend right-of core gap 30`. Lists the style \
+         classes that declare a `legend:` text, so it can only ever describe a \
+         colour the file actually used. The chart archetypes build their own \
+         from their series and need no statement.",
     ),
     (
         "note",

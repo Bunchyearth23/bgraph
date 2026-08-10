@@ -57,6 +57,9 @@ pub struct Diagram {
     pub constraints: Vec<ConstraintDecl>,
     /// Free text placed by the ordinary anchors, belonging to no box.
     pub notes: Vec<NoteDecl>,
+    /// A key to the style classes in use. At most one is meaningful; a second
+    /// is reported rather than drawn twice.
+    pub legends: Vec<NoteDecl>,
 }
 
 /// `note "Figures are March" below api gap 20`.

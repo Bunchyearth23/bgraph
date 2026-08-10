@@ -203,6 +203,7 @@ Aliases are marked. They behave identically to the property they alias; the edit
 
 | Property | Applies to | Syntax | Meaning |
 |---|---|---|---|
+| `legend` | both | `legend: <text>` | What this style class is called in a `legend` statement. Its presence is what puts the class in one — a legend built from every class would list the ones that only round a corner, and one built from the colours in use would have nothing to call them. |
 | `description` | both | `description: <text>` | What this is, in a sentence. Emitted as an SVG `<title>` in every genre — a tooltip to a reader with a mouse, a label to one with a screen reader — and additionally *drawn* under the technology line in `type block`, which has room for it. |
 | `desc` *(alias)* | both | `desc: <text>` | Alias for `description`. |
 | `fill` | node | `fill: <color>` | Interior color of the shape. |

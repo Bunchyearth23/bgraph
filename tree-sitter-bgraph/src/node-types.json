@@ -322,6 +322,10 @@
           "named": true
         },
         {
+          "type": "legend_declaration",
+          "named": true
+        },
+        {
           "type": "note_declaration",
           "named": true
         },
@@ -572,6 +576,46 @@
     }
   },
   {
+    "type": "legend_declaration",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "class": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "class_reference",
+            "named": true
+          }
+        ]
+      },
+      "placement": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "absolute_position",
+            "named": true
+          },
+          {
+            "type": "relative_position",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
     "type": "note_declaration",
     "named": true,
     "fields": {
@@ -776,6 +820,10 @@
         },
         {
           "type": "item_declaration",
+          "named": true
+        },
+        {
+          "type": "legend_declaration",
           "named": true
         },
         {
@@ -1028,6 +1076,10 @@
   },
   {
     "type": "left-of",
+    "named": false
+  },
+  {
+    "type": "legend",
     "named": false
   },
   {

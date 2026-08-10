@@ -227,6 +227,7 @@ impl State {
         d.extra_archetypes.extend(other.extra_archetypes);
         d.constraints.extend(other.constraints);
         d.notes.extend(other.notes);
+        d.legends.extend(other.legends);
         d.styles.extend(other.styles);
         d.nodes.extend(other.nodes);
 

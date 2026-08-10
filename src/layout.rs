@@ -1096,6 +1096,107 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         }
     }
 
+    // A legend, for the genres that have no chart to build one from. Derived
+    // from the style classes that declare a `legend:` text, in the order they
+    // were declared — so it lists what the file actually says rather than
+    // guessing from the colours on the page.
+    for legend in &diagram.legends {
+        let style = registry.resolve(node_base.clone(), "note", &legend.classes, &legend.props)?;
+        let size = style.font_size.unwrap_or(12.0);
+        let swatch = size;
+        let step = size * 2.0;
+        let gap_to_text = size * 0.7;
+
+        // The swatch takes the class's stroke as well as its fill: a pale
+        // fill is common — a status colour is usually a tint with the meaning
+        // in the border — and a swatch drawn from the fill alone would be a
+        // key nobody can read.
+        let entries: Vec<(String, String, String)> = diagram
+            .styles
+            .iter()
+            .filter_map(|decl| {
+                let resolved = registry.get(decl.name.as_str())?;
+                let text = resolved.legend.clone()?;
+                Some((
+                    text,
+                    resolved.fill.clone().unwrap_or_else(|| "#94a3b8".into()),
+                    resolved.stroke.clone().unwrap_or_else(|| "#94a3b8".into()),
+                ))
+            })
+            .collect();
+        if entries.is_empty() {
+            continue;
+        }
+
+        let widest = entries
+            .iter()
+            .map(|(text, _, _)| advance(text, size))
+            .fold(0.0_f64, f64::max);
+        let w = swatch + gap_to_text + widest;
+        let h = entries.len() as f64 * step;
+
+        let rect = match legend.placement.as_ref().map(|p| p.resolved(opts.grid)) {
+            Some(Placement::At { x, y }) => Rect { x, y, w, h },
+            Some(Placement::Rel {
+                dir,
+                ref anchor,
+                gap,
+                align,
+            }) => {
+                let found = index.get(anchor.as_str()).and_then(|entity| match entity {
+                    Entity::Node(i) => nodes.get(*i).map(|n| n.rect),
+                    Entity::Group(g) => groups.get(*g).map(|f| f.rect),
+                });
+                let Some(anchor_rect) = found else { continue };
+                offset_from(&anchor_rect, dir, gap.unwrap_or(opts.gap), align, w, h)
+            }
+            Some(Placement::Cell { col, row }) => Rect {
+                x: col,
+                y: row,
+                w,
+                h,
+            },
+            None => continue,
+        };
+
+        for (i, (text, fill, stroke)) in entries.iter().enumerate() {
+            let y = rect.y + i as f64 * step;
+            nodes.push(PlacedNode {
+                id: String::new(),
+                lines: Vec::new(),
+                rect: Rect {
+                    x: rect.x,
+                    y: y + (step - swatch) / 2.0,
+                    w: swatch,
+                    h: swatch,
+                },
+                style: Style {
+                    fill: Some(fill.clone()),
+                    stroke: Some(stroke.clone()),
+                    stroke_width: Some(1.2),
+                    radius: Some(3.0),
+                    ..Style::default()
+                },
+            });
+            annotations.push(Annotation {
+                text: text.clone(),
+                x: rect.x + swatch + gap_to_text,
+                y: y + step / 2.0,
+                anchor: Anchor::Start,
+                size,
+                color: style.font_color.clone().unwrap_or_else(|| {
+                    if dark {
+                        "#e2e8f0".into()
+                    } else {
+                        "#1a1a1a".into()
+                    }
+                }),
+                weight: "500".into(),
+                family: style.font_family.clone().unwrap_or_default(),
+            });
+        }
+    }
+
     // `graph { title }` on a genre that draws boxes rather than a chart. The
     // chart archetypes each reserve a band and shift their content down; here
     // nothing needs shifting, because the heading simply sits above the
