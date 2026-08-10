@@ -112,6 +112,82 @@ pub fn lint(source: &str) -> Vec<(crate::ast::Span, String)> {
     out
 }
 
+/// Bindings read from CSV — one header line, one row per repetition.
+///
+/// The format most real data arrives in, and the one that maps exactly onto
+/// [`Value::Rows`]: a header names the fields, every other line is a row. The
+/// whole file becomes **one** binding, named by the caller, because a CSV has
+/// one table in it and pretending otherwise would need a convention nobody
+/// asked for.
+///
+/// A field that parses as a number becomes one; everything else is text. No
+/// quoting dialect beyond the common one — a field may be wrapped in `"` and
+/// double a `"` inside itself, which is what a spreadsheet writes.
+#[cfg(feature = "csv")]
+pub fn rows_from_csv(name: &str, source: &str) -> Result<Bindings> {
+    let mut lines = source.lines().filter(|l| !l.trim().is_empty());
+    let Some(header) = lines.next() else {
+        bail!("the CSV is empty — the first line names the fields");
+    };
+    let fields = split_csv(header);
+    if fields.iter().any(|f| f.is_empty()) {
+        bail!("a column in the header has no name, and a row's fields are named by it");
+    }
+
+    let mut rows = Vec::new();
+    for (n, line) in lines.enumerate() {
+        let cells = split_csv(line);
+        if cells.len() != fields.len() {
+            bail!(
+                "row {} has {} field{} for {} column{} — a row that does not line up with \
+                 the header has no reading",
+                n + 1,
+                cells.len(),
+                if cells.len() == 1 { "" } else { "s" },
+                fields.len(),
+                if fields.len() == 1 { "" } else { "s" }
+            );
+        }
+        let mut row = Bindings::new();
+        for (field, cell) in fields.iter().zip(cells) {
+            row.insert(
+                field.clone(),
+                match cell.parse::<f64>() {
+                    Ok(n) => Value::Number(n),
+                    Err(_) => Value::Text(cell),
+                },
+            );
+        }
+        rows.push(row);
+    }
+
+    Ok(Bindings::new().set(name, Value::Rows(rows)))
+}
+
+/// One CSV line into its fields. The common dialect: commas separate, a field
+/// may be wrapped in `"`, and `""` inside one is a literal quote.
+#[cfg(feature = "csv")]
+fn split_csv(line: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut field = String::new();
+    let mut quoted = false;
+    let mut chars = line.trim_end_matches(['\r', '\n']).chars().peekable();
+
+    while let Some(c) = chars.next() {
+        match c {
+            '"' if quoted && chars.peek() == Some(&'"') => {
+                chars.next();
+                field.push('"');
+            }
+            '"' => quoted = !quoted,
+            ',' if !quoted => out.push(std::mem::take(&mut field).trim().to_string()),
+            _ => field.push(c),
+        }
+    }
+    out.push(field.trim().to_string());
+    out
+}
+
 /// Whether text can stand as a bare name. The same rule the grammar uses:
 /// a leading letter or underscore, then letters, digits, underscores and
 /// interior hyphens — a trailing hyphen would make `a-` swallow an arrow.

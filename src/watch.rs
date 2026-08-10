@@ -12,17 +12,27 @@ use std::time::UNIX_EPOCH;
 
 use anyhow::{Context, Result};
 
-pub fn serve(input: PathBuf, port: u16) -> Result<()> {
+/// Serve a diagram, reloading on every save.
+///
+/// `data` is a JSON file of bindings, when the diagram is a template. It is
+/// re-read on each request alongside the source, so editing the *data* reloads
+/// the preview too — writing a template against its real numbers is the loop
+/// this genre of file is written in, and it was the only one without a live
+/// view.
+pub fn serve(input: PathBuf, data: Option<PathBuf>, port: u16) -> Result<()> {
     let listener = TcpListener::bind(("127.0.0.1", port))
         .with_context(|| format!("cannot bind 127.0.0.1:{port}"))?;
 
     println!("bgraph watching {}", input.display());
+    if let Some(path) = &data {
+        println!("  with data from {}", path.display());
+    }
     println!("  → http://127.0.0.1:{port}");
 
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
-                if let Err(err) = handle(stream, &input) {
+                if let Err(err) = handle(stream, &input, data.as_deref()) {
                     eprintln!("request failed: {err}");
                 }
             }
@@ -33,7 +43,7 @@ pub fn serve(input: PathBuf, port: u16) -> Result<()> {
     Ok(())
 }
 
-fn handle(mut stream: TcpStream, input: &Path) -> Result<()> {
+fn handle(mut stream: TcpStream, input: &Path, data: Option<&Path>) -> Result<()> {
     let mut reader = BufReader::new(stream.try_clone()?);
     let mut request = String::new();
     reader.read_line(&mut request)?;
@@ -42,11 +52,11 @@ fn handle(mut stream: TcpStream, input: &Path) -> Result<()> {
 
     let (content_type, body) = match path {
         "/version" => ("text/plain", version(input)),
-        "/svg" => match render_source(input) {
+        "/svg" => match render_source(input, data) {
             Ok(svg) => ("image/svg+xml", svg),
             Err(err) => ("text/plain", format!("{err:#}")),
         },
-        _ => ("text/html", page(input)),
+        _ => ("text/html", page(input, data)),
     };
 
     write!(
@@ -60,9 +70,29 @@ fn handle(mut stream: TcpStream, input: &Path) -> Result<()> {
     Ok(())
 }
 
-fn render_source(input: &Path) -> Result<String> {
+pub(crate) fn render_source(input: &Path, data: Option<&Path>) -> Result<String> {
     let source =
         fs::read_to_string(input).with_context(|| format!("cannot read {}", input.display()))?;
+
+    // A template with data is filled first; the error from a bad binding then
+    // reaches the page the same way a syntax error does, instead of ending the
+    // server.
+    //
+    // *Without* data a template renders as written, holes and all — which is
+    // the opposite of what a one-shot render does, and deliberately. A hole
+    // parses, so the shape is drawable, and the shape is what you are editing
+    // when you have not wired the data up yet. Refusing here would leave the
+    // preview blank for the whole first half of writing a template.
+    #[cfg(feature = "json")]
+    if let Some(path) = data {
+        let raw =
+            fs::read_to_string(path).with_context(|| format!("cannot read {}", path.display()))?;
+        let values = crate::template::Bindings::from_json(&raw)
+            .with_context(|| format!("in {}", path.display()))?;
+        return crate::template::render(&source, &values);
+    }
+    let _ = data;
+
     let diagram = crate::parser::parse_diagram(&source)?;
     let layout = crate::layout::solve(&diagram)?;
     Ok(crate::render_svg::render(&layout))
@@ -77,8 +107,8 @@ fn version(input: &Path) -> String {
         .unwrap_or_else(|| "0".into())
 }
 
-fn page(input: &Path) -> String {
-    let (status, content) = match render_source(input) {
+fn page(input: &Path, data: Option<&Path>) -> String {
+    let (status, content) = match render_source(input, data) {
         Ok(svg) => ("", svg),
         Err(err) => (
             "error",
@@ -258,7 +288,7 @@ tick();
 /// the source. One missed pair produces a page that serves fine and silently
 /// does nothing — hence the tests below.
 pub fn preview_page(input: &Path) -> String {
-    page(input)
+    page(input, None)
 }
 
 fn html_escape(s: &str) -> String {
@@ -272,7 +302,7 @@ mod tests {
     use super::*;
 
     fn rendered() -> String {
-        page(Path::new("diagram.bd"))
+        page(Path::new("diagram.bd"), None)
     }
 
     /// Everything between `<style>`/`<script>` and their closing tag.

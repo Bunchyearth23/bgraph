@@ -689,6 +689,105 @@ fn the_manual_names_every_genre_and_its_word() {
     );
 }
 
+// ---------------------------------------------------------------------- W-062
+
+#[cfg(feature = "csv")]
+#[test]
+fn a_csv_is_one_table_of_rows() {
+    // The format real data arrives in, and the one that maps exactly onto
+    // repetition: a header names the fields, every other line writes the
+    // statement once.
+    let bound = crate::template::rows_from_csv(
+        "r",
+        "id,name,value\norganic,Organic search,4820\npaid,\"Paid, all networks\",410\n",
+    )
+    .expect("reads");
+
+    let t = Template::parse("type pie\nslice {{r.id}} \"{{r.name}}\" {{r.value}}").expect("parses");
+    let filled = t.fill(&bound).expect("fills");
+
+    assert!(
+        filled.contains("slice organic \"Organic search\" 4820"),
+        "{filled}"
+    );
+    // A quoted field keeps its comma, which is the only reason the dialect
+    // needs quoting at all.
+    assert!(
+        filled.contains("slice paid \"Paid, all networks\" 410"),
+        "{filled}"
+    );
+}
+
+#[cfg(feature = "csv")]
+#[test]
+fn a_csv_refuses_a_row_that_does_not_line_up() {
+    // A short row read positionally would silently shift every field after
+    // the gap into the wrong column.
+    let e = format!(
+        "{:#}",
+        crate::template::rows_from_csv("r", "a,b,c\n1,2\n").expect_err("should refuse")
+    );
+    assert!(e.contains("2 fields for 3 columns"), "{e}");
+
+    let e = format!(
+        "{:#}",
+        crate::template::rows_from_csv("r", "").expect_err("should refuse")
+    );
+    assert!(e.contains("empty"), "{e}");
+
+    let e = format!(
+        "{:#}",
+        crate::template::rows_from_csv("r", "a,,c\n1,2,3\n").expect_err("should refuse")
+    );
+    assert!(e.contains("no name"), "{e}");
+}
+
+#[cfg(feature = "csv")]
+#[test]
+fn a_csv_field_that_is_a_number_becomes_one() {
+    // Otherwise every value would arrive quoted, and a chart would refuse the
+    // data it was given.
+    let bound = crate::template::rows_from_csv("r", "n,s\n42,42abc\n").expect("reads");
+    let t =
+        Template::parse("node a \"x\" { width: {{r.n}} font-family: {{r.s}} }").expect("parses");
+    let filled = t.fill(&bound).expect("fills");
+    assert!(filled.contains("width: 42"), "a number is bare: {filled}");
+    assert!(
+        filled.contains("font-family: \"42abc\""),
+        "text is quoted: {filled}"
+    );
+}
+
+// ---------------------------------------------------------------------- W-061
+
+#[cfg(feature = "json")]
+#[test]
+fn the_preview_fills_a_template_from_its_data() {
+    // Writing a template against its real numbers is the loop this genre of
+    // file is written in, and it was the only one with no live view.
+    let dir = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/examples"));
+    let svg = crate::watch::render_source(&dir.join("report.bd"), Some(&dir.join("report.json")))
+        .expect("renders");
+
+    assert!(svg.starts_with("<svg"), "{}", &svg[..40.min(svg.len())]);
+    assert!(
+        svg.contains("Organic search"),
+        "a row from the data reached the page"
+    );
+
+    // Without data it renders as written, holes and all — the opposite of a
+    // one-shot render, and deliberately: a hole parses, so the shape is
+    // drawable, and the shape is what you are editing before the data is
+    // wired up. Refusing here would blank the preview for the whole first
+    // half of writing a template.
+    let bare = crate::watch::render_source(&dir.join("report.bd"), None).expect("draws the shape");
+    assert!(
+        bare.contains("{{"),
+        "the holes are shown as written: {}",
+        &bare[..60]
+    );
+}
+
 // ---------------------------------------------------------------------- W-058
 
 #[test]
@@ -5240,11 +5339,12 @@ fn every_archetype_has_a_feature_and_every_feature_an_archetype() {
         .take_while(|l| !l.starts_with('['))
         .filter_map(|l| l.split_once(" = []"))
         .map(|(name, _)| name.trim())
-        // `pdf` gates an output format and `json` an input one, not a genre.
+        // `pdf` gates an output format, `json` and `csv` input ones — not
+        // genres.
         // They are named here rather
         // than filtered by a pattern, so a second non-archetype feature has to
         // be justified in this list instead of slipping past a wildcard.
-        .filter(|name| !matches!(*name, "pdf" | "json"))
+        .filter(|name| !matches!(*name, "pdf" | "json" | "csv"))
         .collect();
 
     let mut archetypes: Vec<&str> = crate::props::ARCHETYPES

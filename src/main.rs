@@ -33,6 +33,12 @@ struct Cli {
     #[arg(long = "data", value_name = "FILE")]
     data: Option<PathBuf>,
 
+    /// Bind one hole to the rows of a CSV: `--rows source=sales.csv`. The
+    /// header names the fields, and every other line writes its statement
+    /// once.
+    #[arg(long = "rows", value_name = "NAME=FILE")]
+    rows: Option<String>,
+
     /// Print the filled source instead of rendering it
     #[arg(long)]
     emit: bool,
@@ -44,6 +50,11 @@ enum Command {
     Watch {
         /// Input DSL file
         input: PathBuf,
+
+        /// Bind a template's holes from a JSON object, re-read on every
+        /// request — so editing the data reloads the preview too
+        #[arg(long = "data", value_name = "FILE")]
+        data: Option<PathBuf>,
 
         #[arg(short, long, default_value_t = 7878)]
         port: u16,
@@ -75,8 +86,8 @@ fn run() -> Result<i32> {
     let cli = Cli::parse();
 
     match cli.command {
-        Some(Command::Watch { input, port }) => {
-            watch::serve(input, port)?;
+        Some(Command::Watch { input, data, port }) => {
+            watch::serve(input, data, port)?;
             return Ok(0);
         }
         Some(Command::Check { input }) => return check_file(&input),
@@ -104,7 +115,11 @@ fn run() -> Result<i32> {
 
     // A file with holes is a template; one without renders exactly as before.
     let template = bgraph::Template::parse(&source)?;
-    if !template.holes().is_empty() || !cli.set.is_empty() || cli.data.is_some() {
+    if !template.holes().is_empty()
+        || !cli.set.is_empty()
+        || cli.data.is_some()
+        || cli.rows.is_some()
+    {
         // Data first, `--set` after: a flag on the command line is the thing
         // you are changing right now, so it wins over the file.
         let mut values = match &cli.data {
@@ -124,6 +139,30 @@ fn run() -> Result<i32> {
             Some(_) => bail!("this build has no JSON reader — rebuild with the `json` feature"),
             None => bgraph::Bindings::new(),
         };
+        // Rows next: a CSV is one table under one name, so it cannot clash
+        // with anything `--data` supplied except that same name.
+        if let Some(spec) = &cli.rows {
+            #[cfg(feature = "csv")]
+            {
+                let Some((name, path)) = spec.split_once('=') else {
+                    bail!("`--rows {spec}` needs a `name=file.csv`");
+                };
+                let raw = if path == "-" {
+                    std::io::read_to_string(std::io::stdin())
+                        .context("cannot read the rows from standard input")?
+                } else {
+                    fs::read_to_string(path).with_context(|| format!("cannot read {path}"))?
+                };
+                let table = bgraph::template::rows_from_csv(name, &raw)
+                    .with_context(|| format!("in {path}"))?;
+                if let Some(bound) = table.get(name) {
+                    values.insert(name, bound.clone());
+                }
+            }
+            #[cfg(not(feature = "csv"))]
+            bail!("this build has no CSV reader — rebuild with the `csv` feature");
+        }
+
         for pair in &cli.set {
             let Some((name, raw)) = pair.split_once('=') else {
                 bail!("`--set {pair}` needs a `name=value`");

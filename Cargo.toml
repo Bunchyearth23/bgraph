@@ -24,7 +24,7 @@ name = "bgraph-lsp"
 path = "src/bin/bgraph-lsp.rs"
 
 [features]
-default = ["all-archetypes", "pdf", "json"]
+default = ["all-archetypes", "pdf", "json", "csv"]
 all-archetypes = [
     "pie",
     "packet",
@@ -91,6 +91,10 @@ pdf = []
 # Reading bindings from JSON. `serde_json` is already here for the language
 # server's wire format, so this gates code rather than a dependency.
 json = []
+
+# Reading rows from CSV — one header line, one row per repetition. Hand-rolled
+# for the same reason as everything else here: the dialect is twenty lines.
+csv = []
 
 [dependencies]
 anyhow = "1.0.104"

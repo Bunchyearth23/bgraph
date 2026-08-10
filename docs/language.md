@@ -399,6 +399,8 @@ bgraph watch diagram.bd --port 9000
 bgraph check diagram.bd             # diagnostics only, no output file
 bgraph report.bd --data q3.json     # fill a template from a JSON object
 bgraph report.bd --data - --emit    # …from a pipe, printing the filled source
+bgraph report.bd --rows r=sales.csv # one hole from the rows of a CSV
+bgraph watch report.bd --data q3.json   # live preview, data re-read on save
 bgraph docs -o docs/reference.md    # regenerate the reference manual
 ```
 
