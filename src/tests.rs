@@ -6132,3 +6132,91 @@ fn an_unknown_genre_names_the_ones_that_exist() {
     assert!(message.contains("pie"), "{message}");
     assert!(message.contains("gantt"), "{message}");
 }
+
+// ------------------------------------------------- diagnostics (I-051)
+
+/// The first diagnostic a source produces, with its position resolved.
+fn first_diag(source: &str) -> (crate::check::Diag, usize, usize) {
+    let diag = diags(source).into_iter().next().expect("a diagnostic");
+    let (line, col) = crate::lsp::LineIndex::new(source).line_col(diag.span.start);
+    (diag, line, col)
+}
+
+#[test]
+fn the_flat_form_has_not_moved() {
+    // Pinned byte for byte, and deliberately so. Editors parse this, CI logs
+    // are grepped for it, and readers have it in a shell alias — it is an
+    // interchange format, not a rendering, and the rich form beside it is
+    // not permission to drift.
+    let source = r#"node a "A" { fil: #fff }"#;
+    let (diag, line, col) = first_diag(source);
+
+    assert_eq!(
+        crate::report::flat("diagram.bd", line, col, &diag),
+        "diagram.bd:1:14: error: unknown property `fil` — did you mean `fill`?"
+    );
+}
+
+#[test]
+fn the_caret_lands_under_what_is_wrong() {
+    // The whole value of the rich form. An off-by-one here is worse than no
+    // caret at all: it points confidently at the wrong token.
+    let source = "node a \"A\"\nnode b \"B\" right-of a\nb -> nowhere\n";
+    let (diag, line, col) = first_diag(source);
+    let rendered = crate::report::rich("d.bd", source, line, col, &diag, false);
+
+    let lines: Vec<&str> = rendered.lines().collect();
+    let text = lines[3];
+    let carets = lines[4];
+
+    let at = carets.find('^').expect("a caret");
+    assert_eq!(
+        text[at..at + 7].to_string(),
+        "nowhere",
+        "the caret sits over `{}`",
+        &text[at..]
+    );
+    assert_eq!(
+        carets[at..].trim_end(),
+        "^".repeat(7),
+        "the caret does not cover the whole name"
+    );
+}
+
+#[test]
+fn a_span_running_past_its_line_is_not_underlined_to_the_end_of_the_file() {
+    // An unclosed block reaches to end of file. Underlining all of it would
+    // claim the rest of the diagram is the mistake.
+    // Built rather than provoked: which parser reports an unclosed block is
+    // beside the point, and the clamp is what is being tested.
+    let source = "node a \"A\" {\nnode b \"B\"\nnode c \"C\"\n";
+    let diag = crate::check::Diag {
+        severity: crate::check::Severity::Error,
+        message: "unclosed block".into(),
+        span: crate::ast::Span {
+            start: 11,
+            end: source.len(),
+        },
+    };
+
+    let rendered = crate::report::rich("d.bd", source, 0, 11, &diag, false);
+    let carets = rendered.lines().nth(4).expect("a caret line");
+    assert_eq!(
+        carets.chars().filter(|c| *c == '^').count(),
+        1,
+        "the underline runs past its own line:\n{rendered}"
+    );
+}
+
+#[test]
+fn colour_is_absent_when_it_is_not_wanted() {
+    // Escape sequences in a redirected stream are noise a reader has to strip.
+    let source = r#"node a "A" { fil: #fff }"#;
+    let (diag, line, col) = first_diag(source);
+
+    let plain = crate::report::rich("d.bd", source, line, col, &diag, false);
+    assert!(!plain.contains('\x1b'), "uncoloured output has escapes");
+
+    let tinted = crate::report::rich("d.bd", source, line, col, &diag, true);
+    assert!(tinted.contains('\x1b'), "coloured output has none");
+}

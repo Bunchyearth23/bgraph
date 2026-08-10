@@ -75,6 +75,11 @@ enum Command {
     Check {
         /// Input DSL file
         input: PathBuf,
+
+        /// Force the flat `file:line:col: severity: message` form, whatever
+        /// stdout is attached to
+        #[arg(long)]
+        ci: bool,
     },
     /// Reformat a file to the canonical shape
     Fmt {
@@ -242,7 +247,7 @@ fn run() -> Result<i32> {
             port,
             server,
         }) => return show_or_serve(input, data, port, server),
-        Some(Command::Check { input }) => return check_file(&input),
+        Some(Command::Check { input, ci }) => return check_file(&input, ci),
         Some(Command::Fmt { inputs, check }) => return format_files(&inputs, check),
         #[cfg(feature = "completions")]
         Some(Command::Completions { shell }) => return completions(&shell),
@@ -387,9 +392,10 @@ fn run() -> Result<i32> {
 
 /// Prints every diagnostic in `file:line:col: severity: message` form so it
 /// drops straight into an editor's error list.
-fn check_file(input: &PathBuf) -> Result<i32> {
+fn check_file(input: &PathBuf, ci: bool) -> Result<i32> {
     use bgraph::check::Severity;
     use bgraph::lsp::LineIndex;
+    use bgraph::report;
 
     let source =
         fs::read_to_string(input).with_context(|| format!("cannot read {}", input.display()))?;
@@ -413,23 +419,25 @@ fn check_file(input: &PathBuf) -> Result<i32> {
     }
     diagnostics.sort_by_key(|d| (d.span.start, d.span.end));
 
+    let (rich, colour) = report::decorate(ci);
+    let path = input.display().to_string();
+
     let mut errors = 0;
     for diag in &diagnostics {
         let (line, col) = index.line_col(diag.span.start);
-        let label = match diag.severity {
-            Severity::Error => {
-                errors += 1;
-                "error"
-            }
-            Severity::Warning => "warning",
-        };
-        println!(
-            "{}:{}:{}: {label}: {}",
-            input.display(),
-            line + 1,
-            col + 1,
-            diag.message
-        );
+        if diag.severity == Severity::Error {
+            errors += 1;
+        }
+        if rich {
+            // A blank line between them, or two diagnostics from adjacent
+            // lines read as one five-line block.
+            println!(
+                "{}\n",
+                report::rich(&path, &source, line, col, diag, colour)
+            );
+        } else {
+            println!("{}", report::flat(&path, line, col, diag));
+        }
     }
 
     if diagnostics.is_empty() {

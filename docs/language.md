@@ -404,6 +404,7 @@ bgraph watch diagram.svg            # …a picture works too; the extension deci
 bgraph watch diagram.bd --server    # …the browser preview rather than a window
 bgraph watch diagram.bd --port 9000
 bgraph check diagram.bd             # diagnostics only, no output file
+bgraph check diagram.bd --ci        # …the flat form, whatever stdout is
 bgraph report.bd --data q3.json     # fill a template from a JSON object
 bgraph report.bd --data - --emit    # …from a pipe, printing the filled source
 bgraph report.bd --rows r=sales.csv # one hole from the rows of a CSV

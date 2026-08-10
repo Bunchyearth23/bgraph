@@ -644,8 +644,11 @@ bgraph init pie
 The output extension picks the writer. A flag would be a second way of saying
 what the filename already says.
 
-`check` prints `file:line:col: severity: message` and exits non-zero on an
-error — the form editors and build systems already understand.
+`check` exits non-zero on an error. At a terminal it shows the offending line
+with a caret under it; redirected — or with `--ci` — it prints
+`file:line:col: severity: message`, the form editors and build systems already
+understand. That form is an interchange format rather than a rendering, so it
+does not move; the caret beside it is not permission to drift.
 
 `fmt` fixes what is structural: indentation, trailing space, runs of blank
 lines. It leaves columns lined up by hand exactly as written — indentation is
