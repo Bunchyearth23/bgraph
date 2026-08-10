@@ -38,11 +38,16 @@ the review raised was answered the same day (`D-023`). One idea is still parked,
 on purpose — `I-021`, because nobody has chosen which part of BPMN is the useful
 part, and that has to be decided before it can be costed.
 
+The thirty-nine ideas raised on 2026-08-10 are all settled: **thirty built**
+(`W-071` … `W-100`), nine refused with a reason. What remains open in this
+file is `Q-005` and `I-021`, and neither is a piece of work — both are a
+decision somebody has to take.
+
 ### Questions
 
 | id | state | title | notes |
 |---|---|---|---|
-| `Q-005` | open | Is the proprietary licence (`D-020`) final? | The whole distribution half of the 2026-08-10 triage — `I-023` Markdown, `I-024` a public playground, `I-025` released binaries — assumes a distribution the current licence forbids. It was decided and changed once already on the same day, so it is worth settling **before** any of that is built rather than after. |
+| `Q-005` | open · **the only thing left** | Is the proprietary licence (`D-020`) final? | Everything the distribution half needed is now **built and unpublished**: the Markdown preview (`W-098`), the Typst plugin (`W-099`), the wasm playground (`W-096`), the release workflow and the CI action (`W-097`). Building was never what the licence forbade — *distributing* is, so none of them ship and a test asserts the release workflow creates nothing. `Cargo.toml` still carries `publish = false`, and `LICENSE` still says all rights reserved. **This is the last open item in the file, and it is not a technical one.** |
 
 ### Work planned
 
