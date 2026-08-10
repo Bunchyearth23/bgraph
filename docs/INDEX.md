@@ -26,8 +26,9 @@ purpose — an identifier is earned by being cited.
 ## Open — the answer to "what is left"
 
 **Nothing is planned. No question is open and nothing is blocked.**
-Thirty archetypes ship, both editors have an extension, and the library renders
-SVG and PDF. The parked ideas were
+Twenty-eight genres plus `free` ship, both editors have an extension, and the
+library renders SVG and PDF. (Earlier lines in this file said "thirty"; the
+table in `props.rs` has twenty-nine `ArchetypeDef` entries, one of them `free`.) The parked ideas were
 reviewed on 2026-08-10 and every one of them moved: what was worth building
 became a work item, what was not was discarded, and the one language question
 the review raised was answered the same day (`D-023`). One idea is still parked,

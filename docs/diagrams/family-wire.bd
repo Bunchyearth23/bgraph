@@ -1,0 +1,17 @@
+// `type bytefield` — the ruler counts bytes, and a field's range is inclusive.
+type bytefield {
+  title: "ELF64 header, first two rows"
+  width: 16
+  cell: 30 34
+  ruler: on
+}
+graph { background: #ffffff padding: 16 }
+
+style field { fill: #eef3ff stroke: #2563eb 1.2 radius: 3 font: 11 "Archivo" #1a1a1a }
+style magic extends field { fill: #fff6e9 stroke: #c77700 1.2 }
+
+field ident   "e_ident" .magic 0 15
+field etype   "e_type"        16 17
+field machine "e_machine"     18 19
+field version "e_version"     20 23
+field entry   "e_entry"       24 31

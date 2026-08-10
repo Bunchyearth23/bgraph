@@ -1,0 +1,17 @@
+// Style resolution, weakest to strongest. Each layer only overwrites what it
+// actually mentions, which is what lets a class carry a theme and a statement
+// carry an exception.
+graph { background: #ffffff padding: 18 gap: 22 flow: right }
+
+style node { fill: #eef3ff stroke: #2563eb 1.3 font: 12 "Archivo" #1a1a1a radius: 5 padding: 12 }
+style edge { stroke: #8a8a8a 1.2 font: 10 "Archivo" #8a8a8a }
+style weak { fill: #f0f0f0 stroke: #8a8a8a 1.2 }
+
+node d "built-in defaults"   .weak at (0, 0)
+node t "style node / edge"   right-of d
+node c ".classes, in order"  right-of t
+node i "inline { … }"        right-of c
+
+d -> t "overwritten by"
+t -> c "overwritten by"
+c -> i "overwritten by"

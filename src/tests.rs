@@ -633,6 +633,35 @@ fn a_packet_field_needs_bits() {
     assert!(err("type packet\nnode a \"A\"").contains("has no `bits`"));
 }
 
+#[test]
+fn the_manual_names_every_genre_and_its_word() {
+    // The manual carries a table of every `type` and the word it calls its
+    // items. That table is a copy of `props.rs`, and a copy is a thing that
+    // stops being true — a genre added without reaching the manual would
+    // leave a document that quietly describes an older language.
+    let manual = include_str!("../docs/manual.typ");
+
+    for def in crate::props::ARCHETYPES {
+        assert!(
+            manual.contains(&format!("[{}]", def.name)),
+            "`type {}` is missing from the manual's table",
+            def.name
+        );
+        for item in def.items() {
+            assert!(
+                manual.contains(&format!("[`{item}`]")),
+                "`{item}` is `type {}`'s word and the manual does not give it",
+                def.name
+            );
+        }
+    }
+
+    // And the count in the prose, which is the sentence a reader trusts.
+    let genres = crate::props::ARCHETYPES.len() - 1;
+    assert_eq!(genres, 28, "the manual says twenty-eight genres and `free`");
+    assert!(manual.contains("Twenty-eight genres and `free`"), "the prose count");
+}
+
 // ---------------------------------------------------------------------- W-042
 
 #[cfg(feature = "pdf")]

@@ -19,3 +19,6 @@
 /editors/vscode/node_modules
 /editors/vscode/package-lock.json
 /editors/vscode/*.vsix
+
+# Compiled documents. The .typ source and the diagram sources are the record.
+/out

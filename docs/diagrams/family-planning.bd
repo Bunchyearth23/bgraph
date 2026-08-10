@@ -1,0 +1,13 @@
+// `type gantt` — bars on a calendar; a section comes from a group.
+type gantt {
+  title: "A release"
+  size: 460 24
+}
+graph { background: #ffffff padding: 16 }
+style task { fill: #eef3ff stroke: #2563eb 1.2 font: 11 "Archivo" #1a1a1a radius: 3 }
+style done extends task { fill: #ecf8ef stroke: #1b8a3a 1.2 }
+
+task spec  "Specification" .done 2026-03-02 12d
+task build "Implementation"      2026-03-16 3w
+task test  "Verification"        2026-04-06 10d
+task ship  "Release"             2026-04-20 4d

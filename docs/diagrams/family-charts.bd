@@ -1,0 +1,12 @@
+// `type bar` — one series per statement, its numbers in category order.
+type bar {
+  title: "Requests served, by region"
+  size: 470 210
+  categories: "Q1" "Q2" "Q3" "Q4"
+}
+graph { background: #ffffff padding: 16 }
+style series { font: 11 "Archivo" #1a1a1a }
+
+series emea "EMEA" 120 185 240 310
+series amer "AMER" 200 210 265 280
+series apac "APAC"  80 130 175 260

@@ -1,0 +1,18 @@
+// `type orgchart` — the hierarchy is the edges, and the archetype places every
+// box, so adding a report never means renumbering anything.
+type orgchart { title: "Reporting lines" row: 74 spacing: 20 }
+graph { background: #ffffff padding: 16 }
+style position { fill: #eef3ff stroke: #2563eb 1.3 font: 11 "Archivo" #1a1a1a radius: 5 padding: 10 }
+
+position cto  "CTO"
+position plat "Platform"
+position sig  "DSP"
+position k8s  "Kubernetes"
+position api  "Backend"
+position cap  "Capture"
+
+cto -> plat
+cto -> sig
+plat -> k8s
+plat -> api
+sig -> cap
