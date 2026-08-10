@@ -111,6 +111,7 @@
 //! never be improved.
 
 pub mod check;
+pub mod compose;
 pub mod parser;
 pub mod template;
 
@@ -179,7 +180,34 @@ pub use template::{Bindings, Template, Value};
 /// server does.
 pub fn render_source(source: &str) -> Result<String> {
     let diagram = parser::parse_diagram(source)?;
+    // No filesystem here, and deliberately: this function is the semver
+    // surface and the wasm build rests on it, so it cannot start opening
+    // files because a statement asked it to (`D-029`). It says which call
+    // does rather than failing vaguely.
+    if let Some(first) = diagram.includes.first() {
+        anyhow::bail!(
+            "`include \"{}\"` needs a file to resolve it against, and \
+             `render_source` is given text — use `bgraph::render_file`",
+            first.path.as_str()
+        );
+    }
     let layout = layout::solve(&diagram)?;
+    Ok(render_svg::render(&layout))
+}
+
+/// A file on disk to SVG, resolving whatever it includes.
+///
+/// The counterpart to [`render_source`]: same pipeline, but a path to resolve
+/// `include` against. A file with no includes renders identically either way.
+///
+/// # Errors
+///
+/// The first problem found, as [`render_source`] does — plus the ones only a
+/// set of files can have: a circular include, or a name declared in two of
+/// them with no `as` to separate them.
+pub fn render_file(path: &std::path::Path) -> Result<String> {
+    let composed = compose::load(path)?;
+    let layout = layout::solve(&composed.diagram)?;
     Ok(render_svg::render(&layout))
 }
 

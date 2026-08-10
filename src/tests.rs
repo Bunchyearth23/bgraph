@@ -1312,14 +1312,14 @@ fn the_textmate_grammar_knows_every_word_the_compiler_does() {
     // missing a keyword just stops colouring it, which nobody notices — so the
     // list is re-derived here rather than trusted.
     let grammar = include_str!("../editors/vscode/syntaxes/bgraph.tmLanguage.json");
+    // Found by its scope name and then by position, rather than by a literal
+    // prefix of the pattern: anchoring on the words themselves made this test
+    // fail the first time a keyword was added at the front of the list, which
+    // is exactly the change it exists to allow.
     let statement = grammar
         .lines()
-        .find(|l| l.contains("keyword.control.bgraph"))
-        .and_then(|_| {
-            grammar
-                .lines()
-                .find(|l| l.contains(r"(?<![\\w-])(type|graph|style|group|activate|"))
-        })
+        .skip_while(|l| !l.contains("keyword.control.bgraph"))
+        .find(|l| l.contains("\"match\""))
         .expect("the statement pattern is in the grammar");
 
     for (word, _) in crate::props::KEYWORDS {
@@ -6717,4 +6717,202 @@ fn a_syntax_error_no_longer_hides_the_rest_of_the_file() {
         messages.iter().any(|m| m.contains("ghost")),
         "an unknown name after a syntax error went unreported: {messages:?}"
     );
+}
+
+// ------------------------------------------------- composition (I-028, I-032)
+
+/// Write a set of files into a scratch directory and return the entry point.
+fn compose_files(name: &str, files: &[(&str, &str)]) -> std::path::PathBuf {
+    let dir = scratch(name);
+    for (file, source) in files {
+        std::fs::write(dir.join(file), source).expect("a scratch file");
+    }
+    dir.join(files[0].0)
+}
+
+#[test]
+fn an_include_brings_a_file_in_whole() {
+    let entry = compose_files(
+        "compose-plain",
+        &[
+            (
+                "main.bd",
+                "include \"core.bd\"\nnode ui \"UI\"\nui -> api\n",
+            ),
+            ("core.bd", "node api \"API\"\n"),
+        ],
+    );
+    let composed = crate::compose::load(&entry).expect("it should compose");
+    let ids: Vec<&str> = composed
+        .diagram
+        .nodes
+        .iter()
+        .map(|n| n.id.as_str())
+        .collect();
+    assert!(ids.contains(&"api"), "{ids:?}");
+    assert!(ids.contains(&"ui"), "{ids:?}");
+    crate::layout::solve(&composed.diagram).expect("and it should draw");
+}
+
+#[test]
+fn a_prefix_makes_a_clash_impossible() {
+    // Both files declare `api`. Without `as` that is an error; with it the
+    // two are simply different names.
+    let entry = compose_files(
+        "compose-prefix",
+        &[
+            (
+                "main.bd",
+                "include \"core.bd\" as core\nnode api \"Mine\"\napi -> core.api\n",
+            ),
+            ("core.bd", "node api \"Theirs\"\n"),
+        ],
+    );
+    let composed = crate::compose::load(&entry).expect("it should compose");
+    let ids: Vec<&str> = composed
+        .diagram
+        .nodes
+        .iter()
+        .map(|n| n.id.as_str())
+        .collect();
+    assert!(ids.contains(&"core.api"), "{ids:?}");
+    assert!(ids.contains(&"api"), "{ids:?}");
+    crate::layout::solve(&composed.diagram).expect("the qualified edge should resolve");
+}
+
+#[test]
+fn an_included_files_own_references_follow_it_under_the_prefix() {
+    // The included file's internal edge and anchor must be renamed with the
+    // names they point at, or the prefix would break the file it prefixes.
+    let entry = compose_files(
+        "compose-internal",
+        &[
+            ("main.bd", "include \"core.bd\" as core\nnode ui \"UI\"\n"),
+            (
+                "core.bd",
+                "node api \"API\"\nnode db \"DB\" below api\napi -> db\n",
+            ),
+        ],
+    );
+    let composed = crate::compose::load(&entry).expect("it should compose");
+    let edge = &composed.diagram.edges[0];
+    assert_eq!(edge.from.as_str(), "core.api");
+    assert_eq!(edge.to.as_str(), "core.db");
+    crate::layout::solve(&composed.diagram).expect("the anchor should still resolve");
+}
+
+#[test]
+fn a_name_in_two_files_is_an_error_naming_both() {
+    // `D-005` applied to a second file rather than a second spelling: no
+    // silent shadowing, and the message has to say where the other one is or
+    // it cannot be acted on.
+    let entry = compose_files(
+        "compose-clash",
+        &[
+            ("main.bd", "include \"core.bd\"\nnode api \"Mine\"\n"),
+            ("core.bd", "node api \"Theirs\"\n"),
+        ],
+    );
+    let message = format!("{:#}", crate::compose::load(&entry).expect_err("a clash"));
+    assert!(message.contains("api"), "{message}");
+    assert!(message.contains("main.bd"), "{message}");
+    assert!(message.contains("core.bd"), "{message}");
+}
+
+#[test]
+fn a_circular_include_names_the_chain() {
+    let entry = compose_files(
+        "compose-cycle",
+        &[
+            ("a.bd", "include \"b.bd\"\nnode a \"A\"\n"),
+            ("b.bd", "include \"a.bd\"\nnode b \"B\"\n"),
+        ],
+    );
+    let message = format!("{:#}", crate::compose::load(&entry).expect_err("a cycle"));
+    assert!(message.contains("circle"), "{message}");
+    assert!(message.contains("a.bd"), "{message}");
+    assert!(message.contains("b.bd"), "{message}");
+}
+
+#[test]
+fn a_bds_holds_styles_and_nothing_else() {
+    let entry = compose_files(
+        "compose-bds",
+        &[
+            ("main.bd", "include \"stray.bds\"\nnode a \"A\"\n"),
+            ("stray.bds", "style x { fill: #fff }\nnode b \"B\"\n"),
+        ],
+    );
+    let message = format!(
+        "{:#}",
+        crate::compose::load(&entry).expect_err("a stray item")
+    );
+    assert!(message.contains(".bds"), "{message}");
+
+    // …and one that holds only styles is fine, and its styles arrive.
+    let entry = compose_files(
+        "compose-bds-good",
+        &[
+            ("main.bd", "include \"house.bds\"\nnode a \"A\" .card\n"),
+            ("house.bds", "style card { fill: #1e293b }\n"),
+        ],
+    );
+    let composed = crate::compose::load(&entry).expect("styles should come in");
+    assert_eq!(composed.diagram.styles.len(), 1);
+    let l = crate::layout::solve(&composed.diagram).expect("it draws");
+    assert_eq!(l.nodes[0].style.fill.as_deref(), Some("#1e293b"));
+}
+
+#[test]
+fn a_diagnostic_points_at_the_file_that_wrote_it() {
+    // The whole reason the composer keeps a source map. A warning about a
+    // statement in an included file reported against the including file
+    // would send the reader to the wrong line of the wrong document.
+    let entry = compose_files(
+        "compose-spans",
+        &[
+            ("main.bd", "include \"core.bd\"\nnode ui \"UI\"\n"),
+            ("core.bd", "node api \"API\"\nnode db \"DB\" below api\n"),
+        ],
+    );
+    let composed = crate::compose::load(&entry).expect("it composes");
+
+    let api = composed
+        .diagram
+        .nodes
+        .iter()
+        .find(|n| n.id.as_str() == "api")
+        .expect("`api` is there");
+    let (path, line, _) = composed.map.locate(api.id.span.start);
+    assert_eq!(path.file_name().unwrap(), "core.bd");
+    assert_eq!(line, 0, "`api` is on the first line of core.bd");
+
+    let ui = composed
+        .diagram
+        .nodes
+        .iter()
+        .find(|n| n.id.as_str() == "ui")
+        .expect("`ui` is there");
+    let (path, line, _) = composed.map.locate(ui.id.span.start);
+    assert_eq!(path.file_name().unwrap(), "main.bd");
+    assert_eq!(line, 1, "`ui` is on the second line of main.bd");
+}
+
+#[test]
+fn render_source_refuses_an_include_rather_than_reading_the_disk() {
+    // It is the semver surface and the wasm build rests on it, so it cannot
+    // start opening files because a statement asked it to (`D-029`).
+    let message = format!(
+        "{:#}",
+        crate::render_source("include \"other.bd\"\nnode a \"A\"\n").expect_err("it must refuse")
+    );
+    assert!(message.contains("render_file"), "{message}");
+}
+
+#[test]
+fn a_qualified_name_does_not_swallow_a_class_reference() {
+    // The conflict `I-032` flagged. `core.api` is one token by maximal munch,
+    // so `.card` after it is still a class and not the tail of a name.
+    let l = build("style card { fill: #123456 }\nnode a \"A\" .card\n");
+    assert_eq!(l.nodes[0].style.fill.as_deref(), Some("#123456"));
 }

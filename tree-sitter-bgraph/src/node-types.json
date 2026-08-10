@@ -236,6 +236,10 @@
           "named": true
         },
         {
+          "type": "include_declaration",
+          "named": true
+        },
+        {
           "type": "item_declaration",
           "named": true
         },
@@ -326,6 +330,32 @@
           },
           {
             "type": "relative_position",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "include_declaration",
+    "named": true,
+    "fields": {
+      "path": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
+      "prefix": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
             "named": true
           }
         ]
@@ -597,6 +627,10 @@
           "named": true
         },
         {
+          "type": "include_declaration",
+          "named": true
+        },
+        {
           "type": "item_declaration",
           "named": true
         },
@@ -718,6 +752,10 @@
     "named": true
   },
   {
+    "type": "as",
+    "named": false
+  },
+  {
     "type": "at",
     "named": false
   },
@@ -769,6 +807,10 @@
   {
     "type": "identifier",
     "named": true
+  },
+  {
+    "type": "include",
+    "named": false
   },
   {
     "type": "left",

@@ -2284,6 +2284,12 @@ pub const PALETTE_DARK: &[&str] = &[
 /// Keywords that open a statement.
 pub const KEYWORDS: &[(&str, &str)] = &[
     (
+        "include",
+        "Merge another file — `include \"house.bds\"`, or `include \"core.bd\" \
+         as core` to bring its names in under a prefix. Without a prefix every \
+         name must be unique across the set; a clash names both files.",
+    ),
+    (
         "type",
         "Diagram archetype, declared once at the top of the file — `type pie`. \
          Defaults to `free`.",

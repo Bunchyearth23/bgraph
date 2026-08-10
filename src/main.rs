@@ -442,8 +442,11 @@ fn run() -> Result<i32> {
         return Ok(0);
     }
 
-    let diagram = parser::parse_diagram(&source)?;
-    let layout = layout::solve(&diagram)?;
+    // Through the composer rather than the parser, so `include` resolves
+    // against the file that wrote it. A file with no includes takes exactly
+    // the same path and comes out the same.
+    let composed = bgraph::compose::load(&input)?;
+    let layout = layout::solve(&composed.diagram)?;
 
     // The output extension picks the writer. A flag would be a second way to
     // say what the filename already says, and the two could disagree.
@@ -495,6 +498,53 @@ fn run() -> Result<i32> {
     Ok(0)
 }
 
+/// The same report, for a diagram spread over several files.
+///
+/// Recovery is not attempted here: it works by cutting one text into
+/// statements, and there is no one text once files are merged. A composed
+/// diagram that parses at all is checked in full, which is the case that
+/// matters — a syntax error in an included file was already reported by name
+/// when the composer refused to load it.
+fn report_composed(
+    input: &std::path::Path,
+    composed: &bgraph::compose::Composed,
+    ci: bool,
+) -> Result<i32> {
+    use bgraph::check::Severity;
+    use bgraph::report;
+
+    let mut diagnostics = bgraph::check::check(&composed.diagram);
+    if let Ok(solved) = layout::solve(&composed.diagram) {
+        diagnostics.extend(bgraph::check::after_layout(&solved));
+    }
+    diagnostics.sort_by_key(|d| (d.span.start, d.span.end));
+
+    let (rich, colour) = report::decorate(ci);
+    let mut errors = 0;
+
+    for diag in &diagnostics {
+        // Through the map, so a problem in an included file is reported
+        // against *that* file at *its* line — the whole reason the composer
+        // keeps one.
+        let (path, line, col) = composed.map.locate(diag.span.start);
+        let path = path.display().to_string();
+        if diag.severity == Severity::Error {
+            errors += 1;
+        }
+        if rich {
+            let text = composed.map.source_of(diag.span.start);
+            println!("{}\n", report::rich(&path, text, line, col, diag, colour));
+        } else {
+            println!("{}", report::flat(&path, line, col, diag));
+        }
+    }
+
+    if diagnostics.is_empty() {
+        println!("{}: no problems found", input.display());
+    }
+    Ok(i32::from(errors > 0))
+}
+
 /// Prints every diagnostic in `file:line:col: severity: message` form so it
 /// drops straight into an editor's error list.
 fn check_file(input: &PathBuf, ci: bool) -> Result<i32> {
@@ -505,6 +555,21 @@ fn check_file(input: &PathBuf, ci: bool) -> Result<i32> {
     let source =
         fs::read_to_string(input).with_context(|| format!("cannot read {}", input.display()))?;
     let index = LineIndex::new(&source);
+
+    // Composed first, so a diagram spread over several files is checked as
+    // the one diagram it is. When that fails — a circular include, a name in
+    // two files — there is nothing to check yet, so the failure is the report.
+    match bgraph::compose::load(input) {
+        Ok(composed) => {
+            if !composed.diagram.includes.is_empty() || composed.map.text != source {
+                return report_composed(input, &composed, ci);
+            }
+        }
+        Err(err) => {
+            eprintln!("error: {err:#}");
+            return Ok(1);
+        }
+    }
 
     // Every mistake, not the first: a person fixing a file wants the list,
     // and a build log that stops at line 3 hides what is on line 40.

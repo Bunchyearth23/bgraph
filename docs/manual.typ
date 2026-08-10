@@ -625,6 +625,53 @@ measuring — otherwise text that is genuinely unreadable gets reported as fine.
 
 // ══════════════════════════════════════════════════════════════════════════════
 #pagebreak(weak: true)
+#slide(title: "Composing files")[
+
+A diagram need not be one file.
+
+```
+include "house.bds"          // a shared palette: styles only
+include "core.bd" as core    // a diagram, under a namespace
+
+node ui "Browser" .card
+ui -> core.api "HTTPS"
+```
+
+Without `as`, every declared name must be unique across the whole set. A clash
+is an error naming *both* files — never a silent shadowing, which is the same
+rule that makes an unknown name an error rather than a no-op. With `as`, the
+included file's names arrive under a prefix and a clash becomes impossible;
+its own internal edges and anchors are renamed with it, so prefixing never
+breaks the file it prefixes.
+
+A qualified name is *one token*. That is what keeps a leading `.card`
+unambiguously a class reference: the lexer takes the longest match, so the dot
+in `core.api` is never seen on its own, and no new punctuation was needed.
+
+A `.bds` holds style declarations and nothing else. A shared house palette is
+what the extension promises, and a file that could also declare nodes would be
+a `.bd` under a misleading name.
+
+Diagnostics point at the file and the line that wrote the statement, not at
+the file that pulled it in. The files are laid end to end into one buffer and
+each one's spans are shifted by where its text starts, so a single offset
+answers both questions at once — and nothing else in the engine has to learn
+that composition exists.
+
+A circular include is an error naming the chain.
+
+#v(0.3em)
+
+#diagram(
+  image("diagrams/compose.svg", width: 88%),
+  caption: [Three files, one diagram. The prefix is what makes the second
+  include safe: without it, two files declaring `api` would be an error
+  naming both.],
+)
+
+]
+
+#pagebreak(weak: true)
 #slide(title: "Working with it")[
 
 #two-col(

@@ -12,7 +12,13 @@ sep = _{ (nl | ";" | ",")* }
 
 // A trailing hyphen is disallowed so `a->b` splits into `a` `->` `b`
 // while keywords like `right-of` still read as one token.
-ident  = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_" | ("-" ~ (ASCII_ALPHANUMERIC | "_")))* }
+part   = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_" | ("-" ~ (ASCII_ALPHANUMERIC | "_")))* }
+// A qualified name — `core.api` — is *one* token. That is what settles the
+// conflict `I-032` flagged: maximal munch takes the whole of it, so a leading
+// `.box` is still unambiguously a class reference and no new sigil is needed
+// (`D-029`). A dot must be followed by a name part, or `a.` would swallow the
+// dot and leave the reader with a stranger error than "unknown name".
+ident  = @{ part ~ ("." ~ part)* }
 string = ${ "\"" ~ str_inner ~ "\"" }
 str_inner = @{ (!("\"" | "\\") ~ ANY | "\\" ~ ANY)* }
 number = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? ~ ("px" | "%")? }
@@ -30,7 +36,12 @@ term = _{ (nl | ";" | ",")+ | &EOI }
 // an edge; PEG backtracking still lets a node actually named `type` have edges.
 // `edge_decl` precedes `item_decl` only for speed: `item_decl` would fail on
 // the arrow anyway and backtrack.
-stmt = _{ type_decl | graph_decl | style_decl | group_decl | edge_decl | item_decl }
+stmt = _{ include_decl | type_decl | graph_decl | style_decl | group_decl | edge_decl | item_decl }
+
+// `include "shared.bds"` merges another file whole; with `as` its names come
+// in under a prefix. Resolved before parsing reaches `check`, so by the time
+// anything is validated there is one diagram (`D-029`).
+include_decl = { "include" ~ string ~ ("as" ~ ident)? }
 
 type_decl  = { "type" ~ ident ~ block? }
 

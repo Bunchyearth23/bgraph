@@ -17,6 +17,43 @@ a -> b "carries"
 
 ---
 
+## Composing files
+
+`include` merges another file whole, resolved relative to the file that wrote
+it.
+
+```bgraph
+include "house.bds"          // a shared palette: styles only
+include "core.bd" as core    // a diagram, under a namespace
+
+node ui "Browser" .card
+ui -> core.api "HTTPS"
+```
+
+Without `as`, every declared name must be unique across the whole set — a
+clash is an error naming **both** files, never a silent shadowing. With `as`,
+the included file's names arrive under a prefix and a clash becomes
+impossible: `core.api` refers into it, and the file's own internal edges and
+anchors are renamed with it, so prefixing never breaks the file it prefixes.
+
+A qualified name is one token. That is what keeps `.card` unambiguously a
+class reference: the lexer takes the longest match, so the dot in `core.api`
+is never seen on its own.
+
+A `.bds` holds `style` declarations and nothing else — that is what the
+extension promises, and a file that could also declare nodes would be a `.bd`
+under a misleading name.
+
+A circular include is an error naming the chain. Diagnostics point at the file
+and line that wrote the statement, not at the file that pulled it in.
+
+The library keeps the split: `render_source` takes text and refuses an
+`include`, because it has no path to resolve one against — the wasm build and
+the semver promise both rest on it doing no I/O. `render_file` takes a path
+and resolves them.
+
+---
+
 ## Archetypes
 
 `type` picks the **genre** of diagram, once, at the top of the file. Without

@@ -36,6 +36,7 @@ module.exports = grammar({
 
     _statement: ($) =>
       choice(
+        $.include_declaration,
         $.type_declaration,
         $.graph_declaration,
         $.style_declaration,
@@ -49,6 +50,11 @@ module.exports = grammar({
     comment: (_) => token(seq('//', /[^\n]*/)),
 
     // ---------------------------------------------------------- statements
+
+    // `include "shared.bds"` merges another file whole; with `as` its names
+    // come in under a prefix (`D-029`).
+    include_declaration: ($) =>
+      seq('include', field('path', $.string), optional(seq('as', field('prefix', $.identifier)))),
 
     // The archetype: `type pie { … }`. Absent means `free`.
     type_declaration: ($) =>
@@ -214,7 +220,13 @@ module.exports = grammar({
     // ---------------------------------------------------------- tokens
 
     // A trailing hyphen is excluded so `a->b` splits into `a` `->` `b`.
-    identifier: (_) => /[a-zA-Z_][a-zA-Z0-9_]*(-[a-zA-Z0-9_]+)*/,
+    //
+    // A qualified name — `core.api` — is one token, which is what lets a
+    // leading `.box` stay unambiguously a class reference: the lexer takes the
+    // longest match, so the dot in `core.api` is never seen on its own
+    // (`D-029`). A dot must be followed by a name part.
+    identifier: (_) =>
+      /[a-zA-Z_][a-zA-Z0-9_]*(-[a-zA-Z0-9_]+)*(\.[a-zA-Z_][a-zA-Z0-9_]*(-[a-zA-Z0-9_]+)*)*/,
 
     number: (_) => token(seq(optional('-'), /\d+/, optional(seq('.', /\d+/)), optional(choice('px', '%')))),
 

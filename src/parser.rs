@@ -210,6 +210,7 @@ fn build(file: Pair<Rule>) -> Result<Diagram> {
                 let block = pair.into_inner().next().expect("graph block");
                 diagram.graph.extend(parse_block(block)?);
             }
+            Rule::include_decl => diagram.includes.push(parse_include(pair)?),
             Rule::style_decl => diagram.styles.push(parse_style(pair)?),
             Rule::item_decl => diagram.nodes.push(parse_item(pair)?),
             Rule::group_decl => parse_group(pair, &mut diagram)?,
@@ -242,6 +243,23 @@ fn spanned(pair: &Pair<Rule>) -> Spanned<String> {
         value: pair.as_str().to_string(),
         span: span_of(pair),
     }
+}
+
+fn parse_include(pair: Pair<Rule>) -> Result<crate::ast::IncludeDecl> {
+    let span = span_of(&pair);
+    let mut inner = pair.into_inner();
+
+    let path = inner
+        .next()
+        .context("an include needs a path")
+        .map(|p| Spanned {
+            span: span_of(&p),
+            value: unescape(p),
+        })?;
+
+    let prefix = inner.next().map(|p| spanned(&p));
+
+    Ok(crate::ast::IncludeDecl { path, prefix, span })
 }
 
 fn parse_style(pair: Pair<Rule>) -> Result<StyleDecl> {

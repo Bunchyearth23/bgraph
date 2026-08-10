@@ -44,6 +44,21 @@ pub struct Diagram {
     /// Containers. Members live in the flat `nodes`/`groups` lists and are
     /// named here, so the identifier namespace stays single and global.
     pub groups: Vec<GroupDecl>,
+    /// Other files this one pulls in. Resolved by [`crate::compose`] before
+    /// anything is checked, so by the time `check` runs there is one diagram
+    /// and no such thing as a file boundary (`D-029`).
+    pub includes: Vec<IncludeDecl>,
+}
+
+/// `include "shared.bds"`, or `include "core.bd" as core`.
+#[derive(Debug)]
+pub struct IncludeDecl {
+    /// As written, resolved relative to the file that wrote it.
+    pub path: Spanned<String>,
+    /// The namespace its names arrive under. Without one, every name must be
+    /// unique across the whole set, and a clash is an error naming both files.
+    pub prefix: Option<Spanned<String>>,
+    pub span: Span,
 }
 
 #[derive(Debug)]
