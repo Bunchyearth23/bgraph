@@ -635,6 +635,7 @@ measuring — otherwise text that is genuinely unreadable gets reported as fine.
 bgraph diagram.bd -o diagram.svg
 bgraph diagram.bd -o diagram.pdf
 bgraph diagram.bd -o diagram.png
+bgraph diagram.bd -o diagram.json
 bgraph watch diagram.bd
 bgraph watch docs/diagrams
 bgraph check diagram.bd
@@ -645,6 +646,12 @@ bgraph init pie
 
 The output extension picks the writer. A flag would be a second way of saying
 what the filename already says.
+
+`.json` writes the solved geometry instead of a picture — the rectangles, the
+routed edge points with their elbows, the placed labels — in the same
+coordinate space the SVG uses, so a rectangle here is the rectangle in the file
+beside it. The *shape* of that document is promised; the *values* are not, and
+move whenever the drawing improves, exactly as the SVG does.
 
 PNG needs the `png` feature, and is the one output that does: everything else
 here is hand-rolled, but a raster means zlib and a rasteriser means text

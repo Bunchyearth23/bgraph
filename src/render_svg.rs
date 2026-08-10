@@ -18,8 +18,10 @@ use crate::style::{Head, Router, Shape, Style};
 /// endpoint clipping and label avoidance are the difference between a line
 /// between two centres and a drawn edge, and a second implementation of them
 /// would be a second answer.
-pub(crate) struct Routed {
+pub struct Routed {
+    /// The line as drawn, elbows included — not just the two endpoints.
     pub points: Vec<(f64, f64)>,
+    /// The label and the rectangle it was given, once avoidance has run.
     pub label: Option<(String, Rect)>,
 }
 
@@ -183,7 +185,11 @@ pub fn render(layout: &Layout) -> String {
     svg
 }
 
-pub(crate) fn route_all(layout: &Layout) -> Vec<Routed> {
+/// Route every edge and place every edge label.
+///
+/// Public because three writers need the same answer — SVG, PDF and the JSON
+/// export — and a second implementation would be a second diagram.
+pub fn route_all(layout: &Layout) -> Vec<Routed> {
     let mut routed: Vec<Routed> = layout
         .edges
         .iter()

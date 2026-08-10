@@ -461,6 +461,12 @@ fn run() -> Result<i32> {
             #[cfg(not(feature = "pdf"))]
             bail!("this build has no PDF writer — rebuild with the `pdf` feature");
         }
+        "json" => {
+            // Pretty by default: a person running this at a terminal is
+            // reading it, and a program does not care either way.
+            fs::write(&cli.output, bgraph::render_json::render_pretty(&layout))
+                .with_context(|| format!("cannot write {}", cli.output.display()))?;
+        }
         "png" => {
             #[cfg(feature = "png")]
             {

@@ -308,6 +308,7 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
             let y = title_h + i as f64 * LEGEND_STEP;
 
             nodes.push(PlacedNode {
+                id: String::new(),
                 lines: Vec::new(),
                 rect: Rect {
                     x,
@@ -570,6 +571,7 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             .unwrap_or_else(|| palette[rail.min(palette.len() - 1)].to_string());
 
         nodes.push(PlacedNode {
+            id: String::new(),
             lines: Vec::new(),
             rect: Rect {
                 x: x - DOT / 2.0,
@@ -872,6 +874,7 @@ pub fn tree(
         let _ = node;
         let (x, y) = shift(pos[i]);
         nodes.push(PlacedNode {
+            id: node.id.as_str().to_string(),
             lines: vec![labels[i].clone()],
             rect: Rect {
                 x,
@@ -1103,6 +1106,7 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         let (cx, cy) = place(i);
         let (opaque, _) = crate::render_svg::split_alpha(colour);
         nodes.push(PlacedNode {
+            id: String::new(),
             lines: Vec::new(),
             rect: Rect {
                 x: cx - r,
@@ -1228,6 +1232,7 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
     }
 
     groups.push(PlacedGroup {
+        id: String::new(),
         lines: Vec::new(),
         rect: Rect {
             x: gutter,
@@ -1276,6 +1281,7 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         let span = high.saturating_sub(low) + 1;
 
         nodes.push(PlacedNode {
+            id: node.id.as_str().to_string(),
             lines: vec![label],
             rect: Rect {
                 x: gutter + 2.0,
@@ -1494,6 +1500,7 @@ pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
         });
         for (x, y) in shape {
             nodes.push(PlacedNode {
+                id: String::new(),
                 lines: Vec::new(),
                 rect: Rect {
                     x: x - 3.5,
@@ -1705,6 +1712,7 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
         }
         for (x, y) in path {
             nodes.push(PlacedNode {
+                id: String::new(),
                 lines: Vec::new(),
                 rect: Rect {
                     x: x - 4.5,
@@ -1749,6 +1757,7 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
             &group.props,
         )?;
         groups.push(PlacedGroup {
+            id: String::new(),
             lines: vec![
                 group
                     .label
@@ -1874,6 +1883,7 @@ pub fn kanban(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             let h = lines.len() as f64 * size * 1.35 + 2.0 * PAD;
 
             nodes.push(PlacedNode {
+                id: node.id.as_str().to_string(),
                 lines,
                 rect: Rect {
                     x: x + PAD,
@@ -1922,6 +1932,7 @@ pub fn kanban(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
         });
 
         groups.push(PlacedGroup {
+            id: String::new(),
             lines: Vec::new(),
             rect: Rect {
                 x,
@@ -2061,6 +2072,7 @@ fn packet_like(
             let w = (segment_end - bit + 1) as f64 * bit_w;
 
             nodes.push(PlacedNode {
+                id: String::new(),
                 lines: if named {
                     Vec::new()
                 } else {
@@ -2363,6 +2375,7 @@ fn emit_tiles(
 
         if tile.is_group {
             groups.push(PlacedGroup {
+                id: String::new(),
                 lines: Vec::new(),
                 rect: inset,
                 style: Style {
@@ -2411,6 +2424,7 @@ fn emit_tiles(
         }
 
         nodes.push(PlacedNode {
+            id: String::new(),
             lines: Vec::new(),
             rect: inset,
             style: Style {
@@ -2741,6 +2755,7 @@ pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             .unwrap_or_else(|| palette[slot.min(palette.len() - 1)].to_string());
 
         nodes.push(PlacedNode {
+            id: node.id.as_str().to_string(),
             lines: Vec::new(),
             rect: Rect {
                 x: px - DOT / 2.0,
@@ -3346,6 +3361,7 @@ pub fn sankey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             .unwrap_or_else(|| palette[i.min(palette.len() - 1)].to_string());
 
         nodes.push(PlacedNode {
+            id: node.id.as_str().to_string(),
             lines: Vec::new(),
             rect,
             style: Style {
@@ -3607,6 +3623,7 @@ fn draw_legend(
     for (i, (name, colour)) in names.iter().zip(colours).enumerate() {
         let row = y + i as f64 * LEGEND_STEP;
         nodes.push(PlacedNode {
+            id: String::new(),
             lines: Vec::new(),
             rect: Rect {
                 x,
@@ -3824,6 +3841,7 @@ pub fn bar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
             // Adjacent fills must never touch, stacked segments included.
             let inset = if stacked { 1.0 } else { 0.0 };
             nodes.push(PlacedNode {
+                id: String::new(),
                 lines: Vec::new(),
                 rect: Rect {
                     x,
@@ -4117,6 +4135,7 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
         if mark == "dot" || path.len() == 1 {
             for (x, y) in path {
                 nodes.push(PlacedNode {
+                    id: String::new(),
                     lines: Vec::new(),
                     rect: Rect {
                         x: x - 4.5,
@@ -4240,6 +4259,7 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             .max(50.0);
 
         nodes.push(PlacedNode {
+            id: node.id.as_str().to_string(),
             lines: vec![label],
             rect: Rect {
                 x: centre(i) - w / 2.0,
@@ -4282,6 +4302,7 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         let top = first_row + first as f64 * row - row * 0.5;
         let height = (last - first) as f64 * row + row * 0.9;
         nodes.push(PlacedNode {
+            id: String::new(),
             lines: Vec::new(),
             rect: Rect {
                 x: centre(col) - BAR_W / 2.0,
@@ -4355,6 +4376,7 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         let left = (centre(lo) - column * 0.36).min(centre(lo) - title_w);
 
         groups.push(PlacedGroup {
+            id: String::new(),
             lines: group
                 .label
                 .clone()
@@ -4614,6 +4636,7 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
         });
 
         nodes.push(PlacedNode {
+            id: String::new(),
             lines: Vec::new(),
             rect: Rect {
                 x: x_of(*start),
@@ -4688,6 +4711,7 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
         });
 
         groups.push(PlacedGroup {
+            id: String::new(),
             lines: Vec::new(),
             rect: band,
             style,
@@ -4923,6 +4947,7 @@ pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         // A mark, not a box: it carries no label of its own.
         let r = 5.0;
         nodes.push(PlacedNode {
+            id: String::new(),
             lines: Vec::new(),
             rect: Rect {
                 x: x - r,

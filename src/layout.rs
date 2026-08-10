@@ -38,6 +38,12 @@ impl Rect {
 }
 
 pub struct PlacedNode {
+    /// The identifier the author wrote, when the box is one they can name.
+    /// Empty for the boxes a chart invents — a legend swatch, an axis plate —
+    /// which nothing in the source addresses and nothing outside should try
+    /// to correlate. What makes the JSON export and the visual diff possible
+    /// at all: geometry without names is a picture, not data.
+    pub id: String,
     pub lines: Vec<String>,
     pub rect: Rect,
     pub style: Style,
@@ -56,6 +62,8 @@ pub struct PlacedEdge {
 }
 
 pub struct PlacedGroup {
+    /// As on a node: the declared name, or empty for a frame nobody wrote.
+    pub id: String,
     pub lines: Vec<String>,
     pub rect: Rect,
     pub style: Style,
@@ -632,7 +640,8 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         .nodes
         .iter()
         .enumerate()
-        .map(|(i, _node)| PlacedNode {
+        .map(|(i, node)| PlacedNode {
+            id: node.id.as_str().to_string(),
             lines: labels[i].clone(),
             rect: placed[i].expect("every node is placed once the loop exits"),
             style: styles[i].clone(),
@@ -731,6 +740,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                 )
                 .map_err(|e| e.context(format!("in group `{}`", group.id.as_str())))?;
             Ok(PlacedGroup {
+                id: group.id.as_str().to_string(),
                 lines: group
                     .label
                     .clone()
@@ -800,6 +810,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             // boxes, so the rule would vanish under the class's own fill.
             let thickness = s.stroke_width.unwrap_or(1.5);
             rules.push(PlacedNode {
+                id: String::new(),
                 lines: Vec::new(),
                 rect: Rect {
                     x: placed.rect.x,

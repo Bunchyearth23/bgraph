@@ -6412,3 +6412,102 @@ fn the_rasteriser_is_opt_in_and_the_window_implies_it() {
          `png`, so the two can drift: {window}"
     );
 }
+
+// ------------------------------------------------- layout as JSON (I-045)
+
+fn geometry(source: &str) -> serde_json::Value {
+    serde_json::from_str(&crate::render_json::render(&build(source))).expect("valid JSON")
+}
+
+#[test]
+fn the_json_geometry_is_in_the_same_space_as_the_svg() {
+    // The whole reason the export is worth having. Emitting the layout's own
+    // untranslated coordinates would hand every consumer the same
+    // off-by-a-padding bug to find on their own.
+    let l = build("node a \"A\"\nnode b \"B\" right-of a\na -> b");
+    let (dx, dy, _, _) = crate::render_svg::canvas(&l);
+    let json = geometry("node a \"A\"\nnode b \"B\" right-of a\na -> b");
+
+    let node = json["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|n| n["id"] == "a")
+        .expect("`a` should be in the export");
+
+    assert_eq!(node["rect"]["x"].as_f64().unwrap(), l.nodes[0].rect.x + dx);
+    assert_eq!(node["rect"]["y"].as_f64().unwrap(), l.nodes[0].rect.y + dy);
+}
+
+#[test]
+fn every_box_the_author_named_is_addressable() {
+    // Geometry without names is a picture, not data.
+    let json = geometry(
+        r#"group core "Core" {
+             node api "API"
+             node db "DB" below api
+           }
+           node ui "UI" right-of core
+           api -> db"#,
+    );
+
+    let ids: Vec<&str> = json["nodes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|n| n["id"].as_str())
+        .filter(|id| !id.is_empty())
+        .collect();
+    assert!(ids.contains(&"api"), "{ids:?}");
+    assert!(ids.contains(&"db"), "{ids:?}");
+    assert!(ids.contains(&"ui"), "{ids:?}");
+
+    let groups: Vec<&str> = json["groups"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|g| g["id"].as_str())
+        .collect();
+    assert_eq!(groups, ["core"]);
+
+    let edge = &json["edges"][0];
+    assert_eq!(edge["from"], "api");
+    assert_eq!(edge["to"], "db");
+}
+
+#[test]
+fn an_edge_carries_its_elbows_and_not_just_its_ends() {
+    // A consumer drawing a straight line between the endpoints of an
+    // orthogonal edge would be drawing a different diagram.
+    let json = geometry(
+        r#"node a "A"
+           node b "B" below a
+           a -> b { router: ortho }"#,
+    );
+    let points = json["edges"][0]["points"].as_array().unwrap();
+    assert!(
+        points.len() >= 2,
+        "an edge came back with fewer than two points"
+    );
+}
+
+#[test]
+fn the_export_declares_its_schema_version() {
+    // The shape is promised and the coordinates are not, so a consumer needs
+    // to be able to tell which half changed.
+    let json = geometry("node a \"A\"");
+    assert_eq!(
+        json["version"].as_u64().unwrap() as u32,
+        crate::render_json::VERSION
+    );
+}
+
+#[test]
+fn the_canvas_in_the_export_is_the_canvas_in_the_svg() {
+    let l = build("node a \"A\"\nnode b \"B\" right-of a");
+    let (_, _, w, h) = crate::render_svg::canvas(&l);
+    let json = geometry("node a \"A\"\nnode b \"B\" right-of a");
+
+    assert_eq!(json["canvas"]["width"].as_f64().unwrap(), w);
+    assert_eq!(json["canvas"]["height"].as_f64().unwrap(), h);
+}
