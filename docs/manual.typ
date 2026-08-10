@@ -668,7 +668,9 @@ file's timestamp, it keeps up with whatever is regenerating it. The extension
 decides which it is, the same rule `-o` uses.
 
 Built with the `window` feature it opens a *native window* rather than
-serving a page: no port, no browser, and the SVG rasterised directly. That is
+serving a page: no port, no browser, and the SVG rasterised directly. Scroll
+zooms by 5% a notch, or 10% holding shift; drag pans; `f` fits, `0` is actual
+size, `r` reloads. That is
 the one place this project takes a dependency tree, which is why it is opt-in.
 `--server` asks for the page instead, and a machine with no display is told
 rather than left waiting.

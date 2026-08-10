@@ -1,6 +1,7 @@
 //! A native window, for `bgraph watch`.
 //!
-//! The same viewer as the browser page and the same controls — scroll to zoom,
+//! The same viewer as the browser page and the same controls — scroll to zoom
+//! by 5% a notch, or 10% holding shift,
 //! drag to pan, `f` to fit, `0` for actual size, `r` to reload, and the file
 //! reloaded when it changes on disk — with no server, no port and no browser.
 //!
@@ -66,8 +67,19 @@ pub fn show(input: PathBuf, data: Option<PathBuf>) -> Result<()> {
             }
         }
 
-        if let Some((_, dy)) = window.get_scroll_wheel() {
-            viewer.zoom(dy as f64 * 0.12);
+        if let Some((_, dy)) = window.get_scroll_wheel()
+            && dy.abs() > f32::EPSILON
+        {
+            // Only the *sign* is read. The backends disagree about the
+            // magnitude of one notch — X11 sends ±1, Wayland sends the axis in
+            // fractional pixels, about ±15 — and treating that as a factor
+            // made one notch a 2.8× zoom in one direction and a negative
+            // scale in the other, which the clamp then showed as 5%.
+            //
+            // Negative is up, and up zooms in.
+            let shift = window.is_key_down(Key::LeftShift) || window.is_key_down(Key::RightShift);
+            let step = if shift { 1.10 } else { 1.05 };
+            viewer.zoom_by(if dy < 0.0 { step } else { 1.0 / step });
         }
 
         match (
@@ -202,10 +214,14 @@ impl Viewer {
     }
 
     /// Zoom about the centre, so what you are looking at stays where it is.
-    fn zoom(&mut self, step: f64) {
+    ///
+    /// Multiplicative rather than additive: one notch in and one notch out
+    /// returns to exactly where you were, and a step means the same thing at
+    /// 20% as at 800%.
+    fn zoom_by(&mut self, factor: f64) {
         let (cx, cy) = (self.size.0 as f64 / 2.0, self.size.1 as f64 / 2.0);
         let before = self.view.scale;
-        let after = (before * (1.0 + step)).clamp(0.05, 40.0);
+        let after = (before * factor).clamp(0.05, 40.0);
         self.view.dx = cx - (cx - self.view.dx) * (after / before);
         self.view.dy = cy - (cy - self.view.dy) * (after / before);
         self.view.scale = after;
@@ -294,4 +310,57 @@ pub fn available() -> bool {
 /// Where the file is, for the message when there is no display.
 pub fn describe(input: &Path) -> String {
     input.display().to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn viewer() -> Viewer {
+        let mut v = Viewer::new(PathBuf::from("x.svg"), None);
+        v.size = (800, 600);
+        v
+    }
+
+    #[test]
+    fn a_notch_is_five_percent_and_shift_is_ten() {
+        let mut v = viewer();
+        v.zoom_by(1.05);
+        assert!((v.view.scale - 1.05).abs() < 1e-9, "{}", v.view.scale);
+
+        let mut v = viewer();
+        v.zoom_by(1.10);
+        assert!((v.view.scale - 1.10).abs() < 1e-9, "{}", v.view.scale);
+    }
+
+    #[test]
+    fn one_notch_each_way_returns_to_where_it_was() {
+        // Multiplicative rather than additive, so a step means the same thing
+        // at 20% as at 800% and the pair cancels exactly.
+        let mut v = viewer();
+        v.zoom_by(0.4);
+        let before = v.view;
+        v.zoom_by(1.05);
+        v.zoom_by(1.0 / 1.05);
+        assert!((v.view.scale - before.scale).abs() < 1e-9);
+        assert!((v.view.dx - before.dx).abs() < 1e-6, "and it stays put");
+        assert!((v.view.dy - before.dy).abs() < 1e-6);
+    }
+
+    #[test]
+    fn zooming_never_leaves_the_scale_at_or_below_zero() {
+        // The bug this replaced: a factor derived from Wayland's axis value
+        // went negative, and the clamp showed that as 5% — a wheel *up* that
+        // shrank the picture to nothing.
+        let mut v = viewer();
+        for _ in 0..400 {
+            v.zoom_by(1.0 / 1.05);
+        }
+        assert!(v.view.scale >= 0.05, "{}", v.view.scale);
+
+        for _ in 0..800 {
+            v.zoom_by(1.05);
+        }
+        assert!(v.view.scale <= 40.0, "{}", v.view.scale);
+    }
 }

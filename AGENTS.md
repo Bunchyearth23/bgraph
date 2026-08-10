@@ -230,6 +230,14 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   referenced — but **not** where the archetype goes, since the archetype is
   what makes the rest of the file checkable.
 
+- [2026-08-10] **A scroll wheel's delta is not a number you can scale.** X11
+  sends ±1 a notch; Wayland sends the axis in fractional pixels, about ±15.
+  Multiplying that by a factor made one notch a 2.8× zoom in one direction and
+  a *negative* scale in the other — which the clamp then displayed as 5%, so a
+  wheel *up* shrank the picture to nothing. Read the sign, never the
+  magnitude, and make the step multiplicative so one notch means the same
+  thing at 20% as at 800%.
+
 ### Gotchas
 - [2026-07-31] `template::scan` is textual on purpose, so `{{…}}` written
   inside a **comment** is still a hole. Writing about the syntax in a `.bd`
