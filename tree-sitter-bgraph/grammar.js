@@ -63,7 +63,7 @@ module.exports = grammar({
     group_declaration: ($) =>
       seq(
         field('keyword', choice('group', 'activate')),
-        field('name', $.identifier),
+        field('name', $._name),
         optional(field('label', $.string)),
         // No positional data: a group has no slots, it is a frame.
         repeat(field('class', $.class_reference)),
@@ -103,7 +103,7 @@ module.exports = grammar({
     item_declaration: ($) =>
       seq(
         field('keyword', $.item_keyword),
-        field('name', $.identifier),
+        field('name', $._name),
         // "The first string is always the label" is encoded here rather than
         // left to the reader: with a label, later strings are data; without
         // one, data cannot begin with a string. Exactly one parse either way.
@@ -125,13 +125,17 @@ module.exports = grammar({
         ),
       ),
 
+    // A hole may stand where a name goes (see the pest grammar for why not
+    // where the archetype goes).
+    _name: ($) => choice($.identifier, $.placeholder),
+
     item_keyword: ($) => $.identifier,
 
     edge_declaration: ($) =>
       seq(
-        field('from', $.identifier),
+        field('from', $._name),
         field('operator', $.arrow),
-        field('to', $.identifier),
+        field('to', $._name),
         // Same rule as an item: the first string is the label, and what
         // follows is positional data for archetypes that declare edge slots.
         choice(
@@ -157,7 +161,7 @@ module.exports = grammar({
     relative_position: ($) =>
       seq(
         field('direction', $.direction),
-        field('anchor', $.identifier),
+        field('anchor', $._name),
         optional($.gap_clause),
         optional($.align_clause),
       ),

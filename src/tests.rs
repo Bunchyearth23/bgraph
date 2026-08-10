@@ -662,6 +662,63 @@ fn the_manual_names_every_genre_and_its_word() {
     assert!(manual.contains("Twenty-eight genres and `free`"), "the prose count");
 }
 
+// ---------------------------------------------------------------------- W-058
+
+#[test]
+fn a_hole_stands_where_a_name_goes() {
+    // The CLI always rendered this — `Template::parse` substitutes before
+    // parsing — but the *editor* parses the template as written, so a file
+    // like this showed as a syntax error with its highlighting collapsed.
+    for source in [
+        "type pie\nslice {{r.id}} \"{{r.name}}\" {{r.value}}",
+        "node {{a}} \"A\"\nnode b \"B\" right-of {{a}}",
+        "node {{a}}\nnode b\n{{a}} -> b \"x\"",
+        "group {{g}} \"G\" {\n  node c\n}",
+    ] {
+        parse_diagram(source).unwrap_or_else(|e| panic!("{source}\n{e:#}"));
+    }
+}
+
+#[test]
+fn a_hole_may_not_stand_where_the_archetype_goes() {
+    // The archetype decides which properties exist and which words name an
+    // item, so nothing else in the file is checkable until it is known.
+    let e = err("type {{genre}}\nnode a");
+    assert!(!e.is_empty(), "a genre from data is refused");
+}
+
+#[test]
+fn a_template_reports_what_only_a_render_used_to_catch() {
+    // `Template::parse` refuses these, but as one sentence with no span —
+    // enough for a command line, useless in an editor.
+    let two = "type pie\nslice {{a.id}} \"{{b.name}}\" 1\n";
+    let found = crate::template::lint(two);
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].1.contains("repeats over"), "{found:?}");
+    assert!(found[0].1.contains("`a`") && found[0].1.contains("`b`"), "{found:?}");
+
+    let open = "node a \"{{never closed\n";
+    let found = crate::template::lint(open);
+    assert!(found[0].1.contains("never closed"), "{found:?}");
+
+    // And a well-formed template is silent.
+    assert!(crate::template::lint("slice {{r.id}} \"{{r.name}}\" {{r.value}}").is_empty());
+}
+
+#[test]
+fn holes_are_found_with_their_positions_and_their_row() {
+    let holes = crate::template::holes_in("slice {{r.id}} \"{{r.name}}\" {{total}}");
+    assert_eq!(holes.len(), 3);
+    assert_eq!(holes[0].name, "r.id");
+    assert_eq!(holes[0].prefix.as_deref(), Some("r"));
+    assert_eq!(holes[2].prefix, None, "an undotted hole belongs to no row");
+
+    // The spans cover the braces, so an editor points at the whole hole.
+    let source = "slice {{r.id}}";
+    let h = &crate::template::holes_in(source)[0];
+    assert_eq!(&source[h.span.start..h.span.end], "{{r.id}}");
+}
+
 // ---------------------------------------------------------------------- W-057
 
 #[cfg(feature = "json")]

@@ -214,6 +214,16 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   language calls idiomatic. Any new validation over properties must run on the
   **folded** props, never on `.props`.
 
+- [2026-08-10] **A hole could not stand where a name goes, and only the editor
+  noticed.** `Template::parse` substitutes *before* parsing, so the CLI
+  rendered `slice {{r.id}} "…"` happily — while both grammars refused it, so
+  the file showed as a syntax error in Zed and VS Code with its highlighting
+  collapsed. Anything the templating layer accepts must be accepted by the
+  grammars too, or the editor and the renderer disagree about what a file is.
+  `name = ident | placeholder` now, everywhere a name is declared or
+  referenced — but **not** where the archetype goes, since the archetype is
+  what makes the rest of the file checkable.
+
 ### Gotchas
 - [2026-07-31] `template::scan` is textual on purpose, so `{{…}}` written
   inside a **comment** is still a hole. Writing about the syntax in a `.bd`

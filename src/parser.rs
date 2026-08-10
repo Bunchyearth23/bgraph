@@ -230,6 +230,13 @@ fn span_of(pair: &Pair<Rule>) -> Span {
     }
 }
 
+/// Whether this pair stands where a *name* goes — an identifier, or a hole
+/// that will become one. `check` is what refuses a hole where a real name is
+/// needed to answer a question.
+fn is_name(rule: Rule) -> bool {
+    matches!(rule, Rule::ident | Rule::placeholder)
+}
+
 fn spanned(pair: &Pair<Rule>) -> Spanned<String> {
     Spanned {
         value: pair.as_str().to_string(),
@@ -277,7 +284,7 @@ fn parse_group(pair: Pair<Rule>, diagram: &mut Diagram) -> Result<()> {
     for part in pair.into_inner() {
         match part.as_rule() {
             Rule::group_kw => activates = part.as_str() == "activate",
-            Rule::ident if id.is_none() => id = Some(spanned(&part)),
+            r if is_name(r) && id.is_none() => id = Some(spanned(&part)),
             Rule::string if label.is_none() => label = Some(unescape(part)),
             Rule::class_ref => classes.push(class_name(part)),
             Rule::abs_pos | Rule::rel_pos => placement = Some(parse_placement(part)?),
@@ -336,7 +343,7 @@ fn is_activation(pair: &Pair<Rule>) -> bool {
 fn group_name(pair: &Pair<Rule>) -> Result<Spanned<String>> {
     pair.clone()
         .into_inner()
-        .find(|p| p.as_rule() == Rule::ident)
+        .find(|p| is_name(p.as_rule()))
         .map(|p| spanned(&p))
         .ok_or_else(|| anyhow::anyhow!("a group declaration always names the group"))
 }
@@ -359,7 +366,7 @@ fn parse_item(pair: Pair<Rule>) -> Result<NodeDecl> {
             // The first two identifiers are the keyword and the name; a third
             // is a bare-word positional value.
             Rule::ident if keyword.is_none() => keyword = Some(spanned(&part)),
-            Rule::ident if id.is_none() => id = Some(spanned(&part)),
+            r if is_name(r) && id.is_none() => id = Some(spanned(&part)),
             // Likewise the first string is the label, by construction.
             Rule::string if label.is_none() => label = Some(unescape(part)),
             Rule::class_ref => classes.push(class_name(part)),
@@ -412,7 +419,7 @@ fn parse_edge(pair: Pair<Rule>) -> Result<EdgeDecl> {
         match part.as_rule() {
             // The first two identifiers are the endpoints; a third is a
             // bare-word positional value.
-            Rule::ident if endpoints.len() < 2 => endpoints.push(spanned(&part)),
+            r if is_name(r) && endpoints.len() < 2 => endpoints.push(spanned(&part)),
             Rule::arrow => arrow = Arrow::parse(part.as_str()),
             Rule::string if label.is_none() => label = Some(unescape(part)),
             Rule::class_ref => classes.push(class_name(part)),
@@ -477,7 +484,7 @@ fn parse_placement(pair: Pair<Rule>) -> Result<Placement> {
                             other => bail!("unknown direction `{other}`"),
                         }
                     }
-                    Rule::ident => anchor = Some(spanned(&part)),
+                    r if is_name(r) => anchor = Some(spanned(&part)),
                     Rule::gap => {
                         let n = part.into_inner().next().expect("gap value");
                         gap = Some(number(n)?);

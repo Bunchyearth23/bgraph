@@ -1,0 +1,8 @@
+type pie
+slice {{row.id}} "{{row.name}}" {{row.value}}
+node {{a}} "A"
+node b "B" right-of {{a}}
+{{a}} -> b "link"
+group {{g}} "G" {
+  node c
+}

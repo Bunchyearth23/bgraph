@@ -17,6 +17,101 @@ use std::fmt::Write;
 
 use anyhow::{Result, bail};
 
+/// A hole, and where it is written.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Hole {
+    /// The name between the braces, trimmed.
+    pub name: String,
+    /// The row it repeats over, when the name is dotted.
+    pub prefix: Option<String>,
+    /// Byte range of the whole `{{…}}`, for an editor to point at.
+    pub span: crate::ast::Span,
+}
+
+/// Every hole in a source, in the order written — repeats included, because an
+/// editor wants to point at each occurrence and not only the first.
+pub fn holes_in(source: &str) -> Vec<Hole> {
+    let mut out = Vec::new();
+    let mut at = 0usize;
+
+    while let Some(open) = source[at..].find("{{") {
+        let start = at + open;
+        let body = &source[start + 2..];
+        let Some(close) = body.find("}}") else { break };
+        let name = body[..close].trim().to_string();
+        let end = start + 2 + close + 2;
+        if !name.is_empty() {
+            out.push(Hole {
+                prefix: name.split_once('.').map(|(p, _)| p.to_string()),
+                name,
+                span: crate::ast::Span { start, end },
+            });
+        }
+        at = end;
+    }
+
+    out
+}
+
+/// What is wrong with a template, with somewhere to point.
+///
+/// [`Template::parse`] refuses these too, but it refuses them as one sentence
+/// with no span — which is enough for a command line and useless in an editor.
+/// The knowledge lives here rather than in the language server, because the
+/// rules are the template's own.
+pub fn lint(source: &str) -> Vec<(crate::ast::Span, String)> {
+    let mut out = Vec::new();
+    let mut offset = 0usize;
+
+    for line in source.split_inclusive('\n') {
+        // An unterminated `{{` is text to `fill`, which is the forgiving
+        // reading — but on a line that clearly meant to open a hole it is
+        // almost always a typo, and saying so costs nothing.
+        if let Some(open) = line.find("{{")
+            && !line[open..].contains("}}")
+        {
+            out.push((
+                crate::ast::Span {
+                    start: offset + open,
+                    end: offset + line.trim_end().len(),
+                },
+                "this `{{` is never closed, so it is written out as text".to_string(),
+            ));
+        }
+
+        // A line naming two rows has no answer for how many times to write it.
+        let mut prefixes: Vec<String> = Vec::new();
+        for hole in holes_in(line) {
+            if let Some(prefix) = hole.prefix
+                && !prefixes.contains(&prefix)
+            {
+                prefixes.push(prefix);
+            }
+        }
+        if prefixes.len() > 1 {
+            out.push((
+                crate::ast::Span {
+                    start: offset,
+                    end: offset + line.trim_end().len(),
+                },
+                format!(
+                    "this line repeats over {} — a line may repeat over one list, or the \
+                     number of times it is written would be ambiguous",
+                    prefixes
+                        .iter()
+                        .map(|p| format!("`{p}`"))
+                        .collect::<Vec<_>>()
+                        .join(" and ")
+                ),
+            ));
+        }
+
+        offset += line.len();
+    }
+
+    out
+}
+
 /// Whether text can stand as a bare name. The same rule the grammar uses:
 /// a leading letter or underscore, then letters, digits, underscores and
 /// interior hyphens — a trailing hyphen would make `a-` swallow an arrow.

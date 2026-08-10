@@ -41,7 +41,7 @@ type_decl  = { "type" ~ ident ~ block? }
 // an *existing* item rather than declaring a new one, because a bar belongs to
 // a participant that is already on the diagram (`D-024`).
 group_kw    = { "group" | "activate" }
-group_decl  = { group_kw ~ ident ~ string? ~ class_ref* ~ placement? ~ group_block }
+group_decl  = { group_kw ~ name ~ string? ~ class_ref* ~ placement? ~ group_block }
 // Entries are separated, for the same reason statements are: without it
 // `padding: 22 node a` cannot be told from a property with three values.
 group_block = { "{" ~ sep ~ ((prop | stmt) ~ inner_term)* ~ "}" }
@@ -56,7 +56,12 @@ style_decl = { "style" ~ ident ~ ("extends" ~ ident)? ~ block }
 // there is no reason to make the author remember an order.
 // The placement and the block may come in either order — both read
 // naturally, and `{` cannot be mistaken for a placement keyword.
-item_decl  = { ident ~ ident ~ string? ~ (pos_value | class_ref)* ~ tail? }
+// A hole may stand where a *name* goes, so a template can supply the id of the
+// statement it fills — which is the whole point of repeating a line per row.
+// Not where the archetype goes: the archetype decides which properties exist,
+// so it has to be known before anything else can be checked.
+name       = _{ ident | placeholder }
+item_decl  = { ident ~ name ~ string? ~ (pos_value | class_ref)* ~ tail? }
 tail       = _{ placement ~ block? | block ~ placement? }
 
 // A placement keyword would otherwise be eaten as a bare-word value.
@@ -66,7 +71,7 @@ place_kw   = @{ ("at" | "right-of" | "left-of" | "below" | "above") ~ !(ASCII_AL
 // An edge may not start with a statement keyword. Without this, `style -> a`
 // parses here (pest backtracks out of `style_decl`) but not in tree-sitter,
 // whose lexer commits to the keyword. `check` reserves these names outright.
-edge_decl  = { !(keyword) ~ ident ~ arrow ~ ident ~ string? ~ (pos_value | class_ref)* ~ block? }
+edge_decl  = { !(keyword) ~ name ~ arrow ~ name ~ string? ~ (pos_value | class_ref)* ~ block? }
 // Atomic: a non-atomic rule would let implicit whitespace slip between the
 // word and the boundary test, so `style -> a` would read the `-` as part
 // of an identifier and the guard would never fire.
@@ -77,7 +82,7 @@ arrow     = @{ "<->" | "<-" | "-->" | "..>" | "--" | "->" | ".." }
 
 placement = _{ abs_pos | rel_pos }
 abs_pos   = { "at" ~ point }
-rel_pos   = { rel_dir ~ ident ~ gap? ~ align? }
+rel_pos   = { rel_dir ~ name ~ gap? ~ align? }
 rel_dir    = { "right-of" | "left-of" | "below" | "above" }
 gap        = { "gap" ~ number }
 align      = { "align" ~ align_kw }

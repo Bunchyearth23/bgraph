@@ -249,6 +249,35 @@ impl Server {
         let trimmed = line.trim_start();
         let archetype = declared_archetype(text);
 
+        // Inside `{{ … }}`: offer the holes this file already uses. A template
+        // is written by repeating its own parameter names, and misspelling one
+        // silently produces a second parameter nobody binds.
+        if let Some(open) = line.rfind("{{")
+            && !line[open..].contains("}}")
+        {
+            let typed = line[open + 2..].trim_start();
+            let mut names: Vec<String> = Vec::new();
+            for hole in crate::template::holes_in(text) {
+                if !names.contains(&hole.name) {
+                    names.push(hole.name);
+                }
+            }
+            return names
+                .into_iter()
+                .filter(|n| n.starts_with(typed) || typed.is_empty())
+                .map(|name| {
+                    let doc = match name.split_once('.') {
+                        Some((prefix, field)) => format!(
+                            "`{field}` of each row of `{prefix}`. This line is written once \
+                             per row."
+                        ),
+                        None => format!("A value bound once for the whole file: `{name}`."),
+                    };
+                    completion(&name, 6, "hole", &doc)
+                })
+                .collect();
+        }
+
         // `.class` — only after whitespace, so `1.5` and `..>` stay quiet.
         if let Some(dot) = line.rfind('.')
             && line[dot + 1..].chars().all(is_ident_char)
@@ -637,7 +666,33 @@ impl Server {
         let ctx = Context::at(text, offset);
         let archetype = declared_archetype(text);
 
-        let markdown = if text[line_start..span.start].trim_end().ends_with("type") {
+        // A hole reads as an ordinary word to `word_at`, so it is answered
+        // before anything else — otherwise `value` inside `{{r.value}}` would
+        // be documented as the pie property, which it is not.
+        let inside = crate::template::holes_in(text)
+            .into_iter()
+            .find(|h| h.span.contains(offset));
+
+        let markdown = if let Some(hole) = inside {
+            let uses = crate::template::holes_in(text)
+                .iter()
+                .filter(|h| h.name == hole.name)
+                .count();
+            let plural = if uses == 1 { "once" } else { "twice or more" };
+            Some(match &hole.prefix {
+                Some(prefix) => format!(
+                    "**hole** `{}`\n\nA field of each row of `{prefix}`. The line it sits on \
+                     is written **once per row**, so the number of statements is decided by \
+                     the data rather than by the file.\n\nWritten {plural} here.",
+                    hole.name
+                ),
+                None => format!(
+                    "**hole** `{}`\n\nBound once for the whole file.\n\nWritten {plural} \
+                     here.",
+                    hole.name
+                ),
+            })
+        } else if text[line_start..span.start].trim_end().ends_with("type") {
             props::archetype(&word).map(|a| format!("**type** `{}`\n\n{}", a.name, a.doc))
         } else if is_key && ctx.block.is_some() {
             let table: Vec<&'static props::PropDef> = match ctx.block {
@@ -807,6 +862,28 @@ impl Server {
         let index = LineIndex::new(text);
 
         let mut out = Vec::new();
+
+        // The holes first: they are the file's parameters, and a template's
+        // outline that did not list them would be an outline of the shape
+        // without the thing that varies.
+        let mut seen: Vec<String> = Vec::new();
+        for hole in crate::template::holes_in(text) {
+            if seen.contains(&hole.name) {
+                continue;
+            }
+            seen.push(hole.name.clone());
+            out.push(json!({
+                "name": format!("{{{{{}}}}}", hole.name),
+                "detail": match &hole.prefix {
+                    Some(prefix) => format!("one per row of {prefix}"),
+                    None => "bound once".to_string(),
+                },
+                "kind": 26,                      // TypeParameter
+                "range": index.range(hole.span),
+                "selectionRange": index.range(hole.span),
+            }));
+        }
+
         for style in &diagram.styles {
             out.push(json!({
                 "name": style.name.as_str(),
@@ -843,6 +920,19 @@ fn diagnostics(text: &str) -> Vec<Value> {
             span: err.span,
         }],
     };
+
+    // A template's rules are the template's, and nothing was running them
+    // until a render did — so a line repeating over two lists was a surprise
+    // at the end rather than a squiggle while writing it.
+    let mut diags = diags;
+    for (span, message) in crate::template::lint(text) {
+        diags.push(check::Diag {
+            severity: Severity::Warning,
+            message,
+            span,
+        });
+    }
+    diags.sort_by_key(|d| (d.span.start, d.span.end));
 
     diags
         .into_iter()
@@ -1174,7 +1264,11 @@ fn capabilities() -> Value {
                 // Space is a trigger again, but `items_for` now answers with
                 // nothing wherever a suggestion would be in the way — the
                 // quiet comes from the answer, not from refusing to be asked.
-                "triggerCharacters": [".", ":", " "],
+                // `{` opens a hole *and* a block, so it fires often — which is
+                // fine, because `items_for` answers with nothing unless the
+                // two characters before the cursor are `{{` (`D-011`: the
+                // quiet comes from the answer, not from refusing to be asked).
+                "triggerCharacters": [".", ":", " ", "{"],
             },
             "hoverProvider": true,
             // Positional data is the idiomatic form in this language, and it
@@ -1435,6 +1529,73 @@ mod tests {
             .expect("leaf is declared");
         assert!(hover.contains("extends `base`"), "{hover}");
         assert!(hover.contains("shape: cylinder"), "{hover}");
+    }
+
+    #[test]
+    fn a_template_squiggles_while_it_is_written() {
+        // A line repeating over two lists used to be a surprise at render
+        // time; nothing was running the template's own rules in the editor.
+        let source = "type pie\nslice {{a.id}} \"{{b.name}}\" 1\n";
+        let found = diagnostics(source);
+        assert!(
+            found.iter().any(|d| d["message"]
+                .as_str()
+                .unwrap_or_default()
+                .contains("repeats over")),
+            "{found:?}"
+        );
+        // And the span is the line, not the whole file.
+        let d = found
+            .iter()
+            .find(|d| d["message"].as_str().unwrap_or_default().contains("repeats over"))
+            .unwrap();
+        assert_eq!(d["range"]["start"]["line"].as_u64().unwrap(), 1);
+    }
+
+    #[test]
+    fn completion_inside_a_hole_offers_the_holes_already_used() {
+        // A template is written by repeating its own parameter names, and
+        // misspelling one silently produces a parameter nobody binds.
+        let source = "type pie { title: \"{{quarter}}\" }\nslice {{r.id}} \"x\" 1\nslice {{";
+        let items = server(source).items_for(source, "slice {{", source.len());
+        let labels: Vec<&str> = items
+            .iter()
+            .filter_map(|i| i["label"].as_str())
+            .collect();
+        assert!(labels.contains(&"r.id"), "{labels:?}");
+        assert!(labels.contains(&"quarter"), "{labels:?}");
+    }
+
+    #[test]
+    fn hover_on_a_hole_says_what_it_binds() {
+        // `value` inside `{{r.value}}` is not the pie property, and answering
+        // with that documentation would be worse than answering nothing.
+        let source = "type pie\nslice {{r.value}} \"x\" 1";
+        let on_hole = source.find("r.value").unwrap() + 2;
+        let md = server(source).hover(&at(source, on_hole))["contents"]["value"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+
+        assert!(md.contains("**hole**"), "{md}");
+        assert!(md.contains("once per row"), "{md}");
+        assert!(!md.contains("slice"), "not the archetype's property: {md}");
+    }
+
+    #[test]
+    fn the_outline_lists_a_templates_parameters() {
+        let source = "type pie { title: \"{{quarter}}\" }\nslice {{r.id}} \"{{r.name}}\" 1";
+        let symbols = server(source).symbols(&json!({
+            "textDocument": { "uri": "file:///t.bd" }
+        }));
+        let names: Vec<&str> = symbols
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|s| s["name"].as_str())
+            .collect();
+        assert!(names.contains(&"{{quarter}}"), "{names:?}");
+        assert!(names.contains(&"{{r.id}}"), "{names:?}");
     }
 
     #[test]
