@@ -26,7 +26,7 @@ purpose — an identifier is earned by being cited.
 ## Open — the answer to "what is left"
 
 **Nothing is planned. One question is open (`Q-005`, the licence) and nothing
-is blocked.** Thirty ideas were triaged on 2026-08-10 — `I-023` … `I-052` —
+is blocked.** Thirty-nine ideas were triaged on 2026-08-10 — `I-023` … `I-061` —
 and the audience was settled: *first right for its author, then distributable*,
 which is the order that survives.
 Twenty-eight genres plus `free` ship, both editors have an extension, and the
@@ -228,8 +228,8 @@ Nothing is marked `landed` without a commit to point at.
 | `I-021` | parked | `type bpmn` — the notation is large and mostly ceremony: which part of it is the useful part has to be chosen before the work can be costed, and nobody has chosen |
 | `I-022` | promoted | `type requirements` — became `W-051` |
 
-Thirty were put one by one on 2026-08-10, against what Mermaid, PlantUML, D2,
-Graphviz, Structurizr and Excalidraw do. Twenty-two were kept, seven refused,
+Thirty-nine were put one by one on 2026-08-10, against what Mermaid, PlantUML,
+D2, Graphviz, Structurizr and Excalidraw do. Thirty were kept, eight refused,
 one left undecided. A refusal is recorded with its reason, so it is not
 proposed again from scratch.
 
@@ -264,4 +264,13 @@ proposed again from scratch.
 | `I-049` | parked | **`bgraph init <genre>`** — a skeleton derived from the same tables the reference and completion read, so it cannot go stale. Twenty-eight genres is more than anyone remembers |
 | `I-050` | parked | **Visual diff** — two renders, one image showing what moved, for review |
 | `I-051` | parked | **Rich terminal diagnostics** — the source line and a caret, as `rustc` does, with `--ci` for the flat `file:line:col` form editors and build systems expect |
+| `I-053` | parked | **A title on any diagram** — `graph { title }`. Not an idea but a **defect**: `title` exists only in the chart archetypes' own settings, so `free`, `class`, `er` and `harness` have no way to name themselves at all |
+| `I-054` | parked | **A `note` statement** — text placed by the same anchors as everything else, belonging to no box. There is currently no way to put a caption, a warning or an aside *inside* the picture |
+| `I-055` | parked | **Parser error recovery** — a missed separator on line 3 costs the diagnostics *and* the semantic highlighting of the fifty lines after it, which is exactly when they are wanted. A statement ends at a newline, so the resumption point is obvious |
+| `I-056` | parked | **Shell completions and a man page** — `clap` generates both; standard for a command-line tool and nearly free |
+| `I-057` | parked | **Language-server setup for Neovim, Helix and Emacs** — the server already works with all of them; only two editors are packaged. A documentation page, not code |
+| `I-058` | parked | **An embedded font subset in the SVG**, optional — only the glyphs actually used, a few kilobytes. Would make SVG text exact the way PDF already is, closing the practical half of `X-005` |
+| `I-059` | discarded | Translated diagnostics — the code, the generated reference and the property names are English; a French sentence around English vocabulary reads worse than either |
+| `I-060` | parked | **A legend outside the chart archetypes** — a `network` or `block` diagram cannot declare one |
+| `I-061` | parked | **Multi-page print** — a large diagram across several sheets |
 | `I-052` | parked | **`watch` over a directory** — both readings: a build loop that regenerates what changes, and the window following it |
