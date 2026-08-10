@@ -70,6 +70,58 @@ enum Command {
         /// Input DSL file
         input: PathBuf,
     },
+    /// Reformat a file to the canonical shape
+    Fmt {
+        /// Input DSL files
+        inputs: Vec<PathBuf>,
+
+        /// Report which files would change, and change nothing
+        #[arg(long)]
+        check: bool,
+    },
+}
+
+/// Reformat, or report what would change.
+///
+/// `--check` exits non-zero when a file is not in its canonical shape, so the
+/// same command serves a person and a build — one runs it to fix, the other to
+/// refuse.
+fn format_files(inputs: &[PathBuf], check: bool) -> Result<i32> {
+    if inputs.is_empty() {
+        bail!("no input file (try `bgraph fmt diagram.bd`)");
+    }
+
+    let mut changed = 0;
+    for path in inputs {
+        let source =
+            fs::read_to_string(path).with_context(|| format!("cannot read {}", path.display()))?;
+        let formatted = bgraph::fmt::format(&source)
+            .with_context(|| format!("{} does not parse, so it is left alone", path.display()))?;
+
+        if formatted == source {
+            continue;
+        }
+        changed += 1;
+        if check {
+            println!("{}", path.display());
+        } else {
+            fs::write(path, &formatted)
+                .with_context(|| format!("cannot write {}", path.display()))?;
+            println!("{} reformatted", path.display());
+        }
+    }
+
+    if check && changed > 0 {
+        eprintln!(
+            "{changed} file{} would change",
+            if changed == 1 { "" } else { "s" }
+        );
+        return Ok(1);
+    }
+    if changed == 0 {
+        println!("nothing to change");
+    }
+    Ok(0)
 }
 
 fn main() {
@@ -91,6 +143,7 @@ fn run() -> Result<i32> {
             return Ok(0);
         }
         Some(Command::Check { input }) => return check_file(&input),
+        Some(Command::Fmt { inputs, check }) => return format_files(&inputs, check),
         Some(Command::Docs { output }) => {
             let manual = bgraph::docgen::reference();
             match output {
@@ -234,7 +287,7 @@ fn check_file(input: &PathBuf) -> Result<i32> {
         fs::read_to_string(input).with_context(|| format!("cannot read {}", input.display()))?;
     let index = LineIndex::new(&source);
 
-    let diagnostics = match parser::parse(&source) {
+    let mut diagnostics = match parser::parse(&source) {
         Ok(diagram) => bgraph::check::check(&diagram),
         Err(err) => vec![bgraph::check::Diag {
             severity: Severity::Error,
@@ -242,6 +295,15 @@ fn check_file(input: &PathBuf) -> Result<i32> {
             span: err.span,
         }],
     };
+
+    // The ones that need the boxes placed. `check` is still the only
+    // validator; this is its second pass, not a second one.
+    if let Ok(diagram) = parser::parse(&source)
+        && let Ok(solved) = layout::solve(&diagram)
+    {
+        diagnostics.extend(bgraph::check::after_layout(&solved));
+    }
+    diagnostics.sort_by_key(|d| (d.span.start, d.span.end));
 
     let mut errors = 0;
     for diag in &diagnostics {

@@ -186,6 +186,77 @@ fn check_archetype(diagram: &Diagram, out: &mut Vec<Diag>) -> &'static props::Ar
     def
 }
 
+/// The diagnostics that need the diagram to have been *solved*.
+///
+/// [`check`] runs before any geometry exists, which is right for almost
+/// everything: an unknown property is wrong whatever the boxes end up doing.
+/// A few problems are only visible afterwards, and they still belong here —
+/// `layout.rs` solves, `check.rs` judges, and moving one of these into the
+/// solver would be the beginning of a second validator.
+pub fn after_layout(layout: &crate::layout::Layout) -> Vec<Diag> {
+    let mut out = Vec::new();
+    let routed = crate::render_svg::route_all(layout);
+
+    for (edge, route) in layout.edges.iter().zip(&routed) {
+        // A straight edge is clipped against both shapes and goes nowhere
+        // near anything else by construction. An elbow is routed around
+        // nothing at all, so it can cross a box on its way (`X-004`).
+        if edge.style.router != Some(crate::style::Router::Ortho) {
+            continue;
+        }
+        for (i, node) in layout.nodes.iter().enumerate() {
+            if i == edge.from || i == edge.to {
+                continue;
+            }
+            if route
+                .points
+                .windows(2)
+                .any(|seg| crosses(seg[0], seg[1], &node.rect))
+            {
+                out.push(Diag::warn(
+                    edge.span,
+                    "this `ortho` edge passes through a box on its way — the router \
+                     turns corners but avoids nothing, so move a node, widen the gap, \
+                     or use `router: straight`"
+                        .to_string(),
+                ));
+                break;
+            }
+        }
+    }
+
+    out
+}
+
+/// Whether a segment touches a rectangle: either end inside it, or the segment
+/// crossing one of its four sides.
+fn crosses(a: (f64, f64), b: (f64, f64), r: &crate::layout::Rect) -> bool {
+    let inside = |(x, y): (f64, f64)| x > r.x && x < r.right() && y > r.y && y < r.bottom();
+    if inside(a) || inside(b) {
+        return true;
+    }
+
+    let corners = [
+        (r.x, r.y),
+        (r.right(), r.y),
+        (r.right(), r.bottom()),
+        (r.x, r.bottom()),
+    ];
+    (0..4).any(|i| segments_cross(a, b, corners[i], corners[(i + 1) % 4]))
+}
+
+/// Orientation-based segment intersection. Endpoints that merely touch do not
+/// count: an edge leaves its own box at the boundary, and a line grazing a
+/// corner is not passing through anything.
+fn segments_cross(p1: (f64, f64), p2: (f64, f64), p3: (f64, f64), p4: (f64, f64)) -> bool {
+    let side = |a: (f64, f64), b: (f64, f64), c: (f64, f64)| {
+        (b.0 - a.0) * (c.1 - a.1) - (b.1 - a.1) * (c.0 - a.0)
+    };
+    let (d1, d2) = (side(p3, p4, p1), side(p3, p4, p2));
+    let (d3, d4) = (side(p1, p2, p3), side(p1, p2, p4));
+    ((d1 > 0.0) != (d2 > 0.0)) && ((d3 > 0.0) != (d4 > 0.0))
+}
+
 /// The first error, if any — what the CLI reports.
 pub fn first_error(diagram: &Diagram) -> Option<Diag> {
     check(diagram)

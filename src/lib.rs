@@ -119,6 +119,7 @@ pub mod template;
 pub mod ast;
 #[allow(missing_docs)]
 pub mod charts;
+pub mod fmt;
 #[allow(missing_docs)]
 pub mod layout;
 #[allow(missing_docs)]

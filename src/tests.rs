@@ -689,6 +689,134 @@ fn the_manual_names_every_genre_and_its_word() {
     );
 }
 
+// ---------------------------------------------------------------------- W-064
+
+#[cfg(test)]
+fn after(source: &str) -> Vec<String> {
+    let diagram = parse_diagram(source).expect("parses");
+    let solved = layout::solve(&diagram).expect("solves");
+    crate::check::after_layout(&solved)
+        .into_iter()
+        .map(|d| d.message)
+        .collect()
+}
+
+#[test]
+fn an_ortho_edge_through_a_box_is_reported() {
+    // `X-004`: the router turns corners and avoids nothing, so it could draw a
+    // line straight through a node and say nothing at all.
+    let found = after(
+        "node a \"A\" at (0, 0)\nnode mid \"in the way\" right-of a gap 40\n\
+         node b \"B\" right-of mid gap 40\na -> b { router: ortho }",
+    );
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert!(found[0].contains("passes through a box"), "{found:?}");
+    assert!(
+        found[0].contains("router: straight"),
+        "the message says a way out"
+    );
+}
+
+#[test]
+fn a_clear_ortho_edge_is_silent() {
+    // A warning that fired on the ordinary case would be one nobody reads.
+    assert!(
+        after("node a \"A\" at (0, 0)\nnode b \"B\" below a gap 90\na -> b { router: ortho }")
+            .is_empty()
+    );
+
+    // Its own endpoints are not obstacles: an edge leaves one box and enters
+    // another by definition.
+    assert!(
+        after("node a \"A\" at (0, 0)\nnode b \"B\" right-of a\na -> b { router: ortho }")
+            .is_empty()
+    );
+}
+
+#[test]
+fn a_straight_edge_is_not_asked_about_obstacles() {
+    // It is clipped against both shapes and, being straight, crossing a third
+    // box is a placement the author chose rather than a router's decision.
+    let found = after(
+        "node a \"A\" at (0, 0)\nnode mid \"in the way\" right-of a gap 40\n\
+         node b \"B\" right-of mid gap 40\na -> b",
+    );
+    assert!(found.is_empty(), "{found:?}");
+}
+
+#[test]
+fn every_example_is_free_of_geometric_complaints() {
+    // The suite already renders them; this asserts the second pass has nothing
+    // to say about any of them, so a shipped example is not demonstrating the
+    // very thing the warning is about.
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/examples");
+    for entry in std::fs::read_dir(dir).expect("readable") {
+        let path = entry.expect("entry").path();
+        if path.extension().is_none_or(|e| e != "bd") {
+            continue;
+        }
+        let source = std::fs::read_to_string(&path).expect("readable");
+        if source.contains("{{") {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        assert!(after(&source).is_empty(), "{name}: {:?}", after(&source));
+    }
+}
+
+// ---------------------------------------------------------------------- W-063
+
+#[test]
+fn the_formatter_fixes_structure_and_leaves_taste_alone() {
+    let messy = "type pie {\ntitle: \"x\"\n      radius: 10\n}\n\n\n\nslice a \"A\" 1   \n";
+    let tidy = crate::fmt::format(messy).expect("parses");
+
+    assert_eq!(
+        tidy, "type pie {\n  title: \"x\"\n  radius: 10\n}\n\nslice a \"A\" 1\n",
+        "{tidy:?}"
+    );
+
+    // Columns lined up by hand survive: indentation is structural, alignment
+    // is taste, and only the first is the formatter's business.
+    let aligned = "field a \"A\"    0 15\nfield bb \"B\"  16 31\n";
+    assert_eq!(crate::fmt::format(aligned).expect("parses"), aligned);
+}
+
+#[test]
+fn the_formatter_counts_braces_it_can_see() {
+    // A brace inside a string or after a `//` is text. Counting it would
+    // reindent everything after the line by one, for good.
+    let source = "node a \"a { b\"\nnode b // a } here\nnode c\n";
+    assert_eq!(crate::fmt::format(source).expect("parses"), source);
+}
+
+#[test]
+fn the_formatter_refuses_a_file_it_does_not_understand() {
+    // An unbalanced brace reindents everything after it, and the diff would
+    // bury the one line that was actually wrong.
+    assert!(crate::fmt::format("node a \"never closed").is_err());
+}
+
+#[test]
+fn every_example_is_in_the_shape_the_formatter_writes() {
+    // The formatter agreeing with the house style is the claim; a repository
+    // whose own files fail it would mean it had invented a different one.
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/examples");
+    for entry in std::fs::read_dir(dir).expect("readable") {
+        let path = entry.expect("entry").path();
+        if path.extension().is_none_or(|e| e != "bd") {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        let source = std::fs::read_to_string(&path).expect("readable");
+        assert_eq!(
+            crate::fmt::format(&source).unwrap_or_else(|e| panic!("{name}: {e:#}")),
+            source,
+            "{name} is not in canonical shape — run `bgraph fmt examples/{name}`"
+        );
+    }
+}
+
 // ---------------------------------------------------------------------- W-062
 
 #[cfg(feature = "csv")]

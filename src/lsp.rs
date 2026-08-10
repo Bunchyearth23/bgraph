@@ -922,10 +922,17 @@ fn diagnostics(text: &str) -> Vec<Value> {
         }],
     };
 
+    // And the ones that need the boxes to have been placed.
+    let mut diags = diags;
+    if let Ok(diagram) = crate::parser::parse(text)
+        && let Ok(layout) = crate::layout::solve(&diagram)
+    {
+        diags.extend(check::after_layout(&layout));
+    }
+
     // A template's rules are the template's, and nothing was running them
     // until a render did — so a line repeating over two lists was a surprise
     // at the end rather than a squiggle while writing it.
-    let mut diags = diags;
     for (span, message) in crate::template::lint(text) {
         diags.push(check::Diag {
             severity: Severity::Warning,

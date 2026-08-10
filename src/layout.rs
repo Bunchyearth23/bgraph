@@ -49,6 +49,10 @@ pub struct PlacedEdge {
     pub label: Option<String>,
     pub arrow: Arrow,
     pub style: Style,
+    /// Where the edge was written. Geometry-dependent diagnostics are found
+    /// after the solve, and one that could not point at a line would be a
+    /// diagnostic nobody could act on.
+    pub span: Span,
 }
 
 pub struct PlacedGroup {
@@ -704,6 +708,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             label,
             arrow: edge.arrow,
             style,
+            span: edge.span,
         });
     }
 

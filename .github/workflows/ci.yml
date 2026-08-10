@@ -54,6 +54,11 @@ jobs:
             exit 1
           fi
 
+      # The repository's own files must pass the formatter it ships, or the
+      # formatter has invented a style rather than followed one.
+      - name: The examples are in canonical shape
+        run: cargo run --bin bgraph -- fmt --check examples/*.bd
+
       # An archetype not compiled in must be *unknown*, not broken.
       - name: Build with no archetype at all
         run: cargo build --no-default-features

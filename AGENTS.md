@@ -81,6 +81,7 @@ disagree.
 | `src/layout.rs` | Anchor solver → absolute `Rect`s |
 | `src/render_svg.rs` | Shapes, edge routing, markers, text |
 | `src/render_pdf.rs` | PDF output, hand-written — vector, so no rasteriser |
+| `src/fmt.rs` | The formatter. Lexical, so comments and blank lines survive |
 | `src/template.rs` | `{{holes}}` and the values a calling program binds |
 | `src/watch.rs` | Dependency-free HTTP live preview, with pan and zoom |
 | `src/lsp.rs` | Language server + `LineIndex` (byte ↔ UTF-16 position) |
@@ -102,7 +103,9 @@ disagree.
 ## Patterns
 - ALWAYS: add validation to `check.rs`, never to `layout.rs`. `layout::solve`
   calls `check::first_error` and its own `bail!`s only guard invariants that
-  check has already established
+  check has already established. A diagnostic that needs the boxes *placed*
+  goes in `check::after_layout`, which is the same validator's second pass —
+  putting one in the solver would be the start of a second validator
 - ALWAYS: XML-escape anything from the source before it reaches the SVG
   (`render_svg::esc`) — labels are user text
 - ALWAYS: derive the viewBox from solved bounds; never hardcode a canvas

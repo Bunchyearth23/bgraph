@@ -401,6 +401,8 @@ bgraph report.bd --data q3.json     # fill a template from a JSON object
 bgraph report.bd --data - --emit    # …from a pipe, printing the filled source
 bgraph report.bd --rows r=sales.csv # one hole from the rows of a CSV
 bgraph watch report.bd --data q3.json   # live preview, data re-read on save
+bgraph fmt diagram.bd               # reformat to the canonical shape
+bgraph fmt --check examples/*.bd    # …or report what would change, and exit non-zero
 bgraph docs -o docs/reference.md    # regenerate the reference manual
 ```
 
