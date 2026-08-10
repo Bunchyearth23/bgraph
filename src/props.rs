@@ -563,6 +563,52 @@ pub const STATE_ITEM_PROPS: &[PropDef] = &[
 
 /// The SysML relation vocabulary, verb stems. Read tail-to-head:
 /// `r2 -> r1 derive` is r2 derives from r1.
+pub const RACK_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the frame.",
+    },
+    PropDef {
+        name: "units",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "units: <count>",
+        doc: "How tall the frame is, in rack units. 42 by default.",
+    },
+    PropDef {
+        name: "cell",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "cell: <width> <height>",
+        doc: "Width of the frame and the height of one rack unit.",
+    },
+    PropDef {
+        name: "ruler",
+        alias: false,
+        ctx: Ctx::Both,
+        words: TOGGLE,
+        syntax: "ruler: <on|off>",
+        doc: "Unit numbers down the rails. On by default.",
+    },
+];
+
+pub const RACK_ITEM_PROPS: &[PropDef] = &[PropDef {
+    name: "u",
+    alias: false,
+    ctx: Ctx::Node,
+    words: &[],
+    syntax: "u: <lowest> <highest>",
+    doc: "The inclusive span of rack units a device occupies, counted from **1 \
+          at the bottom** as a rack is. `u: 12` is a single unit. Usually \
+          written positionally — `device srv \"Compute node\" 38 41`.",
+}];
+
 pub const RADAR_PROPS: &[PropDef] = &[
     PropDef {
         name: "title",
@@ -1117,6 +1163,21 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
             prop: "bits",
             arity: 2,
         }],
+        members: false,
+        alt_items: &[],
+        edge_slots: &[],
+    },
+    #[cfg(feature = "rack")]
+    ArchetypeDef {
+        name: "rack",
+        item: "device",
+        doc: "A rack elevation. Units are numbered from 1 at the **bottom**, \
+              as a rack is, and a device occupies an inclusive span of them. \
+              Empty units are left empty: unlike a packet, a rack with gaps is \
+              a rack with room, not a rack that does not add up.",
+        props: RACK_PROPS,
+        item_props: RACK_ITEM_PROPS,
+        slots: &[Slot { prop: "u", arity: 2 }],
         members: false,
         alt_items: &[],
         edge_slots: &[],

@@ -1082,6 +1082,58 @@ field urg   "Urgent pointer"      144 159
 
 </details>
 
+### `type rack`
+
+A rack elevation. Units are numbered from 1 at the **bottom**, as a rack is, and a device occupies an inclusive span of them. Empty units are left empty: unlike a packet, a rack with gaps is a rack with room, not a rack that does not add up.
+
+```
+device <id> ["label"] <u> <u>
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the frame. |
+| `units` | `units: <count>` | How tall the frame is, in rack units. 42 by default. |
+| `cell` | `cell: <width> <height>` | Width of the frame and the height of one rack unit. |
+| `ruler` | `ruler: <on\|off>` | Unit numbers down the rails. On by default. |
+
+On a `device` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `u` | node | `u: <lowest> <highest>` | The inclusive span of rack units a device occupies, counted from **1 at the bottom** as a rack is. `u: 12` is a single unit. Usually written positionally — `device srv "Compute node" 38 41`. |
+
+<details>
+<summary>A complete file — <code>examples/rack.bd</code></summary>
+
+```
+// A rack elevation. Units count from 1 at the bottom, as a rack is labelled —
+// and a device occupies an inclusive span of them (W-044).
+type rack {
+  title: "Rack A3 — capture row"
+  units: 24
+  cell: 280 20
+  ruler: on
+}
+
+graph { background: #0b1120 padding: 28 }
+
+style device  { fill: #1e293b stroke: #334155 1 radius: 3 font: 12 #e2e8f0 }
+style network extends device { fill: #0c2a3e stroke: #38bdf8 1 }
+style power   extends device { fill: #422006 stroke: #f59e0b 1 }
+
+// `device <id> ["label"] <lowest> <highest>`
+device tor    "Top-of-rack switch"   .network 24 24
+device patch  "Patch panel"          .network 23 23
+device proc01 "snds-p01-proc01"               19 22
+device proc02 "snds-p01-proc02"               15 18
+device cap01  "hp-capture02"                  11 14
+device store  "Storage shelf"                  6 9
+device ups    "UPS"                  .power     1 4
+```
+
+</details>
+
 ### `type radar`
 
 Axes radiating from a centre, one closed polygon per series. Every axis shares one scale: the shape a reader compares is only meaningful if a ring means the same thing all the way round.

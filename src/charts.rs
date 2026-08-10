@@ -387,6 +387,138 @@ struct Granularity {
     step: u32,
 }
 
+/// A rack elevation: a numbered frame, devices occupying spans of units.
+///
+/// Units count from **1 at the bottom**, which is how a rack is labelled and
+/// how anyone standing in front of one reads it. Getting that inverted would
+/// produce a diagram that is right about everything except where to put your
+/// hands.
+#[cfg(feature = "rack")]
+pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
+    let cfg = &diagram.archetype_props;
+    let theme = Theme::of(&opts);
+    let def = crate::check::archetype_of(diagram);
+
+    let units = number(cfg, "units", 42.0).max(1.0) as u32;
+    let frame_w = setting(cfg, "cell")
+        .and_then(|v| v.first())
+        .and_then(|v| v.as_num())
+        .unwrap_or(260.0)
+        .max(60.0);
+    let unit_h = setting(cfg, "cell")
+        .and_then(|v| v.get(1))
+        .and_then(|v| v.as_num())
+        .unwrap_or(18.0)
+        .max(6.0);
+    let ruler = toggle(cfg, "ruler", true);
+    let title = text(cfg, "title");
+
+    let base = registry.resolve(Style::node_defaults(), def.item, &[], &[])?;
+    let title_h = if title.is_some() {
+        TITLE_SIZE * 2.0
+    } else {
+        0.0
+    };
+    let gutter = if ruler {
+        text_width(&[format!("{units}")], 9.0) + 10.0
+    } else {
+        0.0
+    };
+    let top = title_h;
+
+    // U1 is the bottom row, so a unit's y grows as its number shrinks.
+    let row_y = |u: u32| -> f64 { top + (units.saturating_sub(u)) as f64 * unit_h };
+
+    let mut nodes = Vec::new();
+    let mut groups = Vec::new();
+    let mut guides = Vec::new();
+    let mut annotations = Vec::new();
+
+    if let Some(title) = title {
+        annotations.push(Annotation {
+            text: title,
+            x: 0.0,
+            y: TITLE_SIZE,
+            anchor: Anchor::Start,
+            size: TITLE_SIZE,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    groups.push(PlacedGroup {
+        lines: Vec::new(),
+        rect: Rect {
+            x: gutter,
+            y: top,
+            w: frame_w,
+            h: units as f64 * unit_h,
+        },
+        style: registry.resolve(Style::group_defaults(), "group", &[], &[])?,
+    });
+
+    if ruler {
+        let rail = if theme.dark { "#1e293b" } else { "#e4e4e7" };
+        for u in 1..=units {
+            let y = row_y(u);
+            // Every unit is numbered, as a real rail is — the number is what
+            // you count against when you are holding a server.
+            annotations.push(Annotation {
+                text: format!("{u}"),
+                x: gutter - 4.0,
+                y: y + unit_h * 0.5 + 3.0,
+                anchor: Anchor::End,
+                size: 9.0,
+                color: theme.muted.clone(),
+                weight: "400".into(),
+                family: family(&base),
+            });
+            guides.push(Guide {
+                from: (gutter, y),
+                to: (gutter + frame_w, y),
+                color: rail.to_string(),
+                width: 0.5,
+                dash: None,
+            });
+        }
+    }
+
+    for node in &diagram.nodes {
+        let style = registry.resolve(
+            Style::node_defaults(),
+            def.item,
+            &node.classes,
+            &node.props_for(def),
+        )?;
+        let Some((low, high)) = style.u else { continue };
+        let label = node.label.clone().unwrap_or_else(|| node.id.value.clone());
+        let span = high.saturating_sub(low) + 1;
+
+        nodes.push(PlacedNode {
+            lines: vec![label],
+            rect: Rect {
+                x: gutter + 2.0,
+                y: row_y(high),
+                w: frame_w - 4.0,
+                h: span as f64 * unit_h,
+            },
+            style,
+        });
+    }
+
+    Ok(Layout {
+        guides,
+        polylines: Vec::new(),
+        groups,
+        nodes,
+        edges: Vec::new(),
+        opts,
+        chart: Chart::Free,
+        annotations,
+    })
+}
+
 /// Axes radiating from a centre, one closed polygon per series.
 ///
 /// Every axis shares one scale. A radar whose axes each normalised themselves

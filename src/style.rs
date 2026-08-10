@@ -155,6 +155,9 @@ pub struct Style {
     pub verify: Option<String>,
     /// `type requirements` — what a relation asserts, read tail to head.
     pub link: Option<String>,
+    /// `type rack` — the inclusive span of rack units a device occupies,
+    /// counted from 1 at the bottom.
+    pub u: Option<(u32, u32)>,
     /// `type journey` — one score per actor, in the order `actors` names them.
     pub scores: Option<Vec<f64>>,
     /// `type kanban` — a column's work-in-progress limit. On the cascade like
@@ -225,6 +228,7 @@ impl Style {
             risk,
             verify,
             link,
+            u,
             scores,
             limit,
             guard,
@@ -427,6 +431,14 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
         "link" => style.link = first.and_then(|x| x.as_word()).map(String::from),
         "limit" => style.limit = first.and_then(|x| x.as_num()),
         "scores" => style.scores = Some(v.iter().filter_map(|x| x.as_num()).collect()),
+        "u" => {
+            let a = first.and_then(|x| x.as_num()).unwrap_or(1.0).max(0.0) as u32;
+            let b = v
+                .get(1)
+                .and_then(|x| x.as_num())
+                .map_or(a, |n| n.max(0.0) as u32);
+            style.u = Some((a.min(b), a.max(b)));
+        }
         "description" | "desc" => {
             style.description = first.and_then(|x| x.as_text()).map(String::from)
         }

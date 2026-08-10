@@ -633,6 +633,81 @@ fn a_packet_field_needs_bits() {
     assert!(err("type packet\nnode a \"A\"").contains("has no `bits`"));
 }
 
+// ---------------------------------------------------------------------- W-044
+
+#[test]
+fn a_rack_counts_from_one_at_the_bottom() {
+    // The one thing this archetype can get wrong in a way that still looks
+    // right: a rack labelled top-down is correct about everything except
+    // where to put your hands.
+    let l = build(
+        "type rack { units: 10 cell: 200 20 ruler: off }\n\
+         device low \"Low\" 1 1\n\
+         device high \"High\" 10 10\n",
+    );
+
+    assert_eq!(l.nodes.len(), 2);
+    assert!(
+        l.nodes[0].rect.y > l.nodes[1].rect.y,
+        "U1 sits below U10: {:?}",
+        l.nodes.iter().map(|n| n.rect.y).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn a_device_is_as_tall_as_the_units_it_occupies() {
+    let l = build(
+        "type rack { units: 10 cell: 200 20 ruler: off }\n\
+         device one \"1U\" 1 1\n\
+         device four \"4U\" 5 8\n",
+    );
+    assert_eq!(l.nodes[0].rect.h, 20.0);
+    assert_eq!(l.nodes[1].rect.h, 80.0, "U5 through U8 inclusive is four");
+}
+
+#[test]
+fn every_unit_is_numbered_on_the_rail() {
+    // A rail with every number is what you count against while holding a
+    // server; a rail labelled every five is a rail you have to do sums on.
+    let l = build("type rack { units: 6 cell: 200 20 }\ndevice a \"A\" 1 1");
+    let rail: Vec<&str> = l
+        .annotations
+        .iter()
+        .map(|a| a.text.as_str())
+        .filter(|t| t.parse::<u32>().is_ok())
+        .collect();
+    for u in ["1", "2", "3", "4", "5", "6"] {
+        assert!(rail.contains(&u), "U{u} missing from {rail:?}");
+    }
+}
+
+#[test]
+fn a_rack_refuses_what_cannot_physically_hold() {
+    let e = err("type rack { units: 10 }\ndevice a \"A\" 1 4\ndevice b \"B\" 3 6");
+    assert!(e.contains("overlap"), "{e}");
+    assert!(e.contains("cannot share a unit"), "{e}");
+
+    let e = err("type rack { units: 10 }\ndevice a \"A\" 8 12");
+    assert!(e.contains("past the top of a 10U frame"), "{e}");
+
+    let e = err("type rack { units: 10 }\ndevice a \"A\" 0 2");
+    assert!(e.contains("counts from 1"), "{e}");
+
+    let e = err("type rack\ndevice a \"A\"");
+    assert!(e.contains("has no `u`"), "{e}");
+}
+
+#[test]
+fn empty_units_are_room_not_a_mistake() {
+    // A packet with unassigned bits does not add up; a rack with empty units
+    // has space. The same shape of gap, two different meanings.
+    let d = diags("type rack { units: 10 }\ndevice a \"A\" 1 2\ndevice b \"B\" 7 8");
+    assert!(
+        !d.iter().any(|x| x.message.contains("unassigned")),
+        "{d:?}"
+    );
+}
+
 // ---------------------------------------------------------------------- W-046
 
 #[cfg(test)]
@@ -1128,6 +1203,7 @@ fn each_data_property_belongs_to_exactly_the_genres_that_read_it() {
         ("value", &["pie", "sankey", "treemap"][..]),
         ("bits", &["packet"]),
         ("bytes", &["bytefield"]),
+        ("u", &["rack"]),
         ("x", &["quadrant"]),
         ("y", &["quadrant"]),
         ("wave", &["wave"]),

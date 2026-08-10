@@ -44,6 +44,7 @@ all-archetypes = [
     "kanban",
     "journey",
     "radar",
+    "rack",
     "class",
     "state",
 ]
@@ -65,6 +66,7 @@ requirements = []
 kanban = []
 journey = []
 radar = []
+rack = []
 class = []
 state = []
 
