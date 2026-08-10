@@ -25,7 +25,10 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**Nothing is planned. No question is open and nothing is blocked.**
+**Nothing is planned. One question is open (`Q-005`, the licence) and nothing
+is blocked.** Thirty ideas were triaged on 2026-08-10 — `I-023` … `I-052` —
+and the audience was settled: *first right for its author, then distributable*,
+which is the order that survives.
 Twenty-eight genres plus `free` ship, both editors have an extension, and the
 library renders SVG and PDF. (Earlier lines in this file said "thirty"; the
 table in `props.rs` has twenty-nine `ArchetypeDef` entries, one of them `free`.) The parked ideas were
@@ -34,6 +37,12 @@ became a work item, what was not was discarded, and the one language question
 the review raised was answered the same day (`D-023`). One idea is still parked,
 on purpose — `I-021`, because nobody has chosen which part of BPMN is the useful
 part, and that has to be decided before it can be costed.
+
+### Questions
+
+| id | state | title | notes |
+|---|---|---|---|
+| `Q-005` | open | Is the proprietary licence (`D-020`) final? | The whole distribution half of the 2026-08-10 triage — `I-023` Markdown, `I-024` a public playground, `I-025` released binaries — assumes a distribution the current licence forbids. It was decided and changed once already on the same day, so it is worth settling **before** any of that is built rather than after. |
 
 ### Work planned
 
@@ -216,5 +225,43 @@ Nothing is marked `landed` without a commit to point at.
 | `I-018` | promoted | `type venn` — became `W-053`. Split out of `I-012` first, which is what made it visible that it is a geometry problem and not a chart |
 | `I-019` | promoted | `type kanban` — became `W-050` |
 | `I-020` | promoted | `type journey` — became `W-052` |
-| `I-021` | parked | `type bpmn` — the notation is large and mostly ceremony. **The only idea still parked**, and deliberately: which part of it is the useful part has to be chosen before the work can be costed, and nobody has chosen |
+| `I-021` | parked | `type bpmn` — the notation is large and mostly ceremony: which part of it is the useful part has to be chosen before the work can be costed, and nobody has chosen |
 | `I-022` | promoted | `type requirements` — became `W-051` |
+
+Thirty were put one by one on 2026-08-10, against what Mermaid, PlantUML, D2,
+Graphviz, Structurizr and Excalidraw do. Twenty-two were kept, seven refused,
+one left undecided. A refusal is recorded with its reason, so it is not
+proposed again from scratch.
+
+| id | state | title |
+|---|---|---|
+| `I-023` | parked | **Markdown rendering** — a ` ```bgraph ` block previewed in VS Code *and* Zed, plus a **Typst package** so a document calls bgraph instead of embedding a pre-rendered SVG. Mermaid is not better than bgraph; it is rendered by GitHub, and that is the whole adoption gap |
+| `I-024` | parked | **wasm build and a static playground** — try it without installing, which is what keeps Mermaid and D2 alive. `render_source` already does no I/O |
+| `I-025` | parked | **Pre-built binaries per platform**, from the CI that already exists |
+| `I-026` | discarded | Being a Kroki backend — no interest in inserting into that ecosystem |
+| `I-027` | parked | **A packaged CI action**: render every `.bd` in a repository and fail when a committed `.svg` has drifted. The problem this project actually hit |
+| `I-028` | parked | **`include`** — a dedicated style file (`.bds`), with language-server support of its own, *and* the ability to import another `.bd`. The extension carries the promise, the way `-o` picks the writer. Thirty-three examples each redeclare their dark theme by hand today |
+| `I-029` | parked | **Named themes** — light, dark, print, validated for contrast as the categorical palette already is, plus `--theme` so one file renders both ways without being edited |
+| `I-030` | parked | **Reusable components** — define a shape once, instantiate it |
+| `I-031` | discarded | One model, several views (the Structurizr idea) — a file draws one diagram; several views are several files over a shared `include` |
+| `I-032` | parked | **Imported identifiers are prefixed by the file** — `core.api`, with `as` to rename. Carries a real conflict to settle first: `.` already means a class reference, so the access syntax cannot simply be a dot |
+| `I-033` | parked | **`bgraph layout`** — auto-placement as a *one-time source transformation*: it writes anchors into the file, and the engine still places nothing at render time. Optional, which is what keeps it clear of `I-004`: the objection it answers is "you have to place everything yourself", and it answers it without the engine ever deciding anything |
+| `I-034` | parked | **Alignment constraints** — `align-group` *and* `same-width`. The ground only a declared-layout tool can hold, since every competitor auto-places |
+| `I-035` | parked | **A declared grid** — `at (col 3, row 2)`, the step set once in `graph`. Interacts with `I-033` and `I-034`; the three are one design, not three |
+| `I-036` | discarded | Relative units (`10%`, `2fr`) — a percentage of what? Every answer is defensible, so none is obvious, and a unit whose meaning is guessed is the opposite of what this language does |
+| `I-037` | parked | **`explain`** — where a box's position and each of its colours came from, layer by layer. Both as a command and in the editor's hover, which already reports the resolved paint but not where any of it came from |
+| `I-038` | discarded | Clickable links — an interactive SVG assumes a viewer that print and PDF do not have |
+| `I-039` | discarded | Tooltips — refused for the same reason as `I-038` |
+| `I-040` | parked | **Accessibility** — `<title>`, `<desc>` and ARIA derived from what the file already says, so a screen reader can read a diagram, plus a general `description` property for what a shape *means*. No competitor does this seriously, and it suits a project that already refuses unreadable colour |
+| `I-041` | parked | **PNG**, behind its own `png` feature — `resvg` is already in the tree for the window, and someone rendering images in CI does not need a window. Would narrow `X-017` |
+| `I-042` | parked | **Layers and steps** — a diagram told in stages. **Undecided**, honestly: neither promoted nor refused |
+| `I-043` | parked | **Sketch mode** — `graph { sketch: on }`. A sketched architecture says "this is a proposal" where a crisp one says "this is decided", which is information rather than only style. The noise must be **deterministic**, or the same file renders to different bytes — a bug this project has already had once |
+| `I-044` | discarded | DOT or TikZ output — SVG and PDF cover screen and print; DOT would throw away the declared placement that is the point |
+| `I-045` | parked | **Layout as JSON** — the solved rectangles, routed edges and placed labels, so another program can consume the geometry without knowing the language. Extends the embedding promise |
+| `I-046` | discarded | Reading SQL or nested JSON — a pipe and `jq` do it, and the day bgraph reads SQL it owes an opinion on drivers, credentials and time zones |
+| `I-047` | parked | **`top n`** in a binding — keep the largest n rows and fold the rest into one. The palette diagnostic already *advises* this without being able to do it |
+| `I-048` | parked | **A genre that reads a data file directly** — `series from "sales.csv"`. Carries a consequence worth stating: a file that reads the disk at render time stops being autonomous, which is the argument that refused `I-046` |
+| `I-049` | parked | **`bgraph init <genre>`** — a skeleton derived from the same tables the reference and completion read, so it cannot go stale. Twenty-eight genres is more than anyone remembers |
+| `I-050` | parked | **Visual diff** — two renders, one image showing what moved, for review |
+| `I-051` | parked | **Rich terminal diagnostics** — the source line and a caret, as `rustc` does, with `--ci` for the flat `file:line:col` form editors and build systems expect |
+| `I-052` | parked | **`watch` over a directory** — both readings: a build loop that regenerates what changes, and the window following it |
