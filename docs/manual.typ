@@ -637,6 +637,7 @@ bgraph diagram.bd -o diagram.pdf
 bgraph watch diagram.bd
 bgraph check diagram.bd
 bgraph fmt diagram.bd
+bgraph view diagram.svg
 ```
 
 The output extension picks the writer. A flag would be a second way of saying
@@ -661,6 +662,11 @@ reload, or zooming while editing would be pointless.
 `watch --data q3.json` previews a *filled* template, re-reading the data on
 every request — so editing the numbers reloads too. Without data it draws the
 shape, holes and all, which is what you are editing before the data exists.
+
+`view` is the same page pointed at a picture rather than a source. An `.svg` is
+served as it is, so it works on a file bgraph never wrote — and because the
+reload follows the file's timestamp, it keeps up with whatever is regenerating
+it.
   ],
   [
 *The editors*

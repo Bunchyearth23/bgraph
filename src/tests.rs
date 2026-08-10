@@ -817,6 +817,39 @@ fn every_example_is_in_the_shape_the_formatter_writes() {
     }
 }
 
+// ---------------------------------------------------------------------- W-066
+
+#[test]
+fn the_viewer_shows_a_picture_it_did_not_draw() {
+    // An `.svg` is already the picture. Serving it as it is means the viewer
+    // works on a file bgraph never wrote — and since the reload is driven by
+    // the file's timestamp, it follows another tool regenerating it.
+    let dir = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/examples"));
+    let svg = dir.join("venn.svg");
+
+    let served = crate::watch::render_source(&svg, None).expect("serves");
+    let on_disk = std::fs::read_to_string(&svg).expect("readable");
+    assert_eq!(served, on_disk, "verbatim, not re-rendered");
+
+    // And a source is still rendered, so one command covers both.
+    let rendered = crate::watch::render_source(&dir.join("venn.bd"), None).expect("renders");
+    assert!(rendered.starts_with("<svg"));
+}
+
+#[test]
+fn the_extension_decides_what_the_viewer_is_looking_at() {
+    // The same rule `-o` uses: a flag would be a second way of saying what the
+    // filename already says.
+    use std::path::Path;
+    assert!(crate::watch::is_svg(Path::new("a.svg")));
+    assert!(
+        crate::watch::is_svg(Path::new("A.SVG")),
+        "case is not meaning"
+    );
+    assert!(!crate::watch::is_svg(Path::new("a.bd")));
+    assert!(!crate::watch::is_svg(Path::new("svg")));
+}
+
 // ---------------------------------------------------------------------- W-062
 
 #[cfg(feature = "csv")]

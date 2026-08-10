@@ -23,9 +23,13 @@ pub fn serve(input: PathBuf, data: Option<PathBuf>, port: u16) -> Result<()> {
     let listener = TcpListener::bind(("127.0.0.1", port))
         .with_context(|| format!("cannot bind 127.0.0.1:{port}"))?;
 
-    println!("bgraph watching {}", input.display());
-    if let Some(path) = &data {
-        println!("  with data from {}", path.display());
+    if is_svg(&input) {
+        println!("bgraph viewing {}", input.display());
+    } else {
+        println!("bgraph watching {}", input.display());
+        if let Some(path) = &data {
+            println!("  with data from {}", path.display());
+        }
     }
     println!("  → http://127.0.0.1:{port}");
 
@@ -71,6 +75,15 @@ fn handle(mut stream: TcpStream, input: &Path, data: Option<&Path>) -> Result<()
 }
 
 pub(crate) fn render_source(input: &Path, data: Option<&Path>) -> Result<String> {
+    // An `.svg` is already the picture, so it is served as it is. The viewer
+    // is the same page either way — pan, zoom, fit, and the view kept across
+    // the reload a save triggers — which is the whole reason it is worth
+    // pointing at a file bgraph did not write.
+    if is_svg(input) {
+        return fs::read_to_string(input)
+            .with_context(|| format!("cannot read {}", input.display()));
+    }
+
     let source =
         fs::read_to_string(input).with_context(|| format!("cannot read {}", input.display()))?;
 
@@ -96,6 +109,15 @@ pub(crate) fn render_source(input: &Path, data: Option<&Path>) -> Result<String>
     let diagram = crate::parser::parse_diagram(&source)?;
     let layout = crate::layout::solve(&diagram)?;
     Ok(crate::render_svg::render(&layout))
+}
+
+/// Whether the file is a picture rather than a source. The extension decides,
+/// as it does for `-o`: a flag would be a second way of saying what the
+/// filename already says.
+pub(crate) fn is_svg(input: &Path) -> bool {
+    input
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("svg"))
 }
 
 fn version(input: &Path) -> String {
