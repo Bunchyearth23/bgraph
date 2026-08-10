@@ -384,6 +384,26 @@ renumber coordinates.
 `top` / `bottom` / `center` (or `middle`) for horizontal ones. It defaults
 to `center`.
 
+### Sketch mode
+
+```bgraph
+graph { sketch: on }
+```
+
+A sketched architecture says *this is a proposal* where a crisp one says *this
+is decided* — information rather than ornament, and the reason it is worth
+having at all.
+
+It is **deterministic**. The wobble is a hash of each shape's own geometry, so
+the same file always produces the same file: the golden test would refuse
+anything else, and a diagram that redrew itself on every save would be
+unreviewable. Two boxes in different places deform differently, which is what
+makes it look drawn rather than stamped.
+
+Only the rectangles are wobbled. A diamond drawn freehand stops reading as a
+decision and a circle stops reading as a circle — a shape whose meaning is its
+outline is not one to wobble.
+
 ### A grid
 
 Declare a step once and place in cells:

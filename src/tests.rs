@@ -7871,3 +7871,65 @@ fn rows_are_numbered_rather_than_named_after_their_labels() {
         .collect();
     assert_eq!(ids, ["row1", "row2"]);
 }
+
+// ------------------------------------------------- sketch mode (I-043)
+
+#[test]
+fn sketch_mode_draws_paths_instead_of_rectangles() {
+    let plain = crate::render_source("node a \"A\"").unwrap();
+    let drawn = crate::render_source("graph { sketch: on }\nnode a \"A\"").unwrap();
+    assert!(plain.contains("<rect"), "{plain}");
+    // `rx=` rather than `<rect`: the canvas background is a rectangle too,
+    // and it is not a shape the author drew.
+    assert!(
+        !drawn.contains("rx="),
+        "a crisp box survived sketch mode: {drawn}"
+    );
+    assert!(drawn.contains("<path d=\"M"), "{drawn}");
+}
+
+#[test]
+fn a_sketch_is_the_same_file_every_time() {
+    // The whole difficulty of the feature. The golden test asserts the output
+    // is byte-identical run to run — and more to the point, a diagram that
+    // redrew itself differently on every save would be unreviewable.
+    let source = "graph { sketch: on }\nnode a \"A\"\nnode b \"B\" right-of a\na -> b";
+    let first = crate::render_source(source).unwrap();
+    for _ in 0..5 {
+        assert_eq!(crate::render_source(source).unwrap(), first);
+    }
+}
+
+#[test]
+fn two_boxes_in_different_places_wobble_differently() {
+    // Otherwise it is a stamp rather than a drawing: every box deformed
+    // identically reads as a font, not as a hand.
+    let svg =
+        crate::render_source("graph { sketch: on }\nnode a \"A\"\nnode b \"B\" right-of a gap 40")
+            .unwrap();
+    let paths: Vec<&str> = svg
+        .match_indices("<path d=\"M")
+        .map(|(i, _)| &svg[i..i + 40])
+        .collect();
+    assert!(paths.len() >= 2, "{paths:?}");
+    // Compare the fractional parts: the two boxes are at different x, so the
+    // *offsets* are what must differ rather than the coordinates.
+    assert_ne!(
+        paths[0].split_whitespace().nth(2),
+        paths[1].split_whitespace().nth(2),
+        "both boxes were deformed identically"
+    );
+}
+
+#[test]
+fn a_shape_whose_meaning_is_its_outline_is_left_alone() {
+    // A diamond drawn freehand stops reading as a decision, and a circle
+    // stops reading as a circle. Only the rectangles are wobbled.
+    let svg =
+        crate::render_source("graph { sketch: on }\nnode a \"A\" { shape: diamond }").unwrap();
+    assert!(svg.contains("<polygon") || svg.contains("<path"), "{svg}");
+    assert!(
+        !svg.contains("Q "),
+        "a diamond was drawn with the freehand bow"
+    );
+}

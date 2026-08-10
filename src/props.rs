@@ -362,6 +362,18 @@ pub const GRAPH_PROPS: &[PropDef] = &[
         doc: "Margin between the drawing and the canvas edge.",
     },
     PropDef {
+        name: "sketch",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &["on", "off"],
+        syntax: "sketch: <on|off>",
+        doc: "Draw as if by hand. A sketched architecture says \"this is a \
+              proposal\" where a crisp one says \"this is decided\" — \
+              information rather than ornament. Deterministic: the wobble is a \
+              hash of each shape's own geometry, so the same file always \
+              produces the same file.",
+    },
+    PropDef {
         name: "grid",
         alias: false,
         ctx: Ctx::Both,
@@ -2150,6 +2162,18 @@ pub const WAVE_PROPS: &[PropDef] = &[
         words: &[],
         syntax: "every: <number>",
         doc: "Label a ruler tick every N periods. 4 by default.",
+    },
+    PropDef {
+        name: "sketch",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &["on", "off"],
+        syntax: "sketch: <on|off>",
+        doc: "Draw as if by hand. A sketched architecture says \"this is a \
+              proposal\" where a crisp one says \"this is decided\" — \
+              information rather than ornament. Deterministic: the wobble is a \
+              hash of each shape's own geometry, so the same file always \
+              produces the same file.",
     },
     PropDef {
         name: "grid",

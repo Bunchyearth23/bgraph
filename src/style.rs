@@ -686,6 +686,10 @@ pub struct GraphOpts {
     pub description: Option<String>,
     /// Column and row step for `at (col 3, row 2)`, when one is declared.
     pub grid: Option<(f64, f64)>,
+    /// Draw as if by hand. A sketched architecture says "this is a proposal"
+    /// where a crisp one says "this is decided", which is information rather
+    /// than ornament.
+    pub sketch: bool,
 }
 
 impl Default for GraphOpts {
@@ -700,6 +704,7 @@ impl Default for GraphOpts {
             title: None,
             description: None,
             grid: None,
+            sketch: false,
         }
     }
 }
@@ -714,6 +719,12 @@ impl GraphOpts {
                 "title" => opts.title = first.and_then(|x| x.as_text()).map(String::from),
                 "description" | "desc" => {
                     opts.description = first.and_then(|x| x.as_text()).map(String::from)
+                }
+                "sketch" => {
+                    opts.sketch = !matches!(
+                        first.and_then(|x| x.as_word()),
+                        Some("off" | "false" | "none")
+                    )
                 }
                 "grid" => {
                     let numbers: Vec<f64> = prop.values.iter().filter_map(|v| v.as_num()).collect();

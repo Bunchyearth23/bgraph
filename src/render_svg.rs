@@ -147,10 +147,12 @@ pub fn render(layout: &Layout) -> String {
         if node.style.shadow == Some(true) {
             needs_shadow = true;
         }
-        body.push_str(&described(
-            &node_shape(node),
-            node.style.description.as_deref(),
-        ));
+        let shape = if layout.opts.sketch {
+            sketch_shape(node)
+        } else {
+            node_shape(node)
+        };
+        body.push_str(&described(&shape, node.style.description.as_deref()));
         body.push_str(&node_label(node));
     }
 
@@ -662,6 +664,101 @@ fn described(shape: &str, description: Option<&str>) -> String {
         return shape.to_string();
     }
     format!("{stripped}><title>{}</title></{tag}>", esc(text))
+}
+
+/// A deterministic offset in `[-amount, amount]`, from a shape's own numbers.
+///
+/// **Not random**, and it cannot be: the golden test asserts the output is
+/// byte-identical run to run, and more to the point a diagram that redrew
+/// itself differently every save would be unreviewable. The wobble is an
+/// FNV-1a hash of the geometry, so the same box always deforms the same way —
+/// and two boxes in different places deform differently, which is what makes
+/// it look drawn rather than stamped.
+fn wobble(seed: &[f64], salt: u64, amount: f64) -> f64 {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325 ^ salt;
+    for value in seed {
+        // Through the bit pattern of the rounded value: two runs must hash
+        // the same, and a float printed and reparsed does not always.
+        for byte in ((value * 64.0).round() as i64).to_le_bytes() {
+            hash ^= byte as u64;
+            hash = hash.wrapping_mul(0x100_0000_01b3);
+        }
+    }
+    let unit = (hash >> 11) as f64 / (1u64 << 53) as f64;
+    (unit * 2.0 - 1.0) * amount
+}
+
+/// A node in sketch mode. Only the rectangular shapes are redrawn: a circle
+/// or a diamond drawn freehand stops being recognisable as one, and a shape
+/// whose meaning is its outline is not one to wobble.
+fn sketch_shape(node: &PlacedNode) -> String {
+    let s = &node.style;
+    match s.shape.unwrap_or(Shape::Rect) {
+        Shape::Rect | Shape::Stadium => {
+            let fill = paint("fill", s.fill.as_deref().unwrap_or("#ffffff"));
+            let stroke = paint("stroke", s.stroke.as_deref().unwrap_or("#1f2937"));
+            let sw = n(s.stroke_width.unwrap_or(1.5));
+            let dash = s
+                .dash_array()
+                .map(|d| format!(r#" stroke-dasharray="{d}""#))
+                .unwrap_or_default();
+            sketched_box(
+                &node.rect,
+                &format!(r#"{fill}{stroke} stroke-width="{sw}"{dash}"#),
+            )
+        }
+        _ => node_shape(node),
+    }
+}
+
+/// A rectangle drawn as if by hand: each corner nudged, each side bowed.
+fn sketched_box(r: &Rect, common: &str) -> String {
+    let a = 2.4;
+    let p = |x: f64, y: f64, salt: u64| {
+        (
+            x + wobble(&[r.x, r.y, r.w, r.h, x], salt, a),
+            y + wobble(&[r.x, r.y, r.w, r.h, y], salt ^ 0x9e37, a),
+        )
+    };
+    let (x0, y0) = p(r.x, r.y, 1);
+    let (x1, y1) = p(r.right(), r.y, 2);
+    let (x2, y2) = p(r.right(), r.bottom(), 3);
+    let (x3, y3) = p(r.x, r.bottom(), 4);
+
+    // A quadratic through the middle of each side, pulled off the straight
+    // line — a hand does not draw a chord, it draws a slight bow.
+    let mid = |ax: f64, ay: f64, bx: f64, by: f64, salt: u64| {
+        (
+            (ax + bx) / 2.0 + wobble(&[ax, ay, bx, by], salt, a * 1.6),
+            (ay + by) / 2.0 + wobble(&[bx, by, ax, ay], salt, a * 1.6),
+        )
+    };
+    let (m0x, m0y) = mid(x0, y0, x1, y1, 11);
+    let (m1x, m1y) = mid(x1, y1, x2, y2, 12);
+    let (m2x, m2y) = mid(x2, y2, x3, y3, 13);
+    let (m3x, m3y) = mid(x3, y3, x0, y0, 14);
+
+    format!(
+        r#"<path d="M {} {} Q {} {} {} {} Q {} {} {} {} Q {} {} {} {} Q {} {} {} {} Z"{common} stroke-linejoin="round"/>"#,
+        n(x0),
+        n(y0),
+        n(m0x),
+        n(m0y),
+        n(x1),
+        n(y1),
+        n(m1x),
+        n(m1y),
+        n(x2),
+        n(y2),
+        n(m2x),
+        n(m2y),
+        n(x3),
+        n(y3),
+        n(m3x),
+        n(m3y),
+        n(x0),
+        n(y0),
+    )
 }
 
 fn node_shape(node: &PlacedNode) -> String {
