@@ -346,6 +346,8 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         "radar" => return crate::charts::radar(diagram, opts, &registry),
         #[cfg(feature = "rack")]
         "rack" => return crate::charts::rack(diagram, opts, &registry),
+        #[cfg(feature = "venn")]
+        "venn" => return crate::charts::venn(diagram, opts, &registry),
         #[cfg(feature = "bytefield")]
         "bytefield" => return crate::charts::bytefield(diagram, opts, &registry),
         #[cfg(feature = "treemap")]

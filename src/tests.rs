@@ -633,6 +633,68 @@ fn a_packet_field_needs_bits() {
     assert!(err("type packet\nnode a \"A\"").contains("has no `bits`"));
 }
 
+// ---------------------------------------------------------------------- W-053
+
+#[test]
+fn two_sets_have_their_lens_solved_to_the_area_asked_for() {
+    // The one thing a venn exists to show. Drawn by eye it is a chart that
+    // lies about its own subject, so the distance is solved, not chosen.
+    let l = build("type venn { radius: 100 }\nset a \"A\" 100\nset b \"B\" 100\na -> b 50");
+
+    let (ra, rb) = (l.nodes[0].rect.w / 2.0, l.nodes[1].rect.w / 2.0);
+    let ax = l.nodes[0].rect.x + ra;
+    let bx = l.nodes[1].rect.x + rb;
+    let d = (bx - ax).abs();
+
+    // Half of each set is shared, so the lens must be half a circle's area.
+    let want = std::f64::consts::PI * ra * rb * 0.5;
+    let got = crate::charts::lens_area(ra, rb, d);
+    assert!(
+        (got - want).abs() / want < 0.02,
+        "lens {got} against {want}, centres {d} apart"
+    );
+}
+
+#[test]
+fn a_circle_is_scaled_by_area_not_by_radius() {
+    // Radius would square every difference: a set twice as big would read as
+    // four times.
+    let l = build("type venn { radius: 100 }\nset a \"A\" 100\nset b \"B\" 25\na -> b 5");
+    let (big, small) = (l.nodes[0].rect.w, l.nodes[1].rect.w);
+    assert!(
+        (big / small - 2.0).abs() < 0.05,
+        "four times the count is twice the width: {big} vs {small}"
+    );
+}
+
+#[test]
+fn a_venn_refuses_what_no_arrangement_can_show() {
+    let e = err("type venn\nset a \"A\" 10");
+    assert!(e.contains("needs two sets"), "{e}");
+
+    let e = err("type venn\nset a \"A\" 1\nset b \"B\" 1\nset c \"C\" 1\nset d \"D\" 1");
+    assert!(e.contains("cannot be drawn as circles"), "{e}");
+    assert!(e.contains("upset"), "the message names the honest alternative: {e}");
+
+    // An overlap bigger than a set is a counting mistake, not a drawing one.
+    let e = err("type venn\nset a \"A\" 10\nset b \"B\" 100\na -> b 50");
+    assert!(e.contains("more than the 10 in `a`"), "{e}");
+
+    let e = err("type venn\nset a \"A\"\nset b \"B\" 5\na -> b 1");
+    assert!(e.contains("has no `count`"), "{e}");
+}
+
+#[test]
+fn three_sets_say_that_their_areas_are_indicative() {
+    // Three circles cannot honour all seven regions. Saying so beats
+    // pretending, and the numbers stay exact.
+    let d = diags("type venn\nset a \"A\" 5\nset b \"B\" 5\nset c \"C\" 5\na -> b 1");
+    assert!(
+        d.iter().any(|x| x.message.contains("indicative")),
+        "{d:?}"
+    );
+}
+
 // ---------------------------------------------------------------------- W-043
 
 #[test]
@@ -1331,6 +1393,8 @@ fn each_data_property_belongs_to_exactly_the_genres_that_read_it() {
         ("bits", &["packet"]),
         ("bytes", &["bytefield"]),
         ("u", &["rack"]),
+        ("count", &["venn"]),
+        ("shared", &["venn"]),
         ("role", &["network"]),
         ("addr", &["network"]),
         ("speed", &["network"]),

@@ -565,6 +565,52 @@ pub const STATE_ITEM_PROPS: &[PropDef] = &[
 /// `r2 -> r1 derive` is r2 derives from r1.
 /// What a box on a topology *is*. Drives the shape, so a reader tells a
 /// router from a storage array before reading the label.
+pub const VENN_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading drawn above the diagram.",
+    },
+    PropDef {
+        name: "radius",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "radius: <number>",
+        doc: "How large the biggest set is drawn. The others are scaled \
+              against it by area, not by radius — a circle read as twice the \
+              size is one with twice the ink in it.",
+    },
+];
+
+pub const VENN_ITEM_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "count",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "count: <number>",
+        doc: "How many things are in the set. Not `size`, which is on the \
+              shared table and means a box's width and height. Usually \
+              written positionally — `set rust \"Rust\" 120`.",
+    },
+    PropDef {
+        name: "shared",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: &[],
+        syntax: "shared: <number>",
+        doc: "How many things two sets have in common, written on a link \
+              between them — `rust -> embedded 30`. With two sets the lens is \
+              solved to that exact area; with three it is labelled but not \
+              solved, because three circles cannot in general be arranged to \
+              honour all seven regions at once.",
+    },
+];
+
 pub const NET_ROLES: &[&str] = &[
     "server", "switch", "router", "firewall", "storage", "client", "cloud",
 ];
@@ -1212,6 +1258,28 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         members: false,
         alt_items: &[],
         edge_slots: &[],
+    },
+    #[cfg(feature = "venn")]
+    ArchetypeDef {
+        name: "venn",
+        item: "set",
+        doc: "Overlapping sets. Two or three of them: with two, the lens is \
+              solved so its **area** is the number you wrote; with three the \
+              overlaps are labelled but arranged rather than solved, because \
+              three circles cannot in general honour all seven regions at \
+              once. Four is refused rather than drawn wrongly.",
+        props: VENN_PROPS,
+        item_props: VENN_ITEM_PROPS,
+        slots: &[Slot {
+            prop: "count",
+            arity: 1,
+        }],
+        members: false,
+        alt_items: &[],
+        edge_slots: &[Slot {
+            prop: "shared",
+            arity: 1,
+        }],
     },
     #[cfg(feature = "network")]
     ArchetypeDef {

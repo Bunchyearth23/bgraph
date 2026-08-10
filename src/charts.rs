@@ -387,6 +387,238 @@ struct Granularity {
     step: u32,
 }
 
+/// The area of the lens between two circles of radii `a` and `b` whose centres
+/// are `d` apart. The standard two-circle formula; it is what makes the
+/// two-set case *solvable* rather than merely arranged.
+#[cfg(feature = "venn")]
+pub(crate) fn lens_area(a: f64, b: f64, d: f64) -> f64 {
+    if d >= a + b {
+        return 0.0;
+    }
+    if d <= (a - b).abs() {
+        return std::f64::consts::PI * a.min(b).powi(2);
+    }
+    let c1 = ((d * d + a * a - b * b) / (2.0 * d * a)).clamp(-1.0, 1.0);
+    let c2 = ((d * d + b * b - a * a) / (2.0 * d * b)).clamp(-1.0, 1.0);
+    a * a * (c1.acos() - c1 * (1.0 - c1 * c1).max(0.0).sqrt())
+        + b * b * (c2.acos() - c2 * (1.0 - c2 * c2).max(0.0).sqrt())
+}
+
+/// The centre distance that makes the lens exactly `want`. Bisection rather
+/// than a closed form, because there is none: the area is monotone in `d`,
+/// which is all a bisection needs.
+#[cfg(feature = "venn")]
+fn distance_for(a: f64, b: f64, want: f64) -> f64 {
+    let (mut lo, mut hi) = ((a - b).abs(), a + b);
+    for _ in 0..60 {
+        let mid = (lo + hi) / 2.0;
+        if lens_area(a, b, mid) > want {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    (lo + hi) / 2.0
+}
+
+/// Overlapping sets.
+///
+/// With **two** sets the lens is solved so its area is the number written —
+/// a Venn diagram whose overlap is drawn by eye is a chart that lies about the
+/// one thing it exists to show. With **three** the overlaps are labelled but
+/// arranged rather than solved, because three circles cannot in general be
+/// placed to honour all seven regions at once; saying so is better than
+/// pretending. Four is refused in `check`.
+#[cfg(feature = "venn")]
+pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
+    use std::collections::HashMap;
+
+    let cfg = &diagram.archetype_props;
+    let theme = Theme::of(&opts);
+    let def = crate::check::archetype_of(diagram);
+    let palette = theme.palette();
+
+    let biggest = number(cfg, "radius", 110.0).max(30.0);
+    let title = text(cfg, "title");
+    let base = registry.resolve(chart_defaults(), def.item, &[], &[])?;
+
+    let mut sets = Vec::new();
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        let style = registry.resolve(
+            chart_defaults(),
+            def.item,
+            &node.classes,
+            &node.props_for(def),
+        )?;
+        let count = style.set_size.unwrap_or(0.0).max(0.0);
+        let colour = style
+            .fill
+            .clone()
+            .unwrap_or_else(|| palette[i.min(palette.len() - 1)].to_string());
+        let name = node.label.clone().unwrap_or_else(|| node.id.value.clone());
+        sets.push((node.id.value.clone(), name, count, colour, style));
+    }
+
+    // Area, not radius: a circle read as twice the size is one with twice the
+    // ink in it. Radius would exaggerate every difference by squaring it.
+    let largest = sets
+        .iter()
+        .map(|(_, _, c, _, _)| *c)
+        .fold(0.0_f64, f64::max)
+        .max(1.0);
+    let radius = |count: f64| biggest * (count / largest).max(0.0).sqrt();
+
+    let index: HashMap<&str, usize> = sets
+        .iter()
+        .enumerate()
+        .map(|(i, (id, _, _, _, _))| (id.as_str(), i))
+        .collect();
+    let mut shared: HashMap<(usize, usize), f64> = HashMap::new();
+    for edge in &diagram.edges {
+        let (Some(&a), Some(&b)) = (
+            index.get(edge.from.as_str()),
+            index.get(edge.to.as_str()),
+        ) else {
+            continue;
+        };
+        let style = registry.resolve(
+            chart_defaults(),
+            "edge",
+            &edge.classes,
+            &edge.effective_props(def.edge_slots),
+        )?;
+        if let Some(n) = style.shared {
+            shared.insert((a.min(b), a.max(b)), n.max(0.0));
+        }
+    }
+
+    let scale = biggest * biggest / largest * std::f64::consts::PI;
+    let centres: Vec<(f64, f64)> = match sets.len() {
+        0 | 1 => vec![(0.0, 0.0)],
+        2 => {
+            let (ra, rb) = (radius(sets[0].2), radius(sets[1].2));
+            let want = shared.get(&(0, 1)).copied().unwrap_or(0.0) * scale;
+            let d = distance_for(ra, rb, want);
+            vec![(0.0, 0.0), (d, 0.0)]
+        }
+        _ => {
+            // Three on an equilateral triangle, sized so each pair overlaps
+            // visibly. Arranged, not solved — and the docs say so.
+            let r = sets
+                .iter()
+                .map(|(_, _, c, _, _)| radius(*c))
+                .fold(0.0_f64, f64::max);
+            let d = r * 1.1;
+            (0..sets.len())
+                .map(|i| {
+                    let a = -std::f64::consts::FRAC_PI_2
+                        + i as f64 * std::f64::consts::TAU / sets.len() as f64;
+                    (d * a.cos(), d * a.sin())
+                })
+                .collect()
+        }
+    };
+
+    let title_h = if title.is_some() {
+        TITLE_SIZE * 2.0
+    } else {
+        0.0
+    };
+    let min_x = centres
+        .iter()
+        .zip(&sets)
+        .map(|((x, _), (_, _, c, _, _))| x - radius(*c))
+        .fold(f64::MAX, f64::min);
+    let min_y = centres
+        .iter()
+        .zip(&sets)
+        .map(|((_, y), (_, _, c, _, _))| y - radius(*c))
+        .fold(f64::MAX, f64::min);
+
+    let mut nodes = Vec::new();
+    let mut annotations = Vec::new();
+
+    if let Some(title) = title {
+        annotations.push(Annotation {
+            text: title,
+            x: 0.0,
+            y: TITLE_SIZE,
+            anchor: Anchor::Start,
+            size: TITLE_SIZE,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    let place = |i: usize| -> (f64, f64) {
+        let (x, y) = centres.get(i).copied().unwrap_or((0.0, 0.0));
+        (x - min_x, y - min_y + title_h + 18.0)
+    };
+
+    for (i, (_, name, count, colour, style)) in sets.iter().enumerate() {
+        let r = radius(*count);
+        let (cx, cy) = place(i);
+        let (opaque, _) = crate::render_svg::split_alpha(colour);
+        nodes.push(PlacedNode {
+            lines: Vec::new(),
+            rect: Rect {
+                x: cx - r,
+                y: cy - r,
+                w: r * 2.0,
+                h: r * 2.0,
+            },
+            style: Style {
+                fill: Some(format!("{opaque}44")),
+                stroke: Some(colour.clone()),
+                stroke_width: Some(style.stroke_width.unwrap_or(1.5)),
+                shape: Some(Shape::Ellipse),
+                ..style.clone()
+            },
+        });
+
+        // The name sits above its circle rather than inside it: the inside is
+        // where the overlaps are, and a name there would compete with them.
+        annotations.push(Annotation {
+            text: format!("{name}  {}", trim_number(*count)),
+            x: cx,
+            y: cy - r - 8.0,
+            anchor: Anchor::Middle,
+            size: 12.0,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    // The shared count goes in the lens, on the line between the two centres.
+    for ((a, b), n) in &shared {
+        let (ax, ay) = place(*a);
+        let (bx, by) = place(*b);
+        annotations.push(Annotation {
+            text: trim_number(*n),
+            x: (ax + bx) / 2.0,
+            y: (ay + by) / 2.0 + 4.0,
+            anchor: Anchor::Middle,
+            size: 12.0,
+            color: ink(&base, &theme),
+            weight: "600".into(),
+            family: family(&base),
+        });
+    }
+
+    Ok(Layout {
+        guides: Vec::new(),
+        polylines: Vec::new(),
+        groups: Vec::new(),
+        nodes,
+        edges: Vec::new(),
+        opts,
+        chart: Chart::Free,
+        annotations,
+    })
+}
+
 /// A rack elevation: a numbered frame, devices occupying spans of units.
 ///
 /// Units count from **1 at the bottom**, which is how a rack is labelled and

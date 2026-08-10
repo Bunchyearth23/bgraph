@@ -169,6 +169,9 @@ pub struct Style {
     pub verify: Option<String>,
     /// `type requirements` — what a relation asserts, read tail to head.
     pub link: Option<String>,
+    /// `type venn` — how many things are in a set, and how many two share.
+    pub set_size: Option<f64>,
+    pub shared: Option<f64>,
     /// `type network` — what the box is, and its address line.
     pub role: Option<NetRole>,
     pub addr: Option<String>,
@@ -247,6 +250,8 @@ impl Style {
             risk,
             verify,
             link,
+            set_size,
+            shared,
             role,
             addr,
             speed,
@@ -453,6 +458,8 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
         "link" => style.link = first.and_then(|x| x.as_word()).map(String::from),
         "limit" => style.limit = first.and_then(|x| x.as_num()),
         "scores" => style.scores = Some(v.iter().filter_map(|x| x.as_num()).collect()),
+        "count" => style.set_size = first.and_then(|x| x.as_num()),
+        "shared" => style.shared = first.and_then(|x| x.as_num()),
         "role" => {
             let word = first.and_then(|x| x.as_word()).unwrap_or_default();
             style.role = Some(match word {

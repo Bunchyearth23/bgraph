@@ -100,6 +100,8 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "rack" => check_rack(diagram, &mut out),
         #[cfg(feature = "network")]
         "network" => check_network(diagram, &mut out),
+        #[cfg(feature = "venn")]
+        "venn" => check_venn(diagram, &mut out),
         #[cfg(feature = "block")]
         "block" => check_block(diagram, &mut out),
         #[cfg(feature = "gantt")]
@@ -736,6 +738,13 @@ fn warn_ignored(diagram: &Diagram, archetype: &str, out: &mut Vec<Diag>) {
             format!("`type {archetype}` draws no edges; this line is ignored"),
         ));
     }
+    warn_ignored_placement(diagram, archetype, out);
+}
+
+/// The half of [`warn_ignored`] that applies to an archetype which *does* read
+/// edges — `venn` carries its overlap counts on them — but still places its
+/// own items.
+fn warn_ignored_placement(diagram: &Diagram, archetype: &str, out: &mut Vec<Diag>) {
     for node in &diagram.nodes {
         if node.placement.is_some() {
             out.push(Diag::warn(
@@ -1228,6 +1237,97 @@ fn check_block(diagram: &Diagram, out: &mut Vec<Diag>) {
                 member.span,
                 "a block carries a `description`, not members".to_string(),
             ));
+        }
+    }
+}
+
+/// A venn refuses what it cannot draw honestly. Two circles can be placed so
+/// the lens has exactly the right area; three cannot in general honour all
+/// seven regions at once, and four have no arrangement at all — so three is
+/// warned about and four is refused rather than drawn wrongly.
+#[cfg(feature = "venn")]
+fn check_venn(diagram: &Diagram, out: &mut Vec<Diag>) {
+    warn_ignored_placement(diagram, "venn", out);
+
+    let where_ = diagram
+        .archetype
+        .as_ref()
+        .map(|a| a.span)
+        .unwrap_or_default();
+    let count = diagram.nodes.len();
+
+    if count < 2 {
+        out.push(Diag::error(
+            where_,
+            format!("a venn needs two sets to overlap; this has {count}"),
+        ));
+    } else if count > 3 {
+        out.push(Diag::error(
+            where_,
+            format!(
+                "{count} sets cannot be drawn as circles — three is the most that can \
+                 be arranged at all, and beyond it there is no arrangement to fall \
+                 back on. An `upset` plot is the honest picture for this many"
+            ),
+        ));
+    } else if count == 3 {
+        out.push(Diag::warn(
+            where_,
+            "with three sets the overlaps are labelled but not solved: three circles \
+             cannot in general honour all seven regions at once, so the areas are \
+             indicative and the numbers are what to read"
+                .to_string(),
+        ));
+    }
+
+    let styles = resolved_nodes(diagram, base_style("venn"));
+    let mut sizes: HashMap<&str, f64> = HashMap::new();
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        match styles.get(i).and_then(|s| s.set_size) {
+            None if !awaits_binding(node, archetype_of(diagram), "count") => out.push(Diag::error(
+                node.id.span,
+                format!(
+                    "`{}` has no `count` — a set with no size cannot be drawn to scale",
+                    node.id.as_str()
+                ),
+            )),
+            None => {}
+            Some(n) => {
+                sizes.insert(node.id.as_str(), n);
+            }
+        }
+    }
+
+    // An overlap larger than either set is not a drawing problem, it is a
+    // counting one — and no arrangement of circles can express it.
+    let def = archetype_of(diagram);
+    for edge in &diagram.edges {
+        let props = edge.effective_props(def.edge_slots);
+        let Some(n) = props
+            .iter()
+            .find(|p| p.name == "shared")
+            .and_then(|p| p.values.first())
+            .and_then(|v| v.as_num())
+        else {
+            continue;
+        };
+        for end in [&edge.from, &edge.to] {
+            if let Some(size) = sizes.get(end.as_str())
+                && n > *size
+            {
+                out.push(Diag::error(
+                    edge.positional_span,
+                    format!(
+                        "`{} -> {}` share {}, more than the {} in `{}` — no arrangement \
+                         of circles can show that",
+                        edge.from.as_str(),
+                        edge.to.as_str(),
+                        crate::charts::trim_number(n),
+                        crate::charts::trim_number(*size),
+                        end.as_str()
+                    ),
+                ));
+            }
         }
     }
 }

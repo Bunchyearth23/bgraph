@@ -1087,6 +1087,53 @@ field urg   "Urgent pointer"      144 159
 
 </details>
 
+### `type venn`
+
+Overlapping sets. Two or three of them: with two, the lens is solved so its **area** is the number you wrote; with three the overlaps are labelled but arranged rather than solved, because three circles cannot in general honour all seven regions at once. Four is refused rather than drawn wrongly.
+
+```
+set <id> ["label"] <count>
+```
+
+```
+<from> -> <to> ["label"] <shared>
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+| `radius` | `radius: <number>` | How large the biggest set is drawn. The others are scaled against it by area, not by radius — a circle read as twice the size is one with twice the ink in it. |
+
+On a `set` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `count` | node | `count: <number>` | How many things are in the set. Not `size`, which is on the shared table and means a box's width and height. Usually written positionally — `set rust "Rust" 120`. |
+| `shared` | edge | `shared: <number>` | How many things two sets have in common, written on a link between them — `rust -> embedded 30`. With two sets the lens is solved to that exact area; with three it is labelled but not solved, because three circles cannot in general be arranged to honour all seven regions at once. |
+
+<details>
+<summary>A complete file — <code>examples/venn.bd</code></summary>
+
+```
+// Two sets, so the lens is *solved*: its area is the number written, not a
+// distance chosen by eye (W-053).
+type venn {
+  title: "Rust users, by what they build"
+  radius: 120
+}
+
+graph { background: #0b1120 padding: 32 }
+style set { font: 12 #e2e8f0 }
+
+set embedded "Embedded" 210
+set web      "Web"      340
+
+// `<from> -> <to> <shared>` — how many are in both.
+embedded -> web 85
+```
+
+</details>
+
 ### `type network`
 
 Network topology: hosts, links and the segments that hold them. Placed by anchors exactly as in `free` — the archetype supplies the vocabulary, the shapes and the diagnostics, and a `group` is a segment or a zone.

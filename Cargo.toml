@@ -46,6 +46,7 @@ all-archetypes = [
     "radar",
     "rack",
     "network",
+    "venn",
     "class",
     "state",
 ]
@@ -69,6 +70,7 @@ journey = []
 radar = []
 rack = []
 network = []
+venn = []
 class = []
 state = []
 
