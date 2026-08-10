@@ -47,8 +47,10 @@ bgraph docs -o docs/reference.md   # regenerate the reference manual
 - **Archetypes** — `type pie` and `type packet` reinterpret the same
   statements as chart data, reusing the whole style cascade.
 - **Editor support** — a tree-sitter grammar and a language server, packaged
-  as a [Zed extension](editors/zed): diagnostics, context-aware completion,
-  hover with resolved geometry, go-to-definition, outline.
+  for [Zed](editors/zed) and [VS Code](editors/vscode), and a few lines of
+  configuration away in Neovim, Helix and Emacs — see
+  [`editors/README.md`](editors/README.md). Diagnostics, context-aware
+  completion, hover with resolved geometry, go-to-definition, outline.
 
 ## Other archetypes
 

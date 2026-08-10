@@ -6511,3 +6511,59 @@ fn the_canvas_in_the_export_is_the_canvas_in_the_svg() {
     assert_eq!(json["canvas"]["width"].as_f64().unwrap(), w);
     assert_eq!(json["canvas"]["height"].as_f64().unwrap(), h);
 }
+
+// ------------------------------------------------- editor setup (I-057)
+
+#[test]
+fn the_editor_guide_points_at_paths_that_exist() {
+    // Written because the first draft of that guide cited
+    // `tree-sitter-bgraph/queries/`, which has never existed — the queries
+    // live beside the Zed extension. A setup guide with a wrong path is worse
+    // than none: it costs the reader the time to discover it is wrong.
+    let guide = include_str!("../editors/README.md");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    let mut checked = 0;
+    for word in guide.split(|c: char| c.is_whitespace() || c == '`' || c == '*') {
+        let word = word.trim_end_matches(['.', ',', ':', ';', ')']);
+        if !word.starts_with("editors/")
+            && !word.starts_with("tree-sitter-bgraph/")
+            && !word.starts_with("src/")
+        {
+            continue;
+        }
+        // A path with a placeholder in it is an instruction, not a claim.
+        if word.contains('<') || word.contains('*') {
+            continue;
+        }
+        assert!(
+            root.join(word).exists(),
+            "the editor guide cites `{word}`, which does not exist"
+        );
+        checked += 1;
+    }
+    assert!(
+        checked >= 4,
+        "only {checked} paths were checked — the guide's \
+                           shape changed and this test stopped looking"
+    );
+}
+
+#[test]
+fn every_editor_the_repository_ships_is_in_the_guide() {
+    // A packaged editor that the guide does not mention is one nobody finds.
+    let guide = include_str!("../editors/README.md");
+    let editors = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/editors"));
+
+    for entry in std::fs::read_dir(editors).expect("an editors directory") {
+        let path = entry.expect("a directory entry").path();
+        if !path.is_dir() {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        assert!(
+            guide.to_lowercase().contains(&name.to_lowercase()),
+            "`editors/{name}` is packaged but the guide never mentions it"
+        );
+    }
+}

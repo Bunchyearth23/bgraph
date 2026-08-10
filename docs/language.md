@@ -437,10 +437,14 @@ diagram.bd:14:3: warning: `fill` has no effect on an edge
 
 ## Editor support
 
-`bgraph-lsp` is a language server for this DSL, packaged for Zed in
-[`editors/zed`](../editors/zed) along with a tree-sitter grammar. It reports
-the same diagnostics as `check`, completes properties and values in context,
-shows a node's resolved position on hover and jumps to declarations.
+`bgraph-lsp` is a language server for this DSL. It reports the same
+diagnostics as `check`, completes properties and values in context, shows a
+node's resolved position on hover and jumps to declarations.
+
+Packaged for [Zed](../editors/zed) and [VS Code](../editors/vscode); Neovim,
+Helix and Emacs each need a few lines of configuration, which
+[`editors/README.md`](../editors/README.md) gives in full alongside where the
+tree-sitter queries live.
 
 Any LSP client can use it — the binary speaks LSP over stdin/stdout with no
-arguments.
+arguments and no configuration file.
