@@ -635,6 +635,7 @@ measuring — otherwise text that is genuinely unreadable gets reported as fine.
 bgraph diagram.bd -o diagram.svg
 bgraph diagram.bd -o diagram.pdf
 bgraph watch diagram.bd
+bgraph watch docs/diagrams
 bgraph check diagram.bd
 bgraph fmt diagram.bd
 bgraph completions fish
@@ -655,6 +656,15 @@ lines. It leaves columns lined up by hand exactly as written — indentation is
 structural and so its business, alignment is taste and is not. `--check`
 reports instead of writing, and exits non-zero, so one command serves a person
 and a build.
+
+Given a **directory**, `watch` is a build loop rather than a view: every `.bd`
+in it is rendered whenever it changes, which is what a repository of sources
+beside their committed pictures needs. `--once` builds and stops, exiting
+non-zero if anything failed, so a person and a build run the same command. One
+broken file never stops the others — mid-edit that is the normal state of the
+file being worked on. `--follow` additionally opens a window on whichever file
+changed last; it is opt-in, because a window that changes subject on its own is
+one you stop trusting.
 
 `init` writes a working file for a genre — the archetype's shape stated from
 the compiler's own tables, over the genre's example — so the first thing you

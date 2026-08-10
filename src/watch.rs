@@ -319,6 +319,129 @@ fn html_escape(s: &str) -> String {
         .replace('>', "&gt;")
 }
 
+// ------------------------------------------------------------ a directory
+
+/// How often a directory is looked at again. Long enough that a build loop
+/// costs nothing on an idle machine, short enough that a save feels answered.
+const POLL: std::time::Duration = std::time::Duration::from_millis(250);
+
+/// Render every `.bd` in `dir` whose picture is missing or older, then keep
+/// doing it as they change.
+///
+/// This is the half of `watch` that is a *build*, not a view: regenerating a
+/// directory of diagrams after editing one of them is the thing this project
+/// did by hand all day, and it is what a repository of `.bd` files beside
+/// their committed `.svg` needs. `--once` makes the same command a build step,
+/// so a CI job and a person run one thing rather than two.
+///
+/// Not recursive, and deliberately: a directory of diagrams is a directory of
+/// diagrams, and walking a whole tree turns a predictable command into one
+/// that can rewrite a file you had forgotten was there.
+pub fn build_dir(dir: &Path, out: Option<&Path>, once: bool) -> Result<()> {
+    let out = out.unwrap_or(dir);
+    if !dir.is_dir() {
+        anyhow::bail!("{} is not a directory", dir.display());
+    }
+    fs::create_dir_all(out).with_context(|| format!("cannot create {}", out.display()))?;
+
+    loop {
+        let mut built = 0;
+        let mut failed = 0;
+
+        for source in sources(dir)? {
+            let target = out.join(
+                source
+                    .with_extension("svg")
+                    .file_name()
+                    .expect("a source has a file name"),
+            );
+            if !outdated(&source, &target) {
+                continue;
+            }
+
+            match render_source(&source, None) {
+                Ok(svg) => {
+                    fs::write(&target, svg)
+                        .with_context(|| format!("cannot write {}", target.display()))?;
+                    println!("{} → {}", source.display(), target.display());
+                    built += 1;
+                }
+                // One broken file must not stop the others: mid-edit, that is
+                // the normal state of the file being worked on, and taking the
+                // loop down with it would end the session.
+                Err(err) => {
+                    eprintln!("{}: {err:#}", source.display());
+                    failed += 1;
+                }
+            }
+        }
+
+        if once {
+            if built == 0 && failed == 0 {
+                println!("{}: everything is up to date", dir.display());
+            }
+            return if failed > 0 {
+                anyhow::bail!("{failed} file{} did not render", plural(failed))
+            } else {
+                Ok(())
+            };
+        }
+        std::thread::sleep(POLL);
+    }
+}
+
+/// The `.bd` files directly in `dir`, in a stable order.
+///
+/// Sorted because the filesystem's order is not one: a build that reports its
+/// work in a different sequence each run is a build whose log cannot be
+/// compared with the last.
+pub fn sources(dir: &Path) -> Result<Vec<PathBuf>> {
+    let mut found: Vec<PathBuf> = fs::read_dir(dir)
+        .with_context(|| format!("cannot read {}", dir.display()))?
+        .filter_map(|entry| entry.ok().map(|e| e.path()))
+        .filter(|path| path.extension().is_some_and(|e| e == "bd"))
+        .collect();
+    found.sort();
+    Ok(found)
+}
+
+/// Whether the picture needs making again. A missing target counts, and so
+/// does one whose mtime cannot be read — doing the work is cheap and being
+/// wrong the other way leaves a stale picture committed.
+fn outdated(source: &Path, target: &Path) -> bool {
+    let Ok(made) = fs::metadata(target).and_then(|m| m.modified()) else {
+        return true;
+    };
+    match fs::metadata(source).and_then(|m| m.modified()) {
+        Ok(edited) => edited > made,
+        Err(_) => true,
+    }
+}
+
+fn plural(n: usize) -> &'static str {
+    if n == 1 { "" } else { "s" }
+}
+
+/// The most recently edited `.bd` in `dir`, for a window that follows one.
+///
+/// Gated with the window because that is its only caller — a build loop
+/// renders everything and has no use for "which one is newest".
+#[cfg(feature = "window")]
+pub(crate) fn newest(dir: &Path) -> Option<PathBuf> {
+    sources(dir)
+        .ok()?
+        .into_iter()
+        .filter_map(|p| {
+            let stamp = fs::metadata(&p).and_then(|m| m.modified()).ok()?;
+            Some((stamp, p))
+        })
+        // `max_by_key` on the path as well as the stamp, so two files saved in
+        // the same tick resolve the same way every run rather than by whatever
+        // order the directory came back in.
+        .max_by_key(|(stamp, path)| (*stamp, path.clone()))
+        .map(|(_, path)| path)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -39,8 +39,25 @@ const GROUND: (u8, u8, u8) = (0x1c, 0x1f, 0x26);
 /// the window down — see the note where it returns — so a caller that carries
 /// on afterwards would hold the window's resources until it exits.
 pub fn show(input: PathBuf, data: Option<PathBuf>) -> Result<()> {
-    let mut viewer = Viewer::new(input, data);
+    run(Viewer::new(input, data))
+}
 
+/// A window on whichever `.bd` in `dir` was edited last.
+///
+/// Opt-in from the command line, and it has to be: a window that changes
+/// subject on its own is one you stop trusting. Asked for outright — while
+/// editing six diagrams in turn — it is exactly right, and the alternative is
+/// six windows.
+pub fn follow(dir: PathBuf) -> Result<()> {
+    let Some(first) = crate::watch::newest(&dir) else {
+        anyhow::bail!("no `.bd` file in {}", dir.display());
+    };
+    let mut viewer = Viewer::new(first, None);
+    viewer.follow = Some(dir);
+    run(viewer)
+}
+
+fn run(mut viewer: Viewer) -> Result<()> {
     let mut window = Window::new(
         "bgraph",
         960,
@@ -114,7 +131,17 @@ pub fn show(input: PathBuf, data: Option<PathBuf>) -> Result<()> {
         // times a second costs nothing and needs no platform-specific code.
         if viewer.checked.elapsed() >= Duration::from_millis(250) {
             viewer.checked = Instant::now();
-            if viewer.stale() {
+            // Following a directory, the subject may have changed as well as
+            // the file. Repointing counts as opening a picture rather than
+            // reloading one, so the view is refitted — keeping a zoom from the
+            // previous diagram would drop the reader somewhere arbitrary in
+            // the new one.
+            let moved = viewer.retarget();
+            if moved {
+                viewer.reload();
+                viewer.placed = false;
+                viewer.fit();
+            } else if viewer.stale() {
                 // The view survives the reload, or zooming while editing would
                 // be pointless — the same rule the web page follows.
                 viewer.reload();
@@ -157,6 +184,8 @@ enum Art {
 
 struct Viewer {
     input: PathBuf,
+    /// The directory being followed, when the window has no fixed subject.
+    follow: Option<PathBuf>,
     data: Option<PathBuf>,
     art: Option<Art>,
     /// The file's modified time when it was last read.
@@ -173,6 +202,7 @@ impl Viewer {
     fn new(input: PathBuf, data: Option<PathBuf>) -> Viewer {
         Viewer {
             input,
+            follow: None,
             data,
             art: None,
             stamp: None,
@@ -209,6 +239,24 @@ impl Viewer {
             Ok(tree) => Art::Tree(Box::new(tree)),
             Err(err) => Art::Failed(format!("the SVG did not parse: {err}")),
         });
+    }
+
+    /// Point at the newest file in the followed directory, if that is a
+    /// different one. Returns whether the subject moved.
+    fn retarget(&mut self) -> bool {
+        let Some(dir) = self.follow.as_ref() else {
+            return false;
+        };
+        match crate::watch::newest(dir) {
+            Some(newest) if newest != self.input => {
+                self.input = newest;
+                true
+            }
+            // A directory that has just lost its last file keeps showing what
+            // it had. Blanking the window would say the diagram was deleted,
+            // which is a stronger claim than "nothing to point at".
+            _ => false,
+        }
     }
 
     fn stale(&self) -> bool {

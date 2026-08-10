@@ -403,6 +403,8 @@ bgraph watch diagram.bd             # show it, and reload when it changes
 bgraph watch diagram.svg            # …a picture works too; the extension decides
 bgraph watch diagram.bd --server    # …the browser preview rather than a window
 bgraph watch diagram.bd --port 9000
+bgraph watch docs/diagrams          # a directory: build every .bd as it changes
+bgraph watch docs/diagrams --once   # …once, non-zero on failure — a build step
 bgraph check diagram.bd             # diagnostics only, no output file
 bgraph check diagram.bd --ci        # …the flat form, whatever stdout is
 bgraph report.bd --data q3.json     # fill a template from a JSON object

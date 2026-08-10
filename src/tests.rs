@@ -6220,3 +6220,107 @@ fn colour_is_absent_when_it_is_not_wanted() {
     let tinted = crate::report::rich("d.bd", source, line, col, &diag, true);
     assert!(tinted.contains('\x1b'), "coloured output has none");
 }
+
+// ------------------------------------------------- watch a directory (I-052)
+
+/// A scratch directory of its own per test, emptied first so a previous run
+/// cannot make this one pass.
+fn scratch(name: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("bgraph-{name}"));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("a scratch directory");
+    dir
+}
+
+#[test]
+fn a_directory_builds_every_diagram_in_it() {
+    let dir = scratch("build-all");
+    std::fs::write(dir.join("one.bd"), "node a \"A\"\n").unwrap();
+    std::fs::write(dir.join("two.bd"), "node b \"B\"\n").unwrap();
+    // Not a source, and must not become one: the loop renders `.bd`, not
+    // whatever else happens to share the directory.
+    std::fs::write(dir.join("notes.md"), "# notes\n").unwrap();
+
+    crate::watch::build_dir(&dir, None, true).expect("the directory should build");
+
+    assert!(dir.join("one.svg").is_file(), "one.svg was not written");
+    assert!(dir.join("two.svg").is_file(), "two.svg was not written");
+    assert!(!dir.join("notes.svg").exists(), "a non-source was rendered");
+}
+
+#[test]
+fn one_broken_file_does_not_stop_the_others() {
+    // Mid-edit, a broken file is the normal state of the one being worked on.
+    // Taking the loop down with it would end the session.
+    let dir = scratch("build-broken");
+    std::fs::write(dir.join("good.bd"), "node a \"A\"\n").unwrap();
+    std::fs::write(dir.join("bad.bd"), "node a \"A\" right-of ghost\n").unwrap();
+
+    let outcome = crate::watch::build_dir(&dir, None, true);
+
+    assert!(
+        dir.join("good.svg").is_file(),
+        "the sound file was not rendered"
+    );
+    assert!(
+        !dir.join("bad.svg").exists(),
+        "the broken file was rendered"
+    );
+    // …and the *command* still fails, or a build step would pass on a
+    // directory half of which does not draw.
+    assert!(outcome.is_err(), "a failed render exited zero");
+}
+
+#[test]
+fn a_picture_already_current_is_not_rewritten() {
+    let dir = scratch("build-current");
+    std::fs::write(dir.join("one.bd"), "node a \"A\"\n").unwrap();
+
+    crate::watch::build_dir(&dir, None, true).unwrap();
+    let first = std::fs::metadata(dir.join("one.svg"))
+        .and_then(|m| m.modified())
+        .unwrap();
+
+    crate::watch::build_dir(&dir, None, true).unwrap();
+    let second = std::fs::metadata(dir.join("one.svg"))
+        .and_then(|m| m.modified())
+        .unwrap();
+
+    assert_eq!(
+        first, second,
+        "an up-to-date picture was written again — a build loop that rewrites \
+         everything every pass is one that never settles"
+    );
+}
+
+#[test]
+fn the_pictures_can_go_somewhere_else() {
+    let dir = scratch("build-out-src");
+    let out = scratch("build-out-dst");
+    std::fs::write(dir.join("one.bd"), "node a \"A\"\n").unwrap();
+
+    crate::watch::build_dir(&dir, Some(&out), true).unwrap();
+
+    assert!(out.join("one.svg").is_file(), "nothing landed in --out");
+    assert!(
+        !dir.join("one.svg").exists(),
+        "the source directory was written to as well"
+    );
+}
+
+#[test]
+fn sources_come_back_in_a_stable_order() {
+    // The filesystem's order is not one, and a build whose log reorders
+    // itself each run is a log that cannot be compared with the last.
+    let dir = scratch("build-order");
+    for name in ["zebra.bd", "alpha.bd", "mid.bd"] {
+        std::fs::write(dir.join(name), "node a \"A\"\n").unwrap();
+    }
+
+    let names: Vec<String> = crate::watch::sources(&dir)
+        .unwrap()
+        .iter()
+        .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(names, ["alpha.bd", "mid.bd", "zebra.bd"]);
+}

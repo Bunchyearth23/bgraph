@@ -47,10 +47,27 @@ struct Cli {
 #[derive(Subcommand, Debug)]
 enum Command {
     /// Show a diagram and reload it when it changes. Takes a `.bd` to render
-    /// or an `.svg` to show as it is — the extension decides
+    /// or an `.svg` to show as it is — the extension decides. Given a
+    /// directory, it becomes a build loop instead: every `.bd` in it is
+    /// rendered as it changes
     Watch {
-        /// Input `.bd` or `.svg` file
+        /// Input `.bd` or `.svg` file, or a directory of `.bd` files
         input: PathBuf,
+
+        /// Where a directory's pictures are written; beside their source
+        /// when omitted. Ignored for a single file, which `-o` already covers
+        #[arg(long = "out", value_name = "DIR")]
+        out: Option<PathBuf>,
+
+        /// Build once and stop, exiting non-zero if anything failed — the
+        /// same command as a build step. Directories only
+        #[arg(long)]
+        once: bool,
+
+        /// Also open a window on whichever file changed last. Off by default:
+        /// a window that changes subject on its own is one you stop following
+        #[arg(long)]
+        follow: bool,
 
         /// Serve the preview over HTTP instead of opening a window — for a
         /// remote machine, a second screen, or a build with no display
@@ -106,6 +123,54 @@ enum Command {
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
+}
+
+/// A directory of diagrams, kept rendered.
+///
+/// The build loop is the whole of it without `--follow`, and that is the
+/// half worth having: regenerating a directory after editing one file is what
+/// a repository of `.bd` files beside their committed `.svg` needs.
+///
+/// `--follow` adds the window, on whichever file changed last. It is opt-in
+/// because a window that changes subject on its own is a window you stop
+/// trusting — but while editing six diagrams in turn it is exactly right, and
+/// the alternative is six windows.
+fn watch_dir(
+    dir: &std::path::Path,
+    out: Option<&std::path::Path>,
+    once: bool,
+    follow: bool,
+) -> Result<i32> {
+    if follow && once {
+        bail!("`--once` builds and stops, so there is nothing for `--follow` to follow");
+    }
+
+    #[cfg(feature = "window")]
+    if follow {
+        if !bgraph::window::available() {
+            bail!(
+                "`--follow` needs a display; without one, build with no flag and open what you want"
+            );
+        }
+        // The loop runs beside the window rather than inside it: the pictures
+        // must keep being written whether or not anyone is looking at one.
+        let building = dir.to_path_buf();
+        let target = out.map(|p| p.to_path_buf());
+        std::thread::spawn(move || {
+            if let Err(err) = watch::build_dir(&building, target.as_deref(), false) {
+                eprintln!("bgraph: the build loop stopped: {err:#}");
+            }
+        });
+        bgraph::window::follow(dir.to_path_buf())?;
+        return Ok(0);
+    }
+    #[cfg(not(feature = "window"))]
+    if follow {
+        bail!("this build has no window — rebuild with `--features window`");
+    }
+
+    watch::build_dir(dir, out, once)?;
+    Ok(0)
 }
 
 /// A working file for a genre, or the list of genres.
@@ -243,10 +308,24 @@ fn run() -> Result<i32> {
     match cli.command {
         Some(Command::Watch {
             input,
+            out,
+            once,
+            follow,
             data,
             port,
             server,
-        }) => return show_or_serve(input, data, port, server),
+        }) => {
+            if input.is_dir() {
+                return watch_dir(&input, out.as_deref(), once, follow);
+            }
+            if once || out.is_some() || follow {
+                bail!(
+                    "`--out`, `--once` and `--follow` are for a directory; \
+                     for one file use `-o` and `bgraph diagram.bd`"
+                );
+            }
+            return show_or_serve(input, data, port, server);
+        }
         Some(Command::Check { input, ci }) => return check_file(&input, ci),
         Some(Command::Fmt { inputs, check }) => return format_files(&inputs, check),
         #[cfg(feature = "completions")]
