@@ -991,14 +991,36 @@ const LOOM: &str = "type harness\n\
      connector j2 \"J2\" right-of j1 {\n  - 1: VCC\n  - 2: RETURN\n}\n";
 
 #[test]
-fn a_wire_states_the_pins_it_lands_on() {
-    // The line joins the two connectors, so the mapping has to be written on
-    // it — implied by where it touches would be implied by nothing.
-    let l = build(&format!("{LOOM}j1 -> j2 \"power\" 1 1"));
-    assert_eq!(l.edges[0].label.as_deref(), Some("power\n1 → 1"));
+fn a_wire_lands_on_the_pin_it_names() {
+    // What `X-016` was about. The wire used to join the two *boxes* and state
+    // its pins in a label; now it leaves the pin row it names and arrives at
+    // the one at the other end, which is what a loom drawing is for.
+    let l = build(&format!("{LOOM}j1 -> j2 \"power\" 1 2\nj1 -> j2 \"ground\" 2 1"));
 
-    let l = build(&format!("{LOOM}j1 -> j2 2 2"));
-    assert_eq!(l.edges[0].label.as_deref(), Some("2 → 2"));
+    assert!(l.edges.is_empty(), "wires are not routed as ordinary edges");
+    assert_eq!(l.polylines.len(), 2, "one polyline per wire");
+
+    let ends = |i: usize| {
+        let p = &l.polylines[i].points;
+        (p[0].1, p[p.len() - 1].1)
+    };
+    let (a_from, a_to) = ends(0);
+    let (b_from, b_to) = ends(1);
+
+    // Pin 1 is above pin 2 in both connectors, and the two wires cross —
+    // which is only visible because each one starts and ends on a row.
+    assert!(a_from < b_from, "pin 1 leaves above pin 2: {a_from} {b_from}");
+    assert!(a_to > b_to, "and arrives below it: {a_to} {b_to}");
+}
+
+#[test]
+fn a_wire_keeps_its_own_label_and_drops_the_pin_pair() {
+    // The geometry says the pins now, so repeating them beside the line would
+    // be the same fact twice.
+    let l = build(&format!("{LOOM}j1 -> j2 \"power\" 1 1"));
+    let texts: Vec<&str> = l.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert!(texts.contains(&"power"), "{texts:?}");
+    assert!(!texts.iter().any(|t| t.contains('→')), "{texts:?}");
 }
 
 #[test]

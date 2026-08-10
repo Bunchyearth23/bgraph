@@ -442,7 +442,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     let machine = item.name == "state";
     let architecture = item.name == "block";
     let topology = item.name == "network";
-    let harness = item.name == "harness";
+
     let dark = opts
         .background
         .as_deref()
@@ -451,6 +451,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     // of the archetype rather than matched against a list of names here — a
     // list like that is one nobody remembers to extend.
     let compartments = item.members;
+    let harness = item.name == "harness";
     // A base that leaves `shape` unset, so a declared one is distinguishable
     // from the default and a state can fall back to a rounded box.
     let node_base = if machine {
@@ -672,15 +673,6 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                 _ => format!("«{link}»"),
             });
         }
-        // Which pins a wire lands on. The line joins the two connectors, not
-        // the two pin rows — so the mapping is stated on the wire rather than
-        // implied by where it touches (see the risk this genre carries).
-        if harness && let Some((from, to)) = style.wire {
-            label = Some(match label {
-                Some(text) if !text.is_empty() => format!("{text}\n{from} → {to}"),
-                _ => format!("{from} → {to}"),
-            });
-        }
         // What a link runs at, bracketed under its label — the same shape the
         // C4 view uses for a protocol, because it is the same kind of fact.
         if topology && let Some(speed) = &style.speed {
@@ -742,8 +734,12 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     let guides = Vec::new();
     let mut annotations = Vec::new();
     let mut rules: Vec<PlacedNode> = Vec::new();
+    // Where every member row ended up, per node. Recorded as it is drawn
+    // rather than recomputed later: a second copy of the row formula is a
+    // second place for the wire and the pin it names to drift apart.
+    let mut member_rows: Vec<Vec<f64>> = vec![Vec::new(); nodes.len()];
     if compartments {
-        for (node, placed) in diagram.nodes.iter().zip(nodes.iter_mut()) {
+        for (n, (node, placed)) in diagram.nodes.iter().zip(nodes.iter_mut()).enumerate() {
             let s = placed.style.clone();
             let font = s.font_size.unwrap_or(14.0);
             let pad = s.padding.unwrap_or(14.0);
@@ -789,6 +785,10 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                     ..Style::default()
                 },
             });
+
+            member_rows[n] = (0..node.members.len())
+                .map(|i| head + 8.0 + (i as f64 + 0.5) * font * 1.45)
+                .collect();
 
             for (i, member) in node.members.iter().enumerate() {
                 annotations.push(Annotation {
@@ -847,12 +847,118 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         }
     }
 
+    // A harness draws its wires **to the pins**, not between the boxes. The
+    // pin rows were recorded as they were laid out, so a wire lands on the
+    // number it names and a reader can follow it with a finger — which is the
+    // whole point of a loom drawing, and what `X-016` said was missing.
+    let mut polylines = Vec::new();
+    if harness {
+        let by_id: HashMap<&str, usize> = diagram
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(i, n)| (n.id.as_str(), i))
+            .collect();
+
+        // Which row carries which pin, per connector.
+        let pin_row: Vec<HashMap<u32, usize>> = diagram
+            .nodes
+            .iter()
+            .map(|node| {
+                node.members
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, m)| pin_number(m.as_str()).map(|p| (p, i)))
+                    .collect()
+            })
+            .collect();
+
+        for (edge, placed) in diagram.edges.iter().zip(edges.iter()) {
+            let (Some(&a), Some(&b)) =
+                (by_id.get(edge.from.as_str()), by_id.get(edge.to.as_str()))
+            else {
+                continue;
+            };
+            let props = edge.effective_props(item.edge_slots);
+            let pins: Vec<u32> = props
+                .iter()
+                .filter(|p| p.name == "wire")
+                .flat_map(|p| p.values.iter())
+                .filter_map(|v| v.as_num())
+                .map(|n| n.max(0.0) as u32)
+                .collect();
+            let (Some(&from_pin), Some(&to_pin)) = (pins.first(), pins.get(1)) else {
+                continue;
+            };
+            let (Some(&ra), Some(&rb)) = (pin_row[a].get(&from_pin), pin_row[b].get(&to_pin))
+            else {
+                continue;
+            };
+            let (Some(&ya), Some(&yb)) = (
+                member_rows[a].get(ra).as_ref(),
+                member_rows[b].get(rb).as_ref(),
+            ) else {
+                continue;
+            };
+
+            // Out of one connector, across, into the other — the way a cable
+            // actually leaves a shell. A straight diagonal would cross every
+            // pin between the two and read as touching them.
+            let (ba, bb) = (nodes[a].rect, nodes[b].rect);
+            let (xa, xb, out) = if bb.cx() >= ba.cx() {
+                (ba.right(), bb.x, 14.0)
+            } else {
+                (ba.x, bb.right(), -14.0)
+            };
+            let mid = (xa + out + xb - out) / 2.0;
+
+            polylines.push(Polyline {
+                points: vec![
+                    (xa, *ya),
+                    (xa + out, *ya),
+                    (mid, *ya),
+                    (mid, *yb),
+                    (xb - out, *yb),
+                    (xb, *yb),
+                ],
+                closed: false,
+                fill: None,
+                stroke: placed.style.stroke.clone(),
+                width: placed.style.stroke_width.unwrap_or(1.4),
+                head: None,
+                dash: placed.style.dash.clone(),
+            });
+
+            // The pin pair is no longer written: the wire touches both, which
+            // says it better than a label beside the line ever did.
+            if let Some(label) = edge.label.as_ref().filter(|l| !l.is_empty()) {
+                annotations.push(Annotation {
+                    text: label.clone(),
+                    x: mid,
+                    y: (ya + yb) / 2.0 - 4.0,
+                    anchor: Anchor::Middle,
+                    size: placed.style.font_size.unwrap_or(11.0),
+                    color: placed
+                        .style
+                        .font_color
+                        .clone()
+                        .unwrap_or_else(|| "#94a3b8".into()),
+                    weight: "400".into(),
+                    family: placed.style.font_family.clone().unwrap_or_default(),
+                });
+            }
+        }
+        // Every wire is drawn above; leaving the routed edges in would draw
+        // each one twice, once between the boxes.
+        edges.clear();
+    }
+
     // After the boxes, so the compartment rules land on top of them.
     nodes.extend(rules);
 
     Ok(Layout {
         guides,
-        polylines: Vec::new(),
+        polylines,
         groups,
         nodes,
         edges,

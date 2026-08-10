@@ -1396,14 +1396,7 @@ fn check_harness(diagram: &Diagram, out: &mut Vec<Diag>) {
             let set = node
                 .members
                 .iter()
-                .filter_map(|m| {
-                    m.as_str()
-                        .trim_start_matches(['-', '+'])
-                        .trim()
-                        .split([':', ' '])
-                        .next()
-                        .and_then(|n| n.parse::<u32>().ok())
-                })
+                .filter_map(|m| pin_number(m.as_str()))
                 .collect();
             (node.id.as_str(), set)
         })

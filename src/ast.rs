@@ -112,6 +112,20 @@ impl NodeDecl {
     }
 }
 
+/// The pin a member line declares: `- 1: +12V` is pin 1.
+///
+/// Shared, because `check` proves a wire lands on a pin that exists and the
+/// layout then draws it there — two readings of the same line, and two
+/// parsers would be two chances to disagree about what a pin is called.
+pub fn pin_number(member: &str) -> Option<u32> {
+    member
+        .trim_start_matches(['-', '+'])
+        .trim()
+        .split([':', ' '])
+        .next()
+        .and_then(|n| n.parse().ok())
+}
+
 /// Positional values fill the archetype's slots in order and are placed
 /// before the inline block, so an explicit property still wins.
 fn fold_positional(

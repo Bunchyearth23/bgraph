@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 
 use serde_json::{Value, json};
+use std::fmt::Write as _;
 
 use crate::ast::Span;
 use crate::check::{self, Severity};
@@ -179,6 +180,10 @@ impl Server {
             "textDocument/hover" => Response::Result(self.hover(params)),
             "textDocument/definition" => Response::Result(self.definition(params)),
             "textDocument/documentSymbol" => Response::Result(self.symbols(params)),
+            "textDocument/signatureHelp" => Response::Result(self.signature(params)),
+            "textDocument/documentColor" => Response::Result(self.colours(params)),
+            "textDocument/colorPresentation" => Response::Result(colour_presentation(params)),
+            "textDocument/documentHighlight" => Response::Result(self.highlights(params)),
 
             _ => Response::Nothing,
         }
@@ -384,7 +389,19 @@ impl Server {
         if words.len() <= 1 && !ends_with_space {
             let mut out: Vec<Value> = props::KEYWORDS
                 .iter()
-                .map(|(name, doc)| completion(name, 14, "keyword", doc))
+                .map(|(name, doc)| {
+                    // The shape each statement takes, so accepting one leaves
+                    // a well-formed line rather than a bare word.
+                    let insert = match *name {
+                        "type" => "type ${1:archetype}$0".to_string(),
+                        "graph" => "graph { $0 }".to_string(),
+                        "style" => "style ${1:name} {\n  $0\n}".to_string(),
+                        "group" => "group ${1:id} \"${2:label}\" {\n  $0\n}".to_string(),
+                        "activate" => "activate ${1:participant} {\n  $0\n}".to_string(),
+                        other => format!("{other} ${{1:id}} \"${{2:label}}\"$0"),
+                    };
+                    snippet(name, 14, "keyword", doc, &insert)
+                })
                 .collect();
 
             // The archetype's own word first; `node` stays available. A second
@@ -397,20 +414,30 @@ impl Server {
                 if def.item != "node" {
                     out.insert(
                         at,
-                        completion(
+                        snippet(
                             def.item,
                             14,
-                            "keyword",
+                            &format!("{} <id> [\"label\"] …", def.item),
                             &format!(
                                 "Declare a {} — what `type {archetype}` calls its elements.",
                                 def.item
                             ),
+                            &item_snippet(def.item, def.slots),
                         ),
                     );
                     at += 1;
                 }
                 for alt in def.alt_items {
-                    out.insert(at, completion(alt.item, 14, "keyword", alt.doc));
+                    out.insert(
+                        at,
+                        snippet(
+                            alt.item,
+                            14,
+                            &format!("{} <id> [\"label\"] …", alt.item),
+                            alt.doc,
+                            &item_snippet(alt.item, alt.slots),
+                        ),
+                    );
                     at += 1;
                 }
             }
@@ -425,6 +452,172 @@ impl Server {
         }
 
         Vec::new()
+    }
+
+    // ----------------------------------------------------- signature help
+
+    /// What the statement under the cursor takes, and which value you are on.
+    ///
+    /// `slice a "A" 4820` is the idiomatic form (`D-015`), and until now the
+    /// only way to learn its shape was to read the manual — the editor knew
+    /// and did not say. The active parameter is counted from the values
+    /// already written, so it walks along as you type.
+    fn signature(&self, params: &Value) -> Value {
+        let Some((text, _index, offset)) = self.doc(params) else {
+            return Value::Null;
+        };
+        let ctx = Context::at(text, offset);
+        if ctx.in_string || ctx.in_comment || ctx.block.is_some() {
+            return Value::Null;
+        }
+
+        let prefix = &text[..offset];
+        let line_start = prefix.rfind('\n').map(|i| i + 1).unwrap_or(0);
+        let line = &prefix[line_start..];
+        let words: Vec<&str> = line.split_whitespace().collect();
+        let Some(&word) = words.first() else {
+            return Value::Null;
+        };
+
+        let archetype = declared_archetype(text);
+        let Some(def) = props::archetype(archetype) else {
+            return Value::Null;
+        };
+        if !def.accepts(word) {
+            return Value::Null;
+        }
+
+        // `<id>` and an optional `"label"` come before the data, so the slots
+        // start at the third word.
+        let slots = def.slots_for(word);
+        if slots.is_empty() {
+            return Value::Null;
+        }
+        let mut parts = vec![format!("{word} <id>"), "[\"label\"]".to_string()];
+        for slot in slots {
+            if slot.arity == props::VARIADIC {
+                parts.push(format!("<{}>…", slot.prop));
+            } else {
+                for _ in 0..slot.arity {
+                    parts.push(format!("<{}>", slot.prop));
+                }
+            }
+        }
+
+        // How many values are already written, ignoring the keyword, the id
+        // and a label — a label is optional, so it only counts if it is there.
+        let has_label = words.get(2).is_some_and(|w| w.starts_with('"'));
+        let written = words.len().saturating_sub(if has_label { 3 } else { 2 });
+        // Clamped to the last slot: a variadic one goes on accepting values,
+        // and pointing past the end would highlight nothing.
+        let active = written.min(parts.len().saturating_sub(3)) + 2;
+
+        let label = parts.join(" ");
+        let mut offsets = Vec::new();
+        let mut at = 0usize;
+        for part in &parts {
+            offsets.push(json!({ "label": [at, at + part.chars().count()] }));
+            at += part.chars().count() + 1;
+        }
+
+        json!({
+            "signatures": [{
+                "label": label,
+                "documentation": { "kind": "markdown", "value": def.doc },
+                "parameters": offsets,
+                "activeParameter": active,
+            }],
+            "activeSignature": 0,
+            "activeParameter": active,
+        })
+    }
+
+    // ---------------------------------------------------------- colours
+
+    /// Every colour literal in the file, so the editor can show a swatch and
+    /// open a picker on it. `#` is only ever a colour here (`D-004`), which is
+    /// what makes a lexical scan safe.
+    fn colours(&self, params: &Value) -> Value {
+        let Some(text) = params["textDocument"]["uri"]
+            .as_str()
+            .and_then(|uri| self.docs.get(uri))
+        else {
+            return json!([]);
+        };
+        let index = LineIndex::new(text);
+        let mut out = Vec::new();
+
+        let bytes = text.as_bytes();
+        let mut i = 0;
+        while i < bytes.len() {
+            if bytes[i] != b'#' {
+                i += 1;
+                continue;
+            }
+            let start = i;
+            let mut end = i + 1;
+            while end < bytes.len() && (bytes[end] as char).is_ascii_hexdigit() {
+                end += 1;
+            }
+            let hex = &text[start + 1..end];
+            i = end.max(start + 1);
+
+            let expand = |s: &str| -> String { s.chars().flat_map(|c| [c, c]).collect() };
+            let (rgb, alpha) = match hex.len() {
+                3 => (expand(hex), "ff".to_string()),
+                4 => (expand(&hex[0..3]), expand(&hex[3..4])),
+                6 => (hex.to_string(), "ff".to_string()),
+                8 => (hex[0..6].to_string(), hex[6..8].to_string()),
+                _ => continue,
+            };
+            let channel = |at: usize, from: &str| {
+                u8::from_str_radix(&from[at..at + 2], 16).unwrap_or(0) as f64 / 255.0
+            };
+            out.push(json!({
+                "range": index.range(Span { start, end }),
+                "color": {
+                    "red": channel(0, &rgb),
+                    "green": channel(2, &rgb),
+                    "blue": channel(4, &rgb),
+                    "alpha": channel(0, &alpha),
+                },
+            }));
+        }
+
+        json!(out)
+    }
+
+    // -------------------------------------------------------- highlights
+
+    /// Every place the identifier under the cursor is written. Reading a
+    /// diagram means following an id around the file, and until now that was
+    /// the editor's find-in-file rather than anything that knew what an id is.
+    fn highlights(&self, params: &Value) -> Value {
+        let Some((text, index, offset)) = self.doc(params) else {
+            return json!([]);
+        };
+        let Some((word, _)) = word_at(text, offset) else {
+            return json!([]);
+        };
+        if word.is_empty() || props::KEYWORDS.iter().any(|(k, _)| *k == word) {
+            return json!([]);
+        }
+
+        let mut out = Vec::new();
+        let bytes = text.as_bytes();
+        let mut from = 0;
+        while let Some(found) = text[from..].find(&word) {
+            let start = from + found;
+            let end = start + word.len();
+            from = end;
+            // Whole words only: `a` must not light up inside `api`.
+            let before_ok = start == 0 || !is_ident_char(bytes[start - 1] as char);
+            let after_ok = end >= bytes.len() || !is_ident_char(bytes[end] as char);
+            if before_ok && after_ok {
+                out.push(json!({ "range": index.range(Span { start, end }), "kind": 1 }));
+            }
+        }
+        json!(out)
     }
 
     // -------------------------------------------------------- hover
@@ -465,6 +658,29 @@ impl Server {
             || text[line_start..span.start].trim_end().ends_with("extends")
         {
             self.describe_style(text, &word)
+        } else if text[line_start..span.start].trim().is_empty()
+            && props::archetype(archetype).is_some_and(|d| d.accepts(&word))
+            && word != "node"
+        {
+            // The archetype's own word, at the start of a statement. Its
+            // positional shape is the thing you actually want here.
+            props::archetype(archetype).map(|def| {
+                let slots = def.slots_for(&word);
+                let mut form = format!("{word} <id> [\"label\"]");
+                for slot in slots {
+                    if slot.arity == props::VARIADIC {
+                        let _ = write!(form, " <{}>…", slot.prop);
+                    } else {
+                        for _ in 0..slot.arity {
+                            let _ = write!(form, " <{}>", slot.prop);
+                        }
+                    }
+                }
+                format!(
+                    "```\n{form}\n```\n\nWhat `type {}` calls its elements.\n\n{}",
+                    def.name, def.doc
+                )
+            })
         } else if let Some((_, doc)) = props::PLACEMENTS.iter().find(|(k, _)| *k == word) {
             Some(doc.to_string())
         } else if let Some((_, doc)) = props::KEYWORDS.iter().find(|(k, _)| *k == word) {
@@ -504,15 +720,30 @@ impl Server {
             out.push_str(&format!("\n\nstyles: {}", classes.join(" ")));
         }
 
-        // Resolved geometry is the thing you actually want when hovering.
+        // Resolved geometry *and* the resolved paint. The cascade is the
+        // thing that is hard to hold in your head — four layers deep, and the
+        // answer was only visible by rendering the file.
         if let Ok(layout) = crate::layout::solve(&diagram)
             && let Some(placed) = layout.nodes.get(i)
         {
             let r = placed.rect;
-            out.push_str(&format!(
-                "\n\n```\nx {:.0}  y {:.0}   {:.0} × {:.0}\n```",
-                r.x, r.y, r.w, r.h
-            ));
+            let s = &placed.style;
+            let mut facts = vec![format!("x {:.0}  y {:.0}   {:.0} × {:.0}", r.x, r.y, r.w, r.h)];
+            if let Some(fill) = &s.fill {
+                facts.push(format!("fill    {fill}"));
+            }
+            if let Some(stroke) = &s.stroke {
+                facts.push(format!(
+                    "stroke  {stroke}{}",
+                    s.stroke_width
+                        .map(|w| format!("  {w}"))
+                        .unwrap_or_default()
+                ));
+            }
+            if let Some(shape) = s.shape {
+                facts.push(format!("shape   {shape:?}").to_lowercase());
+            }
+            out.push_str(&format!("\n\n```\n{}\n```", facts.join("\n")));
         }
 
         Some(out)
@@ -881,7 +1112,58 @@ fn completion(label: &str, kind: u8, detail: &str, doc: &str) -> Value {
         "kind": kind,
         "detail": detail,
         "documentation": { "kind": "markdown", "value": doc },
+        // Alphabetical order puts `align` above the archetype's own word,
+        // which is the one thing you always want first. The kind is a rough
+        // priority, so ordering by it and then by name says what the list is
+        // for rather than what the alphabet is.
+        "sortText": format!("{:02}{label}", 99 - kind),
     })
+}
+
+/// The same, but typing the completion writes the whole form.
+///
+/// This is the ergonomic difference between a list of words and a list of
+/// *statements*: accepting `slice` should leave the cursor in the identifier
+/// with the label already quoted, not leave you to type the rest from memory.
+/// `$1`, `$2` are tab stops; `$0` is where the cursor ends.
+fn snippet(label: &str, kind: u8, detail: &str, doc: &str, insert: &str) -> Value {
+    let mut item = completion(label, kind, detail, doc);
+    item["insertText"] = json!(insert);
+    item["insertTextFormat"] = json!(2);
+    item
+}
+
+/// The form an archetype's item statement takes, as a snippet: the keyword,
+/// an identifier, a quoted label, then one tab stop per positional slot named
+/// after the property it fills.
+fn item_snippet(word: &str, slots: &[props::Slot]) -> String {
+    let mut out = format!("{word} ${{1:id}} \"${{2:label}}\"");
+    for (i, slot) in slots.iter().enumerate() {
+        if slot.arity == props::VARIADIC {
+            let _ = write!(out, " ${{{}:{}…}}", i + 3, slot.prop);
+        } else {
+            for n in 0..slot.arity {
+                let _ = write!(out, " ${{{}:{}}}", i + 3 + n, slot.prop);
+            }
+        }
+    }
+    out.push_str("$0");
+    out
+}
+
+/// The colour a picker produced, written back as the shortest hex that says
+/// it — `#38bdf8` rather than `#38bdf8ff`, since alpha defaults to opaque
+/// (`D-016`).
+fn colour_presentation(params: &Value) -> Value {
+    let c = &params["color"];
+    let byte = |key: &str| (c[key].as_f64().unwrap_or(0.0) * 255.0).round() as u8;
+    let (r, g, b, a) = (byte("red"), byte("green"), byte("blue"), byte("alpha"));
+    let label = if a == 255 {
+        format!("#{r:02x}{g:02x}{b:02x}")
+    } else {
+        format!("#{r:02x}{g:02x}{b:02x}{a:02x}")
+    };
+    json!([{ "label": label }])
 }
 
 fn capabilities() -> Value {
@@ -895,6 +1177,12 @@ fn capabilities() -> Value {
                 "triggerCharacters": [".", ":", " "],
             },
             "hoverProvider": true,
+            // Positional data is the idiomatic form in this language, and it
+            // is the one form nothing could tell you the shape of while you
+            // were typing it.
+            "signatureHelpProvider": { "triggerCharacters": [" "], "retriggerCharacters": [" "] },
+            "colorProvider": true,
+            "documentHighlightProvider": true,
             "definitionProvider": true,
             "documentSymbolProvider": true,
         },
@@ -942,6 +1230,22 @@ fn write_message(writer: &mut impl Write, message: &Value) -> std::io::Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A server holding one document, and the params a request would carry —
+    /// the tests below drive the real handlers rather than their innards.
+    fn server(text: &str) -> Server {
+        let mut docs = HashMap::new();
+        docs.insert("file:///t.bd".to_string(), text.to_string());
+        Server { docs }
+    }
+
+    fn at(text: &str, offset: usize) -> Value {
+        let (line, character) = LineIndex::new(text).line_col(offset);
+        json!({
+            "textDocument": { "uri": "file:///t.bd" },
+            "position": { "line": line, "character": character },
+        })
+    }
 
     #[test]
     fn line_index_round_trips_utf16_positions() {
@@ -1131,6 +1435,116 @@ mod tests {
             .expect("leaf is declared");
         assert!(hover.contains("extends `base`"), "{hover}");
         assert!(hover.contains("shape: cylinder"), "{hover}");
+    }
+
+    #[test]
+    fn signature_help_names_the_slot_you_are_typing() {
+        // The idiomatic form is positional, and it was the one thing nothing
+        // could tell you the shape of while you were writing it.
+        let source = "type packet\nfield sport \"Source port\" 0 ";
+        let help = server(source).signature(&at(source, source.len()));
+
+        let sig = &help["signatures"][0];
+        assert_eq!(
+            sig["label"].as_str().unwrap(),
+            "field <id> [\"label\"] <bits> <bits>"
+        );
+        // Two values written after the label, so the cursor is on the second.
+        assert_eq!(help["activeParameter"].as_u64().unwrap(), 3);
+
+        // Nothing to say where there is no positional shape.
+        let plain = "type class\nclass a \"A\" ";
+        assert!(server(plain).signature(&at(plain, plain.len())).is_null());
+    }
+
+    #[test]
+    fn every_colour_gets_a_swatch() {
+        // `#` is only ever a colour (`D-004`), which is what makes a lexical
+        // scan of the file safe.
+        let source = "graph { background: #0b1120 }\nnode a { fill: #38bdf880 }\n// #not-a-color-here\n";
+        let colours = server(source).colours(&json!({
+            "textDocument": { "uri": "file:///t.bd" }
+        }));
+        let list = colours.as_array().unwrap();
+        // Two colours. `#not-a-color-here` has no hex digits after the `#`
+        // and yields nothing, which is what keeps the scan safe.
+        assert_eq!(list.len(), 2, "{colours}");
+
+        // The alpha channel is read, not assumed.
+        assert_eq!(list[1]["color"]["alpha"].as_f64().unwrap(), 128.0 / 255.0);
+        assert_eq!(list[0]["color"]["alpha"].as_f64().unwrap(), 1.0);
+    }
+
+    #[test]
+    fn a_colour_comes_back_as_the_shortest_hex_that_says_it() {
+        // Alpha defaults to opaque (`D-016`), so an opaque colour does not
+        // need to write it.
+        let opaque = colour_presentation(&json!({
+            "color": { "red": 0.0, "green": 0.0, "blue": 1.0, "alpha": 1.0 }
+        }));
+        assert_eq!(opaque[0]["label"].as_str().unwrap(), "#0000ff");
+
+        let translucent = colour_presentation(&json!({
+            "color": { "red": 1.0, "green": 1.0, "blue": 1.0, "alpha": 0.5 }
+        }));
+        assert_eq!(translucent[0]["label"].as_str().unwrap(), "#ffffff80");
+    }
+
+    #[test]
+    fn highlighting_an_id_finds_it_everywhere_and_only_whole() {
+        // `a` must not light up inside `api`.
+        let source = "node a \"A\"\nnode api \"API\"\na -> api\n";
+        let hits = server(source).highlights(&at(source, 5));
+        assert_eq!(hits.as_array().unwrap().len(), 2, "{hits}");
+    }
+
+    #[test]
+    fn hover_on_an_archetypes_own_word_gives_its_form() {
+        // The word you are least likely to be sure about, and it said nothing.
+        let source = "type pie\nslice a \"A\" 10";
+        let md = server(source).hover(&at(source, 10))["contents"]["value"]
+            .as_str()
+            .unwrap()
+            .to_string();
+        assert!(md.contains("slice <id> [\"label\"] <value>"), "{md}");
+        assert!(md.contains("type pie"), "{md}");
+    }
+
+    #[test]
+    fn hover_on_a_node_shows_the_paint_the_cascade_settled_on() {
+        // Four layers deep, and the answer used to be visible only by
+        // rendering the file.
+        let source = "style node { fill: #123456 }\nnode a \"A\" { stroke: #abcdef 2 }";
+        let on_a = source.find("node a").unwrap() + 5;
+        let md = server(source).hover(&at(source, on_a))["contents"]["value"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        assert!(md.contains("#123456"), "the inherited fill: {md}");
+        assert!(md.contains("#abcdef"), "the declared stroke: {md}");
+    }
+
+    #[test]
+    fn a_completion_writes_the_whole_statement() {
+        // A list of words leaves you to type the rest from memory; a list of
+        // statements does not.
+        let items = server("type pie\n").items_for("type pie\n", "", 9);
+        let slice = items
+            .iter()
+            .find(|i| i["label"] == "slice")
+            .unwrap_or_else(|| panic!("{items:?}"));
+        assert_eq!(slice["insertTextFormat"].as_u64().unwrap(), 2, "a snippet");
+        assert!(
+            slice["insertText"]
+                .as_str()
+                .unwrap()
+                .starts_with("slice ${1:id} \"${2:label}\""),
+            "{slice}"
+        );
+        assert!(
+            slice["insertText"].as_str().unwrap().contains("value"),
+            "the slot is named in the snippet: {slice}"
+        );
     }
 
     #[test]
