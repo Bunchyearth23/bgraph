@@ -2357,15 +2357,19 @@ fn a_device_is_as_tall_as_the_units_it_occupies() {
          device one \"1U\" 1 1\n\
          device four \"4U\" 5 8\n",
     );
-    // A device is inset three pixels on every side, so its stroke sits inside
-    // the frame rather than straddling it (`W-110`) — the height it occupies
-    // is still the units it spans.
-    const INSET: f64 = 3.0;
-    assert_eq!(l.nodes[0].rect.h, 20.0 - INSET * 2.0);
+    // A device spans the full width between the rails, so no unit rule shows
+    // past it, and is inset vertically so one unit reads apart from the next
+    // (`W-123`). The height it occupies is still the units it spans.
+    const GAP: f64 = 2.0;
+    assert_eq!(l.nodes[0].rect.h, 20.0 - GAP * 2.0);
     assert_eq!(
         l.nodes[1].rect.h,
-        80.0 - INSET * 2.0,
+        80.0 - GAP * 2.0,
         "U5 through U8 inclusive is four"
+    );
+    assert_eq!(
+        l.nodes[0].rect.w, 200.0,
+        "rail to rail, so it hides the rules"
     );
 }
 

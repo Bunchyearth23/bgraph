@@ -1390,21 +1390,26 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         let label = node.label.clone().unwrap_or_else(|| node.id.value.clone());
         let span = high.saturating_sub(low) + 1;
 
-        // Inset on **all four** sides. It was two pixels left and right and
-        // nothing top or bottom, so a device in the top or the bottom unit had
-        // its stroke straddling the frame's own and read as breaking out of the
-        // rack — which is what it looked like, because half the stroke was
-        // outside. Three is also enough that an 8px corner clears the dashed
-        // line instead of cutting through it (`W-110`).
-        const INSET: f64 = 3.0;
+        // **Rail to rail, and nothing between.** `W-110` inset the device three
+        // pixels on every side to keep its stroke off the frame's; `W-119` then
+        // took the frame away and left the inset behind, so every unit rule —
+        // which runs the full width between the rails — poked three pixels out
+        // of each side of every device. Rails and rules are `Guide`s and
+        // therefore drawn first, so a device that spans the whole width simply
+        // covers the ones it should hide. Its own border landing on the rail is
+        // not an overhang: that is where a device is screwed to a rack.
+        //
+        // The vertical inset stays, and is what separates one unit from the
+        // next (`W-123`).
+        const GAP: f64 = 2.0;
         nodes.push(PlacedNode {
             id: node.id.as_str().to_string(),
             lines: vec![label],
             rect: Rect {
-                x: gutter + INSET,
-                y: row_y(high) + INSET,
-                w: frame_w - INSET * 2.0,
-                h: (span as f64 * unit_h - INSET * 2.0).max(unit_h / 2.0),
+                x: gutter,
+                y: row_y(high) + GAP,
+                w: frame_w,
+                h: (span as f64 * unit_h - GAP * 2.0).max(unit_h / 2.0),
             },
             style,
         });
