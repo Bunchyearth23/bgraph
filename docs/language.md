@@ -600,7 +600,14 @@ node:
 orders -> billing "charge" .critical { router: ortho, stroke: #f43f5e 2 }
 ```
 
-`router: ortho` produces an elbow (right angles) instead of a straight line.
+`router: ortho` produces right angles instead of a straight line, and it
+**routes around the boxes in the way** rather than through them — shortest
+first, then fewest corners among the paths of that length. It avoids *boxes*,
+not other edges: two lines whose tidiest routes share a channel will share it.
+Where there is no way round at all — a box wholly enclosed by others — the edge
+falls back to a plain elbow and `check` reports that it crosses something,
+because a drawing that admits it is wrong beats a missing edge.
+`examples/ortho.bd` is the worked case.
 Endpoints are clipped against the real shape outline, so arrows meet
 diamonds and ellipses on their edge, not on an invisible bounding box.
 

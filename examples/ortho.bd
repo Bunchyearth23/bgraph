@@ -1,0 +1,30 @@
+// Orthogonal edges that go around what is in the way (W-105). Before it, the
+// router turned one corner between two centres and avoided nothing: `miss`
+// went straight through the cache and `trace` straight through the worker.
+graph { title: "Request path" background: #0b1120 padding: 34 }
+
+style node { fill: #1e293b stroke: #334155 1 font: 13 #e2e8f0 radius: 6 padding: 12 }
+style edge { stroke: #64748b 1.4 font: 11 #94a3b8 router: ortho }
+style hot  { fill: #172554 stroke: #38bdf8 1 }
+
+node client "Client"    at (0, 0)
+node cache  "Cache"     at (210, 0)
+node api    "API"       .hot at (420, 0)
+node queue  "Queue"     at (210, 120)
+node audit  "Audit log" at (0, 240)
+node worker "Worker"    at (210, 240)
+node store  "Postgres"  .hot at (420, 240)
+
+// The cache sits on the line, so the edge goes over it.
+client -> api "miss"
+
+// Nothing between these two, so the router takes no detour.
+api -> store "write"
+
+// The worker sits on the line, so the edge goes under it.
+store -> audit "trace"
+
+// Short hops, each of them clear.
+client -> cache
+cache -> queue
+queue -> worker

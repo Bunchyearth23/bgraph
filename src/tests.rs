@@ -340,11 +340,11 @@ fn ortho_edges_produce_an_elbow() {
     );
     assert_eq!(l.edges[0].style.router, Some(Router::Ortho));
 
+    // One corner, not two. With nothing in the way both are 400 points long,
+    // and `W-105`'s per-corner price is what settles a tie the old mid-point
+    // split decided by construction.
     let svg = render_svg::render(&l);
-    assert!(
-        svg.contains(r#"points="100,50 200,50 200,250 300,250""#),
-        "{svg}"
-    );
+    assert!(svg.contains(r#"points="50,100 50,250 300,250""#), "{svg}");
 }
 
 #[test]
@@ -702,13 +702,74 @@ fn after(source: &str) -> Vec<String> {
 }
 
 #[test]
-fn an_ortho_edge_through_a_box_is_reported() {
-    // `X-004`: the router turns corners and avoids nothing, so it could draw a
-    // line straight through a node and say nothing at all.
-    let found = after(
-        "node a \"A\" at (0, 0)\nnode mid \"in the way\" right-of a gap 40\n\
-         node b \"B\" right-of mid gap 40\na -> b { router: ortho }",
-    );
+fn an_ortho_edge_goes_round_the_box_it_used_to_go_through() {
+    // `X-004`, both halves. This case is what `W-064` added the diagnostic for
+    // — a line drawn straight through `mid` and saying nothing about it — and
+    // since `W-105` the router goes over the top instead, so there is nothing
+    // left to report. The diagnostic did not become wrong; it became rare.
+    let source = "node a \"A\" at (0, 0)\nnode mid \"in the way\" right-of a gap 40\n\
+                  node b \"B\" right-of mid gap 40\na -> b { router: ortho }";
+    assert_eq!(after(source), Vec::<String>::new());
+
+    let l = build(source);
+    let path = &render_svg::route_all(&l)[0].points;
+    let wall = l.nodes[1].rect;
+    for seg in path.windows(2) {
+        let (p, q) = (seg[0], seg[1]);
+        assert!(
+            !(p.0.max(q.0) > wall.x && p.0.min(q.0) < wall.right()
+                && p.1.max(q.1) > wall.y && p.1.min(q.1) < wall.bottom()),
+            "the route still enters `mid`: {path:?}"
+        );
+    }
+    assert!(path.len() > 2, "going round takes a corner: {path:?}");
+}
+
+#[test]
+fn a_routed_path_is_the_same_every_time_it_is_asked_for() {
+    // The determinism the golden test rests on, asserted where it is decided
+    // rather than three files downstream. `W-065` shipped a diagram that
+    // rendered to different bytes run to run because one chart iterated a
+    // `HashMap`; the search in `ortho.rs` has integer costs and settles a tie
+    // by state index for exactly that reason, and nothing here may reintroduce
+    // an unordered container without this failing.
+    let source = "node a \"A\" at (0, 0)\nnode w \"wall\" at (200, -40) { size: 60 200 }\n\
+                  node b \"B\" at (400, 0)\nnode c \"C\" at (400, 300)\n\
+                  a -> b { router: ortho }\na -> c { router: ortho }";
+    let first = render_svg::render(&build(source));
+    for _ in 0..8 {
+        assert_eq!(render_svg::render(&build(source)), first);
+    }
+
+    // And the obstacles are read as a set, not a sequence: the same boxes
+    // declared in another order give the same line.
+    let swapped = "node a \"A\" at (0, 0)\nnode b \"B\" at (400, 0)\n\
+                   node c \"C\" at (400, 300)\nnode w \"wall\" at (200, -40) { size: 60 200 }\n\
+                   a -> b { router: ortho }\na -> c { router: ortho }";
+    let l = build(swapped);
+    let path: Vec<_> = render_svg::route_all(&l)[0].points.clone();
+    let l0 = build(source);
+    assert_eq!(path, render_svg::route_all(&l0)[0].points);
+}
+
+#[test]
+fn a_route_that_cannot_be_found_keeps_the_elbow_and_says_so() {
+    // The router declines past `MAX_OBSTACLES`, because the grid grows as the
+    // square of the box count and is built once per edge. What matters is what
+    // happens *then*: the old elbow is kept and `check::after_layout` reports
+    // the crossing, so the drawing admits it is wrong. Dropping the edge would
+    // be a drawing that lies, which is the worse of the two.
+    let mut source = String::from("node a \"A\" at (0, 0)\n");
+    source.push_str("node mid \"in the way\" at (200, 0) { size: 120 60 }\n");
+    source.push_str("node b \"B\" at (500, 0)\n");
+    // Well clear of the line from `a` to `b`, so the only box in the way is
+    // `mid` and the count is the only thing that changed.
+    for i in 0..70 {
+        source.push_str(&format!("node f{i} \"f\" at (0, {})\n", 400 + i * 40));
+    }
+    source.push_str("a -> b { router: ortho }\n");
+
+    let found = after(&source);
     assert_eq!(found.len(), 1, "{found:?}");
     assert!(found[0].contains("passes through a box"), "{found:?}");
     assert!(

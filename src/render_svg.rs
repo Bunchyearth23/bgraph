@@ -231,10 +231,22 @@ pub fn route_all(layout: &Layout) -> Vec<Routed> {
             points: if edge.from == edge.to {
                 self_loop(&layout.nodes[edge.from])
             } else {
+                // Every box but the two being joined is an obstacle. A group
+                // frame is not: a box inside one can only be reached by
+                // crossing it, so treating a frame as solid would refuse the
+                // routes that are correct.
+                let obstacles: Vec<crate::layout::Rect> = layout
+                    .nodes
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| *i != edge.from && *i != edge.to)
+                    .map(|(_, n)| n.rect)
+                    .collect();
                 route(
                     &layout.nodes[edge.from],
                     &layout.nodes[edge.to],
                     edge.style.router.unwrap_or(Router::Straight),
+                    &obstacles,
                 )
             },
             label: None,
@@ -882,7 +894,12 @@ fn outline(r: &Rect, shape: Shape) -> Vec<(f64, f64)> {
 
 // ---------------------------------------------------------------- edges
 
-fn route(from: &PlacedNode, to: &PlacedNode, router: Router) -> Vec<(f64, f64)> {
+fn route(
+    from: &PlacedNode,
+    to: &PlacedNode,
+    router: Router,
+    obstacles: &[crate::layout::Rect],
+) -> Vec<(f64, f64)> {
     let a = &from.rect;
     let b = &to.rect;
 
@@ -892,6 +909,13 @@ fn route(from: &PlacedNode, to: &PlacedNode, router: Router) -> Vec<(f64, f64)> 
             let end = boundary(to, (a.cx(), a.cy()));
             vec![start, end]
         }
+        // `X-004`. The solver goes around the boxes; the elbow below is what is
+        // left when there is no way round — a box wholly enclosed, or a diagram
+        // too large for the grid to pay for itself. Keeping the old line rather
+        // than dropping the edge is deliberate: `check::after_layout` then says
+        // the line crosses something, which is a drawing that admits it is
+        // wrong, where a missing edge is one that lies.
+        Router::Ortho if let Some(path) = crate::ortho::route(*a, *b, obstacles) => path,
         Router::Ortho => {
             let dx = b.cx() - a.cx();
             let dy = b.cy() - a.cy();
