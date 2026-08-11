@@ -126,6 +126,11 @@ enum Command {
         /// Report which files would change, and change nothing
         #[arg(long)]
         check: bool,
+
+        /// Rewrite a removed `opacity` as the fourth channel of the colours it
+        /// applied to, and reformat nothing
+        #[arg(long)]
+        migrate: bool,
     },
     /// Write a shell completion script, or the man page, to standard output
     #[cfg(feature = "completions")]
@@ -384,7 +389,7 @@ fn show_or_serve(input: PathBuf, data: Option<PathBuf>, port: u16, server: bool)
     Ok(0)
 }
 
-fn format_files(inputs: &[PathBuf], check: bool) -> Result<i32> {
+fn format_files(inputs: &[PathBuf], check: bool, migrate: bool) -> Result<i32> {
     if inputs.is_empty() {
         bail!("no input file (try `bgraph fmt diagram.bd`)");
     }
@@ -393,19 +398,28 @@ fn format_files(inputs: &[PathBuf], check: bool) -> Result<i32> {
     for path in inputs {
         let source =
             fs::read_to_string(path).with_context(|| format!("cannot read {}", path.display()))?;
-        let formatted = bgraph::fmt::format(&source)
-            .with_context(|| format!("{} does not parse, so it is left alone", path.display()))?;
+        // A migration is a second mode, not a side effect of formatting: one
+        // rewrites what the language dropped and the other arranges what it
+        // kept, and a diff that did both would be unreviewable.
+        let rewritten = if migrate {
+            bgraph::fmt::migrate(&source)
+                .with_context(|| format!("cannot migrate {}", path.display()))?
+        } else {
+            bgraph::fmt::format(&source)
+                .with_context(|| format!("{} does not parse, so it is left alone", path.display()))?
+        };
 
-        if formatted == source {
+        if rewritten == source {
             continue;
         }
         changed += 1;
         if check {
             println!("{}", path.display());
         } else {
-            fs::write(path, &formatted)
+            fs::write(path, &rewritten)
                 .with_context(|| format!("cannot write {}", path.display()))?;
-            println!("{} reformatted", path.display());
+            let what = if migrate { "migrated" } else { "reformatted" };
+            println!("{} {what}", path.display());
         }
     }
 
@@ -457,7 +471,11 @@ fn run() -> Result<i32> {
             return show_or_serve(input, data, port, server);
         }
         Some(Command::Check { input, ci }) => return check_file(&input, ci),
-        Some(Command::Fmt { inputs, check }) => return format_files(&inputs, check),
+        Some(Command::Fmt {
+            inputs,
+            check,
+            migrate,
+        }) => return format_files(&inputs, check, migrate),
         #[cfg(feature = "completions")]
         Some(Command::Completions { shell }) => return completions(&shell),
         Some(Command::Init { genre, output }) => return init(genre, output),

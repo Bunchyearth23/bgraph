@@ -790,6 +790,106 @@ fn the_formatter_counts_braces_it_can_see() {
     assert_eq!(crate::fmt::format(source).expect("parses"), source);
 }
 
+// ---------------------------------------------------------------------- W-104
+
+#[test]
+fn the_migration_moves_opacity_onto_every_paint_in_its_block() {
+    // `X-008`. The whole point is that this is surgical: the alpha digits go
+    // into the colour where it stands, the `opacity` line is cut out, and the
+    // comment and the hand alignment either side of it are untouched.
+    let before = "style card {\n  fill:    #1e293b      // aligned by hand\n  \
+                  stroke:  #334155 1\n  opacity: 0.5\n}\n\
+                  node a \"A\" { fill: #38bdf8 opacity: 0.25 }\n";
+    let after = crate::fmt::migrate(before).expect("migrates");
+
+    assert_eq!(
+        after,
+        "style card {\n  fill:    #1e293b80      // aligned by hand\n  \
+         stroke:  #33415580 1\n}\n\
+         node a \"A\" { fill: #38bdf840 }\n",
+        "{after:?}"
+    );
+
+    // And the file it produces is one the language accepts, where the file it
+    // was given is not — which is the only reason the command exists.
+    assert!(err(before).contains("unknown property `opacity`"));
+    let migrated = parse_diagram(&after).expect("parses");
+    for diag in crate::check::check(&migrated) {
+        assert!(
+            !diag.message.contains("unknown property"),
+            "the migrated file still has an unknown property: {}",
+            diag.message
+        );
+    }
+}
+
+#[test]
+fn the_migration_multiplies_an_alpha_it_finds_and_drops_one_it_does_not_need() {
+    // An element opacity and a paint alpha composited, so a colour that
+    // already carried one keeps what it meant rather than losing it.
+    let half = crate::fmt::migrate("node a { fill: #11223380 opacity: 0.5 }\n").expect("migrates");
+    assert!(half.contains("#11223340"), "{half}");
+
+    // Fully opaque is written as no alpha at all: `ff` is the default, and
+    // `split_alpha` reads the two forms back the same way.
+    let whole = crate::fmt::migrate("node a { fill: #112233 opacity: 1 }\n").expect("migrates");
+    assert_eq!(whole, "node a { fill: #112233 }\n", "{whole:?}");
+
+    // A short colour is expanded rather than given a one-digit alpha, because
+    // one hex digit cannot hold 0.5 and a migration may not change the value
+    // it was asked to preserve.
+    let short = crate::fmt::migrate("node a { fill: #123 opacity: 0.5 }\n").expect("migrates");
+    assert_eq!(short, "node a { fill: #11223380 }\n", "{short:?}");
+}
+
+#[test]
+fn the_migration_is_idempotent_and_leaves_a_clean_file_alone() {
+    let done = "node a { fill: #11223380 }\n";
+    assert_eq!(crate::fmt::migrate(done).expect("migrates"), done);
+
+    let once = crate::fmt::migrate("node a { fill: #112233 opacity: 0.5 }\n").expect("migrates");
+    assert_eq!(crate::fmt::migrate(&once).expect("migrates"), once);
+}
+
+#[test]
+fn the_migration_declines_rather_than_inventing_a_colour() {
+    // Both refusals are the same principle: this command may move a value, it
+    // may not decide one. A `#ffffff` conjured to carry an alpha would have
+    // changed the drawing while claiming to preserve it.
+    let none = crate::fmt::migrate("node a \"A\" {\n  size: 10 10\n  opacity: 0.5\n}\n")
+        .expect_err("nothing to ride on");
+    let none = format!("{none:#}");
+    assert!(none.contains("line 3"), "{none}");
+    assert!(none.contains("nothing to ride on"), "{none}");
+
+    let named = crate::fmt::migrate("node a \"A\" {\n  fill: tomato\n  opacity: 0.5\n}\n")
+        .expect_err("a name has no fourth channel");
+    let named = format!("{named:#}");
+    assert!(named.contains("line 2"), "{named}");
+    assert!(named.contains("tomato"), "{named}");
+
+    let silly = crate::fmt::migrate("node a { fill: #112233 opacity: 50 }\n")
+        .expect_err("not a fraction");
+    assert!(format!("{silly:#}").contains("not a fraction"), "{silly:#}");
+}
+
+#[test]
+fn the_migration_reads_the_source_and_not_a_label_that_looks_like_one() {
+    // The scan is lexical, so it has to survive the two things a lexical scan
+    // always gets wrong: a `#` inside a string and a property inside a
+    // comment. Neither is a declaration, and treating one as such would edit
+    // a label or delete a note.
+    let source = "node a \"fill: #ffffff opacity: 0.5\" { fill: #112233 opacity: 0.5 }\n\
+                  // opacity: 0.9 — a note about the old property\n";
+    let after = crate::fmt::migrate(source).expect("migrates");
+    assert_eq!(
+        after,
+        "node a \"fill: #ffffff opacity: 0.5\" { fill: #11223380 }\n\
+         // opacity: 0.9 — a note about the old property\n",
+        "{after:?}"
+    );
+}
+
 #[test]
 fn the_formatter_refuses_a_file_it_does_not_understand() {
     // An unbalanced brace reindents everything after it, and the diff would

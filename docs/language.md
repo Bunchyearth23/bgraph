@@ -561,6 +561,14 @@ node card "Card" {
 }
 ```
 
+A file written before that change says `opacity: 0.5` and now fails with
+`unknown property`. **`bgraph fmt --migrate` rewrites it**: the fraction is
+folded into the alpha of every paint in the same block, the line is cut out,
+and nothing else in the file moves — comments and hand-aligned columns
+included. It declines rather than guessing, naming the line, when a block has
+no colour to carry the alpha or when the colour is a name like `tomato`, which
+has no fourth channel to write into.
+
 Numbers accept a `px` suffix; it is ignored.
 
 ### Shapes
@@ -694,6 +702,7 @@ bgraph report.bd --rows r=sales.csv # one hole from the rows of a CSV
 bgraph watch report.bd --data q3.json   # live preview, data re-read on save
 bgraph fmt diagram.bd               # reformat to the canonical shape
 bgraph fmt --check examples/*.bd    # …or report what would change, and exit non-zero
+bgraph fmt --migrate old.bd         # rewrite a removed `opacity` as the colour's alpha
 bgraph init pie                     # a working file for a genre; no genre lists them
 bgraph completions fish             # a completion script; bash|zsh|fish|elvish|powershell
 bgraph completions man              # …or the man page, from the same flag definitions
