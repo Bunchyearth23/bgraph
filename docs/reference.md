@@ -253,6 +253,7 @@ Declared once, in `graph { … }`. These are diagram-wide and are not part of th
 
 | Setting | Syntax | Meaning |
 |---|---|---|
+| `title-align` | `title-align: <left\|center\|right>` | Where the heading sits across the drawing. `left` is the default, and it is spelled rather than left as the absence of a word so a theme can put it back. One setting for every genre: a chart names itself in its own block and every other genre in `graph`, but *where* the name goes is the same question either way, so it is asked once (`W-128`). |
 | `description` | `description: <text>` | What the diagram is, in a sentence, for a reader who cannot see it. Becomes `aria-label` on the SVG root, beside `role="img"`. |
 | `title` | `title: <text>` | Heading drawn above the diagram. Every genre accepts it here — the chart archetypes also take a `title` in their own settings, and that one wins where both are given. |
 | `padding` | `padding: <number>` | Margin between the drawing and the canvas edge. |

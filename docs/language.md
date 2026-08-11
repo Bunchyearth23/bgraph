@@ -161,6 +161,26 @@ At the diagram level it becomes `aria-label` on the SVG root, beside
 or skipped entirely. A chart's own `title` serves as the label when no
 `description` is given, so a pie chart names itself without being told twice.
 
+### Where the heading goes
+
+```bgraph
+graph { title: "Order to cash" title-align: center }
+
+node a "A" at (0, 0)
+node b "B" at (400, 0)
+```
+
+`left` (the default), `center` or `right`. **One setting for every genre**: a
+chart names itself in its own block and everything else in `graph`, but *where*
+the name goes is the same question either way, so it is asked once. The default
+is spelled rather than left as the absence of a word, so a theme can put it
+back.
+
+The heading is positioned once the drawing's width is known, and measured
+against the drawing **without** it — measuring with it would let a title wider
+than its diagram widen the diagram, which would move the centre, which would
+move the title.
+
 ### Named themes
 
 `--theme light`, `--theme dark`, `--theme print`. A theme **is** a style

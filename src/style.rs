@@ -798,6 +798,8 @@ pub struct GraphOpts {
     /// own in their settings and that one wins; this is what every other
     /// genre — `free`, `class`, `er`, `harness` — had no way to say at all.
     pub title: Option<String>,
+    /// Where the heading sits across the drawing. `None` is `left`.
+    pub title_align: Option<crate::layout::Anchor>,
     /// What the diagram is, for a screen reader. Becomes `aria-label` on the
     /// SVG root alongside `role="img"`.
     pub description: Option<String>,
@@ -824,6 +826,7 @@ impl Default for GraphOpts {
             background: Some("#ffffff".into()),
             flow: RelDir::RightOf,
             title: None,
+            title_align: None,
             description: None,
             grid: None,
             embed_font: None,
@@ -840,6 +843,14 @@ impl GraphOpts {
             let first = prop.values.first();
             match prop.name.as_str() {
                 "title" => opts.title = first.and_then(|x| x.as_text()).map(String::from),
+                "title-align" => {
+                    opts.title_align = match first.and_then(|x| x.as_word()).unwrap_or("left") {
+                        "left" => None,
+                        "center" | "centre" | "middle" => Some(crate::layout::Anchor::Middle),
+                        "right" => Some(crate::layout::Anchor::End),
+                        other => bail!("unknown title alignment `{other}`"),
+                    }
+                }
                 "description" | "desc" => {
                     opts.description = first.and_then(|x| x.as_text()).map(String::from)
                 }

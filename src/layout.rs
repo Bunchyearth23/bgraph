@@ -175,6 +175,13 @@ pub enum Anchor {
 }
 
 pub struct Annotation {
+    /// Whether this is the diagram's heading.
+    ///
+    /// Marked rather than found: a heading is repositioned once the drawing's
+    /// width is known, which is after every genre has finished placing things,
+    /// and picking it out of the pile by its size and weight would be a guess
+    /// that goes wrong the day somebody styles a label the same (`W-128`).
+    pub title: bool,
     pub text: String,
     pub x: f64,
     pub y: f64,
@@ -268,6 +275,43 @@ fn shape_allowance(shape: Option<Shape>, mut w: f64, mut h: f64) -> (f64, f64) {
         _ => {}
     }
     (w, h)
+}
+
+/// Put the heading where the file asked for it, now that the width is known.
+///
+/// Left is the default and is a no-op, so every drawing that says nothing about
+/// this is byte-identical to what it was. Centring measures against the drawing
+/// **without** the heading: measuring with it would make a title wider than its
+/// diagram widen the diagram, which would move the centre, which would move the
+/// title (`W-128`).
+fn place_title(layout: &mut Layout) {
+    let Some(align) = layout.opts.title_align else {
+        return;
+    };
+    let content = bbox(
+        layout
+            .nodes
+            .iter()
+            .map(|n| n.rect)
+            .chain(layout.groups.iter().map(|g| g.rect))
+            .chain(
+                layout
+                    .annotations
+                    .iter()
+                    .filter(|a| !a.title)
+                    .map(crate::charts::annotation_bounds),
+            ),
+    );
+    let Some(area) = content else { return };
+
+    for a in layout.annotations.iter_mut().filter(|a| a.title) {
+        a.x = match align {
+            Anchor::Middle => area.cx(),
+            Anchor::End => area.right(),
+            Anchor::Start => area.x,
+        };
+        a.anchor = align;
+    }
 }
 
 /// Whether box `i` is one of an edge's own ends, and so not something for that
@@ -439,61 +483,80 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     let registry = Registry::build(&diagram.styles)?;
 
     // The archetype decides what the statements mean.
-    match diagram
+    let chart: Option<Result<Layout>> = match diagram
         .archetype
         .as_ref()
         .map(|a| a.as_str())
         .unwrap_or("free")
     {
         #[cfg(feature = "pie")]
-        "pie" => return crate::charts::pie(diagram, opts, &registry),
+        "pie" => Some(crate::charts::pie(diagram, opts.clone(), &registry)),
         #[cfg(feature = "packet")]
-        "packet" => return crate::charts::packet(diagram, opts, &registry),
+        "packet" => Some(crate::charts::packet(diagram, opts.clone(), &registry)),
         #[cfg(feature = "kanban")]
-        "kanban" => return crate::charts::kanban(diagram, opts, &registry),
+        "kanban" => Some(crate::charts::kanban(diagram, opts.clone(), &registry)),
         #[cfg(feature = "journey")]
-        "journey" => return crate::charts::journey(diagram, opts, &registry),
+        "journey" => Some(crate::charts::journey(diagram, opts.clone(), &registry)),
         #[cfg(feature = "radar")]
-        "radar" => return crate::charts::radar(diagram, opts, &registry),
+        "radar" => Some(crate::charts::radar(diagram, opts.clone(), &registry)),
         #[cfg(feature = "rack")]
-        "rack" => return crate::charts::rack(diagram, opts, &registry),
+        "rack" => Some(crate::charts::rack(diagram, opts.clone(), &registry)),
         #[cfg(feature = "venn")]
-        "venn" => return crate::charts::venn(diagram, opts, &registry),
+        "venn" => Some(crate::charts::venn(diagram, opts.clone(), &registry)),
         #[cfg(feature = "gitgraph")]
-        "gitgraph" => return crate::charts::gitgraph(diagram, opts, &registry),
+        "gitgraph" => Some(crate::charts::gitgraph(diagram, opts.clone(), &registry)),
         #[cfg(feature = "orgchart")]
-        "orgchart" => {
-            return crate::charts::tree(diagram, opts, &registry, crate::charts::TreeKind::Org);
-        }
+        "orgchart" => Some(crate::charts::tree(
+            diagram,
+            opts.clone(),
+            &registry,
+            crate::charts::TreeKind::Org,
+        )),
         #[cfg(feature = "mindmap")]
-        "mindmap" => {
-            return crate::charts::tree(diagram, opts, &registry, crate::charts::TreeKind::Mind);
-        }
+        "mindmap" => Some(crate::charts::tree(
+            diagram,
+            opts.clone(),
+            &registry,
+            crate::charts::TreeKind::Mind,
+        )),
         #[cfg(feature = "treeview")]
-        "treeview" => {
-            return crate::charts::tree(diagram, opts, &registry, crate::charts::TreeKind::View);
-        }
+        "treeview" => Some(crate::charts::tree(
+            diagram,
+            opts.clone(),
+            &registry,
+            crate::charts::TreeKind::View,
+        )),
         #[cfg(feature = "bytefield")]
-        "bytefield" => return crate::charts::bytefield(diagram, opts, &registry),
+        "bytefield" => Some(crate::charts::bytefield(diagram, opts.clone(), &registry)),
         #[cfg(feature = "treemap")]
-        "treemap" => return crate::charts::treemap(diagram, opts, &registry),
+        "treemap" => Some(crate::charts::treemap(diagram, opts.clone(), &registry)),
         #[cfg(feature = "quadrant")]
-        "quadrant" => return crate::charts::quadrant(diagram, opts, &registry),
+        "quadrant" => Some(crate::charts::quadrant(diagram, opts.clone(), &registry)),
         #[cfg(feature = "wave")]
-        "wave" => return crate::charts::wave(diagram, opts, &registry),
+        "wave" => Some(crate::charts::wave(diagram, opts.clone(), &registry)),
         #[cfg(feature = "sankey")]
-        "sankey" => return crate::charts::sankey(diagram, opts, &registry),
+        "sankey" => Some(crate::charts::sankey(diagram, opts.clone(), &registry)),
         #[cfg(feature = "bar")]
-        "bar" => return crate::charts::bar(diagram, opts, &registry),
+        "bar" => Some(crate::charts::bar(diagram, opts.clone(), &registry)),
         #[cfg(feature = "xy")]
-        "xy" => return crate::charts::xy(diagram, opts, &registry),
+        "xy" => Some(crate::charts::xy(diagram, opts.clone(), &registry)),
         #[cfg(feature = "sequence")]
-        "sequence" => return crate::charts::sequence(diagram, opts, &registry),
+        "sequence" => Some(crate::charts::sequence(diagram, opts.clone(), &registry)),
         #[cfg(feature = "gantt")]
-        "gantt" => return crate::charts::gantt(diagram, opts, &registry),
+        "gantt" => Some(crate::charts::gantt(diagram, opts.clone(), &registry)),
         #[cfg(feature = "timeline")]
-        "timeline" => return crate::charts::timeline(diagram, opts, &registry),
-        _ => {}
+        "timeline" => Some(crate::charts::timeline(diagram, opts.clone(), &registry)),
+        _ => None,
+    };
+
+    // One funnel for every genre. A heading can only be placed once the
+    // drawing's width is known, and that is after the archetype has finished —
+    // so it is done here rather than in each of the nineteen places a title is
+    // pushed, which would have been nineteen chances to disagree (`W-128`).
+    if let Some(chart) = chart {
+        let mut chart = chart?;
+        place_title(&mut chart);
+        return Ok(chart);
     }
 
     let mut index: HashMap<&str, Entity> = HashMap::new();
@@ -1061,6 +1124,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                     color: s.font_color.clone().unwrap_or_else(|| "#111827".into()),
                     weight: s.font_weight.clone().unwrap_or_else(|| "600".into()),
                     family: s.font_family.clone().unwrap_or_default(),
+                    title: false,
                 });
             }
 
@@ -1115,6 +1179,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                     color: s.font_color.clone().unwrap_or_else(|| "#111827".into()),
                     weight: "400".into(),
                     family: s.font_family.clone().unwrap_or_default(),
+                    title: false,
                 });
             }
         }
@@ -1145,6 +1210,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                     color: ink.clone(),
                     weight: if secondary { "400" } else { "600" }.into(),
                     family: s.font_family.clone().unwrap_or_default(),
+                    title: false,
                 });
                 y += height;
             }
@@ -1285,6 +1351,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                         .unwrap_or_else(|| "#94a3b8".into()),
                     weight: "400".into(),
                     family: placed.style.font_family.clone().unwrap_or_default(),
+                    title: false,
                 });
             }
         }
@@ -1351,6 +1418,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                 }),
                 weight: "400".into(),
                 family: style.font_family.clone().unwrap_or_default(),
+                title: false,
             });
         }
     }
@@ -1452,6 +1520,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                 }),
                 weight: "500".into(),
                 family: style.font_family.clone().unwrap_or_default(),
+                title: false,
             });
         }
     }
@@ -1501,10 +1570,11 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                 .first()
                 .and_then(|n| n.style.font_family.clone())
                 .unwrap_or_default(),
+            title: true,
         });
     }
 
-    Ok(Layout {
+    let mut out = Layout {
         guides,
         polylines,
         groups,
@@ -1513,7 +1583,11 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         opts,
         chart: Chart::Free,
         annotations,
-    })
+    };
+    // The same funnel the chart genres go through, for the same reason: a
+    // heading can only be placed once the drawing's width is known.
+    place_title(&mut out);
+    Ok(out)
 }
 
 fn offset_from(a: &Rect, dir: RelDir, gap: f64, align: Option<Align>, w: f64, h: f64) -> Rect {

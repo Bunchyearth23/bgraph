@@ -114,6 +114,7 @@ pub fn compare(before: &Layout, after: &Layout) -> Layout {
             color: REMOVED.into(),
             weight: "600".into(),
             family: String::new(),
+            title: false,
         });
     }
 
@@ -229,5 +230,6 @@ fn key(after: &Layout) -> Annotation {
         color: UNCHANGED.into(),
         weight: "500".into(),
         family: String::new(),
+        title: false,
     }
 }

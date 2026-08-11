@@ -1009,6 +1009,56 @@ fn a_bend_rounds_an_elbow_and_a_curve_is_a_polyline_like_everything_else() {
 }
 
 #[test]
+fn a_heading_goes_where_the_file_says() {
+    // `W-128`. One setting for every genre: a chart names itself in its own
+    // block and every other genre in `graph`, but *where* the name goes is the
+    // same question either way, so it is asked once.
+    let at = |align: &str| -> (f64, crate::layout::Anchor) {
+        let l = build(&format!(
+            "type pie {{ title: \"T\" }}\ngraph {{ title-align: {align} }}\n\
+             slice a \"Organic search\" 4820\nslice b \"Direct\" 2410\n"
+        ));
+        let t = l
+            .annotations
+            .iter()
+            .find(|a| a.title)
+            .expect("the heading is marked, not guessed at");
+        (t.x, t.anchor)
+    };
+
+    let (lx, la) = at("left");
+    let (cx, ca) = at("center");
+    let (rx, ra) = at("right");
+    assert_eq!(la, crate::layout::Anchor::Start);
+    assert_eq!(ca, crate::layout::Anchor::Middle);
+    assert_eq!(ra, crate::layout::Anchor::End);
+    assert!(lx < cx && cx < rx, "{lx} {cx} {rx}");
+
+    // Left is the default *and* a no-op, which is why no checked-in drawing
+    // moved when this arrived.
+    let quiet = build("type pie { title: \"T\" }\nslice a \"A\" 1\n");
+    let plain = quiet
+        .annotations
+        .iter()
+        .find(|a| a.title)
+        .expect("a heading");
+    assert_eq!(plain.anchor, crate::layout::Anchor::Start);
+
+    // And it works on a genre that is not a chart, since the whole point is
+    // that the question is asked in one place.
+    let free = build(
+        "graph { title: \"T\" title-align: center }\n\
+         node a \"A\" at (0, 0)\nnode b \"B\" at (400, 0)\n",
+    );
+    let t = free
+        .annotations
+        .iter()
+        .find(|a| a.title)
+        .expect("a heading");
+    assert_eq!(t.anchor, crate::layout::Anchor::Middle);
+}
+
+#[test]
 fn two_ortho_lines_do_not_run_along_each_other() {
     // `X-018`. The router avoided boxes and not other lines, so two edges whose
     // tidiest routes crossed the same tall obstacle both took the one channel

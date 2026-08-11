@@ -283,6 +283,7 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -331,6 +332,7 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
                 color: style.font_color.clone().unwrap_or_else(|| "#ffffff".into()),
                 weight: style.font_weight.clone().unwrap_or_else(|| "600".into()),
                 family: family(style),
+                title: false,
             });
         }
 
@@ -374,6 +376,7 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
                 color: ink(style, &theme),
                 weight: style.font_weight.clone().unwrap_or_else(|| "400".into()),
                 family: family(style),
+                title: false,
             });
         }
 
@@ -549,6 +552,7 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -563,6 +567,7 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             color: palette[r.min(palette.len() - 1)].to_string(),
             weight: "600".into(),
             family: family(&base),
+            title: false,
         });
     }
 
@@ -645,6 +650,7 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             color: ink(&base, &theme),
             weight: "400".into(),
             family: family(&base),
+            title: false,
         });
         if let Some(tag) = &style.tag {
             annotations.push(Annotation {
@@ -656,6 +662,7 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
                 color: colour,
                 weight: "600".into(),
                 family: family(&base),
+                title: false,
             });
         }
     }
@@ -919,6 +926,7 @@ pub fn tree(
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -1170,6 +1178,7 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -1238,6 +1247,7 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: false,
         });
     }
 
@@ -1254,6 +1264,7 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: false,
         });
     }
 
@@ -1332,6 +1343,7 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -1368,6 +1380,7 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
                 color: theme.muted.clone(),
                 weight: "400".into(),
                 family: family(&base),
+                title: false,
             });
             guides.push(Guide {
                 from: (gutter, y),
@@ -1540,6 +1553,7 @@ pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -1597,6 +1611,7 @@ pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
                 color: ink(&base, &theme),
                 weight: "400".into(),
                 family: family(&base),
+                title: false,
             });
         }
     }
@@ -1788,6 +1803,7 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -1939,6 +1955,7 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
                 .unwrap_or_else(|| theme.ink.clone()),
             weight: "600".into(),
             family: family(&base),
+            title: false,
         });
     }
 
@@ -2019,6 +2036,7 @@ pub fn kanban(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -2097,6 +2115,7 @@ pub fn kanban(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: false,
         });
 
         groups.push(PlacedGroup {
@@ -2220,6 +2239,7 @@ fn packet_like(
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -2268,6 +2288,7 @@ fn packet_like(
                     .unwrap_or_else(|| theme.muted.clone()),
                 weight: "400".into(),
                 family: chart_defaults().font_family.unwrap_or_default(),
+                title: false,
             });
 
             named = true;
@@ -2296,6 +2317,7 @@ fn packet_like(
                     color: theme.muted.clone(),
                     weight: "400".into(),
                     family: chart_defaults().font_family.unwrap_or_default(),
+                    title: false,
                 });
             }
         }
@@ -2397,6 +2419,7 @@ pub fn treemap(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -2567,6 +2590,7 @@ fn emit_tiles(
                     color: "#ffffff".into(),
                     weight: "600".into(),
                     family: family(&tile.style),
+                    title: false,
                 });
             }
 
@@ -2635,6 +2659,7 @@ fn emit_tiles(
             color: "#ffffff".into(),
             weight: "500".into(),
             family: family(&tile.style),
+            title: false,
         });
     }
 }
@@ -2816,6 +2841,7 @@ pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -2866,6 +2892,7 @@ pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             color: theme.muted.clone(),
             weight: "600".into(),
             family: family(&base),
+            title: false,
         });
     }
 
@@ -2898,6 +2925,7 @@ pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
                 color: theme.muted.clone(),
                 weight: "500".into(),
                 family: family(&base),
+                title: false,
             });
         }
     }
@@ -2957,6 +2985,7 @@ pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
                 color: ink(&style, &theme),
                 weight: style.font_weight.clone().unwrap_or_else(|| "500".into()),
                 family: family(&style),
+                title: false,
             });
         }
     }
@@ -3084,6 +3113,7 @@ pub fn wave(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -3114,6 +3144,7 @@ pub fn wave(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
                 color: theme.muted.clone(),
                 weight: "400".into(),
                 family: family(&base),
+                title: false,
             });
         }
     }
@@ -3134,6 +3165,7 @@ pub fn wave(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
             color: ink(style, &theme),
             weight: style.font_weight.clone().unwrap_or_else(|| "500".into()),
             family: family(style),
+            title: false,
         });
 
         draw_lane(
@@ -3339,6 +3371,7 @@ fn draw_lane(
                                 color: ink(style, theme),
                                 weight: "500".into(),
                                 family: family(style),
+                                title: false,
                             });
                         }
                     }
@@ -3500,6 +3533,7 @@ pub fn sankey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -3568,6 +3602,7 @@ pub fn sankey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
                 color: ink(&style, &theme),
                 weight: style.font_weight.clone().unwrap_or_else(|| "500".into()),
                 family: family(&style),
+                title: false,
             });
         }
     }
@@ -3754,6 +3789,7 @@ fn draw_frame(
             color: theme.muted.clone(),
             weight: "400".into(),
             family: family(base),
+            title: false,
         });
     }
 
@@ -3775,6 +3811,7 @@ fn draw_frame(
             color: theme.muted.clone(),
             weight: "500".into(),
             family: family(base),
+            title: false,
         });
     }
 }
@@ -3821,6 +3858,7 @@ fn draw_legend(
             color: theme.ink.clone(),
             weight: "400".into(),
             family: family(base),
+            title: false,
         });
     }
 }
@@ -3944,6 +3982,7 @@ pub fn bar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -4250,6 +4289,7 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -4404,6 +4444,7 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -4643,6 +4684,7 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
                 color: ink(&style, &theme),
                 weight: style.font_weight.clone().unwrap_or_else(|| "400".into()),
                 family: family(&style),
+                title: false,
             });
         }
     }
@@ -4769,6 +4811,7 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -4814,6 +4857,7 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
             color: theme.muted.clone(),
             weight: "400".into(),
             family: family(&base),
+            title: false,
         });
         d += step;
     }
@@ -4854,6 +4898,7 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
             color: ink(style, &theme),
             weight: style.font_weight.clone().unwrap_or_else(|| "400".into()),
             family: family(style),
+            title: false,
         });
     }
 
@@ -4899,6 +4944,7 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
                 .unwrap_or_else(|| theme.muted.clone()),
             weight: "600".into(),
             family: family(&base),
+            title: false,
         });
 
         groups.push(PlacedGroup {
@@ -5069,6 +5115,7 @@ pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             color: ink(&base, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: true,
         });
     }
 
@@ -5107,6 +5154,7 @@ pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             color: theme.muted.clone(),
             weight: "400".into(),
             family: family(&base),
+            title: false,
         });
         d += step;
     }
@@ -5164,6 +5212,7 @@ pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             color: ink(style, &theme),
             weight: "600".into(),
             family: family(&base),
+            title: false,
         });
         let (y, m, dd) = civil_from_days(*day);
         annotations.push(Annotation {
@@ -5175,6 +5224,7 @@ pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             color: theme.muted.clone(),
             weight: "400".into(),
             family: family(&base),
+            title: false,
         });
     }
 

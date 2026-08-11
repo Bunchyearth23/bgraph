@@ -76,6 +76,10 @@ pub const HEADS: &[&str] = &[
 /// side back to the engine's choice.
 pub const SIDES: &[&str] = &["auto", "top", "bottom", "left", "right"];
 
+/// Where a heading sits across the drawing. Left is the default and is spelled,
+/// so a theme can put it back.
+pub const TITLE_ALIGNS: &[&str] = &["left", "center", "centre", "middle", "right"];
+
 pub const ROUTERS: &[&str] = &[
     "straight",
     "direct",
@@ -425,6 +429,19 @@ pub const PROPS: &[PropDef] = &[
 ];
 
 pub const GRAPH_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title-align",
+        alias: false,
+        ctx: Ctx::Both,
+        words: TITLE_ALIGNS,
+        syntax: "title-align: <left|center|right>",
+        doc: "Where the heading sits across the drawing. `left` is the \
+              default, and it is spelled rather than left as the absence of a \
+              word so a theme can put it back. One setting for every genre: a \
+              chart names itself in its own block and every other genre in \
+              `graph`, but *where* the name goes is the same question either \
+              way, so it is asked once (`W-128`).",
+    },
     PropDef {
         name: "description",
         alias: false,

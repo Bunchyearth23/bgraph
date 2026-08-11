@@ -220,6 +220,7 @@ pub fn decorate(
                     color: s.font_color.clone().unwrap_or_else(|| "#1f2937".into()),
                     weight: "500".into(),
                     family: s.font_family.clone().unwrap_or_default(),
+                    title: false,
                 });
             }
         }
