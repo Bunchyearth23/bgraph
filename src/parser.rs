@@ -552,10 +552,18 @@ fn parse_edge(pair: Pair<Rule>) -> Result<EdgeDecl> {
     let mut positional_span: Option<Span> = None;
     let mut classes = Vec::new();
     let mut props = Vec::new();
+    let mut via = Vec::new();
 
     for part in pair.into_inner() {
         let part_span = span_of(&part);
         match part.as_rule() {
+            // `via (300, 120) (left-of c gap 20)` — the places the line goes
+            // through, each parenthesised so the list needs no separator.
+            Rule::via_list => {
+                for stop in part.into_inner() {
+                    via.push(parse_waypoint(stop)?);
+                }
+            }
             // The first two identifiers are the endpoints; a third is a
             // bare-word positional value.
             r if is_name(r) && endpoints.len() < 2 => endpoints.push(spanned(&part)),
@@ -593,8 +601,36 @@ fn parse_edge(pair: Pair<Rule>) -> Result<EdgeDecl> {
         positional_span: positional_span.unwrap_or(span),
         classes,
         props,
+        via,
         span,
     })
+}
+
+/// One stop on a line's route: a point, a grid cell, or a place beside a box.
+///
+/// The three are written the same way — parenthesised — so an author moving a
+/// waypoint from a coordinate to something relative changes what is inside the
+/// brackets and nothing else.
+fn parse_waypoint(pair: Pair<Rule>) -> Result<Placement> {
+    match pair.as_rule() {
+        Rule::point => {
+            let mut coords = pair.into_inner();
+            let x = number(coords.next().expect("point x"))?;
+            let y = number(coords.next().expect("point y"))?;
+            Ok(Placement::At { x, y })
+        }
+        Rule::cell => {
+            let mut coords = pair.into_inner();
+            let col = number(coords.next().expect("cell col"))?;
+            let row = number(coords.next().expect("cell row"))?;
+            Ok(Placement::Cell { col, row })
+        }
+        Rule::rel_point => {
+            let inner = pair.into_inner().next().expect("a relative waypoint");
+            parse_placement(inner)
+        }
+        other => bail!("unexpected rule {other:?} in a waypoint"),
+    }
 }
 
 fn parse_placement(pair: Pair<Rule>) -> Result<Placement> {

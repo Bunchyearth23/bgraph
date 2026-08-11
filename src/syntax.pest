@@ -99,14 +99,18 @@ name       = _{ ident | placeholder }
 item_decl  = { ident ~ name ~ string? ~ (pos_value | class_ref)* ~ tail? }
 tail       = _{ placement ~ block? | block ~ placement? }
 
-// A placement keyword would otherwise be eaten as a bare-word value.
+// A placement keyword would otherwise be eaten as a bare-word value. So would
+// `via`, which opens a waypoint list on an edge.
 pos_value  = _{ !(place_kw) ~ value }
-place_kw   = @{ ("at" | "right-of" | "left-of" | "below" | "above") ~ !(ASCII_ALPHANUMERIC | "_" | "-") }
+place_kw   = @{ ("at" | "right-of" | "left-of" | "below" | "above" | "via") ~ !(ASCII_ALPHANUMERIC | "_" | "-") }
 
 // An edge may not start with a statement keyword. Without this, `style -> a`
 // parses here (pest backtracks out of `style_decl`) but not in tree-sitter,
 // whose lexer commits to the keyword. `check` reserves these names outright.
-edge_decl  = { !(keyword) ~ name ~ arrow ~ name ~ string? ~ (pos_value | class_ref)* ~ block? }
+edge_decl  = { !(keyword) ~ name ~ arrow ~ name ~ string? ~ (pos_value | class_ref)* ~ edge_tail? }
+// Either order, the way an item's placement and block already are: both read
+// naturally and `{` cannot be mistaken for `via`.
+edge_tail  = _{ via_list ~ block? | block ~ via_list? }
 // Atomic: a non-atomic rule would let implicit whitespace slip between the
 // word and the boundary test, so `style -> a` would read the `-` as part
 // of an identifier and the guard would never fire.
@@ -123,6 +127,14 @@ gap        = { "gap" ~ number }
 align      = { "align" ~ align_kw }
 align_kw   = { "left" | "right" | "center" | "middle" | "top" | "bottom" }
 point      = { "(" ~ number ~ "," ~ number ~ ")" }
+
+// Waypoints: the places a line has to go through, in order (`D-034`). Each is
+// parenthesised, which is what lets the list need no separator — `,` is
+// already a statement separator — and what lets an absolute point, a grid cell
+// and a place beside a box all be written the same way.
+via_list   = { "via" ~ waypoint+ }
+waypoint   = _{ cell | point | rel_point }
+rel_point  = { "(" ~ rel_pos ~ ")" }
 // `at (col 3, row 2)` is still `at`, in units declared once by `graph { grid }`.
 // A coordinate system, not a solver — which is why it cannot break `D-001`.
 cell       = { "(" ~ "col" ~ number ~ "," ~ "row" ~ number ~ ")" }

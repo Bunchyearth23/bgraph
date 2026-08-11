@@ -55,6 +55,10 @@ pub struct PlacedEdge {
     pub label: Option<String>,
     pub arrow: Arrow,
     pub style: Style,
+    /// The places the line must go through, already solved to absolute points
+    /// (`D-034`). Resolved here because this is the only stage that knows
+    /// where a named anchor ended up.
+    pub via: Vec<(f64, f64)>,
     /// Where the edge was written. Geometry-dependent diagnostics are found
     /// after the solve, and one that could not point at a line would be a
     /// diagnostic nobody could act on.
@@ -937,12 +941,48 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             style.dash = Some(dash.to_string());
         }
 
+        // Waypoints, solved to absolute points. A relative one takes the
+        // anchor's centre on the cross axis and steps off its edge by the gap,
+        // which is the only reading that does not need a size the waypoint does
+        // not have (`D-034`). An anchor `check` has already refused as unknown
+        // cannot arrive here, so a miss is skipped rather than guessed at.
+        let via: Vec<(f64, f64)> = edge
+            .via
+            .iter()
+            .filter_map(|stop| match stop {
+                Placement::At { x, y } => Some((*x, *y)),
+                Placement::Cell { col, row } => {
+                    let (gx, gy) = opts.grid.unwrap_or((1.0, 1.0));
+                    Some((col * gx, row * gy))
+                }
+                Placement::Rel {
+                    dir,
+                    anchor,
+                    gap,
+                    align: _,
+                } => {
+                    let r = match index.get(anchor.as_str())? {
+                        Entity::Node(i) => placed[*i]?,
+                        Entity::Group(g) => solved.groups[*g]?,
+                    };
+                    let step = gap.unwrap_or(opts.gap);
+                    Some(match dir {
+                        RelDir::RightOf => (r.right() + step, r.cy()),
+                        RelDir::LeftOf => (r.x - step, r.cy()),
+                        RelDir::Below => (r.cx(), r.bottom() + step),
+                        RelDir::Above => (r.cx(), r.y - step),
+                    })
+                }
+            })
+            .collect();
+
         edges.push(PlacedEdge {
             from,
             to,
             label,
             arrow: edge.arrow,
             style,
+            via,
             span: edge.span,
         });
     }

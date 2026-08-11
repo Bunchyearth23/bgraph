@@ -388,13 +388,14 @@ pub fn route_all(layout: &Layout) -> Vec<Routed> {
                     .filter(|(i, _)| !crate::layout::endpoint_of(layout, edge, *i))
                     .map(|(_, n)| n.rect)
                     .collect();
-                route(
+                let line = route(
                     &layout.nodes[edge.from],
                     &layout.nodes[edge.to],
                     edge.style.router.unwrap_or(Router::Straight),
                     &obstacles,
                     ports[e],
-                )
+                );
+                through(line, &edge.via, &obstacles, edge.style.router)
             },
             label: None,
         })
@@ -1141,6 +1142,91 @@ fn attach(
         }
     }
     path
+}
+
+/// Bend a routed line through the places it was told to go (`D-034`).
+///
+/// **The waypoints are a passage, not a preference**: the line goes through
+/// each one, in the order written. What survives between them is the
+/// obstacle avoidance — every leg is routed by the same solver `W-105` added,
+/// so a line told to pass left of a box still goes around whatever stands
+/// between it and there. That is the whole reason a waypoint is not simply a
+/// list of points to join up: joining them up would trade the guarantee this
+/// project spent a chantier acquiring for the control it spent this one on,
+/// and there is no reason to pay twice.
+///
+/// A waypoint inside a box is not repaired here. `check::after_layout` reports
+/// it, which is the same bargain `X-004` struck: a drawing that admits it is
+/// wrong beats one that quietly moves what the author wrote.
+fn through(
+    line: Vec<(f64, f64)>,
+    via: &[(f64, f64)],
+    obstacles: &[Rect],
+    router: Option<Router>,
+) -> Vec<(f64, f64)> {
+    if via.is_empty() || line.len() < 2 {
+        return line;
+    }
+    let start = line[0];
+    let end = *line.last().expect("a routed line has an end");
+
+    let mut out = vec![start];
+    let mut at = start;
+    for stop in via.iter().chain(std::iter::once(&end)) {
+        // A leg between two bare points has no boxes of its own to leave, so
+        // the solver is given two degenerate rectangles: it routes from one to
+        // the other and avoids everything else, which is exactly the question.
+        let leg = if router == Some(Router::Ortho) {
+            crate::ortho::route(dot(at), dot(*stop), obstacles).unwrap_or_else(|| vec![at, *stop])
+        } else {
+            vec![at, *stop]
+        };
+        out.extend(leg.into_iter().skip(1));
+        at = *stop;
+    }
+    straighten(out)
+}
+
+/// A point as a rectangle of no size, for a solver that speaks in boxes.
+fn dot((x, y): (f64, f64)) -> Rect {
+    Rect {
+        x,
+        y,
+        w: 0.0,
+        h: 0.0,
+    }
+}
+
+/// Drop the points that say nothing: a repeat, or a corner that does not turn.
+fn straighten(points: Vec<(f64, f64)>) -> Vec<(f64, f64)> {
+    let mut out: Vec<(f64, f64)> = Vec::with_capacity(points.len());
+    for p in points {
+        if out.last().is_some_and(|q| same(*q, p)) {
+            continue;
+        }
+        if out.len() >= 2 {
+            let (a, b) = (out[out.len() - 2], out[out.len() - 1]);
+            // Collinear **and going the same way**. Three points sharing an
+            // ordinate are not on one straight run if the middle one is a
+            // turn-back: `(80,200) (240,200) (220,200)` is a line that
+            // overshoots and returns, and dropping the middle point silently
+            // deleted the very waypoint it had been sent to (`W-126`).
+            let between = |a: f64, b: f64, c: f64| (a - b) * (c - b) <= 0.0;
+            let straight = ((a.0 - b.0).abs() < 0.01
+                && (b.0 - p.0).abs() < 0.01
+                && between(a.1, b.1, p.1))
+                || ((a.1 - b.1).abs() < 0.01 && (b.1 - p.1).abs() < 0.01 && between(a.0, b.0, p.0));
+            if straight {
+                out.pop();
+            }
+        }
+        out.push(p);
+    }
+    out
+}
+
+fn same(a: (f64, f64), b: (f64, f64)) -> bool {
+    (a.0 - b.0).abs() < 0.01 && (a.1 - b.1).abs() < 0.01
 }
 
 /// Whether a stub is worth having. A one-pixel elbow is not a right angle, it

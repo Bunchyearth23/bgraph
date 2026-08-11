@@ -59,7 +59,7 @@
     },
     "placement": {
       "name": "keyword.other.placement.bgraph",
-      "match": "(?<![\\w-])(at|right-of|left-of|above|below|gap|align|extends|as)(?![\\w-])"
+      "match": "(?<![\\w-])(at|via|right-of|left-of|above|below|gap|align|extends|as)(?![\\w-])"
     },
     "property": {
       "comment": "An identifier followed by a colon \u2014 the same lookahead pest uses.",

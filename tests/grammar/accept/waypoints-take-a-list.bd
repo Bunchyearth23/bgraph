@@ -1,0 +1,12 @@
+// `via` takes a list, and each stop is parenthesised so the list needs no
+// separator — `,` is already a statement separator (W-126).
+node a "A" at (0, 0)
+node b "B" at (400, 0)
+node c "C" at (200, 200)
+
+a -> b via (200, 120)
+a -> b via (200, 120) (300, 260)
+a -> b via (left-of c gap 20) (below c gap 30)
+a -> b via (col 3, row 2) (col 5, row 2)
+a -> b "labelled" via (200, 120) { stroke: #f43f5e }
+a -> b "either order" { stroke: #f43f5e } via (200, 120)

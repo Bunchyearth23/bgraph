@@ -645,6 +645,46 @@ Where there is no way round at all — a box wholly enclosed by others — the e
 falls back to a plain elbow and `check` reports that it crosses something,
 because a drawing that admits it is wrong beats a missing edge.
 `bgraph init free` and a `router: ortho` on an edge is the shortest way to see it.
+
+### Telling a line where to go
+
+Two controls, and they are different in kind. **`from` and `to`** name the side
+a line leaves and arrives by; **`via`** names the places it goes through on the
+way. The route between any two of those is still the engine's (`D-033`).
+
+```bgraph
+node a "A" at (0, 0)
+node b "B" at (420, 0)
+node c "C" at (200, 220)
+
+a -> b "over the top"
+a -> b "under" { router: ortho } via (left-of c gap 30) (below c gap 40)
+a -> c { from: bottom to: left }
+```
+
+`from` and `to` take `top`, `bottom`, `left`, `right` or `auto` — `auto` is the
+default and is spelled, so a class can put a side back to the engine's choice.
+Lines arriving at one side of one box **spread along it** in declaration order
+rather than converging on its midpoint; `lane: 2` reorders them by hand. A line
+arriving and a line leaving are not in each other's way, so those are not
+spread against one another.
+
+`via` takes a **list**, and each stop is parenthesised — that is what lets the
+list need no separator, since `,` already separates statements. A stop is one
+of three things, written the same way:
+
+| | |
+|---|---|
+| `(300, 120)` | a point. The escape hatch: `D-001` refuses absolute coordinates for boxes for the same reason they are brittle here |
+| `(col 3, row 2)` | a cell of the grid `graph { grid }` declared — absolute in units you chose, so it survives a change of scale |
+| `(left-of c gap 20)` | a place beside a box, in the anchor vocabulary the rest of the language uses. **The form that survives an insertion** |
+
+A waypoint is a **passage, not a preference**: the line goes through each one,
+in the order written. What survives between them is the obstacle avoidance —
+every leg is routed by the same solver, so a line told to pass left of a box
+still goes around whatever stands between it and there. A waypoint that lands
+inside a box is reported rather than moved, because moving it would change the
+line you asked for.
 Endpoints are clipped against the real shape outline, so arrows meet
 diamonds and ellipses on their edge, not on an invisible bounding box.
 

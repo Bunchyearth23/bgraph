@@ -11,6 +11,7 @@
   "activate"
   "extends"
   "at"
+  "via"
   "gap"
   "align"
   ; Composition, and the two statements that belong to no box.

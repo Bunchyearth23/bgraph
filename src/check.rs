@@ -236,6 +236,30 @@ pub fn after_layout(layout: &crate::layout::Layout) -> Vec<Diag> {
         }
     }
 
+    // A waypoint inside a box. The line is drawn through it because that is
+    // what `D-034` promises — the passage is not negotiable — so what the
+    // engine owes the author is to say that the place he named is inside
+    // something. Repairing it would move the line he asked for.
+    for edge in &layout.edges {
+        for stop in &edge.via {
+            if let Some(node) = layout.nodes.iter().find(|n| {
+                stop.0 > n.rect.x
+                    && stop.0 < n.rect.right()
+                    && stop.1 > n.rect.y
+                    && stop.1 < n.rect.bottom()
+            }) {
+                out.push(Diag::warn(
+                    edge.span,
+                    format!(
+                        "a waypoint at ({:.0}, {:.0}) is inside `{}`, so the line is \
+                         drawn through it — move the waypoint, or the box",
+                        stop.0, stop.1, node.id
+                    ),
+                ));
+            }
+        }
+    }
+
     for (edge, route) in layout.edges.iter().zip(&routed) {
         // A straight edge is clipped against both shapes and goes nowhere
         // near anything else by construction. An elbow is routed around
@@ -458,6 +482,23 @@ fn check_nodes<'a>(
                 anchor.span,
                 format!("unknown node `{}`", anchor.as_str()),
             ));
+        }
+    }
+
+    // A waypoint's anchor is an anchor like any other. Without this a `via
+    // (left-of typo)` drew a line through the origin and said nothing, which
+    // is the silent no-op `D-005` exists to refuse (`W-126`).
+    for edge in &diagram.edges {
+        for stop in &edge.via {
+            let Placement::Rel { anchor, .. } = stop else {
+                continue;
+            };
+            if !anchorable.contains(anchor.as_str()) {
+                out.push(Diag::error(
+                    anchor.span,
+                    format!("unknown node `{}` in a waypoint", anchor.as_str()),
+                ));
+            }
         }
     }
 

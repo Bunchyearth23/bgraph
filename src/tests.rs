@@ -943,6 +943,67 @@ fn after(source: &str) -> Vec<String> {
 }
 
 #[test]
+fn a_line_goes_through_every_place_it_is_told_to() {
+    // `D-034`. A list, not a point — and each stop is parenthesised, which is
+    // what lets the list need no separator, since `,` already separates
+    // statements.
+    let l = build(
+        "node a \"A\" at (0, 0) { size: 80 60 }\n\
+         node b \"B\" at (500, 0) { size: 80 60 }\n\
+         node c \"C\" at (240, 300) { size: 80 60 }\n\
+         a -> b { router: ortho } via (240, 200) (left-of c gap 20)\n",
+    );
+    let path = &render_svg::route_all(&l)[0].points;
+    let near = |p: (f64, f64)| {
+        path.iter()
+            .any(|q| (q.0 - p.0).abs() < 0.5 && (q.1 - p.1).abs() < 0.5)
+    };
+
+    assert!(near((240.0, 200.0)), "the absolute stop: {path:?}");
+    let c = l.nodes[2].rect;
+    assert!(
+        near((c.x - 20.0, c.cy())),
+        "and the one beside a box: {path:?}"
+    );
+
+    // A grid cell is the third form, and it is free: `at` already reads one.
+    let g = build(
+        "graph { grid: 100 50 }\n\
+         node a \"A\" at (0, 0) { size: 40 30 }\n\
+         node b \"B\" at (500, 0) { size: 40 30 }\n\
+         a -> b via (col 3, row 4)\n",
+    );
+    let path = &render_svg::route_all(&g)[0].points;
+    assert!(
+        path.iter()
+            .any(|q| (q.0 - 300.0).abs() < 0.5 && (q.1 - 200.0).abs() < 0.5),
+        "the cell is multiplied by the declared step: {path:?}"
+    );
+}
+
+#[test]
+fn a_waypoint_is_a_passage_and_the_engine_says_when_it_cannot_be_one() {
+    // The passage is not negotiable, so what the engine owes the author is to
+    // say when the place he named is inside something — repairing it would
+    // move the line he asked for, which is the bargain `X-004` struck.
+    let inside = after(
+        "node a \"A\" at (0, 0) { size: 60 40 }\n\
+         node m \"M\" at (200, 0) { size: 100 100 }\n\
+         node b \"B\" at (400, 0) { size: 60 40 }\n\
+         a -> b via (230, 30)\n",
+    );
+    assert!(
+        inside.iter().any(|m| m.contains("is inside `m`")),
+        "{inside:?}"
+    );
+
+    // And an anchor that does not exist is an error, not a line through the
+    // origin — the silent no-op `D-005` refuses.
+    let e = err("node a \"A\" at (0, 0)\nnode b \"B\" at (300, 0)\na -> b via (left-of nope)\n");
+    assert!(e.contains("unknown node `nope` in a waypoint"), "{e}");
+}
+
+#[test]
 fn an_edge_attaches_where_it_is_told_to() {
     // `D-033`. Placement was declared and attachment was not, so an author
     // could say where every box goes and still not stop two heads landing on

@@ -200,8 +200,25 @@ module.exports = grammar({
           ),
           repeat(choice(field('data', $._bare_value), field('class', $.class_reference))),
         ),
-        optional(field('body', $.block)),
+        // `via` and the block come in either order, the way an item's
+        // placement and block already do.
+        optional(
+          choice(
+            seq(field('via', $.via_list), optional(field('body', $.block))),
+            seq(field('body', $.block), optional(field('via', $.via_list))),
+          ),
+        ),
       ),
+
+    // The places a line has to go through, in order (`D-034`). Each is
+    // parenthesised, which is what lets the list need no separator — `,` is
+    // already a statement separator — and what lets a point, a grid cell and a
+    // place beside a box all be written the same way.
+    via_list: ($) => seq('via', repeat1($._waypoint)),
+
+    _waypoint: ($) => choice($.cell, $.point, $.relative_point),
+
+    relative_point: ($) => seq('(', $.relative_position, ')'),
 
     class_reference: ($) => seq('.', $.identifier),
 

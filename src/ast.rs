@@ -258,6 +258,13 @@ pub struct EdgeDecl {
     pub positional_span: Span,
     pub classes: Vec<Spanned<String>>,
     pub props: Vec<Prop>,
+    /// Places the line must go through, in the order written (`D-034`).
+    ///
+    /// A `Placement` and not a point, because a waypoint has to survive a
+    /// neighbour being inserted the same way a box does — so `left-of c gap 20`
+    /// is the useful form and a bare coordinate is the escape hatch. Resolved
+    /// in the layout, which is the only place that knows where `c` ended up.
+    pub via: Vec<Placement>,
     pub span: Span,
 }
 
