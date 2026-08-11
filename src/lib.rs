@@ -132,6 +132,7 @@ pub mod window;
 
 #[cfg(feature = "bpmn")]
 pub mod bpmn;
+pub mod examples;
 pub mod fmt;
 #[allow(missing_docs)]
 pub mod layout;

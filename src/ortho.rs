@@ -22,9 +22,10 @@
 //! by a tidy line. The cost is low enough that it will not take a long detour to
 //! save a corner.
 //!
-//! **Integer costs, and a tie broken by index.** The golden test compares SVG
-//! byte for byte, and this project has already shipped a diagram that rendered
-//! differently run to run (`W-065`, the venn's `HashMap`). So there is no float
+//! **Integer costs, and a tie broken by index.** The golden manifest pins a
+//! hash of every archetype's SVG, and this project has already shipped a
+//! diagram that rendered differently run to run (`W-065`, the venn's
+//! `HashMap`). So there is no float
 //! in the priority order and no hash container anywhere in here: costs are
 //! thousandths of a point as `i64`, and equal costs are settled by the state's
 //! own index. The same input gives the same path, always.
@@ -43,11 +44,10 @@ use crate::layout::Rect;
 /// Clearance kept between a routed line and a box it passes. Also the width of
 /// the channel the grid puts either side of every box.
 ///
-/// Chosen by looking at the result rather than by taste. At 8 the detour in
-/// `examples/ortho.bd` ran close enough over the worker that the arrow head of
-/// the edge *terminating* on it had nowhere to sit — a line that clears a box
-/// by less than an arrow head is technically not touching it and reads as if it
-/// were.
+/// Chosen by looking at the result rather than by taste. At 8 a detour ran
+/// close enough over a box that the arrow head of the edge *terminating* on it
+/// had nowhere to sit — a line that clears a box by less than an arrow head is
+/// technically not touching it and reads as if it were.
 const CLEARANCE: f64 = 16.0;
 
 /// What a corner costs, in points of length. High enough that the path with

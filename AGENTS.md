@@ -31,7 +31,8 @@ is sugar for the named property, so the long form always works. See
 The premise: mermaid-class tools auto-place everything and you fight the
 engine. Here **layout is declared** (relative anchors between nodes) and
 **style is a real cascade**. See `docs/language.md` for the syntax and
-`examples/` for a worked file per archetype.
+`bgraph init <genre>` for a worked file per archetype — they live in
+`src/examples.rs`, not in a directory (`W-116`).
 
 **Where this is going** (`D-014`): archetypes covering four audiences —
 statistics, software, embedded and data — and, at the end of it, an
@@ -58,11 +59,11 @@ disagree.
 
 ## Setup commands
 - `cargo build` — builds both `bgraph` and `bgraph-lsp`
-- `cargo run --bin bgraph -- examples/groups.bd -o groups.svg` (`.pdf` picks the PDF writer)
-- `cargo run --bin bgraph -- watch examples/groups.bd` → http://127.0.0.1:7878
-- `cargo run --bin bgraph -- watch examples/venn.svg` — the same viewer, on a picture
+- `cargo run --bin bgraph -- init free -o /tmp/a.bd && cargo run --bin bgraph -- /tmp/a.bd -o a.svg` (`.pdf` picks the PDF writer)
+- `cargo run --bin bgraph -- watch /tmp/a.bd` → http://127.0.0.1:7878
+- `cargo run --bin bgraph -- watch a.svg` — the same viewer, on a picture
 - `cargo build --features window` — the native window (opt-in: +78 crates)
-- `cargo run --bin bgraph -- check examples/groups.bd` — diagnostics as `file:line:col`
+- `cargo run --bin bgraph -- check /tmp/a.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
 - `cargo test` (523 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo build --no-default-features` — the four-dependency library. **A CI
@@ -101,6 +102,7 @@ disagree.
 | `src/relayout.rs` | `bgraph layout`: inserts into lines, never rewrites them |
 | `src/report.rs` | The two forms of a diagnostic. The flat one is an interchange format and does not move |
 | `src/init.rs` | `bgraph init <genre>`, generated from the same tables |
+| `src/examples.rs` | **The worked file for every archetype, in the source.** Not a directory: `include_str!` made the crate unbuildable without one, and `init` makes one redundant. `docs/goldens.txt` pins what each renders to |
 | `src/wasm.rs` | The wasm boundary. **The only `unsafe` in the crate**, and `forbid` is scoped around it |
 | `src/docgen.rs` | `docs/reference.md`, generated from the `props.rs` tables |
 | `src/check.rs` | **The validator** — spanned diagnostics, one source of truth |
@@ -185,6 +187,16 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-08-11] **`include_str!` makes a data directory a build dependency.**
+  Thirty-one of them pointed at `examples/`, so deleting a directory of *sample
+  files* stopped the crate compiling. Anything the code needs at build time
+  belongs in the code; a directory is an output. The examples are
+  `src/examples.rs` now and `docs/goldens.txt` pins what each one draws.
+- [2026-08-11] **A sweep over a directory passes when the directory is empty.**
+  Half the suite's coverage was `read_dir("examples")` loops with a
+  `seen >= 25` floor — which is a guard, but the floor is the only thing that
+  was guarding. Iterate a table the compiler knows about, and a test cannot
+  quietly check nothing.
 - [2026-08-11] **The golden test compares bytes and says nothing about
   validity.** An SVG with an `<ellipse>` closed by a `</path>` was checked in
   and passed every run: browsers draw it, so the preview looked fine, and only

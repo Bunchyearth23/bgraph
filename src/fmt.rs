@@ -6,7 +6,7 @@
 //! than it is written, so the shape of the source is worth as much as the
 //! shape of the picture.
 //!
-//! **Interior alignment is left exactly as written.** `examples/packet.bd`
+//! **Interior alignment is left exactly as written.** The `packet` example
 //! lines its bit ranges up in columns and that is a real style, not an
 //! accident; a formatter that crushed it would be arguing with the author
 //! about something the grammar has no opinion on. Indentation is structural

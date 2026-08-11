@@ -139,7 +139,9 @@ node seq   "Sequence number"  { bits: 32 63 }
 Guided tour: [`docs/language.md`](docs/language.md).
 Exhaustive reference (generated from the compiler's own tables):
 [`docs/reference.md`](docs/reference.md).
-Worked examples: [`examples/`](examples) — one complete file per archetype.
+Worked examples: `bgraph init <genre>` prints a complete file for any of the
+twenty-nine, and the reference reproduces every one of them. They live in
+`src/examples.rs`, so the crate needs no directory of sample files to build.
 
 ## Build
 

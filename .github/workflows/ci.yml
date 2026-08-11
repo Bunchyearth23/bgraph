@@ -54,10 +54,12 @@ jobs:
             exit 1
           fi
 
-      # The repository's own files must pass the formatter it ships, or the
-      # formatter has invented a style rather than followed one.
-      - name: The examples are in canonical shape
-        run: cargo run --bin bgraph -- fmt --check examples/*.bd
+      # The examples live in `src/examples.rs` and the suite already holds them
+      # to the formatter's own shape, so the step that ran `fmt --check` over a
+      # directory of files went with the directory (`W-116`). What it proved —
+      # that the repository's own files pass the formatter it ships — is now
+      # `every_example_is_in_the_shape_the_formatter_writes`, which cannot be
+      # skipped by the files not being there.
 
       # An archetype not compiled in must be *unknown*, not broken.
       - name: Build with no archetype at all

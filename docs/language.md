@@ -24,7 +24,7 @@ it.
 
 ```
 // main.bd — a bgraph-tagged fence promises one complete file, and this is
-// three. The whole set is in examples/compose/, and a test renders it.
+// three. A test writes this set out and renders it.
 include "house.bds"          // a shared palette: styles only
 include "core.bd" as core    // a diagram, under a namespace
 
@@ -88,7 +88,8 @@ Deliberately no conditionals and no loops. Past that it is a macro system, and
 a much larger promise than this makes — the library fills a table for the
 cases that need one.
 
-The whole example is in [`examples/components.bd`](../examples/components.bd).
+`bgraph init free` prints a working file to start from; this snippet is
+complete on its own and the suite renders it.
 
 ### Notes
 
@@ -395,7 +396,7 @@ own word, and every positional value can be written as a property instead —
 positional form is the idiomatic one.
 
 Every archetype ships a complete, working file: they are in
-[`examples/`](../examples), and each one is reproduced in
+`bgraph init <genre>`, and each one is reproduced in
 [`reference.md`](reference.md) under its genre.
 
 ---
@@ -643,7 +644,7 @@ not other edges: two lines whose tidiest routes share a channel will share it.
 Where there is no way round at all — a box wholly enclosed by others — the edge
 falls back to a plain elbow and `check` reports that it crosses something,
 because a drawing that admits it is wrong beats a missing edge.
-`examples/ortho.bd` is the worked case.
+`bgraph init free` and a `router: ortho` on an edge is the shortest way to see it.
 Endpoints are clipped against the real shape outline, so arrows meet
 diamonds and ellipses on their edge, not on an invisible bounding box.
 
@@ -744,7 +745,7 @@ bgraph report.bd --data - --emit    # …from a pipe, printing the filled source
 bgraph report.bd --rows r=sales.csv # one hole from the rows of a CSV
 bgraph watch report.bd --data q3.json   # live preview, data re-read on save
 bgraph fmt diagram.bd               # reformat to the canonical shape
-bgraph fmt --check examples/*.bd    # …or report what would change, and exit non-zero
+bgraph fmt --check *.bd            # …or report what would change, and exit non-zero
 bgraph fmt --migrate old.bd         # rewrite a removed `opacity` as the colour's alpha
 bgraph init pie                     # a working file for a genre; no genre lists them
 bgraph completions fish             # a completion script; bash|zsh|fish|elvish|powershell

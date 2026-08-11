@@ -89,44 +89,7 @@ fn graph_settings(m: &mut String) {
     );
 }
 
-/// A complete, working file per archetype.
-///
-/// `include_str!` rather than a path, so the reference cannot show a diagram
-/// that does not exist; and `every_example_still_works` renders each one, so
-/// it cannot show one that no longer draws. Tables tell you what a property
-/// means — this is what you copy to start.
-pub(crate) const EXAMPLES: &[(&str, &str)] = &[
-    ("free", include_str!("../examples/groups.bd")),
-    ("pie", include_str!("../examples/pie.bd")),
-    ("packet", include_str!("../examples/packet.bd")),
-    ("bytefield", include_str!("../examples/bytefield.bd")),
-    ("treemap", include_str!("../examples/treemap.bd")),
-    ("quadrant", include_str!("../examples/quadrant.bd")),
-    ("wave", include_str!("../examples/wave.bd")),
-    ("sankey", include_str!("../examples/sankey.bd")),
-    ("bar", include_str!("../examples/bar.bd")),
-    ("xy", include_str!("../examples/xy.bd")),
-    ("sequence", include_str!("../examples/sequence.bd")),
-    ("gantt", include_str!("../examples/gantt.bd")),
-    ("timeline", include_str!("../examples/timeline.bd")),
-    ("block", include_str!("../examples/block.bd")),
-    ("er", include_str!("../examples/er.bd")),
-    ("requirements", include_str!("../examples/requirements.bd")),
-    ("class", include_str!("../examples/class.bd")),
-    ("kanban", include_str!("../examples/kanban.bd")),
-    ("journey", include_str!("../examples/journey.bd")),
-    ("radar", include_str!("../examples/radar.bd")),
-    ("rack", include_str!("../examples/rack.bd")),
-    ("network", include_str!("../examples/network.bd")),
-    ("venn", include_str!("../examples/venn.bd")),
-    ("harness", include_str!("../examples/harness.bd")),
-    ("gitgraph", include_str!("../examples/gitgraph.bd")),
-    ("orgchart", include_str!("../examples/orgchart.bd")),
-    ("mindmap", include_str!("../examples/mindmap.bd")),
-    ("treeview", include_str!("../examples/treeview.bd")),
-    ("state", include_str!("../examples/state.bd")),
-    ("bpmn", include_str!("../examples/bpmn.bd")),
-];
+pub(crate) use crate::examples::EXAMPLES;
 
 fn archetypes(m: &mut String) {
     m.push_str(
@@ -207,7 +170,7 @@ fn archetypes(m: &mut String) {
         if let Some((_, source)) = EXAMPLES.iter().find(|(name, _)| *name == def.name) {
             let _ = write!(
                 m,
-                "\n<details>\n<summary>A complete file — <code>examples/{}.bd</code></summary>\n\n```\n{}\n```\n\n</details>\n",
+                "\n<details>\n<summary>A complete file — <code>bgraph init {}</code></summary>\n\n```\n{}\n```\n\n</details>\n",
                 if def.name == "free" {
                     "groups"
                 } else {

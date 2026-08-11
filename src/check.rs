@@ -201,7 +201,7 @@ pub fn after_layout(layout: &crate::layout::Layout) -> Vec<Diag> {
 
     // An edge label drawn over a box. Nodes are painted after labels, so the
     // box wins and the text is simply gone — which is what `[funds cleared]`
-    // looked like in `examples/state.bd`: not truncated, overpainted.
+    // looked like in the `state` example: not truncated, overpainted.
     //
     // Reported rather than repaired, and that is the whole point. The fix is to
     // widen the gap or move the label, and both are the author's to make:

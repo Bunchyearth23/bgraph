@@ -277,7 +277,7 @@ node <id> ["label"]
 It takes no settings.
 
 <details>
-<summary>A complete file — <code>examples/groups.bd</code></summary>
+<summary>A complete file — <code>bgraph init groups</code></summary>
 
 ```
 // A group is a frame sized by what it holds. Give it a placement and the
@@ -342,7 +342,7 @@ On a `slice` — these are its own, and are not offered elsewhere:
 | `value` | node | `value: <number>` | Magnitude of a slice. Usually written positionally — `slice emea "EMEA" 4820`. |
 
 <details>
-<summary>A complete file — <code>examples/pie.bd</code></summary>
+<summary>A complete file — <code>bgraph init pie</code></summary>
 
 ```
 type pie {
@@ -387,7 +387,7 @@ On a `task` — these are its own, and are not offered elsewhere:
 | `length` | node | `length: <duration>` | How long a task runs, when the start is given on its own. |
 
 <details>
-<summary>A complete file — <code>examples/gantt.bd</code></summary>
+<summary>A complete file — <code>bgraph init gantt</code></summary>
 
 ```
 type gantt {
@@ -436,7 +436,7 @@ class <id> ["label"]
 | `title` | `title: <text>` | Heading drawn above the diagram. |
 
 <details>
-<summary>A complete file — <code>examples/class.bd</code></summary>
+<summary>A complete file — <code>bgraph init class</code></summary>
 
 ```
 type class { title: "Ordering domain" }
@@ -497,7 +497,7 @@ On an `event` — these are its own, and are not offered elsewhere:
 | `date` | node | `date: <date>` | When the event happened. Usually written positionally — `event launch "Launch" 2026-03-15`. Events are drawn in date order, and their labels staggered above and below the line so a cluster stays readable. |
 
 <details>
-<summary>A complete file — <code>examples/timeline.bd</code></summary>
+<summary>A complete file — <code>bgraph init timeline</code></summary>
 
 ```
 type timeline { title: "Rust editions and releases" size: 860 36 }
@@ -536,7 +536,7 @@ On a `block` — these are its own, and are not offered elsewhere:
 | `technology` *(alias)* | both | `technology: <text>` | Alias of `tech`. |
 
 <details>
-<summary>A complete file — <code>examples/block.bd</code></summary>
+<summary>A complete file — <code>bgraph init block</code></summary>
 
 ```
 type block { title: "Internet banking — containers" }
@@ -602,7 +602,7 @@ On an `entity` — these are its own, and are not offered elsewhere:
 | `to-card` | edge | `to-card: <one\|many\|zero-one\|zero-many\|one-many>` | Cardinality at the head of a relation. A declared cardinality replaces the arrowhead at that end. |
 
 <details>
-<summary>A complete file — <code>examples/er.bd</code></summary>
+<summary>A complete file — <code>bgraph init er</code></summary>
 
 ```
 type er { title: "Ordering schema" }
@@ -663,7 +663,7 @@ On a `state` — these are its own, and are not offered elsewhere:
 | `guard` | edge | `guard: <text>` | A condition on a transition, shown in brackets after its label. |
 
 <details>
-<summary>A complete file — <code>examples/state.bd</code></summary>
+<summary>A complete file — <code>bgraph init state</code></summary>
 
 ```
 // The gaps are wide where the transition carries a long label: a guard is
@@ -718,7 +718,7 @@ participant <id> ["label"]
 | `numbered` | `numbered: <on\|off>` | Number the messages in order. |
 
 <details>
-<summary>A complete file — <code>examples/sequence.bd</code></summary>
+<summary>A complete file — <code>bgraph init sequence</code></summary>
 
 ```
 type sequence {
@@ -790,7 +790,7 @@ On a `series` — these are its own, and are not offered elsewhere:
 | `pairs` | node | `pairs: <x> <y> <x> <y> …` | Coordinates, read two at a time — the shape `scatter` carries. `scatter north 1 4 3 8` is two points, at (1, 4) and (3, 8). An odd count is an error: the last x would have no y. |
 
 <details>
-<summary>A complete file — <code>examples/xy.bd</code></summary>
+<summary>A complete file — <code>bgraph init xy</code></summary>
 
 ```
 type xy {
@@ -833,7 +833,7 @@ On a `series` — these are its own, and are not offered elsewhere:
 | `points` | node | `points: <n> <n> …` | One number per category, in order. Usually written positionally — `series north 4 8 15`. |
 
 <details>
-<summary>A complete file — <code>examples/bar.bd</code></summary>
+<summary>A complete file — <code>bgraph init bar</code></summary>
 
 ```
 type bar {
@@ -878,7 +878,7 @@ On a `node` — these are its own, and are not offered elsewhere:
 | `value` | edge | `value: <number>` | How much flows along this link. Usually written positionally — `coal -> grid 40`. |
 
 <details>
-<summary>A complete file — <code>examples/sankey.bd</code></summary>
+<summary>A complete file — <code>bgraph init sankey</code></summary>
 
 ```
 type sankey {
@@ -936,7 +936,7 @@ On a `signal` — these are its own, and are not offered elsewhere:
 | `data` | node | `data: "<first>" "<second>" …` | Names for the data segments of a wave, in order. |
 
 <details>
-<summary>A complete file — <code>examples/wave.bd</code></summary>
+<summary>A complete file — <code>bgraph init wave</code></summary>
 
 ```
 type wave {
@@ -983,7 +983,7 @@ On a `point` — these are its own, and are not offered elsewhere:
 | `y` | node | `y: <number>` | Vertical position, on the axis range the archetype declares. |
 
 <details>
-<summary>A complete file — <code>examples/quadrant.bd</code></summary>
+<summary>A complete file — <code>bgraph init quadrant</code></summary>
 
 ```
 type quadrant {
@@ -1030,7 +1030,7 @@ On a `box` — these are its own, and are not offered elsewhere:
 | `value` | node | `value: <number>` | Area of a box, relative to its siblings. Usually written positionally — `box api "API" 42`. |
 
 <details>
-<summary>A complete file — <code>examples/treemap.bd</code></summary>
+<summary>A complete file — <code>bgraph init treemap</code></summary>
 
 ```
 type treemap {
@@ -1087,7 +1087,7 @@ On a `field` — these are its own, and are not offered elsewhere:
 | `bits` | node | `bits: <first> <last>` | Inclusive bit range of a field. `bits: 8` is shorthand for a single bit. Usually written positionally — `field flags "Flags" 8 15`. |
 
 <details>
-<summary>A complete file — <code>examples/packet.bd</code></summary>
+<summary>A complete file — <code>bgraph init packet</code></summary>
 
 ```
 type packet {
@@ -1144,7 +1144,7 @@ On a `commit` — these are its own, and are not offered elsewhere:
 | `tag` | node | `tag: "<name>"` | A label drawn beside the commit — a release, a marker. |
 
 <details>
-<summary>A complete file — <code>examples/gitgraph.bd</code></summary>
+<summary>A complete file — <code>bgraph init gitgraph</code></summary>
 
 ```
 // Parentage is the edges; the rails are the archetype's to assign. The author
@@ -1194,7 +1194,7 @@ position <id> ["label"]
 | `spacing` | `spacing: <number>` | Distance between two siblings. |
 
 <details>
-<summary>A complete file — <code>examples/orgchart.bd</code></summary>
+<summary>A complete file — <code>bgraph init orgchart</code></summary>
 
 ```
 // The hierarchy is the edges; the archetype places every box, so adding a
@@ -1240,7 +1240,7 @@ topic <id> ["label"]
 | `spacing` | `spacing: <number>` | Distance between two siblings. |
 
 <details>
-<summary>A complete file — <code>examples/mindmap.bd</code></summary>
+<summary>A complete file — <code>bgraph init mindmap</code></summary>
 
 ```
 // The same tree as the orgchart, arranged outward — the root stays central
@@ -1290,7 +1290,7 @@ entry <id> ["label"]
 | `spacing` | `spacing: <number>` | Distance between two siblings. |
 
 <details>
-<summary>A complete file — <code>examples/treeview.bd</code></summary>
+<summary>A complete file — <code>bgraph init treeview</code></summary>
 
 ```
 // The same tree as indented rows — depth is the indent, order is the order
@@ -1343,7 +1343,7 @@ On a `connector` — these are its own, and are not offered elsewhere:
 | `wire` | edge | `wire: <from-pin> <to-pin>` | Which pin at each end a wire lands on, by the number the connector declares as a member line (`D-025`). Usually written positionally — `j1 -> j2 "power" 1 3`. |
 
 <details>
-<summary>A complete file — <code>examples/harness.bd</code></summary>
+<summary>A complete file — <code>bgraph init harness</code></summary>
 
 ```
 // A connector's pins are its member lines; a wire is an edge carrying the pin
@@ -1406,7 +1406,7 @@ On a `set` — these are its own, and are not offered elsewhere:
 | `shared` | edge | `shared: <number>` | How many things two sets have in common, written on a link between them — `rust -> embedded 30`. With two sets the lens is solved to that exact area; with three it is labelled but not solved, because three circles cannot in general be arranged to honour all seven regions at once. |
 
 <details>
-<summary>A complete file — <code>examples/venn.bd</code></summary>
+<summary>A complete file — <code>bgraph init venn</code></summary>
 
 ```
 // Three sets. With two the lens is *solved* to the number written; with three
@@ -1485,7 +1485,7 @@ On a `task` — these are its own, and are not offered elsewhere:
 | `flow` | edge | `flow: <sequence\|message\|association\|default\|conditional>` | What the connector means. A sequence flow is a solid arrow, a message flow is dashed with a hollow head, an association is dotted with none. `default` takes the slash and `conditional` the diamond, both at the gateway end. Usually written positionally — `check -> notify "rejected" default`. |
 
 <details>
-<summary>A complete file — <code>examples/bpmn.bd</code></summary>
+<summary>A complete file — <code>bgraph init bpmn</code></summary>
 
 ```
 // A business process. Four words, because four things have four positional
@@ -1573,7 +1573,7 @@ On a `host` — these are its own, and are not offered elsewhere:
 | `speed` | edge | `speed: "<rate>"` | What the link runs at, drawn in brackets under its label. Usually written positionally — `sw -> srv "uplink" "10 GbE"`. |
 
 <details>
-<summary>A complete file — <code>examples/network.bd</code></summary>
+<summary>A complete file — <code>bgraph init network</code></summary>
 
 ```
 // Topology: hosts, links and the segments that hold them. The role picks the
@@ -1626,7 +1626,7 @@ On a `device` — these are its own, and are not offered elsewhere:
 | `u` | node | `u: <lowest> <highest>` | The inclusive span of rack units a device occupies, counted from **1 at the bottom** as a rack is. `u: 12` is a single unit. Usually written positionally — `device srv "Compute node" 38 41`. |
 
 <details>
-<summary>A complete file — <code>examples/rack.bd</code></summary>
+<summary>A complete file — <code>bgraph init rack</code></summary>
 
 ```
 // A rack elevation. Units count from 1 at the bottom, as a rack is labelled —
@@ -1679,7 +1679,7 @@ On a `series` — these are its own, and are not offered elsewhere:
 | `points` | node | `points: <n> <n> …` | One number per category, in order. Usually written positionally — `series north 4 8 15`. |
 
 <details>
-<summary>A complete file — <code>examples/radar.bd</code></summary>
+<summary>A complete file — <code>bgraph init radar</code></summary>
 
 ```
 // Axes radiating from a centre, one closed polygon per series. Every axis
@@ -1723,7 +1723,7 @@ On a `step` — these are its own, and are not offered elsewhere:
 | `scores` | node | `scores: <n> <n> …` | One score per actor, in the order `actors` declares them. Usually written positionally — `step pay "Pay" 2 4`. |
 
 <details>
-<summary>A complete file — <code>examples/journey.bd</code></summary>
+<summary>A complete file — <code>bgraph init journey</code></summary>
 
 ```
 // Steps in the order they are taken, one line per actor — the point being the
@@ -1777,7 +1777,7 @@ On a `card` — these are its own, and are not offered elsewhere:
 | `limit` | node | `limit: <count>` | The work-in-progress limit of a **column** — the number of cards it is allowed to hold. `check` reports a column over its limit, which is the one thing a board is kept for. Written on the `group`, not on a card; on a card it means nothing and is reported as such. |
 
 <details>
-<summary>A complete file — <code>examples/kanban.bd</code></summary>
+<summary>A complete file — <code>bgraph init kanban</code></summary>
 
 ```
 // A board: `group`s are the columns, in declaration order, and the cards
@@ -1845,7 +1845,7 @@ On a `requirement` — these are its own, and are not offered elsewhere:
 | `link` | edge | `link: <derive\|satisfy\|verify\|refine\|trace\|copy>` | What the relation asserts, read tail to head — `r2 -> r1 derive` is r2 derives from r1. Drawn in guillemets on the line. Usually written positionally. |
 
 <details>
-<summary>A complete file — <code>examples/requirements.bd</code></summary>
+<summary>A complete file — <code>bgraph init requirements</code></summary>
 
 ```
 // `requirements` is a class box with a relation vocabulary: a bare line in the
@@ -1915,7 +1915,7 @@ On a `field` — these are its own, and are not offered elsewhere:
 | `bytes` | node | `bytes: <first> <last>` | Inclusive byte range of a field. `bytes: 4` is shorthand for a single byte. Usually written positionally — `field magic "Magic" 0 3`, which is four bytes. |
 
 <details>
-<summary>A complete file — <code>examples/bytefield.bd</code></summary>
+<summary>A complete file — <code>bgraph init bytefield</code></summary>
 
 ```
 // `bytefield` is `packet` read one order of magnitude up: the ruler counts

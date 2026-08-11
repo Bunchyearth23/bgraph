@@ -947,7 +947,7 @@ fn a_label_wider_than_its_gap_is_reported_rather_than_repaired() {
     // `W-113`. Nodes are painted after labels, so a label that does not fit
     // between the two boxes it runs between is not truncated — it is
     // overpainted, and the text is simply gone. That is what `[funds cleared]`
-    // looked like in `examples/state.bd`.
+    // looked like in the `state` example.
     //
     // The engine says so instead of fixing it, because both fixes are the
     // author's: widening a gap **moves a box**, which `D-001` forbids it to do.
@@ -1090,18 +1090,8 @@ fn every_example_is_free_of_geometric_complaints() {
     // The suite already renders them; this asserts the second pass has nothing
     // to say about any of them, so a shipped example is not demonstrating the
     // very thing the warning is about.
-    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/examples");
-    for entry in std::fs::read_dir(dir).expect("readable") {
-        let path = entry.expect("entry").path();
-        if path.extension().is_none_or(|e| e != "bd") {
-            continue;
-        }
-        let source = std::fs::read_to_string(&path).expect("readable");
-        if source.contains("{{") {
-            continue;
-        }
-        let name = path.file_name().unwrap().to_string_lossy().to_string();
-        assert!(after(&source).is_empty(), "{name}: {:?}", after(&source));
+    for (genre, source) in crate::examples::EXAMPLES {
+        assert!(after(source).is_empty(), "{genre}: {:?}", after(source));
     }
 }
 
@@ -1242,18 +1232,12 @@ fn the_formatter_refuses_a_file_it_does_not_understand() {
 fn every_example_is_in_the_shape_the_formatter_writes() {
     // The formatter agreeing with the house style is the claim; a repository
     // whose own files fail it would mean it had invented a different one.
-    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/examples");
-    for entry in std::fs::read_dir(dir).expect("readable") {
-        let path = entry.expect("entry").path();
-        if path.extension().is_none_or(|e| e != "bd") {
-            continue;
-        }
-        let name = path.file_name().unwrap().to_string_lossy().to_string();
-        let source = std::fs::read_to_string(&path).expect("readable");
+    for (genre, source) in crate::examples::EXAMPLES {
         assert_eq!(
-            crate::fmt::format(&source).unwrap_or_else(|e| panic!("{name}: {e:#}")),
-            source,
-            "{name} is not in canonical shape — run `bgraph fmt examples/{name}`"
+            crate::fmt::format(source).unwrap_or_else(|e| panic!("{genre}: {e:#}")),
+            *source,
+            "the `{genre}` example is not in canonical shape — it is what \
+             `bgraph init {genre}` prints, so it has to be"
         );
     }
 }
@@ -1265,15 +1249,21 @@ fn the_viewer_shows_a_picture_it_did_not_draw() {
     // An `.svg` is already the picture. Serving it as it is means the viewer
     // works on a file bgraph never wrote — and since the reload is driven by
     // the file's timestamp, it follows another tool regenerating it.
-    let dir = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/examples"));
-    let svg = dir.join("venn.svg");
+    // The picture is one this test writes, not one borrowed from a directory
+    // of samples — and it is deliberately *not* something bgraph would emit,
+    // which is the whole claim being made (`W-116`).
+    let dir = scratch("viewer");
+    let hand_drawn = "<svg xmlns=\"http://www.w3.org/2000/svg\"><!-- drawn elsewhere --></svg>\n";
+    let svg = dir.join("hand.svg");
+    std::fs::write(&svg, hand_drawn).unwrap();
 
     let served = crate::watch::render_source(&svg, None).expect("serves");
-    let on_disk = std::fs::read_to_string(&svg).expect("readable");
-    assert_eq!(served, on_disk, "verbatim, not re-rendered");
+    assert_eq!(served, hand_drawn, "verbatim, not re-rendered");
 
     // And a source is still rendered, so one command covers both.
-    let rendered = crate::watch::render_source(&dir.join("venn.bd"), None).expect("renders");
+    let source = dir.join("a.bd");
+    std::fs::write(&source, "node a \"A\"\n").unwrap();
+    let rendered = crate::watch::render_source(&source, None).expect("renders");
     assert!(rendered.starts_with("<svg"));
 }
 
@@ -1414,7 +1404,18 @@ fn a_csv_field_that_is_a_number_becomes_one() {
 fn the_preview_fills_a_template_from_its_data() {
     // Writing a template against its real numbers is the loop this genre of
     // file is written in, and it was the only one with no live view.
-    let dir = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/examples"));
+    let dir = scratch("preview-data");
+    std::fs::write(
+        dir.join("report.bd"),
+        "type pie { title: \"{{quarter}}\" }\n\
+         slice {{source.id}} \"{{source.name}}\" {{source.value}}\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("report.json"),
+        r#"{"quarter": "Q3", "source": [{"id": "organic", "name": "Organic search", "value": 4820}]}"#,
+    )
+    .unwrap();
     let svg = crate::watch::render_source(&dir.join("report.bd"), Some(&dir.join("report.json")))
         .expect("renders");
 
@@ -1724,24 +1725,10 @@ fn pdf_text_is_measured_exactly_rather_than_estimated() {
 fn every_example_also_renders_as_a_pdf() {
     // The sweep, again: an archetype whose geometry the PDF writer cannot
     // express would otherwise only be found by opening a file.
-    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/examples");
-    let mut seen = 0;
-    for entry in std::fs::read_dir(dir).expect("examples/ is readable") {
-        let path = entry.expect("entry").path();
-        if path.extension().is_none_or(|e| e != "bd") {
-            continue;
-        }
-        let source = std::fs::read_to_string(&path).expect("readable");
-        // A template's holes are unbound, so it has nothing to render yet.
-        if source.contains("{{") {
-            continue;
-        }
-        let name = path.file_name().unwrap().to_string_lossy().to_string();
-        let pdf = crate::render_source_pdf(&source).unwrap_or_else(|e| panic!("{name}: {e:#}"));
-        assert!(pdf.starts_with(b"%PDF"), "{name}");
-        seen += 1;
+    for (genre, source) in crate::examples::EXAMPLES {
+        let pdf = crate::render_source_pdf(source).unwrap_or_else(|e| panic!("{genre}: {e:#}"));
+        assert!(pdf.starts_with(b"%PDF"), "{genre}");
     }
-    assert!(seen >= 25, "only {seen} examples found");
 }
 
 // ---------------------------------------------------------------------- W-038
@@ -3006,10 +2993,10 @@ fn each_data_property_belongs_to_exactly_the_genres_that_read_it() {
 
 #[test]
 fn the_chart_examples_stay_valid() {
-    for source in [
-        include_str!("../examples/pie.bd"),
-        include_str!("../examples/packet.bd"),
-    ] {
+    for (_, source) in crate::examples::EXAMPLES
+        .iter()
+        .filter(|(genre, _)| matches!(*genre, "pie" | "packet"))
+    {
         let l = build(source);
         assert!(render_svg::render(&l).starts_with("<svg"));
     }
@@ -3192,25 +3179,21 @@ fn the_tree_sitter_grammar_agrees_with_pest() {
     let mut probe = corpus_files("accept");
     probe.extend(corpus_files("reject"));
 
-    // The examples were named by hand here — three of them, out of nineteen —
-    // so every file added since was cross-checked by nothing, and the list
-    // still pointed at `diagram.bd` after that file went away, which failed
-    // the whole guard rather than the one entry. Sweep the directory: a list
-    // written by hand is a list that stops being true.
-    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/examples");
-    let mut examples: Vec<std::path::PathBuf> = std::fs::read_dir(dir)
-        .unwrap_or_else(|e| panic!("cannot read {dir}: {e}"))
-        .filter_map(|entry| {
-            let path = entry.expect("readable entry").path();
-            (path.extension().is_some_and(|e| e == "bd")).then_some(path)
+    // Every archetype's example, laid out on disk because the cross-check
+    // shells out to the `tree-sitter` CLI and a CLI takes a path. They come
+    // from the table rather than from a directory, so the set cannot shrink
+    // without a genre disappearing with it (`W-116`).
+    let dir = scratch("grammar-examples");
+    let mut examples: Vec<std::path::PathBuf> = crate::examples::EXAMPLES
+        .iter()
+        .map(|(genre, source)| {
+            let path = dir.join(format!("{genre}.bd"));
+            std::fs::write(&path, source).expect("a scratch example");
+            path
         })
         .collect();
     examples.sort();
-    assert!(
-        examples.len() >= 16,
-        "only {} examples found — the sweep is not finding them",
-        examples.len()
-    );
+    assert_eq!(examples.len(), crate::props::ARCHETYPES.len());
     probe.extend(examples);
 
     // The CLI is needed to regenerate the parser anyway. Without it the
@@ -3599,7 +3582,15 @@ fn the_editor_queries_match_the_grammar() {
         env!("CARGO_MANIFEST_DIR"),
         "/editors/zed/languages/bgraph"
     ));
-    let sample = concat!(env!("CARGO_MANIFEST_DIR"), "/examples/packet.bd");
+    // A file for the CLI to run the queries over. Written here from the table,
+    // so no directory of samples has to exist for the guard to run.
+    let sample_dir = scratch("query-sample");
+    let sample = sample_dir.join("sample.bd");
+    let (_, packet) = crate::examples::EXAMPLES
+        .iter()
+        .find(|(genre, _)| *genre == "packet")
+        .expect("`packet` is an archetype");
+    std::fs::write(&sample, packet).expect("a scratch sample");
 
     let mut files: Vec<_> = std::fs::read_dir(queries)
         .expect("the extension ships queries")
@@ -3614,7 +3605,7 @@ fn the_editor_queries_match_the_grammar() {
         std::process::Command::new("tree-sitter")
             .arg("query")
             .arg(path)
-            .arg(sample)
+            .arg(&sample)
             .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/tree-sitter-bgraph"))
             .output()
             .ok()
@@ -6285,48 +6276,58 @@ fn every_checked_in_svg_is_the_one_the_renderer_produces() {
     // They all moved when `W-040` changed how text is measured, and only a
     // manual regeneration caught it — a checked-in artefact nobody checks is a
     // file that can quietly stop being true.
-    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/examples");
-    let mut seen = 0;
+    //
+    // **It is a manifest of hashes now, not a directory of pictures**
+    // (`W-116`). The pictures went with `examples/`, and with them the only
+    // thing that could say "this commit moved a drawing". A hash per genre
+    // gives that back for two kilobytes instead of five hundred. What it
+    // cannot do is show you *what* moved: it says which genre and leaves you
+    // to render it and look, which is what you had to do anyway.
+    let manifest = include_str!("../docs/goldens.txt");
+    let want: std::collections::HashMap<&str, &str> = manifest
+        .lines()
+        .filter(|l| !l.trim_start().starts_with('#') && !l.trim().is_empty())
+        .filter_map(|l| l.split_once(char::is_whitespace))
+        .map(|(genre, hash)| (genre.trim(), hash.trim()))
+        .collect();
 
-    for entry in std::fs::read_dir(dir).unwrap_or_else(|e| panic!("cannot read {dir}: {e}")) {
-        let path = entry.expect("readable entry").path();
-        if path.extension().is_none_or(|e| e != "bd") {
-            continue;
+    let mut stale = Vec::new();
+    for (genre, source) in crate::examples::EXAMPLES {
+        let svg = crate::render_source(source).unwrap_or_else(|e| panic!("{genre}: {e:#}"));
+        let got = format!("{:016x}", fnv1a(svg.trim_end()));
+        match want.get(genre) {
+            Some(pinned) if *pinned == got => {}
+            Some(_) => stale.push(format!("{genre} {got}")),
+            None => panic!("`{genre}` is not pinned in docs/goldens.txt — add `{genre} {got}`"),
         }
-        let source = std::fs::read_to_string(&path).expect("readable");
-        let name = path.file_name().unwrap().to_string_lossy().to_string();
-
-        // A template renders once it has data. When a `.json` sits beside it,
-        // that is the rendered form worth checking in — and leaving it out
-        // would mean the one example of the templating flow was the one nobody
-        // could see.
-        let data = path.with_extension("json");
-        let fresh = match (source.contains("{{"), data.exists()) {
-            (true, false) => continue,
-            (true, true) => {
-                let raw = std::fs::read_to_string(&data).expect("readable");
-                let bound = Bindings::from_json(&raw).unwrap_or_else(|e| panic!("{name}: {e:#}"));
-                Template::parse(&source)
-                    .and_then(|t| t.render(&bound))
-                    .unwrap_or_else(|e| panic!("{name}: {e:#}"))
-            }
-            _ => crate::render_source(&source).unwrap_or_else(|e| panic!("{name}: {e:#}")),
-        };
-
-        let svg = path.with_extension("svg");
-        let Ok(committed) = std::fs::read_to_string(&svg) else {
-            panic!("{name} has no rendered .svg beside it");
-        };
-        assert_eq!(
-            committed.trim_end(),
-            fresh.trim_end(),
-            "{name} is stale — regenerate it with `bgraph {name} -o {}`",
-            svg.file_name().unwrap().to_string_lossy()
-        );
-        seen += 1;
     }
 
-    assert!(seen >= 25, "only {seen} rendered examples found");
+    assert!(
+        stale.is_empty(),
+        "these drawings moved. Render each and look at it, then write the new \
+         line into docs/goldens.txt:\n{}",
+        stale.join("\n")
+    );
+    assert_eq!(
+        want.len(),
+        crate::examples::EXAMPLES.len(),
+        "the manifest has a stray line"
+    );
+}
+
+/// FNV-1a over the bytes, for the golden manifest.
+///
+/// Hand-rolled and non-cryptographic on purpose: the question is "did this
+/// change" and not "can this be forged", and it keeps the crate's dependency
+/// list where it is.
+#[cfg(test)]
+fn fnv1a(text: &str) -> u64 {
+    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+    for b in text.as_bytes() {
+        h ^= u64::from(*b);
+        h = h.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    h
 }
 
 /// Whether a document's tags open and close in order, and nothing is left open.
@@ -6394,26 +6395,15 @@ fn ill_formed(doc: &str) -> Option<String> {
 
 #[test]
 fn every_rendered_example_is_well_formed_xml() {
-    // The golden test compares bytes and says nothing about validity, so an
-    // SVG could be — and was — checked in with an `<ellipse>` closed by a
-    // `</path>`. A browser draws that anyway; resvg refuses it, which is what
-    // made `--window` and `--png` fail on `type block` and nothing else notice
-    // (`W-107`).
-    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/examples");
-    let mut seen = 0;
-
-    for entry in std::fs::read_dir(dir).expect("examples/ is readable") {
-        let path = entry.expect("readable entry").path();
-        if path.extension().is_none_or(|e| e != "svg") {
-            continue;
-        }
-        let name = path.file_name().unwrap().to_string_lossy().to_string();
-        let svg = std::fs::read_to_string(&path).expect("readable");
-        assert_eq!(ill_formed(&svg), None, "{name}");
-        seen += 1;
+    // The golden manifest hashes what we emit and says nothing about whether
+    // it parses, so an SVG with an `<ellipse>` closed by a `</path>` would hash
+    // consistently and still be broken. A browser draws that; resvg refuses it,
+    // which is what made `--window` and `--png` fail on `type block` and
+    // nothing else notice (`W-107`).
+    for (genre, source) in crate::examples::EXAMPLES {
+        let svg = crate::render_source(source).unwrap_or_else(|e| panic!("{genre}: {e:#}"));
+        assert_eq!(ill_formed(&svg), None, "{genre}");
     }
-
-    assert!(seen >= 25, "only {seen} rendered examples found");
 
     // And the scanner is worth believing: it catches the exact shape of the
     // defect it exists for.
@@ -6429,48 +6419,39 @@ fn every_rendered_example_is_well_formed_xml() {
 fn every_example_still_works() {
     // The suite used to name two example files by hand, so the ones added
     // since were covered by nothing at all. A directory sweep cannot forget.
-    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/examples");
-    let mut seen = 0;
-
-    for entry in std::fs::read_dir(dir).unwrap_or_else(|e| panic!("cannot read {dir}: {e}")) {
-        let path = entry.expect("readable entry").path();
-        if path.extension().is_none_or(|e| e != "bd") {
-            continue;
-        }
-        seen += 1;
-        let name = path.file_name().unwrap().to_string_lossy().to_string();
-        let source = std::fs::read_to_string(&path).expect("readable");
-
+    // The table, not a directory. A sweep over `examples/` could only ever
+    // check the files that happened to be there, and the day the directory
+    // went it checked nothing at all while still passing (`W-116`).
+    for (genre, source) in crate::examples::EXAMPLES {
         // A template is checked as a template: its holes are not bound here,
         // so rendering it is not the question — whether it is well-formed is.
-        let template = Template::parse(&source)
-            .unwrap_or_else(|e| panic!("{name} is not a well-formed template: {e:#}"));
-        if !template.holes().is_empty() {
-            continue;
-        }
+        let template = Template::parse(source)
+            .unwrap_or_else(|e| panic!("{genre} is not a well-formed template: {e:#}"));
+        assert!(
+            template.holes().is_empty(),
+            "{genre}: an archetype's example must be complete, not a template"
+        );
 
-        // Through the composer, because that is the pipeline: an example
-        // using `include` or a `component` is not a diagram until it has run.
-        // Parsing the text directly would have said `web.app` is an unknown
-        // node, which is true of the text and false of the diagram.
-        let composed = crate::compose::load(&path).unwrap_or_else(|e| panic!("{name}: {e:#}"));
-        let errors: Vec<String> = crate::check::check(&composed.diagram)
+        let errors: Vec<String> = diags(source)
             .into_iter()
             .filter(|d| d.severity == crate::check::Severity::Error)
             .map(|d| d.message)
             .collect();
-        assert!(errors.is_empty(), "{name}: {errors:?}");
+        assert!(errors.is_empty(), "{genre}: {errors:?}");
 
-        let svg = crate::render_file(&path).unwrap_or_else(|e| panic!("{name}: {e:#}"));
+        let svg = crate::render_source(source).unwrap_or_else(|e| panic!("{genre}: {e:#}"));
         assert!(
             svg.starts_with("<svg") && svg.trim_end().ends_with("</svg>"),
-            "{name}"
+            "{genre}"
         );
     }
 
-    assert!(
-        seen >= 16,
-        "only {seen} examples found — the sweep is not finding them"
+    // One per archetype, and the count is asserted so a genre cannot be added
+    // without a file that shows how to write it.
+    assert_eq!(
+        crate::examples::EXAMPLES.len(),
+        crate::props::ARCHETYPES.len(),
+        "every archetype has exactly one worked example"
     );
 }
 
@@ -7567,11 +7548,40 @@ fn a_qualified_name_does_not_swallow_a_class_reference() {
 
 #[test]
 fn the_composed_example_set_still_draws() {
-    // `examples/compose/` is what a bgraph-tagged fence cannot be: three
-    // files that are one diagram. That fence promises a complete current
-    // file, so the multi-file case is verified here rather than documented
-    // and never run.
-    let dir = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/examples/compose"));
+    // Three files that are one diagram — what a bgraph-tagged fence cannot be,
+    // since that fence promises a complete current file. So the multi-file case
+    // is verified here rather than documented and never run.
+    //
+    // Written into a scratch directory rather than read from `examples/`: the
+    // whole point of `W-116` is that the suite does not need a directory of
+    // sample files to be there, and a fixture a test writes itself is one that
+    // cannot go missing.
+    let dir = scratch("compose");
+    std::fs::write(
+        dir.join("house.bds"),
+        "// A shared palette. A `.bds` holds `style` declarations and nothing else.\n\
+         style card { fill: #1e293b stroke: #38bdf8 1.5 font: 13 #e2e8f0 radius: 6 padding: 12 }\n\
+         style hot extends card { stroke: #f43f5e 2 }\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("core.bd"),
+        "// A diagram in its own right — render this file on its own and it draws.\n\
+         include \"house.bds\"\n\
+         node api \"API\"      .card\n\
+         node db  \"Database\" .card below api\n\
+         api -> db \"reads\"\n",
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("main.bd"),
+        "include \"house.bds\"\n\
+         include \"core.bd\" as core\n\
+         graph { background: #0b1120 title: \"Composed from three files\" }\n\
+         node ui \"Browser\" .hot\n\
+         ui -> core.api \"HTTPS\"\n",
+    )
+    .unwrap();
 
     let composed = crate::compose::load(&dir.join("main.bd")).expect("main.bd composes");
     let ids: Vec<&str> = composed

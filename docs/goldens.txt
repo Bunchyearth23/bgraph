@@ -1,0 +1,42 @@
+# The picture every archetype draws, as an FNV-1a of its SVG.
+#
+# A hash and not the file: the pictures used to be checked in beside the
+# sources in `examples/`, and both went when `bgraph init` made that directory
+# redundant (`W-116`). What went with them was the one guard that could say "a
+# commit moved a drawing", and this gives it back for two kilobytes.
+#
+# When a line here fails: render that genre, LOOK AT IT, and only then write
+# the new hash. A hash updated without looking is a guard switched off.
+#
+#   bgraph init pie -o /tmp/pie.bd && bgraph /tmp/pie.bd -o /tmp/pie.svg
+
+free 27311a351d7883a0
+pie 7987390bcc8aaf3b
+packet 74dce6ee6c46e463
+bytefield 7a5f777e09524027
+treemap 2b698a75ce832a1d
+quadrant 7930463a0d5a6378
+wave bc3906ffea5ecf54
+sankey 60bf159610830b51
+bar 6f6aad838a4fb309
+xy 16149fabe1549db6
+sequence ec9a8a5b60473ac9
+gantt 8e8450057a8d548d
+timeline eff03215861c92e2
+block acd32318a13eeac1
+er f3b0d3b829119e56
+requirements 3233722c75236cc0
+class 25a8ff1eb03fff17
+kanban 1b242ec4058b5eef
+journey 6fc73b06c9290af3
+radar 2cb71fb26395d82a
+rack c181b01b809fb143
+network eb558807f030473b
+venn 16bd2ef678507c0f
+harness a9b5e54ba3609310
+gitgraph 8d779df6b83dda46
+orgchart 6d585096edb33234
+mindmap a4cc2b5175fcc3ba
+treeview e56199795b4a3ed3
+state 9600f73988ddf525
+bpmn a46ff2f5f15943ed
