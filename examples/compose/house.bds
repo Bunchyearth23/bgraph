@@ -1,3 +1,0 @@
-// A shared palette. A `.bds` holds `style` declarations and nothing else.
-style card { fill: #1e293b stroke: #38bdf8 1.5 font: 13 #e2e8f0 radius: 6 padding: 12 }
-style hot extends card { stroke: #f43f5e 2 }

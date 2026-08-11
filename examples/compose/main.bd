@@ -1,9 +1,0 @@
-// Three files, one diagram. `core.bd` comes in under a prefix, so nothing it
-// declares can clash with what is here — and `core.api` refers into it.
-include "house.bds"
-include "core.bd" as core
-
-graph { background: #0b1120 title: "Composed from three files" }
-
-node ui "Browser" .hot
-ui -> core.api "HTTPS"
