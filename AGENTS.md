@@ -65,7 +65,7 @@ disagree.
 - `cargo build --features window` — the native window (opt-in: +78 crates)
 - `cargo run --bin bgraph -- check /tmp/a.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (534 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (539 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo build --no-default-features` — the four-dependency library. **A CI
   step, and it has been red before**: a `#[cfg]` on a type without one on its
   users compiles under `default` and not here
@@ -192,6 +192,12 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-08-11] **A block that holds statements is not a block that holds
+  properties.** The grammar has two: `block` (properties, members) and
+  `group_block` (properties *and* statements — `group`, `component`,
+  `activate`). Anything reading a document lexically has to keep the two
+  apart, or a container looks like a node and everything you can only do by
+  declaring becomes invisible.
 - [2026-08-11] **A helper that returns a short list is worse than one that
   fails.** `resolved_nodes` gave back nothing when the style registry would not
   build; seventeen callers walk it beside `diagram.nodes`, most silently

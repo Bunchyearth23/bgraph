@@ -294,6 +294,10 @@ impl Server {
                 .collect();
         }
 
+        // Properties a container block also accepts, held back until the
+        // statement level has had its say. Empty everywhere else.
+        let mut also: Vec<Value> = Vec::new();
+
         if let Some(block) = ctx.block {
             // An item block sees the archetype's own vocabulary first, so
             // `kind:` offers state kinds in a machine and element kinds in an
@@ -334,12 +338,16 @@ impl Server {
             }
 
             let want = match block {
-                Block::Node => Some(Ctx::Node),
+                Block::Node | Block::Container => Some(Ctx::Node),
                 Block::Edge => Some(Ctx::Edge),
+                // `style node` and `style edge` are themes for one side, and
+                // `check_styles` warns when they reach across; offering the
+                // other side's vocabulary is offering that warning.
+                Block::Style(theme) => theme,
                 _ => None,
             };
 
-            return table
+            let offered: Vec<Value> = table
                 .iter()
                 .filter(|p| !p.alias)
                 .filter(|p| want.is_none_or(|c| p.ctx.allows(c)))
@@ -348,10 +356,20 @@ impl Server {
                     let mut it = completion(p.name, 10, p.syntax, p.doc);
                     it["insertText"] = json!(format!("{}: ", p.name));
                     // Table order is meaningful; keep it instead of alphabetical.
-                    it["sortText"] = json!(format!("{i:03}"));
+                    // Sorted after the statement words in a container, where
+                    // both are offered and declaring is the commoner act.
+                    it["sortText"] = json!(format!("z{i:03}"));
                     it
                 })
                 .collect();
+
+            // A container holds statements too, so it does not return here —
+            // it carries its properties down to the statement level and the
+            // two lists are offered together.
+            if block != Block::Container {
+                return offered;
+            }
+            also = offered;
         }
 
         // ------------------------------------------------ statement level
@@ -402,6 +420,22 @@ impl Server {
                 .collect();
         }
 
+        // `style name …` — `extends` is the only word that may follow a name,
+        // and it was reachable only by knowing it was there.
+        if words.first().is_some_and(|w| *w == "style")
+            && words.len() >= 2
+            && preceding != "style"
+            && !words.contains(&"extends")
+        {
+            return vec![snippet(
+                "extends",
+                14,
+                "extends <style>",
+                "Inherit every property of another style, then override what differs.",
+                "extends ${1:parent}$0",
+            )];
+        }
+
         // Placements only make sense where placement is honoured, and only
         // once the item already has an identifier.
         if words.first().is_some_and(|w| *w == item || *w == "node")
@@ -414,8 +448,11 @@ impl Server {
                 .collect();
         }
 
-        // The first word of a statement: a keyword, or a node id starting an edge.
-        if words.len() <= 1 && !ends_with_space {
+        // The first word of a statement: a keyword, or a node id starting an
+        // edge. A line holding nothing but indentation is that position too —
+        // asking on a blank line used to answer nothing, which is the one
+        // moment you most want the list.
+        if words.is_empty() || (words.len() == 1 && !ends_with_space) {
             let mut out: Vec<Value> = props::KEYWORDS
                 .iter()
                 .map(|(name, doc)| {
@@ -477,6 +514,7 @@ impl Server {
                         .map(|(name, label)| completion(&name, 6, item, &label)),
                 );
             }
+            out.extend(also);
             return out;
         }
 
@@ -1061,8 +1099,15 @@ pub(crate) fn diagnostics(text: &str) -> Vec<Value> {
 enum Block {
     Type,
     Graph,
-    Style,
+    /// A style block, carrying the vocabulary its *name* narrows it to: the
+    /// implicit `node` and `edge` themes take one side each, and anything
+    /// else takes both — which is the rule `check_styles` already applies.
+    Style(Option<Ctx>),
     Node,
+    /// A block that holds statements as well as properties — `group`,
+    /// `activate`, `component`. The grammar calls it `group_block`, and the
+    /// difference is not cosmetic: it is where a diagram nests.
+    Container,
     Edge,
 }
 
@@ -1113,9 +1158,16 @@ impl Context {
             match head.split_whitespace().next() {
                 Some("type") => Block::Type,
                 Some("graph") => Block::Graph,
-                // A group's block takes node-ish visual properties.
-                Some("group") => Block::Node,
-                Some("style") => Block::Style,
+                // The three heads the grammar gives a `group_block`. Their
+                // bodies hold statements as well as properties, and calling
+                // them plain nodes is what left completion offering `fill`
+                // to somebody typing `service api "API"` (`W-131`).
+                Some("group") | Some("activate") | Some("component") => Block::Container,
+                Some("style") => Block::Style(match head.split_whitespace().nth(1) {
+                    Some("node") => Some(Ctx::Node),
+                    Some("edge") => Some(Ctx::Edge),
+                    _ => None,
+                }),
                 // Everything else is an item or an edge, and the arrow is what
                 // tells them apart. Matching the *keyword* instead would mean
                 // knowing all sixteen of them — which is how `slice a "A" {`
@@ -1486,13 +1538,45 @@ mod tests {
         assert_eq!(Context::at(text, text.len()).block, Some(Block::Graph));
 
         let text = "style x {\n  fill";
-        assert_eq!(Context::at(text, text.len()).block, Some(Block::Style));
+        assert_eq!(
+            Context::at(text, text.len()).block,
+            Some(Block::Style(None))
+        );
 
         let text = "node a \"A\" {\n  fill";
         assert_eq!(Context::at(text, text.len()).block, Some(Block::Node));
 
         let text = "a -> b {\n  rou";
         assert_eq!(Context::at(text, text.len()).block, Some(Block::Edge));
+
+        let text = "style node {\n  fill";
+        assert_eq!(
+            Context::at(text, text.len()).block,
+            Some(Block::Style(Some(Ctx::Node)))
+        );
+
+        let text = "style edge {\n  rou";
+        assert_eq!(
+            Context::at(text, text.len()).block,
+            Some(Block::Style(Some(Ctx::Edge)))
+        );
+
+        // The three heads the grammar gives a `group_block`.
+        for text in [
+            "group g \"G\" {\n  ",
+            "component c {\n  ",
+            "activate p {\n  ",
+        ] {
+            assert_eq!(
+                Context::at(text, text.len()).block,
+                Some(Block::Container),
+                "{text:?}"
+            );
+        }
+
+        // A `use` takes the ordinary block — properties only.
+        let text = "use c as c1 {\n  ";
+        assert_eq!(Context::at(text, text.len()).block, Some(Block::Node));
 
         let text = "graph { padding: 4 }\nnode a";
         assert_eq!(Context::at(text, text.len()).block, None);
@@ -1605,6 +1689,121 @@ mod tests {
         let labels: Vec<&str> = items.iter().filter_map(|i| i["label"].as_str()).collect();
         assert!(labels.contains(&"flow"));
         assert!(!labels.contains(&"fill"));
+    }
+
+    /// A group is where a diagram nests, and completion used to treat it as a
+    /// node — properties only, no way to declare anything inside it without
+    /// knowing the word already (`W-131`).
+    #[test]
+    fn completion_inside_a_group_offers_statements_as_well_as_properties() {
+        let server = Server {
+            docs: HashMap::new(),
+        };
+
+        for (what, text) in [
+            ("group", "type network\ngroup g \"G\" {\n  "),
+            ("component", "type network\ncomponent c {\n  "),
+            ("activate", "type sequence\nactivate p {\n  "),
+        ] {
+            let items = server.items_for(text, "  ", text.len());
+            let labels: Vec<&str> = items.iter().filter_map(|i| i["label"].as_str()).collect();
+            let item = props::archetype(declared_archetype(text)).unwrap().item;
+            assert!(
+                labels.contains(&item),
+                "{what}: no `{item}` to declare with"
+            );
+            assert!(labels.contains(&"group"), "{what}: groups do not nest");
+            assert!(labels.contains(&"padding"), "{what}: lost its properties");
+        }
+
+        // And the two lists keep their own order: declaring comes first.
+        let text = "type network\ngroup g \"G\" {\n  ";
+        let items = server.items_for(text, "  ", text.len());
+        let sort = |label: &str| -> String {
+            items
+                .iter()
+                .find(|i| i["label"] == label)
+                .and_then(|i| i["sortText"].as_str())
+                .unwrap_or("")
+                .to_string()
+        };
+        assert!(sort("host") < sort("padding"));
+    }
+
+    /// An anchor names something in scope, and the things in scope are mostly
+    /// the group's own members.
+    #[test]
+    fn completion_inside_a_group_offers_its_members_as_anchors() {
+        let server = Server {
+            docs: HashMap::new(),
+        };
+        let text = "type network\ngroup g \"G\" {\n  host a \"A\"\n  host b right-of ";
+        let items = server.items_for(text, "  host b right-of ", text.len());
+        let labels: Vec<&str> = items.iter().filter_map(|i| i["label"].as_str()).collect();
+        assert!(labels.contains(&"a"));
+    }
+
+    /// `style node` and `style edge` are themes for one side of the diagram,
+    /// and `check_styles` says so with a warning. Completion says so by not
+    /// offering the other side at all.
+    #[test]
+    fn a_themed_style_is_offered_only_its_own_side() {
+        let server = Server {
+            docs: HashMap::new(),
+        };
+
+        let text = "style node {\n  ";
+        let items = server.items_for(text, "  ", text.len());
+        let labels: Vec<&str> = items.iter().filter_map(|i| i["label"].as_str()).collect();
+        assert!(labels.contains(&"shape"));
+        assert!(
+            !labels.contains(&"router"),
+            "an edge property in `style node`"
+        );
+
+        let text = "style edge {\n  ";
+        let items = server.items_for(text, "  ", text.len());
+        let labels: Vec<&str> = items.iter().filter_map(|i| i["label"].as_str()).collect();
+        assert!(labels.contains(&"router"));
+        assert!(
+            !labels.contains(&"shape"),
+            "a node property in `style edge`"
+        );
+
+        // A style under any other name is generic, and takes both.
+        let text = "style warn {\n  ";
+        let items = server.items_for(text, "  ", text.len());
+        let labels: Vec<&str> = items.iter().filter_map(|i| i["label"].as_str()).collect();
+        assert!(labels.contains(&"shape") && labels.contains(&"router"));
+    }
+
+    #[test]
+    fn completion_offers_extends_after_a_style_name() {
+        let server = Server {
+            docs: HashMap::new(),
+        };
+        let text = "style warn ";
+        let items = server.items_for(text, text, text.len());
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0]["label"], "extends");
+
+        // Once, though — `extends parent ` is done asking.
+        let text = "style base {\n}\nstyle warn extends base ";
+        let items = server.items_for(text, "style warn extends base ", text.len());
+        assert!(!items.iter().any(|i| i["label"] == "extends"));
+    }
+
+    /// Asking on a line holding nothing but indentation is exactly when you
+    /// most want the list, and it used to answer nothing.
+    #[test]
+    fn completion_answers_on_a_blank_indented_line() {
+        let server = Server {
+            docs: HashMap::new(),
+        };
+        let text = "type network\n  ";
+        let items = server.items_for(text, "  ", text.len());
+        let labels: Vec<&str> = items.iter().filter_map(|i| i["label"].as_str()).collect();
+        assert!(labels.contains(&"host"));
     }
 
     #[test]

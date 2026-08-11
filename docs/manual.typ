@@ -866,6 +866,13 @@ fills. Signature help names the value you are typing — positional data is the
 idiomatic form, and it was the one shape nothing could tell you about while you
 wrote it.
 
+What it offers follows the block you are in, and a container — `group`,
+`component`, `activate` — is the one that holds statements as well as
+properties. Inside one you are offered the genre's declaring word and the
+statement keywords first, anchors that name the group's own members, and the
+group's properties after them. `style node` and `style edge` are themes for one
+side of the diagram, so each is offered only its own side.
+
 Colour literals get a swatch and a picker, and an identifier lights up
 everywhere it is written.
 
@@ -1025,8 +1032,9 @@ positions; the first is a property of the format itself.
    widest — four words, because four things carry four shapes of data. An
    `ortho` link now routes *around* the boxes, so the note saying it avoids
    nothing has been rewritten to say what it still does not avoid: the other
-   links. `bgraph fmt --migrate` rewrites a removed `opacity`. The licence
-   question is closed: proprietary, recorded as a decision.],
+   links. `bgraph fmt --migrate` rewrites a removed `opacity`. Completion
+   inside a container offers statements, which is what a container is for. The
+   licence question is closed: proprietary, recorded as a decision.],
 
   [*1.2*], [10 August 2026], [`watch` shows a picture as readily as a source,
    and opens a native window when the build has one. Records that the viewer is
