@@ -9662,34 +9662,141 @@ fn the_playground_is_an_application_rather_than_one_file() {
 // ------------------------------------------------- releases and CI (I-025, I-027)
 
 #[test]
-fn the_release_workflow_ships_both_binaries_and_neither_publishes() {
-    // The standing rule: never publish anything outward without being asked.
-    // A workflow that quietly created a release would break it on somebody
-    // else's machine, months from now, with nobody watching.
-    let release = include_str!("../.github/workflows/release.yml");
+fn the_release_ships_everything_and_publishes_only_here() {
+    // `D-035` reversed the second half of `D-032`: the artefacts go out as a
+    // GitHub Release. What did not change is *where* — one place, this
+    // repository's own releases page. crates.io and the two extension
+    // marketplaces are a separate decision and nobody has taken it, so they
+    // are named here rather than left to a future edit nobody reviews.
+    let source = include_str!("../.github/workflows/release.yml");
+    // Commands, not prose. This file *explains* which registries it stays off
+    // — naming them is the point — so a search over the comments would find
+    // every one of them and prove nothing.
+    let release: String = source
+        .lines()
+        .filter(|l| !l.trim_start().starts_with('#'))
+        .collect::<Vec<_>>()
+        .join("\n");
 
-    for binary in ["bgraph", "bgraph-lsp"] {
-        assert!(release.contains(binary), "`{binary}` is not shipped");
-    }
+    assert!(
+        release.contains("gh release create"),
+        "the workflow builds a release and never makes one"
+    );
     for forbidden in [
-        "softprops/action-gh-release",
-        "gh release create",
         "cargo publish",
+        "vsce publish",
+        "ovsx publish",
+        "npm publish",
     ] {
         assert!(
             !release.contains(forbidden),
-            "the release workflow publishes: `{forbidden}`"
+            "the workflow publishes outward: `{forbidden}`"
         );
     }
-    // One build per platform, because there is one binary to build: the
-    // native window that made it two is gone (`W-136`), and with it the
-    // system headers a bare Linux runner had to install for it.
+    assert!(
+        include_str!("../Cargo.toml").contains("publish = false"),
+        "crates.io would refuse on a comment rather than on a line"
+    );
+
+    // Test, then build, then release — and the last one only on a tag, so a
+    // `workflow_dispatch` run is a full rehearsal that publishes nothing.
+    for job in [
+        "  test:",
+        "  binaries:",
+        "  extensions:",
+        "  wasm:",
+        "  release:",
+    ] {
+        assert!(release.contains(job), "no `{job}` job");
+    }
+    assert!(
+        release.contains("needs: [test, binaries, extensions, wasm]"),
+        "the release does not wait for everything that feeds it"
+    );
+    assert!(
+        release.contains("if: github.ref_type == 'tag'"),
+        "a manual run would publish"
+    );
+
+    // Every artefact the notes promise. A release that lists five things and
+    // ships four is worse than one that never claimed the fifth.
+    for artefact in [
+        "bgraph-lsp",
+        "bgraph-vscode-",
+        "bgraph-zed-",
+        "bgraph-typst-",
+        "bgraph-playground-",
+    ] {
+        assert!(release.contains(artefact), "`{artefact}` is not built");
+    }
+
+    // The Zed manifest pins its grammar at a path on the author's disk, which
+    // is right for `install.sh` and useless to anybody else.
+    assert!(
+        release.contains("the released manifest still points at a local path"),
+        "the Zed extension would ship pinned to a `file://` path"
+    );
+
+    // One build per platform: the native window that made it two is gone.
     assert!(!release.contains("--features window"), "{release}");
     assert!(!release.contains("libwayland-dev"), "{release}");
+}
 
-    // And the playground it also builds is an application now, so the job has
-    // to install its dependencies rather than run one script.
-    assert!(release.contains("pnpm"), "the playground is never built");
+/// One version, in five files.
+///
+/// A version written in five places is a version that is wrong in four of
+/// them, and the one that is wrong is the one somebody reads.
+#[test]
+fn every_manifest_agrees_on_the_version() {
+    let crate_version = env!("CARGO_PKG_VERSION");
+
+    let vscode: serde_json::Value =
+        serde_json::from_str(include_str!("../editors/vscode/package.json")).expect("valid JSON");
+    assert_eq!(
+        vscode["version"], crate_version,
+        "the VS Code extension is a different version from the compiler in it"
+    );
+
+    for (what, text) in [
+        (
+            "the Zed extension",
+            include_str!("../editors/zed/extension.toml"),
+        ),
+        ("the Typst package", include_str!("../typst/typst.toml")),
+        (
+            "the Zed extension's crate",
+            include_str!("../editors/zed/Cargo.toml"),
+        ),
+    ] {
+        let line = text
+            .lines()
+            .find(|l| l.starts_with("version = "))
+            .unwrap_or_else(|| panic!("{what} declares no version"));
+        assert!(
+            line.contains(crate_version),
+            "{what} says {line}, the compiler says {crate_version}"
+        );
+    }
+
+    // And the notes, which are what a reader is handed.
+    let notes = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/docs/release-notes"))
+        .join(format!("{crate_version}.md"));
+    assert!(
+        notes.exists(),
+        "no release notes for {crate_version} — write docs/release-notes/{crate_version}.md"
+    );
+    let notes = std::fs::read_to_string(&notes).expect("readable");
+    for artefact in ["vsix", "zed", "typst", "playground", "bgraph-lsp"] {
+        assert!(
+            notes.contains(artefact),
+            "the notes never mention `{artefact}`"
+        );
+    }
+    // The count in the prose, which is the sentence a reader trusts.
+    assert!(
+        notes.contains("Twenty-nine genres and `free`") && crate::props::ARCHETYPES.len() - 1 == 29,
+        "the notes give a genre count the compiler does not"
+    );
 }
 
 #[test]

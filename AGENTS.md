@@ -64,7 +64,7 @@ disagree.
 - `cargo run --bin bgraph -- watch a.svg` — the same viewer, on a picture
 - `cargo run --bin bgraph -- check /tmp/a.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (553 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (554 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo build --no-default-features` — the four-dependency library. **A CI
   step, and it has been red before**: a `#[cfg]` on a type without one on its
   users compiles under `default` and not here
@@ -195,6 +195,12 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-08-11] **Releasing is one channel, and it is named.** `D-035` turned
+  the GitHub Release on and left crates.io, the VS Code Marketplace, Open VSX
+  and the Zed registry off — the workflow names all four and a test asserts it
+  runs none of them. `LICENSE` still grants nothing, so the notes say the
+  artefacts come with no permission to run them. Do not add a publish step to
+  a second channel without a decision recorded first.
 - [2026-08-11] **A picture checked in beside its source goes stale silently.**
   `docs/diagrams/` held nine `.svg` files; the day the renderer changed, eight
   were out of date and the manual illustrated a language it no longer

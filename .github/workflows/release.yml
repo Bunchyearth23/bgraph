@@ -1,22 +1,96 @@
-# Binaries per platform, built on a tag.
+# Test, then build, then release — on a tag, and only on a tag.
 #
-# "Install Rust and build it" is a barrier that keeps a tool to its author, and
-# `I-025` recorded it as one. This only *builds*: nothing here pushes anything
-# anywhere, because the licence question is not settled and because publishing
-# is a decision this repository leaves to a person (`Q-005`, AGENTS.md).
+# `D-035` reversed the second half of `D-032`: the artefacts are published as a
+# GitHub Release now. What has *not* changed is where. Nothing here runs
+# `cargo publish`, `vsce publish` or `ovsx publish`, and `Cargo.toml` still
+# carries `publish = false` so crates.io refuses on that line rather than on a
+# comment. One place, this repository's own releases page, and a test asserts
+# the rest by name.
+#
+# `workflow_dispatch` builds every artefact and stops. That is the rehearsal:
+# the whole pipeline runs, nothing is published, and a tag is what turns the
+# last job on.
 name: release
 
 on:
   push:
     tags: ["v*"]
-  # So the artefacts can be produced and looked at without cutting a tag.
   workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: write
+
 jobs:
-  build:
+  # ------------------------------------------------------------------ gate
+  #
+  # Everything below waits on this. A release built from a red tree is worse
+  # than no release: it is a red tree with a version number on it.
+  test:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            ~/.cargo/bin
+            target
+          key: ${{ runner.os }}-release-${{ hashFiles('Cargo.lock') }}
+
+      - name: Install tree-sitter
+        run: cargo install tree-sitter-cli --locked || true
+
+      # The version is read from the manifest, never from the tag: a tag is a
+      # label somebody typed and the manifest is what was built. They have to
+      # agree, and the manifest is the one that decides.
+      - id: version
+        name: The version, and the tag if there is one
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "building $version"
+          if [[ "${{ github.ref_type }}" == tag ]]; then
+            tag="${{ github.ref_name }}"
+            [[ "$tag" == "v$version" ]] || {
+              echo "::error::tag $tag does not match Cargo.toml's $version"
+              exit 1
+            }
+          fi
+
+      - name: Format
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Test
+        run: cargo test --all-features
+
+      # Three guards pass *silently* when the tree-sitter CLI is absent. On a
+      # developer's machine that is a convenience; in a release it is a lie.
+      - name: The grammar guards really ran
+        run: |
+          out=$(cargo test --all-features -- --nocapture 2>&1)
+          if grep -q 'SKIPPED' <<<"$out"; then
+            echo "::error::a guard skipped — it guarded nothing"
+            grep 'SKIPPED' <<<"$out"
+            exit 1
+          fi
+
+      - name: Build with no archetype at all
+        run: cargo build --no-default-features
+
+  # ------------------------------------------------------------- binaries
+  binaries:
+    needs: test
     strategy:
       fail-fast: false
       matrix:
@@ -35,36 +109,107 @@ jobs:
       - name: Install the target
         run: rustup target add ${{ matrix.target }}
 
-      # One build, because there is one binary to build. There used to be two
-      # — with and without a native window — and the window is gone (`W-136`):
-      # `bgraph watch` opens the preview in a browser, which is on every
-      # machine this runs on and needs no headers on a bare runner.
+      # One build, default features: no rasteriser and no windowing library.
+      # Someone who wants `-o diagram.png` asks for `--features png`; nobody
+      # else pays for it.
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Name the artefacts
+      - name: Archive
         shell: bash
         run: |
-          mkdir -p out
+          version="${{ needs.test.outputs.version }}"
+          name="bgraph-$version-${{ matrix.target }}"
+          mkdir -p "out/$name"
           suffix=""
           [[ "${{ matrix.os }}" == windows-latest ]] && suffix=".exe"
-          for name in bgraph bgraph-lsp; do
-            cp "target/${{ matrix.target }}/release/$name$suffix" \
-               "out/$name-${{ matrix.target }}$suffix"
+          for binary in bgraph bgraph-lsp; do
+            cp "target/${{ matrix.target }}/release/$binary$suffix" "out/$name/"
           done
-          cp LICENSE out/
+          cp LICENSE README.md docs/reference.md "out/$name/"
+          cd out
+          if [[ "${{ matrix.os }}" == windows-latest ]]; then
+            7z a -tzip "$name.zip" "$name" >/dev/null
+          else
+            tar czf "$name.tar.gz" "$name"
+          fi
+          rm -rf "$name"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: bgraph-${{ matrix.target }}
-          path: out/
+          name: binaries-${{ matrix.target }}
+          path: out/*
 
-  wasm:
+  # ------------------------------------------------------------ extensions
+  extensions:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: rustup target add wasm32-unknown-unknown
-      - run: ./playground/build.sh
+
+      # VS Code. `package.sh` builds the VSIX by hand — a VSIX is a zip with
+      # three things in it — and it reads every field out of package.json, so
+      # the manifest and the archive cannot disagree.
+      - name: The VS Code extension
+        run: |
+          version="${{ needs.test.outputs.version }}"
+          ./editors/vscode/package.sh
+          mkdir -p out
+          mv "editors/vscode/bgraph-$version.vsix" "out/bgraph-vscode-$version.vsix"
+
+      # Zed. The manifest in the tree pins the grammar at a `file://` path on
+      # the author's disk, which is right for `install.sh` and useless to
+      # anybody else — so the released copy is repointed at this repository and
+      # at the commit being tagged. The generated parser is committed, so that
+      # revision has everything the grammar needs.
+      - name: The Zed extension
+        run: |
+          version="${{ needs.test.outputs.version }}"
+          name="bgraph-zed-$version"
+          mkdir -p "stage/$name"
+          cp -r editors/zed/extension.toml editors/zed/languages editors/zed/src \
+                editors/zed/Cargo.toml editors/zed/Cargo.lock editors/zed/README.md \
+                "stage/$name/"
+          cp LICENSE "stage/$name/"
+          sed -i \
+            -e "s|^repository = \"file://.*\"|repository = \"https://github.com/${{ github.repository }}\"|" \
+            -e "s|^rev = \".*\"|rev = \"$GITHUB_SHA\"|" \
+            "stage/$name/extension.toml"
+          if grep -q 'file://' "stage/$name/extension.toml"; then
+            echo "::error::the released manifest still points at a local path"
+            exit 1
+          fi
+          mkdir -p out
+          tar czf "out/$name.tar.gz" -C stage "$name"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extensions
+          path: out/*
+
+  # ------------------------------------------------ the wasm module and page
+  wasm:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup target add wasm32-unknown-unknown
+
+      # Typst's protocol works through imports the host supplies, so this
+      # module cannot be instantiated by anything else — two modules rather
+      # than one that only one host can start.
+      - name: The Typst package
+        run: |
+          version="${{ needs.test.outputs.version }}"
+          name="bgraph-typst-$version"
+          ./typst/build.sh
+          mkdir -p "stage/$name"
+          cp typst/typst.toml typst/bgraph.typ typst/bgraph.wasm typst/README.md "stage/$name/"
+          cp LICENSE "stage/$name/"
+          mkdir -p out
+          tar czf "out/$name.tar.gz" -C stage "$name"
+
       - uses: pnpm/action-setup@v4
         with:
           version: 9
@@ -73,11 +218,56 @@ jobs:
           node-version: 22
           cache: pnpm
           cache-dependency-path: playground/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-        working-directory: playground
-      - run: pnpm build
-        working-directory: playground
+
+      - name: The playground
+        run: |
+          version="${{ needs.test.outputs.version }}"
+          mkdir -p out
+          ./playground/build.sh
+          pnpm install --frozen-lockfile --dir playground
+          pnpm --dir playground build
+          tar czf "out/bgraph-playground-$version.tar.gz" -C playground/dist .
+
       - uses: actions/upload-artifact@v4
         with:
-          name: bgraph-playground
-          path: playground/dist
+          name: wasm
+          path: out/*
+
+  # -------------------------------------------------------------- release
+  #
+  # Tags only. A `workflow_dispatch` run stops above this, having built and
+  # uploaded every artefact — which is the rehearsal, and the reason nothing
+  # here has to be taken on trust.
+  release:
+    if: github.ref_type == 'tag'
+    needs: [test, binaries, extensions, wasm]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: downloads
+
+      - name: Gather
+        run: |
+          mkdir -p release
+          find downloads -type f -exec mv {} release/ \;
+          ls -lh release
+
+      # The notes are written and reviewed in the repository, not generated
+      # from commit subjects: a release is read by somebody deciding whether
+      # to download it, and a list of commit subjects is written for somebody
+      # who already did. A test holds the file to the manifest's version and
+      # to the artefacts this workflow actually ships.
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${{ needs.test.outputs.version }}"
+          notes="docs/release-notes/$version.md"
+          [[ -f "$notes" ]] || { echo "::error::no $notes"; exit 1; }
+          gh release create "${{ github.ref_name }}" \
+            --title "bgraph $version" \
+            --notes-file "$notes" \
+            release/*

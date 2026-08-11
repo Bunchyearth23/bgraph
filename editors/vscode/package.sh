@@ -57,7 +57,7 @@ if [[ ! -f bgraph.wasm ]] || [[ ../../src/lib.rs -nt bgraph.wasm ]]; then
   if rustup target list --installed | grep -qx wasm32-unknown-unknown; then
     echo "package.sh: building the Markdown preview's renderer…"
     (cd ../.. && ./playground/build.sh >/dev/null)
-    cp ../../playground/bgraph.wasm bgraph.wasm
+    cp ../../playground/public/bgraph.wasm bgraph.wasm
   else
     echo "package.sh: no wasm32-unknown-unknown target — the Markdown preview" >&2
     echo "            will fall back to code blocks. \`rustup target add" >&2
