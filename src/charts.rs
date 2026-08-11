@@ -818,6 +818,12 @@ pub fn tree(
         cursor += span[*r] + spacing * 2.0;
     }
 
+    // The horizontal step of an indented tree. It is a **gutter** as much as an
+    // offset: the vertical guide is drawn inside it, so a link can never end up
+    // behind a box — the column is not the boxes' to occupy (`W-103`). The
+    // minimum is what a guide plus its elbow needs to stay legible.
+    let indent = (spacing + 14.0).max(20.0);
+
     // The three arrangements are the same tree read on different axes.
     match kind {
         TreeKind::Org => {}
@@ -844,7 +850,7 @@ pub fn tree(
             let tallest = sizes.iter().map(|(_, h)| *h).fold(0.0_f64, f64::max);
             let step = row.max(tallest + 6.0);
             for (line, (i, depth)) in order.iter().enumerate() {
-                pos[*i] = (*depth as f64 * (spacing + 14.0), line as f64 * step);
+                pos[*i] = (*depth as f64 * indent, line as f64 * step);
             }
         }
         TreeKind::Mind => {
@@ -921,24 +927,48 @@ pub fn tree(
     // Connectors, drawn as plain lines rather than routed edges: a tree's
     // links are structure, and an arrowhead on every one of them is noise.
     let link = if theme.dark { "#334155" } else { "#d4d4d8" };
+    let mut guide = |points: Vec<(f64, f64)>| {
+        polylines.push(Polyline {
+            points,
+            closed: false,
+            fill: None,
+            stroke: Some(link.to_string()),
+            width: 1.4,
+            head: None,
+            dash: None,
+        });
+    };
     for (parent, kids) in children.iter().enumerate() {
+        if kids.is_empty() {
+            continue;
+        }
+        let a = nodes[parent].rect;
+        if kind == TreeKind::View {
+            // An indented tree is drawn the way a file tree is: one vertical
+            // trunk per parent, running down the gutter its children's indent
+            // reserves, and a short elbow into each row. The trunk stops at the
+            // **last** child, which is what makes the junction read `└` — and
+            // what keeps it off the rows below, since every row between a
+            // parent and its last child is one of its descendants and therefore
+            // indented past the trunk. Nothing here can be drawn behind a box.
+            let tx = a.x + (indent * 0.45).min(a.w / 2.0);
+            let mid = |r: &Rect| r.y + r.h / 2.0;
+            let last = mid(&nodes[*kids.last().unwrap()].rect);
+            guide(vec![(tx, a.bottom()), (tx, last)]);
+            for k in kids {
+                let b = &nodes[*k].rect;
+                guide(vec![(tx, mid(b)), (b.x, mid(b))]);
+            }
+            continue;
+        }
         for k in kids {
-            let a = &nodes[parent].rect;
             let b = &nodes[*k].rect;
             let (from, to) = match kind {
                 TreeKind::Org => ((a.x + a.w / 2.0, a.bottom()), (b.x + b.w / 2.0, b.y)),
                 _ if b.x >= a.x => ((a.right(), a.y + a.h / 2.0), (b.x, b.y + b.h / 2.0)),
                 _ => ((a.x, a.y + a.h / 2.0), (b.right(), b.y + b.h / 2.0)),
             };
-            polylines.push(Polyline {
-                points: vec![from, to],
-                closed: false,
-                fill: None,
-                stroke: Some(link.to_string()),
-                width: 1.4,
-                head: None,
-                dash: None,
-            });
+            guide(vec![from, to]);
         }
     }
 

@@ -1542,6 +1542,65 @@ fn depth_is_the_row_in_an_orgchart_and_the_indent_in_a_treeview() {
 }
 
 #[test]
+fn a_treeview_guide_is_never_drawn_behind_a_box() {
+    // `W-103`. The links used to be diagonals from the parent's right edge to
+    // the child's left, which on indented rows crossed every row between them
+    // and ran *behind* the boxes — nodes are painted after polylines, so the
+    // structure of the tree was hidden by the tree.
+    //
+    // The fix is a property rather than a nicer picture: the indent reserves a
+    // column for the vertical guide, so a link cannot land behind a box because
+    // the space is not the boxes' to occupy. This asserts the property, on a
+    // deep tree rather than the shared fixture — the failure needs a row
+    // between a parent and its last child to appear at all.
+    let deep = "node a \"A\"\nnode b \"B\"\nnode c \"C\"\nnode d \"D\"\nnode e \"Eeeeeeee\"\n\
+                a -> b\nb -> c\nc -> d\na -> e\n";
+    let l = build(&format!("type treeview {{ row: 24 spacing: 12 }}\n{deep}"));
+
+    for line in &l.polylines {
+        for pair in line.points.windows(2) {
+            let (x0, y0) = pair[0];
+            let (x1, y1) = pair[1];
+            for node in &l.nodes {
+                let r = node.rect;
+                // Interior overlap only: an elbow is *meant* to touch the left
+                // edge of the row it points at, and a trunk leaves from under
+                // its parent. A tolerance keeps a shared boundary from reading
+                // as a crossing.
+                let t = 0.01;
+                let hit = x0.min(x1) < r.right() - t
+                    && x0.max(x1) > r.x + t
+                    && y0.min(y1) < r.bottom() - t
+                    && y0.max(y1) > r.y + t;
+                assert!(
+                    !hit,
+                    "a guide from ({x0}, {y0}) to ({x1}, {y1}) runs through {} at ({}, {}) {}×{}",
+                    node.id, r.x, r.y, r.w, r.h
+                );
+            }
+        }
+    }
+
+    // And the trunk stops at the last child rather than running on: without
+    // this the property above would hold trivially for a tree whose guides all
+    // ran off the bottom of the drawing.
+    let lowest = l
+        .nodes
+        .iter()
+        .map(|n| n.rect.bottom())
+        .fold(0.0_f64, f64::max);
+    let deepest = l
+        .polylines
+        .iter()
+        .flat_map(|p| p.points.iter().map(|(_, y)| *y))
+        .fold(0.0_f64, f64::max);
+    assert!(
+        deepest < lowest,
+        "a guide reaches {deepest}, past the last row at {lowest}"
+    );
+}
+
+#[test]
 fn a_mindmap_puts_branches_on_both_sides_of_its_root() {
     // The point of the shape: the root stays central however lopsided the
     // tree is.

@@ -25,8 +25,11 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**Nothing is planned. One question is open (`Q-005`, the licence) and nothing
-is blocked.** Thirty-nine ideas were triaged on 2026-08-10 — `I-023` … `I-061` —
+**No question is open. Three chantiers are planned (`W-102`, `W-104`, `W-105`) and
+nothing is blocked.** The licence question closed on 2026-08-11 — `D-032` says
+proprietary, and says it as a decision rather than a silence, because the four
+built-and-unpublished chantiers will make somebody ask again. Thirty-nine ideas
+were triaged on 2026-08-10 — `I-023` … `I-061` —
 and the audience was settled: *first right for its author, then distributable*,
 which is the order that survives.
 Twenty-eight genres plus `free` ship, both editors have an extension, and the
@@ -34,29 +37,37 @@ library renders SVG and PDF. (Earlier lines in this file said "thirty"; the
 table in `props.rs` has twenty-nine `ArchetypeDef` entries, one of them `free`.) The parked ideas were
 reviewed on 2026-08-10 and every one of them moved: what was worth building
 became a work item, what was not was discarded, and the one language question
-the review raised was answered the same day (`D-023`). One idea is still parked,
-on purpose — `I-021`, because nobody has chosen which part of BPMN is the useful
-part, and that has to be decided before it can be costed.
+the review raised was answered the same day (`D-023`). The one idea left parked
+— `I-021`, BPMN — was parked because nobody had chosen which part of the
+notation is the useful part; that was chosen on 2026-08-11, and it is `W-102`.
 
 The thirty-nine ideas raised on 2026-08-10 are all settled: **thirty built**
-(`W-071` … `W-100`), nine refused with a reason. What remains open in this
-file is `Q-005` and `I-021`, and neither is a piece of work — both are a
-decision somebody has to take.
+(`W-071` … `W-100`), nine refused with a reason. The two that were still a
+decision rather than a piece of work were both taken on 2026-08-11: the licence
+(`D-032`) and BPMN's scope (`I-021` promoted to `W-102`). Two open risks were
+given a chantier at the same time, which is what turns a known defect into work
+somebody can finish — `X-004` into `W-105` and `X-008` into `W-104`.
 
 ### Questions
 
-| id | state | title | notes |
-|---|---|---|---|
-| `Q-005` | open · **the only thing left** | Is the proprietary licence (`D-020`) final? | Everything the distribution half needed is now **built and unpublished**: the Markdown preview (`W-098`), the Typst plugin (`W-099`), the wasm playground (`W-096`), the release workflow and the CI action (`W-097`). Building was never what the licence forbade — *distributing* is, so none of them ship and a test asserts the release workflow creates nothing. `Cargo.toml` still carries `publish = false`, and `LICENSE` still says all rights reserved. **This is the last open item in the file, and it is not a technical one.** |
+Nothing open. `Q-005` was the last, and it was answered on 2026-08-11.
 
 ### Work planned
 
-Nothing. The sixteen chantiers opened on 2026-08-10 all landed the same day.
+Ordered. The order is not preference: `W-103` and `W-105` both regenerate
+checked-in SVG, and two waves of regeneration in one diff cannot be read by eye
+— which is the only proof that counts for geometry.
+
+| id | state | title | notes |
+|---|---|---|---|
+| `W-104` | planned · **next** | `bgraph fmt --migrate` — `opacity` becomes the colour's fourth channel. Closes `X-008` | The mechanism exists: `relayout.rs` (`W-094`) already inserts into lines rather than rewriting them, so comments and hand-aligned columns survive. The one design point is the block that carries an `opacity` and no colour to carry the alpha — **refused, naming the line**, because a migration that invents a `#ffffff` is worse than one that declines. `--check` does not move; `--migrate` is a second mode and not a side effect of formatting |
+| `W-105` | planned · after `W-103` | An `ortho` edge routes around the boxes instead of through them. Retires `X-004` | The contour becomes what `ortho` *is*, rather than a second router name: nobody should have to learn a second word to get a drawing that is not wrong, and `D-015` refuses two spellings of one idea everywhere else. Visibility graph over the box edges, A\* with a per-corner penalty so the shortest path is also the one with fewest elbows. The real risk is not the search but **determinism** — the golden test compares byte for byte and this project has already shipped an unstable SVG once (`W-065`, the venn's `HashMap`). No path is a fallback to today's line plus the existing `after_layout` diagnostic, never a missing edge |
+| `W-102` | planned · last | `type bpmn`, extended scope. Promotes `I-021` | Six deliverable steps, each of which draws something readable: core (tasks, XOR/AND gateways, start/end events, sequence flow), pools and lanes as `group`s, typed event triggers, sub-processes, boundary and intermediate events, then data objects and associations. **Step five has no answer in the language yet**, and it is recorded here rather than discovered halfway: an event attached to the *edge* of a task needs an anchor on a box's perimeter, and `D-001` only knows anchors between whole boxes. That is a language decision, and it will be asked as one |
 
 
 ### Risks
 
-Known ways this goes wrong. `X-005` now has a chantier; the rest do not, because none has been worth the cost yet.
+Known ways this goes wrong. Three now carry a chantier — `X-004` (`W-105`), `X-008` (`W-104`) and `X-005`, which is narrowed as far as it goes. The rest do not, because none has been worth the cost yet.
 
 | id | state | title | notes |
 |---|---|---|---|
@@ -65,8 +76,8 @@ Known ways this goes wrong. `X-005` now has a chantier; the rest do not, because
 | `X-010` | mitigated | `tree-sitter test`'s summary line counts parses, not expectation matches | It read "failed parses: 0" while seven corpus expectations were stale across the `W-029` rename. `the_grammar_corpus_expectations_still_hold` now asserts the **exit code** on each `cargo test`, but only when the CLI is on PATH. |
 | `X-006` | mitigated | Edge labels avoid lines, not each other's readability | `W-010` scores candidates; `W-022` made the node and label penalties proportional to the overlapped area and distance a real cost, which stopped labels fleeing three rows from their own edge. Still local: nothing guarantees the best global arrangement — `W-037` adds the escape hatch (`label-offset`) rather than a better solver, because the author can see what the cost function cannot. |
 | `X-017` | narrowed · `W-077` | Raster output is **optional, not absent** — a build without the `png` feature still has none | `W-042` ships PDF because it is vector and needs nothing; a raster format needs glyph rasterisation and path filling, which is a real renderer. `D-027` records that the honest options were a large dependency tree in a crate that has five, or months of work — and that a PDF opens everywhere a PNG does. Anyone who needs a bitmap can rasterise the PDF or the SVG with a tool built for it. **Narrowed on 2026-08-10 by `W-077`:** `resvg` was already in the tree for the window, so a `png` feature costs the default build nothing and gives someone rendering images in CI a first-class output. The dependency-free promise is unchanged, because it was always a promise about what the *default* build costs. |
-| `X-004` | mitigated | Orthogonal routing ignores obstacles | It still does — the router turns corners and avoids nothing. What changed is that it no longer does so *in silence*: `check::after_layout` reports an `ortho` edge whose path crosses a box that is not one of its endpoints, and names the ways out. A router that avoided obstacles is a different piece of work; a drawing that is wrong without saying so was the part worth fixing first. |
-| `X-008` | open | `D-016` removed `opacity`, which is a breaking change | Any file using `opacity: 0.5` now fails with `unknown property`. The repo's own files carried none, and the message names the fix — but nothing migrates it automatically. |
+| `X-004` | mitigated · `W-105` | Orthogonal routing ignores obstacles | It still does — the router turns corners and avoids nothing. What changed first is that it no longer does so *in silence*: `check::after_layout` reports an `ortho` edge whose path crosses a box that is not one of its endpoints, and names the ways out. A drawing that is wrong without saying so was the part worth fixing first; **the router itself is now `W-105`**, and it replaces `ortho` rather than adding a name beside it. |
+| `X-008` | open · `W-104` | `D-016` removed `opacity`, which is a breaking change | Any file using `opacity: 0.5` now fails with `unknown property`. The repo's own files carried none, and the message names the fix — but nothing migrates it automatically. **`W-104` is that migration**, and the risk closes when it lands. |
 | `X-005` | open | Text width cannot be measured, only estimated | **Narrowed by `W-040`, and it cannot be closed.** The within-typeface error is gone: advances are per character now, so `l` and `W` are no longer charged the same. What remains is unfixable by construction — the SVG names a font *family* and whoever renders it decides what that resolves to, so a box sized against Helvetica metrics is wrong by however much the reader's font differs. `D-026` records why the alternatives are worse. |
 
 ---
@@ -76,6 +87,7 @@ Known ways this goes wrong. `X-005` now has a chantier; the rest do not, because
 ### Decisions
 | id | state | date | title | was |
 |---|---|---|---|---|
+| `D-032` | active | 2026-08-11 | **The licence is proprietary, and that is the answer rather than the absence of one.** Answers `Q-005` by confirming `D-020` after the distribution half was built: the playground (`W-096`), the release binaries and CI action (`W-097`), the Markdown preview (`W-098`) and the Typst plugin (`W-099`) all exist, all work, and **none of them ship**. Recorded as a decision rather than left as a closed question because the four will keep prompting the same question from anyone who finds them, and a repository that answers "we never decided" invites somebody to decide it by accident. Nothing in the repository changes: `LICENSE` grants nothing, `Cargo.toml` keeps `license-file` and `publish = false`, and the test asserting `release.yml` creates no release and runs no `cargo publish` is now load-bearing rather than precautionary. The order `D-014` set holds — **first right for its author, then distributable** — and only the second half is declined | |
 | `D-031` | active | 2026-08-10 | **Placement: a grid is a coordinate system, a constraint is a nudge, and `layout` writes what both accept.** Settles `I-033`, `I-034` and `I-035` together, because they are one design — a grid *is* a constraint system, and `bgraph layout` has to emit whatever the other two read or it would write positions that discard the author's intent. The line all three are held to is `D-001`: **layout stays declared, so nothing here may decide an order.** (1) **The grid** is `graph { grid: 160 90 }` plus `at (col 3, row 2)` — still `at`, in different units. It adds a coordinate system and no solver, which is why it cannot break `D-001`. (2) **A constraint adjusts one axis and never the order**: `align-group a b c` gives them one cross-axis coordinate, `same-width a b c` one width. They run as a pass over the *solved* layout, in declaration order, and an explicit `at` wins — a constraint contradicting a declared position is a **warning naming both**, never a silent move, which is the same refusal to shadow that `D-005` and `D-029` make. (3) **`bgraph layout` writes only what (1) and (2) accept**: a relative anchor where one is obvious, an `at` otherwise. It edits the author's file, so it inserts into lines rather than rewriting them — `fmt` is lexical and leaves interior alignment alone, and this must go further and preserve everything. The guard that makes it trustworthy is a round trip: run it, render before and after, assert the SVG is identical. That is the whole promise. **Order of work: the grid and the constraints first — they are language — then `layout`, which writes them** | |
 | `D-030` | active | 2026-08-10 | **A component is an include of a file you did not have to make.** Settles `I-030` by refusing to invent a second mechanism: a component's body is filled by the **template engine** — the same one a file with holes uses, so a binding is escaped for wherever its hole sits and a label with a quote cannot become a statement — and its names are then prefixed by the **`qualify` pass `D-029` already needed**, so two placings cannot collide. Two consequences worth stating. First, **an instance is a frame**: the expansion wraps it in a group named after the placing, because a group is already anchorable and already sized by what it holds, so `use service as jobs right-of web` needs no placement vocabulary of its own — without this an author could name the boxes inside an instance but not say where the instance goes, which would make the feature a curiosity. Second, **a component's holes are not the file's**: they are bound by each `use`, so a file containing a component is not thereby a template that can never be satisfied. No conditionals and no loops: past that it is a macro system, and the library fills a table for the cases that need one | |
 | `D-029` | active | 2026-08-10 | **Composition: one keyword, two forms, and no silent shadowing.** Settles `I-028` and `I-032` together, because they are one question. (1) `include "path"` merges another file whole, and **every declared name must be unique across the set** — a collision is a hard error naming both files, which is `D-005`'s rule applied to a second file rather than a second spelling of it. (2) `include "path" as core` merges under a prefix, so collisions become impossible by construction and `core.api` refers into it. (3) **A qualified name is one token** — `ident("." ident)*` with no spaces inside — which is what resolves the conflict `I-032` flagged: `.box` still lexes as a class reference because maximal munch takes `core.api` whole, so no new sigil is needed and nothing already written changes meaning. A qualified name in a *declaring* position is an error: nobody declares into another file's namespace. (4) **A `.bds` holds `style` declarations and nothing else**, refused by `check` — "a shared house palette" is what the extension promises, and a file that could also declare nodes would be a `.bd` with a misleading name. (5) Paths resolve relative to the **including** file; a cycle is a hard error naming the chain. (6) **`render_source` stays free of the filesystem**: it is semver-covered and the wasm build rests on it, so it refuses an `include` with a message saying which call to use instead, and a path-taking entry point resolves them. The cost this design accepts, honestly: spans must carry a file identity they do not carry today, or a diagnostic and a go-to-definition would point into the wrong buffer | |
@@ -115,6 +127,7 @@ not copies.
 
 | id | date | title | commit |
 |---|---|---|---|
+| `W-103` | 2026-08-11 | The `treeview` draws its links the way an indented tree is drawn: a trunk in a reserved gutter, a short elbow into each row. It had been treated as a `mindmap` — a diagonal from the parent's right edge to the child's left — which on indented rows crossed every row between the two and ran **behind** the boxes, since nodes are painted after polylines. So the structure of the tree was the one thing the drawing hid. The fix is a **property, not a nicer picture**: the indent reserves a column for the guide, and a link cannot be drawn behind a box because the space is not the boxes' to occupy. The trunk stops at the *last* child, which is both what makes the junction read `└` and what keeps it clear of the rows below — every row between a parent and its last child is one of its descendants, and therefore indented past the trunk. The test asserts the property over every segment against every box rather than checking the picture, and it was **proven by reverting the fix and watching it fail**: it names the guide, the coordinates and the box it crosses | this commit |
 | `W-062` | 2026-08-10 | `--rows name=file.csv`, and `template::rows_from_csv`. A CSV is one table and maps exactly onto repetition — a header names the fields, every other line writes its statement once. Hand-rolled, like everything else here: the dialect is twenty lines | this commit |
 | `W-061` | 2026-08-10 | `bgraph watch --data` — the live preview fills a template from its data, re-read on every request, so editing the *numbers* reloads too. Without data the preview draws the shape holes and all, which is the opposite of a one-shot render and deliberately so: the shape is what you are editing before the data is wired up | this commit |
 | `W-060` | 2026-08-10 | `docs/vocabulary.md` rewritten from the tables, a GitHub Actions workflow, and a golden test for the thirty-three checked-in SVG | 152f834 |
@@ -225,6 +238,7 @@ Nothing is marked `landed` without a commit to point at.
 | `Q-001` | 2026-07-31 | What does `type` select — a placement strategy or a diagram genre? | `D-007` | |
 | `Q-002` | 2026-07-31 | Which archetype after `pie` and `packet`? | answered by the work — `W-016` … `W-026` all landed, so the ordering question stopped having a subject | **Restored 2026-08-10.** This line had been *deleted* rather than closed, which is exactly what the rule at the top of this file forbids: an identifier never changes and is never reused, and state is explicit. A deleted question reads as a question that was never asked. Its last recorded note said the survey had answered it in part and what remained was the order, naming `W-019`, `W-024`, `W-018` and `W-016` as the ones with no prerequisite |
 | `Q-003` | 2026-07-31 | What shape should the embeddable API take? | `D-017` | |
+| `Q-005` | 2026-08-11 | Is the proprietary licence (`D-020`) final? | `D-032` | Asked with the distribution half already built, which is what made it answerable: the question was never "could we ship" but "do we want to", and the four chantiers proved the first half so the second could be decided on its own terms. Answered **yes** — everything stays built and unpublished |
 | `Q-004` | 2026-08-10 | How does an archetype declare a **second** slot form? | `D-023` | Raised by the idea review the same day: a true scatter for `xy` wants `(x, y)` pairs, which `D-015` had no way to express inside one archetype. Asked before it was built, because the answer lands in `props.rs`, both grammars and completion at once |
 
 ### Risks retired
@@ -265,7 +279,7 @@ Nothing is marked `landed` without a commit to point at.
 | `I-018` | promoted | `type venn` — became `W-053`. Split out of `I-012` first, which is what made it visible that it is a geometry problem and not a chart |
 | `I-019` | promoted | `type kanban` — became `W-050` |
 | `I-020` | promoted | `type journey` — became `W-052` |
-| `I-021` | parked | `type bpmn` — the notation is large and mostly ceremony: which part of it is the useful part has to be chosen before the work can be costed, and nobody has chosen |
+| `I-021` | promoted · `W-102` | `type bpmn` — parked from 2026-08-10 to 2026-08-11 for exactly one reason: which part of the notation is the useful part had to be chosen before the work could be costed. It was chosen on 2026-08-11, and **widely** — the core plus typed triggers, boundary and intermediate events, sub-processes and data artefacts. So the estimate is honest rather than small |
 | `I-022` | promoted | `type requirements` — became `W-051` |
 
 Thirty-nine were put one by one on 2026-08-10, against what Mermaid, PlantUML,
