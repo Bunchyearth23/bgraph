@@ -255,6 +255,12 @@ fn shape_allowance(shape: Option<Shape>, mut w: f64, mut h: f64) -> (f64, f64) {
             h += 6.0;
         }
         Shape::Cylinder => h += 14.0,
+        // A stadium's ends are semicircles of radius h/2, so the width a line
+        // of text can actually use is `w - h`. Nothing was added for it, which
+        // is why `type block`'s widest person box had its name running out of
+        // both curved ends (`W-118`). Half the height each side, and a floor so
+        // a short label in a tall box does not double the box.
+        Shape::Stadium => w += h.min(w * 0.6),
         _ => {}
     }
     (w, h)
@@ -996,11 +1002,20 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             // not — and a rule that changes its mind between two boxes reads as
             // a defect even where each case on its own is defensible.
             // Consistency wins, and centred is what UML draws (`W-108`).
+            //
+            // Centred **in both directions** (`W-117`). Horizontally was only
+            // half of it: the rows were laid from the top of the box downward,
+            // so the name sat a padding's worth below the middle of its own
+            // header band and the space above it never matched the space below.
+            // The band is `rect.y` to `head`; the block of title rows is centred
+            // in that.
+            let block = title_rows * font * 1.45;
+            let first = (placed.rect.y + head) / 2.0 - block / 2.0 + font * 1.45 / 2.0;
             for (i, line) in std::mem::take(&mut placed.lines).into_iter().enumerate() {
                 annotations.push(Annotation {
                     text: line,
                     x: placed.rect.cx(),
-                    y: placed.rect.y + pad + (i as f64 + 0.5) * font * 1.45,
+                    y: first + i as f64 * font * 1.45,
                     anchor: Anchor::Middle,
                     size: font,
                     color: s.font_color.clone().unwrap_or_else(|| "#111827".into()),
@@ -1166,7 +1181,21 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             // for. They fan across the gap in declaration order.
             let span = (xb - out) - (xa + out);
             let lane = (drawn as f64 + 1.0) / (wires as f64 + 1.0);
-            let mid = xa + out + span * lane;
+            // Past the name, whatever lane this wire drew. The name sits on the
+            // horizontal run leaving the shell, and the first wire's lane put
+            // the turn a third of the way along — straight through the last two
+            // letters of it (`W-120`). The lane still decides the order; it no
+            // longer decides whether the label is readable.
+            let clear = edge
+                .label
+                .as_deref()
+                .filter(|l| !l.is_empty())
+                .map(|l| {
+                    text_width(&[l.to_string()], placed.style.font_size.unwrap_or(11.0)) + 22.0
+                })
+                .unwrap_or(0.0);
+            let along = (span * lane).max(clear).min(span.abs());
+            let mid = xa + out + along * span.signum();
             drawn += 1;
 
             polylines.push(Polyline {
@@ -1778,10 +1807,21 @@ fn place_all(
             // it the title had nowhere to go: on the border it crossed the
             // frame, and inside it landed on the first member.
             let title = if group.label.is_some() { 16.0 } else { 0.0 };
+            // The frame is at least as wide as its own name. A group is sized
+            // by what it holds and its name is part of that — `type network`'s
+            // "Core segment — 10.0.0.0/24" ran out of the right-hand edge of
+            // the very frame it labels, because only the members were measured
+            // (`W-118`). The same principle `W-112` applied to a caption drawn
+            // beside a box.
+            let named = group
+                .label
+                .as_deref()
+                .map(|l| text_width(&[l.to_string()], 12.0) + padding * 2.0 + 10.0)
+                .unwrap_or(0.0);
             let frame = Rect {
                 x: inner.x - padding,
                 y: inner.y - padding - title,
-                w: inner.w + padding * 2.0,
+                w: (inner.w + padding * 2.0).max(named),
                 h: inner.h + padding * 2.0 + title,
             };
 

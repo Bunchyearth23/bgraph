@@ -880,7 +880,7 @@ group filed "Employee" {
   task  fill   "Fill the form"   user right-of submit gap 44
 }
 
-group review "Finance" below filed gap 34 {
+group review "Finance" below filed gap 112 {
   padding: 22
 
   task    check "Validate receipts" rule at (0, 0)
@@ -894,10 +894,11 @@ group review "Finance" below filed gap 34 {
 // declared like every other placement.
 event late "14 days" boundary timer { attach: pay }
 
-// The form sits between the two participants, on the side the reader's eye
-// already travels: to the right of it, both its association and its message
-// flow had to double back across the picture.
-data claim  "Claim form" object right-of filed gap 40 align top
+// The form sits between the two pools, over the task that reads it. Put to the
+// right of the employee's pool — which is where it went first — its message
+// flow had to cross the whole picture to reach `check` on the far left, which
+// is a worse crossing than the one that move was meant to remove.
+data claim  "Claim form" object below filed gap 22 align left
 data ledger "Ledger"     store below done gap 40
 
 submit -> fill

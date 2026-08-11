@@ -1318,7 +1318,7 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
     let row_y = |u: u32| -> f64 { top + (units.saturating_sub(u)) as f64 * unit_h };
 
     let mut nodes = Vec::new();
-    let mut groups = Vec::new();
+    let groups = Vec::new();
     let mut guides = Vec::new();
     let mut annotations = Vec::new();
 
@@ -1335,17 +1335,23 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         });
     }
 
-    groups.push(PlacedGroup {
-        id: String::new(),
-        lines: Vec::new(),
-        rect: Rect {
-            x: gutter,
-            y: top,
-            w: frame_w,
-            h: units as f64 * unit_h,
-        },
-        style: registry.resolve(Style::group_defaults(), "group", &[], &[])?,
-    });
+    // **Two rails, not a frame.** A rack is a pair of mounting posts: the
+    // horizontals a rounded rectangle draws across the top and the bottom are
+    // not part of one, and they are exactly where a device in the topmost or
+    // bottommost unit had to fight for room. Drawing them as `Guide`s also
+    // retires the corner problem rather than solving it — a straight line has
+    // no radius for a device to clash with (`W-119`).
+    let rail = registry.resolve(Style::group_defaults(), "group", &[], &[])?;
+    let bottom = top + units as f64 * unit_h;
+    for x in [gutter, gutter + frame_w] {
+        guides.push(Guide {
+            from: (x, top),
+            to: (x, bottom),
+            color: rail.stroke.clone().unwrap_or_else(|| theme.muted.clone()),
+            width: rail.stroke_width.unwrap_or(1.0),
+            dash: rail.dash.clone().or_else(|| Some("dashed".into())),
+        });
+    }
 
     if ruler {
         let rail = if theme.dark { "#1e293b" } else { "#e4e4e7" };
@@ -1915,7 +1921,11 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
                 .clone()
                 .unwrap_or_else(|| group.id.value.clone()),
             x: (bx0 + bx1) / 2.0,
-            y: (top + bottom) / 2.0 + 4.0,
+            // `Annotation::y` is the middle of the text, so the band's own
+            // middle is the answer — the four pixels that used to be added here
+            // were a baseline correction for a baseline that is not used
+            // (`W-117`).
+            y: (top + bottom) / 2.0,
             anchor: Anchor::Middle,
             size: 11.0,
             color: style
@@ -4458,8 +4468,13 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             &group.props,
         )?;
         const BAR_W: f64 = 10.0;
-        let top = first_row + first as f64 * row - row * 0.5;
-        let height = (last - first) as f64 * row + row * 0.9;
+        // Tight around the messages it spans. It reached almost half a row past
+        // the last one, which on a bar ending where a frame begins put it
+        // *inside* the frame and read as two things colliding rather than one
+        // ending (`W-121`).
+        const REACH: f64 = 0.3;
+        let top = first_row + first as f64 * row - row * REACH;
+        let height = (last - first) as f64 * row + row * REACH * 2.0;
         nodes.push(PlacedNode {
             id: String::new(),
             lines: Vec::new(),
@@ -4717,7 +4732,10 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
             .iter()
             .map(|t| text_width(std::slice::from_ref(&t.1), name_size))
             .fold(0.0_f64, f64::max)
-        + 18.0;
+        // Eighteen pixels put the longest name almost against the first
+        // gridline, which is what read as cramped: the eye has nothing between
+        // the end of the word and the start of the plot (`W-122`).
+        + 34.0;
 
     let title_h = if title.is_some() {
         // Two and a half lines, not two: at two the heading sat on the top
@@ -4824,7 +4842,7 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
 
         annotations.push(Annotation {
             text: name.clone(),
-            x: names_w - 12.0,
+            x: names_w - 20.0,
             y: y + row_h / 2.0,
             anchor: Anchor::End,
             size: name_size,
