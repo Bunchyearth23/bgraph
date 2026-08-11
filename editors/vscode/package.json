@@ -5,22 +5,39 @@
   "version": "0.1.0",
   "publisher": "bunchyearth23",
   "private": true,
-  "license": "SEE LICENSE IN ../../LICENSE",
-  "repository": { "type": "git", "url": "https://github.com/Bunchyearth23/bgraph" },
-  "engines": { "vscode": "^1.85.0" },
-  "categories": ["Programming Languages"],
-  "activationEvents": ["onLanguage:bgraph", "onLanguage:markdown"],
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Bunchyearth23/bgraph"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:bgraph",
+    "onLanguage:markdown"
+  ],
   "main": "./src/extension.js",
   "contributes": {
     "markdown.markdownItPlugins": true,
     "configurationDefaults": {
-      "[bgraph]": { "editor.tabSize": 2, "editor.insertSpaces": true }
+      "[bgraph]": {
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true
+      }
     },
     "languages": [
       {
         "id": "bgraph",
-        "aliases": ["bgraph"],
-        "extensions": [".bd"],
+        "aliases": [
+          "bgraph"
+        ],
+        "extensions": [
+          ".bd"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],

@@ -9742,6 +9742,77 @@ fn the_release_ships_everything_and_publishes_only_here() {
     assert!(!release.contains("libwayland-dev"), "{release}");
 }
 
+/// One licence, in five files, and it is the one the repository ships.
+///
+/// `D-036` answered it: PolyForm Noncommercial 1.0.0. The text is the
+/// canonical one from SPDX rather than a paraphrase — a licence somebody
+/// rewrote from memory is a licence nobody can rely on — and every manifest
+/// names it by its SPDX identifier so no reader has to open a file to find out.
+#[test]
+fn every_manifest_names_the_licence_the_repository_carries() {
+    const SPDX: &str = "PolyForm-Noncommercial-1.0.0";
+
+    let licence = include_str!("../LICENSE");
+    assert!(
+        licence.contains("PolyForm Noncommercial License 1.0.0"),
+        "LICENSE is not the licence the manifests claim"
+    );
+    // The clause that makes the copyright holder's name travel with a copy.
+    assert!(
+        licence.starts_with("Required Notice: Copyright"),
+        "no `Required Notice:` line, so a copy carries no attribution"
+    );
+    // The two halves a reader must be able to find: what is permitted, and
+    // what is not.
+    for clause in [
+        "Noncommercial Purposes",
+        "Noncommercial Organizations",
+        "No Liability",
+    ] {
+        assert!(
+            licence.contains(clause),
+            "`{clause}` is missing from LICENSE"
+        );
+    }
+
+    for (what, text) in [
+        ("the crate", include_str!("../Cargo.toml")),
+        ("the Typst package", include_str!("../typst/typst.toml")),
+        (
+            "the Zed extension's crate",
+            include_str!("../editors/zed/Cargo.toml"),
+        ),
+        (
+            "the VS Code extension",
+            include_str!("../editors/vscode/package.json"),
+        ),
+    ] {
+        assert!(text.contains(SPDX), "{what} does not name `{SPDX}`");
+    }
+
+    // crates.io and the marketplaces are still a separate decision.
+    assert!(
+        include_str!("../Cargo.toml").contains("publish = false"),
+        "a licence is not a decision to publish"
+    );
+
+    // And the notes say it, because that is the page somebody reads before
+    // downloading rather than after.
+    let notes = std::fs::read_to_string(
+        std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/docs/release-notes"))
+            .join(format!("{}.md", env!("CARGO_PKG_VERSION"))),
+    )
+    .expect("release notes");
+    assert!(
+        notes.contains("PolyForm Noncommercial 1.0.0"),
+        "the notes do not say what licence the artefacts come under"
+    );
+    assert!(
+        notes.contains("Commercial use needs a separate agreement"),
+        "the notes leave the one restriction unstated"
+    );
+}
+
 /// One version, in five files.
 ///
 /// A version written in five places is a version that is wrong in four of

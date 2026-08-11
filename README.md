@@ -153,3 +153,14 @@ cargo build --release        # bgraph and bgraph-lsp
 cargo test
 ./editors/zed/install.sh     # editor support
 ```
+
+## Licence
+
+[PolyForm Noncommercial 1.0.0](LICENSE) — use it for anything that is not
+commercial: personal projects, study, research, hobby work, and inside a
+charity, a school, a public research body or a government. Changing it and
+running it for the people around you are both covered.
+
+A company using it for its own work is commercial use, whatever the diagram is
+for, and so is anything that ends up in something sold. That needs a separate
+agreement.

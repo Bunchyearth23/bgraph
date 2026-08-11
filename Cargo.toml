@@ -7,7 +7,10 @@ description = "Stylable diagrams from a layout-first DSL — you place the boxes
 repository = "https://github.com/Bunchyearth23/bgraph"
 readme = "README.md"
 authors = ["Arnaud De Cafmeyer"]
-license-file = "LICENSE"
+# Noncommercial, and a real SPDX identifier rather than a file nobody parses
+# (`D-036`). `publish = false` stays: crates.io is a second channel and
+# nobody has decided on it.
+license = "PolyForm-Noncommercial-1.0.0"
 
 publish = false
 

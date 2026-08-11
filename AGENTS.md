@@ -64,7 +64,7 @@ disagree.
 - `cargo run --bin bgraph -- watch a.svg` — the same viewer, on a picture
 - `cargo run --bin bgraph -- check /tmp/a.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (554 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (555 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo build --no-default-features` — the four-dependency library. **A CI
   step, and it has been red before**: a `#[cfg]` on a type without one on its
   users compiles under `default` and not here
@@ -195,6 +195,13 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-08-11] **The licence is PolyForm Noncommercial 1.0.0** (`D-036`), and
+  five manifests name it by SPDX id — crate, Zed extension crate, Typst
+  package, VS Code `package.json`, plus `LICENSE` itself. A test holds them
+  together. The text is the canonical SPDX one; never hand-edit or paraphrase
+  a licence. Note what it does *not* do: it permits redistributing the source
+  within the noncommercial scope, so the private repository is what keeps the
+  source in, not the text.
 - [2026-08-11] **Releasing is one channel, and it is named.** `D-035` turned
   the GitHub Release on and left crates.io, the VS Code Marketplace, Open VSX
   and the Zed registry off — the workflow names all four and a test asserts it
