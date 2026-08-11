@@ -13,6 +13,9 @@
   "main": "./src/extension.js",
   "contributes": {
     "markdown.markdownItPlugins": true,
+    "configurationDefaults": {
+      "[bgraph]": { "editor.tabSize": 2, "editor.insertSpaces": true }
+    },
     "languages": [
       {
         "id": "bgraph",

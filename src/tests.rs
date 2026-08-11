@@ -3936,6 +3936,71 @@ fn a_statement_runs_to_its_separator() {
 }
 
 #[test]
+fn every_pair_of_braces_is_indented_by_the_editors() {
+    // `W-129`. The query beside it proves a `.scm` is *valid*; nothing proved
+    // one was *complete*. `indents.scm` named `(block)` and the grammar has
+    // two block types, so `group { … }`, `component { … }` and `use … { … }`
+    // — all `group_block` — indented not at all, while `node a { … }` beside
+    // them did. Pressing Enter did different things in two places that look
+    // the same, which is what "annoying" meant.
+    //
+    // So this counts: every `{` in a sample must be inside something the query
+    // captures. A list of node types written by hand is a list that stops
+    // being true, and the query is written against the brackets for that
+    // reason — this is what holds it to it.
+    let dir = scratch("indent-query");
+    let sample = dir.join("sample.bd");
+    let text = "node a \"A\" {\n  fill: #123456\n}\n\
+                group g \"G\" {\n  node b \"B\"\n}\n\
+                component c {\n  node d \"D\"\n}\n\
+                use c as e {\n  label: \"E\"\n}\n\
+                type pie {\n  title: \"T\"\n}\n";
+    std::fs::write(&sample, text).expect("a scratch sample");
+
+    let query = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/editors/zed/languages/bgraph/indents.scm"
+    );
+    let out = {
+        let _serial = tree_sitter_lock();
+        std::process::Command::new("tree-sitter")
+            .arg("query")
+            .arg(query)
+            .arg(&sample)
+            .current_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/tree-sitter-bgraph"))
+            .output()
+    };
+    let Ok(out) = out else {
+        println!(
+            "SKIPPED: `tree-sitter` is not on PATH, so the indent query was not \
+             checked for completeness."
+        );
+        return;
+    };
+
+    // Distinct *positions*, not occurrences: a query may match one node with
+    // several patterns, and counting hits would make a redundant pattern look
+    // like coverage. The sample deliberately contains no parentheses, so every
+    // capture here is a brace pair.
+    let printed = String::from_utf8_lossy(&out.stdout);
+    let mut spots: Vec<&str> = printed
+        .lines()
+        .filter_map(|l| l.trim().strip_prefix("capture: indent, start: "))
+        .collect();
+    spots.sort_unstable();
+    spots.dedup();
+
+    let braces = text.matches('{').count();
+    assert_eq!(
+        spots.len(),
+        braces,
+        "{} of {braces} brace pairs are indented — a block the query does not \
+         reach is a block Enter behaves differently in:\n{printed}",
+        spots.len()
+    );
+}
+
+#[test]
 fn the_editor_queries_match_the_grammar() {
     // A query naming a node type the grammar no longer has does not degrade
     // gracefully: Zed fails to load the language and stops recognising the

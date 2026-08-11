@@ -8,7 +8,14 @@
   ],
   "surroundingPairs": [["{", "}"], ["(", ")"], ["\"", "\""]],
   "indentationRules": {
-    "increaseIndentPattern": "\\{\\s*$",
+    "increaseIndentPattern": "(^|[^{])\\{\\s*$",
     "decreaseIndentPattern": "^\\s*\\}"
-  }
+  },
+  "onEnterRules": [
+    {
+      "beforeText": "\\{\\s*$",
+      "afterText": "^\\s*\\}",
+      "action": { "indent": "indentOutdent" }
+    }
+  ]
 }

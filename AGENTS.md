@@ -65,7 +65,7 @@ disagree.
 - `cargo build --features window` — the native window (opt-in: +78 crates)
 - `cargo run --bin bgraph -- check /tmp/a.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (533 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (534 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo build --no-default-features` — the four-dependency library. **A CI
   step, and it has been red before**: a `#[cfg]` on a type without one on its
   users compiles under `default` and not here
@@ -147,6 +147,11 @@ disagree.
   `tree-sitter-bgraph/grammar.js`, add a case to `tests/grammar/accept` or
   `tests/grammar/reject`, and let `the_tree_sitter_grammar_agrees_with_pest`
   prove they still accept the same language
+- ALWAYS: write an editor query against the **tokens** it is about, not the
+  node types that hold them. `indents.scm` named `(block)` and silently missed
+  `group_block`, so Enter behaved differently in two blocks that look the same;
+  `(_ "{" "}" @end) @indent` cannot miss the next one. The same reasoning as the
+  highlighter's (`X-014`)
 - ALWAYS: when a tree-sitter node type is renamed, update
   `editors/zed/languages/bgraph/*.scm` in the same breath — the queries are
   part of the grammar's public surface, not decoration
