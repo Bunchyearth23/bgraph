@@ -422,26 +422,6 @@ fn plural(n: usize) -> &'static str {
     if n == 1 { "" } else { "s" }
 }
 
-/// The most recently edited `.bd` in `dir`, for a window that follows one.
-///
-/// Gated with the window because that is its only caller — a build loop
-/// renders everything and has no use for "which one is newest".
-#[cfg(feature = "window")]
-pub(crate) fn newest(dir: &Path) -> Option<PathBuf> {
-    sources(dir)
-        .ok()?
-        .into_iter()
-        .filter_map(|p| {
-            let stamp = fs::metadata(&p).and_then(|m| m.modified()).ok()?;
-            Some((stamp, p))
-        })
-        // `max_by_key` on the path as well as the stamp, so two files saved in
-        // the same tick resolve the same way every run rather than by whatever
-        // order the directory came back in.
-        .max_by_key(|(stamp, path)| (*stamp, path.clone()))
-        .map(|(_, path)| path)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

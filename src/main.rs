@@ -84,16 +84,6 @@ enum Command {
         #[arg(long)]
         once: bool,
 
-        /// Also open a window on whichever file changed last. Off by default:
-        /// a window that changes subject on its own is one you stop following
-        #[arg(long)]
-        follow: bool,
-
-        /// Serve the preview over HTTP instead of opening a window — for a
-        /// remote machine, a second screen, or a build with no display
-        #[arg(long)]
-        server: bool,
-
         /// Bind a template's holes from a JSON object, re-read on every
         /// request — so editing the data reloads the preview too
         #[arg(long = "data", value_name = "FILE")]
@@ -180,48 +170,10 @@ enum Command {
 
 /// A directory of diagrams, kept rendered.
 ///
-/// The build loop is the whole of it without `--follow`, and that is the
-/// half worth having: regenerating a directory after editing one file is what
-/// a repository of `.bd` files beside their committed `.svg` needs.
-///
-/// `--follow` adds the window, on whichever file changed last. It is opt-in
-/// because a window that changes subject on its own is a window you stop
-/// trusting — but while editing six diagrams in turn it is exactly right, and
-/// the alternative is six windows.
-fn watch_dir(
-    dir: &std::path::Path,
-    out: Option<&std::path::Path>,
-    once: bool,
-    follow: bool,
-) -> Result<i32> {
-    if follow && once {
-        bail!("`--once` builds and stops, so there is nothing for `--follow` to follow");
-    }
-
-    #[cfg(feature = "window")]
-    if follow {
-        if !bgraph::window::available() {
-            bail!(
-                "`--follow` needs a display; without one, build with no flag and open what you want"
-            );
-        }
-        // The loop runs beside the window rather than inside it: the pictures
-        // must keep being written whether or not anyone is looking at one.
-        let building = dir.to_path_buf();
-        let target = out.map(|p| p.to_path_buf());
-        std::thread::spawn(move || {
-            if let Err(err) = watch::build_dir(&building, target.as_deref(), false) {
-                eprintln!("bgraph: the build loop stopped: {err:#}");
-            }
-        });
-        bgraph::window::follow(dir.to_path_buf())?;
-        return Ok(0);
-    }
-    #[cfg(not(feature = "window"))]
-    if follow {
-        bail!("this build has no window — rebuild with `--features window`");
-    }
-
+/// Regenerating a directory after editing one file is what a repository of
+/// `.bd` files beside their committed `.svg` needs, and `--once` makes the
+/// same command a build step.
+fn watch_dir(dir: &std::path::Path, out: Option<&std::path::Path>, once: bool) -> Result<i32> {
     watch::build_dir(dir, out, once)?;
     Ok(0)
 }
@@ -363,28 +315,13 @@ fn completions(shell: &str) -> Result<i32> {
 /// `--check` exits non-zero when a file is not in its canonical shape, so the
 /// same command serves a person and a build — one runs it to fix, the other to
 /// refuse.
-/// A window when there is one to open, the HTTP preview otherwise.
+/// The browser preview, reloading as the file changes.
 ///
-/// The window is the default because it is what "show me this" means on a
-/// desktop. The server is not an apology — it is what a remote machine and a
-/// second screen both want, and `--server` asks for it outright.
-fn show_or_serve(input: PathBuf, data: Option<PathBuf>, port: u16, server: bool) -> Result<i32> {
-    #[cfg(feature = "window")]
-    if !server {
-        if bgraph::window::available() {
-            bgraph::window::show(input, data)?;
-            return Ok(0);
-        }
-        eprintln!(
-            "bgraph: no display, so {} is served instead of shown",
-            bgraph::window::describe(&input)
-        );
-    }
-    #[cfg(not(feature = "window"))]
-    if !server {
-        eprintln!("bgraph: this build has no window — rebuild with `--features window`");
-    }
-
+/// There used to be a native window in front of this, and the choice between
+/// them. It is gone (`W-136`): a browser is on every machine this runs on,
+/// it works the same over ssh and on a second screen, and it cost the crate
+/// seventy-eight dependencies and a rasteriser to say the same thing worse.
+fn show_or_serve(input: PathBuf, data: Option<PathBuf>, port: u16) -> Result<i32> {
     watch::serve(input, data, port)?;
     Ok(0)
 }
@@ -455,21 +392,19 @@ fn run() -> Result<i32> {
             input,
             out,
             once,
-            follow,
             data,
             port,
-            server,
         }) => {
             if input.is_dir() {
-                return watch_dir(&input, out.as_deref(), once, follow);
+                return watch_dir(&input, out.as_deref(), once);
             }
-            if once || out.is_some() || follow {
+            if once || out.is_some() {
                 bail!(
-                    "`--out`, `--once` and `--follow` are for a directory; \
+                    "`--out` and `--once` are for a directory; \
                      for one file use `-o` and `bgraph diagram.bd`"
                 );
             }
-            return show_or_serve(input, data, port, server);
+            return show_or_serve(input, data, port);
         }
         Some(Command::Check { input, ci }) => return check_file(&input, ci),
         Some(Command::Fmt {

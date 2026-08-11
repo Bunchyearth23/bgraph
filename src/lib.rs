@@ -127,8 +127,6 @@ pub mod template;
 pub mod ast;
 #[allow(missing_docs)]
 pub mod charts;
-#[cfg(feature = "window")]
-pub mod window;
 
 #[cfg(feature = "bpmn")]
 pub mod bpmn;

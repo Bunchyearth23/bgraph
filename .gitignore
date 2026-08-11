@@ -22,7 +22,8 @@
 
 # Compiled documents. The .typ source and the diagram sources are the record.
 /out
-playground/bgraph.wasm
-playground/standalone.html
+playground/public/bgraph.wasm
+playground/node_modules
+playground/dist
 editors/vscode/bgraph.wasm
 typst/bgraph.wasm

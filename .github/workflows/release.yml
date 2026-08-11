@@ -35,25 +35,12 @@ jobs:
       - name: Install the target
         run: rustup target add ${{ matrix.target }}
 
-      # Two artefacts rather than one compromise. `window` is off by default
-      # and pulls seventy-eight more crates: that is a fair price for someone
-      # who wants a window and an unfair one for a build server, so whoever
-      # downloads chooses rather than the release deciding for them.
-      - name: Build (default features)
+      # One build, because there is one binary to build. There used to be two
+      # — with and without a native window — and the window is gone (`W-136`):
+      # `bgraph watch` opens the preview in a browser, which is on every
+      # machine this runs on and needs no headers on a bare runner.
+      - name: Build
         run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Build (with a window)
-        if: matrix.os != 'ubuntu-latest'
-        run: cargo build --release --target ${{ matrix.target }} --features window
-
-      # minifb needs X11 and Wayland headers, which a bare runner does not
-      # have. Installed only where it is needed rather than in every job.
-      - name: Build (with a window, Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libxkbcommon-dev libwayland-dev libxcb1-dev
-          cargo build --release --target ${{ matrix.target }} --features window
 
       - name: Name the artefacts
         shell: bash
@@ -77,10 +64,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup target add wasm32-unknown-unknown
-      - run: ./playground/build.sh --inline
+      - run: ./playground/build.sh
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: playground/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: playground
+      - run: pnpm build
+        working-directory: playground
       - uses: actions/upload-artifact@v4
         with:
           name: bgraph-playground
-          path: |
-            playground/standalone.html
-            playground/bgraph.wasm
+          path: playground/dist

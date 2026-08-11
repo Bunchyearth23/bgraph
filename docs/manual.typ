@@ -793,9 +793,7 @@ in it is rendered whenever it changes, which is what a repository of sources
 beside their committed pictures needs. `--once` builds and stops, exiting
 non-zero if anything failed, so a person and a build run the same command. One
 broken file never stops the others — mid-edit that is the normal state of the
-file being worked on. `--follow` additionally opens a window on whichever file
-changed last; it is opt-in, because a window that changes subject on its own is
-one you stop trusting.
+file being worked on.
 
 `--theme` lays a named palette — `light`, `dark`, `print` — *underneath* what
 the file declares, so the one box coloured on purpose survives it. A theme is
@@ -845,13 +843,10 @@ it works on a file bgraph never wrote — and because the reload follows the
 file's timestamp, it keeps up with whatever is regenerating it. The extension
 decides which it is, the same rule `-o` uses.
 
-Built with the `window` feature it opens a *native window* rather than
-serving a page: no port, no browser, and the SVG rasterised directly. Scroll
-zooms by 5% a notch, or 10% holding shift; drag pans; `f` fits, `0` is actual
-size, `r` reloads. That is
-the one place this project takes a dependency tree, which is why it is opt-in.
-`--server` asks for the page instead, and a machine with no display is told
-rather than left waiting.
+There was a native window in front of this once, and the choice between the
+two. It is gone: a browser is on every machine this runs on, it works the same
+over ssh and on a second screen, and it cost the crate seventy-eight
+dependencies and a rasteriser to say the same thing worse.
   ],
   [
 *The editors*
@@ -1044,13 +1039,15 @@ positions; the first is a property of the format itself.
    links. `type rack` draws a bank rather than one cabinet: a group is a rack.
    `style grid` and `style title` name a diagram's own furniture, which was
    hardcoded and took its heading's colour from whatever the genre calls its
-   items. `bgraph fmt --migrate` rewrites a removed `opacity`. Completion
+   items. The native window is *removed*, and with it the project's last
+   dependency tree outside the optional rasteriser: `watch` shows the preview
+   in a browser, and the playground is an application rather than one file. `bgraph fmt --migrate` rewrites a removed `opacity`. Completion
    inside a container offers statements, which is what a container is for. The
    licence question is closed: proprietary, recorded as a decision.],
 
   [*1.2*], [10 August 2026], [`watch` shows a picture as readily as a source,
-   and opens a native window when the build has one. Records that the viewer is
-   the one place the project takes a dependency tree, and that it is therefore
+   and opened a native window when the build had one — since removed. Records
+   that the viewer was the one place the project took a dependency tree, and
    opt-in.],
 
   [*1.1*], [10 August 2026], [Corrected a claim that had become false: an

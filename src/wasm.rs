@@ -84,10 +84,110 @@ pub unsafe extern "C" fn bgraph_render(pointer: *const u8, len: usize) -> *const
     result.as_ptr()
 }
 
-/// How long the last [`bgraph_render`] result is.
+/// How long the last result is.
 #[unsafe(no_mangle)]
 pub extern "C" fn bgraph_result_len() -> usize {
     RESULT.lock().map(|r| r.len()).unwrap_or(0)
+}
+
+/// Check the source at `pointer` and return the diagnostics as JSON.
+///
+/// Separate from [`bgraph_render`] because they answer different questions: a
+/// file can render *and* have four warnings, and a page that only knew whether
+/// the render failed could not show them. Positions come out as line and
+/// column, one-based, which is what a reader counts in and what an editor
+/// gutter wants.
+///
+/// # Safety
+///
+/// `pointer` must point at `len` initialised bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn bgraph_check(pointer: *const u8, len: usize) -> *const u8 {
+    let bytes = unsafe { std::slice::from_raw_parts(pointer, len) };
+    let source = String::from_utf8_lossy(bytes);
+
+    let mut out = String::from("[");
+    match crate::parser::parse_diagram(&source) {
+        Ok(diagram) => {
+            let index = crate::lsp::LineIndex::new(&source);
+            for (i, diag) in crate::check::check(&diagram).iter().enumerate() {
+                let (line, col) = index.line_col(diag.span.start);
+                if i > 0 {
+                    out.push(',');
+                }
+                let severity = match diag.severity {
+                    crate::check::Severity::Error => "error",
+                    crate::check::Severity::Warning => "warning",
+                };
+                out.push_str(&format!(
+                    "{{\"severity\":\"{severity}\",\"line\":{},\"col\":{},\"message\":{}}}",
+                    line + 1,
+                    col + 1,
+                    json_string(&diag.message)
+                ));
+            }
+        }
+        // A parse error has no `Diag` to carry it — it is the reason there is
+        // no diagram to check — so it arrives here as the one diagnostic there
+        // can be, rather than as an empty list that reads like "all well".
+        Err(err) => out.push_str(&format!(
+            "{{\"severity\":\"error\",\"line\":0,\"col\":0,\"message\":{}}}",
+            json_string(&format!("{err:#}"))
+        )),
+    }
+    out.push(']');
+
+    let mut result = RESULT.lock().unwrap_or_else(|e| e.into_inner());
+    *result = out.into_bytes();
+    result.as_ptr()
+}
+
+/// Every worked example the binary carries, as JSON.
+///
+/// The page's genre menu is the crate's own `EXAMPLES` table rather than a
+/// copy kept beside it — the same argument that made the reference manual
+/// generated. A playground offering a genre the module cannot render, or
+/// missing one it can, is a playground that lies about the thing it exists to
+/// demonstrate.
+#[unsafe(no_mangle)]
+pub extern "C" fn bgraph_examples() -> *const u8 {
+    let mut out = String::from("[");
+    for (i, (name, source)) in crate::examples::EXAMPLES.iter().enumerate() {
+        if i > 0 {
+            out.push(',');
+        }
+        out.push_str(&format!(
+            "{{\"name\":{},\"source\":{}}}",
+            json_string(name),
+            json_string(source)
+        ));
+    }
+    out.push(']');
+
+    let mut result = RESULT.lock().unwrap_or_else(|e| e.into_inner());
+    *result = out.into_bytes();
+    result.as_ptr()
+}
+
+/// A JSON string literal, escaped by hand for the same reason everything else
+/// here is: pulling a serialiser in to quote four fields would cost more than
+/// it saves.
+fn json_string(text: &str) -> String {
+    let mut out = String::with_capacity(text.len() + 2);
+    out.push('"');
+    for c in text.chars() {
+        match c {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out.push('"');
+    out
 }
 
 // ------------------------------------------------------------ Typst plugins

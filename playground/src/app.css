@@ -1,0 +1,67 @@
+/* One palette, two values each. The page follows the system by default and
+   the toggle overrides it, which is why the dark values are on an attribute
+   rather than only in a media query. */
+:root {
+  --surface: #ffffff;
+  --raised: #f6f7f9;
+  --stage: #fbfbfc;
+  --line: #e4e4e7;
+  --faint: #a1a1aa;
+  --muted: #71717a;
+  --ink: #18181b;
+  --bad: #dc2626;
+  --warn: #b45309;
+  --select: #dbeafe;
+
+  --syntax-comment: #8b8b94;
+  --syntax-string: #0f766e;
+  --syntax-number: #b45309;
+  --syntax-arrow: #7c3aed;
+  --syntax-keyword: #2563eb;
+  --syntax-property: #0369a1;
+  --syntax-placement: #9333ea;
+  --syntax-class: #be123c;
+  --syntax-hole: #ca8a04;
+  --syntax-name: #18181b;
+}
+
+:root[data-theme='dark'] {
+  --surface: #0f1115;
+  --raised: #171a21;
+  --stage: #0b0d11;
+  --line: #262b36;
+  --faint: #4b5563;
+  --muted: #9aa4b2;
+  --ink: #e6e9ef;
+  --bad: #f87171;
+  --warn: #fbbf24;
+  --select: #1e3a5f;
+
+  --syntax-comment: #6b7280;
+  --syntax-string: #5eead4;
+  --syntax-number: #fbbf24;
+  --syntax-arrow: #c4b5fd;
+  --syntax-keyword: #7dd3fc;
+  --syntax-property: #93c5fd;
+  --syntax-placement: #d8b4fe;
+  --syntax-class: #fda4af;
+  --syntax-hole: #fde047;
+  --syntax-name: #e6e9ef;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  font: 14px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+#app {
+  display: contents;
+}

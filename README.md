@@ -29,7 +29,7 @@ orders  -> cache   "read-through" { router: ortho }
 ```sh
 bgraph init pie > traffic.bd       # a working file for any of the 29 genres
 bgraph diagram.bd -o diagram.svg   # …or .pdf, .png, .json — the extension picks
-bgraph watch diagram.bd            # a native window, reloading on save
+bgraph watch diagram.bd            # a browser preview, reloading on save
 bgraph watch docs/diagrams         # …or a whole directory, as a build loop
 bgraph check diagram.bd            # every mistake, with a caret under each
 bgraph explain diagram.bd api      # why that box is where it is
@@ -88,10 +88,13 @@ The core is four dependencies of pure Rust and the SVG writer is hand-written,
 so the renderer compiles to wasm nearly as it stands:
 
 ```sh
-./playground/build.sh --inline   # → playground/standalone.html, open it
+./playground/build.sh            # the wasm module, into playground/public/
+cd playground && pnpm install && pnpm dev
 ```
 
-Source on the left, SVG on the right, no server. The wasm boundary is four
+Source on the left with a real editor, SVG on the right, diagnostics under
+both, and the genre menu is the module's own example table rather than a copy
+kept beside it. The wasm boundary is four
 `extern "C"` functions over linear memory — no `wasm-bindgen`, which would be
 a dependency and a build step for four functions whose job is to move bytes.
 

@@ -1679,11 +1679,16 @@ fn the_extension_decides_what_the_viewer_is_looking_at() {
 // ---------------------------------------------------------------------- W-067
 
 #[test]
-fn the_window_is_opt_in_and_the_core_stays_small() {
+fn the_raster_is_the_only_dependency_and_it_is_opt_in() {
     // The whole reason the SVG writer, the HTTP preview and the PDF writer are
-    // hand-rolled. A window is the one thing that cannot be, so it is the one
-    // thing behind a feature — and a manifest that quietly turned it on would
-    // undo every one of those decisions at once.
+    // hand-rolled: each is a format with a short honest subset, and a raster
+    // is the one that is not. So it is the one thing behind a feature, and a
+    // manifest that quietly turned it on would undo every one of those
+    // decisions at once.
+    //
+    // There was a `window` feature beside it once, a native viewer on
+    // `minifb`. It is gone, and so is that crate — a browser is on every
+    // machine this runs on (`W-136`).
     let manifest = include_str!("../Cargo.toml");
 
     let defaults = manifest
@@ -1691,12 +1696,24 @@ fn the_window_is_opt_in_and_the_core_stays_small() {
         .and_then(|(_, tail)| tail.split_once(']'))
         .expect("a default feature list")
         .0;
+    for gate in ["window", "png"] {
+        assert!(
+            !defaults.contains(gate),
+            "`{gate}` is on by default: {defaults}"
+        );
+    }
     assert!(
-        !defaults.contains("window"),
-        "the window is on by default: {defaults}"
+        !manifest
+            .lines()
+            .any(|l| l.trim_start().starts_with("minifb")),
+        "the windowing dependency is back"
+    );
+    assert!(
+        !manifest.lines().any(|l| l.starts_with("window = ")),
+        "the window feature is back"
     );
 
-    for crate_name in ["minifb", "resvg", "tiny-skia"] {
+    for crate_name in ["resvg", "tiny-skia"] {
         let line = manifest
             .lines()
             .find(|l| l.trim_start().starts_with(crate_name))
@@ -1706,21 +1723,6 @@ fn the_window_is_opt_in_and_the_core_stays_small() {
             "`{crate_name}` is not optional: {line}"
         );
     }
-}
-
-#[cfg(feature = "window")]
-#[test]
-fn the_window_reads_the_same_picture_the_server_does() {
-    // One source of the picture, two ways of looking at it. A window that
-    // rendered by its own path would be a second renderer.
-    let dir = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/examples"));
-    let svg = crate::watch::render_source(&dir.join("venn.svg"), None).expect("reads");
-    assert!(svg.starts_with("<svg"));
-
-    // And it parses as a picture, which is what the window rasterises.
-    let mut options = resvg::usvg::Options::default();
-    options.fontdb_mut().load_system_fonts();
-    assert!(resvg::usvg::Tree::from_str(&svg, &options).is_ok());
 }
 
 // ---------------------------------------------------------------------- W-062
@@ -7726,36 +7728,6 @@ fn a_nonsense_scale_does_not_bring_the_renderer_down() {
     }
 }
 
-#[test]
-fn the_rasteriser_is_opt_in_and_the_window_implies_it() {
-    // `X-017` narrows here rather than retiring: raster becomes optional, not
-    // present. What must stay true is the direction of the implication — a
-    // window already needs the rasteriser, and someone rendering images in a
-    // build wants no windowing library.
-    let manifest = include_str!("../Cargo.toml");
-
-    let defaults = manifest
-        .split_once("default = [")
-        .and_then(|(_, tail)| tail.split_once(']'))
-        .expect("a default feature list")
-        .0;
-    assert!(!defaults.contains("png"), "the rasteriser is on by default");
-
-    let window = manifest
-        .lines()
-        .find(|l| l.starts_with("window = "))
-        .expect("a window feature");
-    assert!(
-        window.contains("\"png\""),
-        "the window does not imply the rasteriser: {window}"
-    );
-    assert!(
-        !window.contains("resvg"),
-        "the window names the rasteriser directly instead of going through \
-         `png`, so the two can drift: {window}"
-    );
-}
-
 // ------------------------------------------------- layout as JSON (I-045)
 
 fn geometry(source: &str) -> serde_json::Value {
@@ -9571,29 +9543,72 @@ fn the_library_needs_no_argument_parser() {
 }
 
 #[test]
-fn the_playground_loads_the_module_the_build_script_writes() {
-    // Two files that have to agree on a name, in two languages, and neither
-    // would fail loudly — the page would simply show nothing.
-    let page = include_str!("../playground/index.html");
+fn the_playground_calls_the_module_the_build_script_writes() {
+    // Two files that have to agree, in two languages, and neither would fail
+    // loudly — the page would simply show nothing. The wrapper is the only
+    // place in the app that knows a pointer exists, so it is the only place
+    // this has to check.
+    let wrapper = include_str!("../playground/src/lib/bgraph.js");
     let script = include_str!("../playground/build.sh");
 
-    assert!(page.contains("./bgraph.wasm"), "the page loads no module");
+    assert!(wrapper.contains("bgraph.wasm"), "the page loads no module");
     assert!(
-        script.contains("playground/bgraph.wasm"),
-        "the build script writes somewhere else"
+        script.contains("playground/public/bgraph.wasm"),
+        "the build script writes somewhere Vite does not serve"
     );
+
     for name in [
         "bgraph_alloc",
         "bgraph_free",
         "bgraph_render",
+        "bgraph_check",
+        "bgraph_examples",
         "bgraph_result_len",
     ] {
-        assert!(page.contains(name), "the page never calls `{name}`");
+        assert!(wrapper.contains(name), "the page never calls `{name}`");
         assert!(
             include_str!("wasm.rs").contains(name),
             "`{name}` is not exported"
         );
     }
+}
+
+/// The single-file page is gone, and it has to stay gone in both directions:
+/// a build script that still wrote one, or a manifest that still shipped one,
+/// would leave half of `W-135` behind.
+#[test]
+fn the_playground_is_an_application_rather_than_one_file() {
+    let script = include_str!("../playground/build.sh");
+    assert!(!script.contains("--inline"), "the standalone page is back");
+    assert!(!script.contains("standalone"), "{script}");
+
+    let manifest = include_str!("../playground/package.json");
+    for command in ["\"dev\"", "\"build\"", "\"wasm\""] {
+        assert!(manifest.contains(command), "no {command} script");
+    }
+    assert!(manifest.contains("svelte"), "{manifest}");
+    assert!(manifest.contains("packageManager"), "pnpm is not pinned");
+
+    // The genre menu is the crate's own table, not a copy kept beside it.
+    assert!(
+        include_str!("../playground/src/App.svelte").contains("wasm.examples()"),
+        "the playground carries its own list of genres"
+    );
+
+    // CodeMirror paints its own gutter, and for a light editor unless told
+    // otherwise — which is how the line numbers came out brighter than the
+    // code they number (`W-137`). Said through a theme, because a theme is
+    // injected above the base and a stylesheet is a specificity race the
+    // build order decides.
+    let editor = include_str!("../playground/src/lib/Editor.svelte");
+    assert!(
+        editor.contains("cm-lineNumbers .cm-gutterElement"),
+        "the line numbers are left to CodeMirror's own colour"
+    );
+    assert!(
+        editor.contains("EditorView.theme") && editor.contains("{ dark },"),
+        "the editor never tells CodeMirror which way round it is"
+    );
 }
 
 // ------------------------------------------------- releases and CI (I-025, I-027)
@@ -9618,9 +9633,15 @@ fn the_release_workflow_ships_both_binaries_and_neither_publishes() {
             "the release workflow publishes: `{forbidden}`"
         );
     }
-    // Two artefacts rather than one compromise: `window` is off by default
-    // and pulls seventy-eight more crates.
-    assert!(release.contains("--features window"), "{release}");
+    // One build per platform, because there is one binary to build: the
+    // native window that made it two is gone (`W-136`), and with it the
+    // system headers a bare Linux runner had to install for it.
+    assert!(!release.contains("--features window"), "{release}");
+    assert!(!release.contains("libwayland-dev"), "{release}");
+
+    // And the playground it also builds is an application now, so the job has
+    // to install its dependencies rather than run one script.
+    assert!(release.contains("pnpm"), "the playground is never built");
 }
 
 #[test]

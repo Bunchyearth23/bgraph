@@ -1,107 +1,13 @@
 <!doctype html>
-<meta charset="utf-8">
-<title>bgraph — playground</title>
-<style>
-  :root { color-scheme: light dark; --ink: #1a1a1a; --muted: #8a8a8a; --line: #e2e8f0; }
-  @media (prefers-color-scheme: dark) {
-    :root { --ink: #f1f5f9; --muted: #94a3b8; --line: #334155; }
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; height: 100vh; display: grid; grid-template-rows: auto 1fr;
-    font: 14px ui-sans-serif, system-ui, sans-serif; color: var(--ink);
-  }
-  header {
-    padding: 10px 16px; border-bottom: 1px solid var(--line);
-    display: flex; gap: 16px; align-items: baseline;
-  }
-  header strong { font-weight: 600; }
-  header span { color: var(--muted); font-size: 13px; }
-  main { display: grid; grid-template-columns: 1fr 1fr; min-height: 0; }
-  textarea {
-    border: 0; border-right: 1px solid var(--line); resize: none; padding: 16px;
-    font: 13px/1.55 ui-monospace, "SF Mono", Menlo, monospace;
-    background: transparent; color: inherit; outline: none;
-  }
-  #out { overflow: auto; padding: 16px; display: grid; place-items: center; }
-  #out svg { max-width: 100%; height: auto; }
-  #out.bad { place-items: start; }
-  pre { color: #dc2626; font: 13px/1.5 ui-monospace, monospace; white-space: pre-wrap; margin: 0; }
-  @media (max-width: 720px) { main { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
-</style>
-
-<header>
-  <strong>bgraph</strong>
-  <span>diagrams as text, where you decide the layout — type on the left</span>
-</header>
-<main>
-  <textarea id="src" spellcheck="false" autofocus>
-graph { title: "Try it" background: #ffffff }
-
-style card { fill: #eef3ff stroke: #2563eb 1.3 radius: 6 }
-
-node ui  "Browser"  .card
-node api "API"      .card right-of ui gap 60
-node db  "Database" .card below api gap 50
-
-ui  -> api "HTTPS"
-api -> db  "reads"
-</textarea>
-  <div id="out"></div>
-</main>
-
-<script type="module">
-  const src = document.getElementById('src');
-  const out = document.getElementById('out');
-
-  // `./bgraph.wasm` is rewritten to a data URI by `build.sh --inline`, which
-  // is what makes the standalone page work from the filesystem.
-  const source = './bgraph.wasm';
-
-  let wasm;
-  try {
-    const response = await fetch(source);
-    ({ instance: wasm } = await WebAssembly.instantiate(await response.arrayBuffer(), {}));
-  } catch (e) {
-    out.className = 'bad';
-    out.innerHTML = '<pre>could not load bgraph.wasm — serve this directory, ' +
-      'or build the standalone page with ./build.sh --inline\n\n' + e + '</pre>';
-    throw e;
-  }
-
-  const api = wasm.exports;
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder();
-
-  function render(text) {
-    const bytes = encoder.encode(text);
-    const ptr = api.bgraph_alloc(bytes.length);
-    // A fresh view each time: the module's memory may have grown, and a view
-    // onto a detached buffer throws rather than reading the wrong bytes.
-    new Uint8Array(api.memory.buffer, ptr, bytes.length).set(bytes);
-    const at = api.bgraph_render(ptr, bytes.length);
-    const len = api.bgraph_result_len();
-    const answer = decoder.decode(new Uint8Array(api.memory.buffer, at, len));
-    api.bgraph_free(ptr, bytes.length);
-    return answer;
-  }
-
-  function draw() {
-    const answer = render(src.value);
-    // One channel, so there is no second call to forget: an error announces
-    // itself in the text rather than in a status nobody checks.
-    if (answer.startsWith('error:')) {
-      out.className = 'bad';
-      out.textContent = '';
-      const pre = document.createElement('pre');
-      pre.textContent = answer;
-      out.append(pre);
-    } else {
-      out.className = '';
-      out.innerHTML = answer;
-    }
-  }
-
-  src.addEventListener('input', draw);
-  draw();
-</script>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>bgraph — playground</title>
+    <meta name="description" content="Diagrams as text, where you decide the layout." />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

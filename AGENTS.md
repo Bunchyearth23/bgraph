@@ -54,22 +54,23 @@ disagree.
 - Zed extension: `editors/zed/`, compiled to `wasm32-wasip1`
 - SVG, PDF, the watch server, base64 and the TrueType subsetter are all
   hand-rolled — no dependency for any of them
-- Optional, each behind its own feature: `png` (a rasteriser, `resvg`),
-  `window` (`minifb`, and it turns `png` on), `completions`, `wasm`, `typst`
+- Optional, each behind its own feature: `png` (a rasteriser, `resvg` — the
+  only dependency tree left), `completions`, `wasm`, `typst`
 
 ## Setup commands
 - `cargo build` — builds both `bgraph` and `bgraph-lsp`
 - `cargo run --bin bgraph -- init free -o /tmp/a.bd && cargo run --bin bgraph -- /tmp/a.bd -o a.svg` (`.pdf` picks the PDF writer)
 - `cargo run --bin bgraph -- watch /tmp/a.bd` → http://127.0.0.1:7878
 - `cargo run --bin bgraph -- watch a.svg` — the same viewer, on a picture
-- `cargo build --features window` — the native window (opt-in: +78 crates)
 - `cargo run --bin bgraph -- check /tmp/a.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
 - `cargo test` (552 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo build --no-default-features` — the four-dependency library. **A CI
   step, and it has been red before**: a `#[cfg]` on a type without one on its
   users compiles under `default` and not here
-- `./playground/build.sh --inline` — the wasm module and a standalone page
+- `./playground/build.sh` — the wasm module, into `playground/public/`
+- `cd playground && pnpm install && pnpm dev` — the playground (Svelte + Vite);
+  `pnpm build` writes `playground/dist`
 - `./typst/build.sh` — the module Typst's plugin protocol expects (its imports
   make it unloadable anywhere else, hence a second feature and a second file)
 - `cargo clippy --all-targets` / `cargo fmt`
@@ -113,7 +114,6 @@ disagree.
 | `src/render_svg.rs` | Shapes, edge routing, markers, text |
 | `src/render_pdf.rs` | PDF output, hand-written — vector, so no rasteriser |
 | `src/fmt.rs` | The formatter, and `--migrate`. Lexical, so comments and blank lines survive |
-| `src/window.rs` | The native viewer. **The only place with a dependency tree**, and opt-in |
 | `src/template.rs` | `{{holes}}` and the values a calling program binds |
 | `src/watch.rs` | Dependency-free HTTP live preview, with pan and zoom |
 | `src/lsp.rs` | Language server + `LineIndex` (byte ↔ UTF-16 position) |
@@ -228,7 +228,7 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
 - [2026-08-11] **The golden test compares bytes and says nothing about
   validity.** An SVG with an `<ellipse>` closed by a `</path>` was checked in
   and passed every run: browsers draw it, so the preview looked fine, and only
-  resvg refused — which meant `--window` and `--png` failed on one genre and
+  resvg refused — which meant `--png` failed on one genre and
   nothing else noticed. `every_rendered_example_is_well_formed_xml` is the
   guard. Any new writer needs the same question asked of it: does anything
   check that what we emit *parses*, or only that it has not changed?
@@ -357,8 +357,8 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   project emits — `Inter, ui-sans-serif, system-ui, sans-serif` — is a *web*
   stack: two of those are CSS generics no font database has, and `Inter` is on
   few machines. So everything lands on the generic, and the generic was
-  whatever usvg guessed, which is how the native window came out set in a face
-  nothing else on the system uses. `window::resolve_generic_families` names
+  whatever usvg guessed, which is how the removed native window came out set
+  in a face nothing else on the system uses. That resolver went with it; names
   the sans, serif and monospace families from what is actually installed.
 
 ### Gotchas
