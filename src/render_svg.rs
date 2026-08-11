@@ -91,11 +91,11 @@ pub fn render(layout: &Layout) -> String {
         // relation reads and two marks at one end would fight.
         let end_head = edge
             .style
-            .to_card
+            .to_head
             .or_else(|| edge.arrow.head_end.then_some(head));
         let start_head = edge
             .style
-            .from_card
+            .from_head
             .or_else(|| edge.arrow.head_start.then_some(head));
 
         for (which, head) in [("end", end_head), ("start", start_head)] {
@@ -224,6 +224,34 @@ pub fn render(layout: &Layout) -> String {
     svg.push_str(&body);
     svg.push_str("</g></svg>");
     svg
+}
+
+/// Which edges run between the same pair of boxes, and where each sits among
+/// them: `None` for a line that has the pair to itself.
+///
+/// Direction is ignored — `a -> b` and `b -> a` are the same corridor, and two
+/// lines drawn on top of each other are two lines a reader sees as one however
+/// they were written (`X-018`, narrowed).
+fn parallels(layout: &Layout) -> Vec<Option<(usize, usize)>> {
+    let mut groups: Vec<((usize, usize), Vec<usize>)> = Vec::new();
+    for (e, edge) in layout.edges.iter().enumerate() {
+        if edge.from == edge.to {
+            continue;
+        }
+        let pair = (edge.from.min(edge.to), edge.from.max(edge.to));
+        match groups.iter_mut().find(|(p, _)| *p == pair) {
+            Some((_, ids)) => ids.push(e),
+            None => groups.push((pair, vec![e])),
+        }
+    }
+
+    let mut out = vec![None; layout.edges.len()];
+    for (_, ids) in groups.iter().filter(|(_, ids)| ids.len() > 1) {
+        for (k, e) in ids.iter().enumerate() {
+            out[*e] = Some((k, ids.len()));
+        }
+    }
+    out
 }
 
 /// Where each edge attaches, at each end: `None` where the router still picks.
@@ -368,6 +396,7 @@ fn declares(edge: &crate::layout::PlacedEdge, at_from: bool) -> bool {
 /// export — and a second implementation would be a second diagram.
 pub fn route_all(layout: &Layout) -> Vec<Routed> {
     let ports = attachments(layout);
+    let siblings = parallels(layout);
 
     let mut routed: Vec<Routed> = layout
         .edges
@@ -395,7 +424,24 @@ pub fn route_all(layout: &Layout) -> Vec<Routed> {
                     &obstacles,
                     ports[e],
                 );
-                through(line, &edge.via, &obstacles, edge.style.router)
+                let line = through(line, &edge.via, &obstacles, edge.style.router);
+                // Two lines between the same pair lie on top of each other
+                // when both are straight. Each takes its own bow, alternating
+                // sides so a pair separates rather than both leaning one way.
+                let line = match siblings[e] {
+                    Some((k, n)) if edge.style.router != Some(Router::Ortho) => {
+                        // The sign follows the *pair*, not the direction the
+                        // edge was written in. A bow is perpendicular to the
+                        // line, so `b -> a` flips the perpendicular too, and
+                        // the two ended up leaning the same way — which is
+                        // exactly the overlap this exists to remove.
+                        let way = if edge.from <= edge.to { 1.0 } else { -1.0 };
+                        let spread = 0.12 * (k as f64 - (n as f64 - 1.0) / 2.0) * way;
+                        bow(line[0], *line.last().expect("an end"), spread)
+                    }
+                    _ => line,
+                };
+                round_corners(&line, edge.style.bend.unwrap_or(0.0))
             },
             label: None,
         })
@@ -1063,6 +1109,14 @@ fn route(
             let end = ports[1].unwrap_or_else(|| boundary(to, start));
             vec![start, end]
         }
+        // A bow between the two ends, sampled. Two lines between the same pair
+        // are the case it exists for: straight, they lie on top of each other.
+        Router::Curved => {
+            let start =
+                ports[0].unwrap_or_else(|| boundary(from, ports[1].unwrap_or((b.cx(), b.cy()))));
+            let end = ports[1].unwrap_or_else(|| boundary(to, start));
+            bow(start, end, 0.0)
+        }
         // `X-004`. The solver goes around the boxes; the elbow below is what is
         // left when there is no way round — a box wholly enclosed, or a diagram
         // too large for the grid to pay for itself. Keeping the old line rather
@@ -1185,6 +1239,80 @@ fn through(
         at = *stop;
     }
     straighten(out)
+}
+
+/// A quadratic bow from `a` to `b`, sampled as a polyline.
+///
+/// `lift` is how far the middle is pushed off the straight line, as a fraction
+/// of its length; zero takes a gentle default. Sampled rather than emitted as a
+/// curve so the bounds, the label solver, the PDF writer and the JSON export
+/// all keep working on the polyline they already understand — the same choice
+/// `self_loop` made for the same reason.
+fn bow(a: (f64, f64), b: (f64, f64), lift: f64) -> Vec<(f64, f64)> {
+    let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+    let len = dx.hypot(dy).max(1e-6);
+    let amount = if lift.abs() < 1e-9 { 0.18 } else { lift };
+    // Perpendicular, so the bow is always across the line rather than along it.
+    let control = (
+        (a.0 + b.0) / 2.0 - dy / len * len * amount,
+        (a.1 + b.1) / 2.0 + dx / len * len * amount,
+    );
+
+    const STEPS: usize = 16;
+    (0..=STEPS)
+        .map(|i| {
+            let t = i as f64 / STEPS as f64;
+            let u = 1.0 - t;
+            (
+                u * u * a.0 + 2.0 * u * t * control.0 + t * t * b.0,
+                u * u * a.1 + 2.0 * u * t * control.1 + t * t * b.1,
+            )
+        })
+        .collect()
+}
+
+/// Round every corner of a path by `radius`, sampled.
+///
+/// Each turn becomes a short arc between two points cut back along the two
+/// segments meeting there. The cut is never more than half the shorter segment,
+/// so a tight elbow rounds a little and a long one rounds fully — a radius that
+/// ate a whole segment would turn a route into a different route.
+fn round_corners(path: &[(f64, f64)], radius: f64) -> Vec<(f64, f64)> {
+    if radius <= 0.0 || path.len() < 3 {
+        return path.to_vec();
+    }
+    let mut out = vec![path[0]];
+    for i in 1..path.len() - 1 {
+        let (p, c, n) = (path[i - 1], path[i], path[i + 1]);
+        let back = ((c.0 - p.0).hypot(c.1 - p.1) / 2.0).min(radius);
+        let fwd = ((n.0 - c.0).hypot(n.1 - c.1) / 2.0).min(radius);
+        let r = back.min(fwd);
+        if r < 0.5 {
+            out.push(c);
+            continue;
+        }
+        let towards = |from: (f64, f64), to: (f64, f64), d: f64| {
+            let len = (to.0 - from.0).hypot(to.1 - from.1).max(1e-6);
+            (
+                from.0 + (to.0 - from.0) / len * d,
+                from.1 + (to.1 - from.1) / len * d,
+            )
+        };
+        let enter = towards(c, p, r);
+        let leave = towards(c, n, r);
+
+        const STEPS: usize = 6;
+        for k in 0..=STEPS {
+            let t = k as f64 / STEPS as f64;
+            let u = 1.0 - t;
+            out.push((
+                u * u * enter.0 + 2.0 * u * t * c.0 + t * t * leave.0,
+                u * u * enter.1 + 2.0 * u * t * c.1 + t * t * leave.1,
+            ));
+        }
+    }
+    out.push(*path.last().expect("a path has an end"));
+    out
 }
 
 /// A point as a rectangle of no size, for a solver that speaks in boxes.
@@ -1406,6 +1534,9 @@ fn marker_id(head: Head, color: &str) -> String {
         Head::ZeroOne => "zeroone",
         Head::ZeroMany => "zeromany",
         Head::OneMany => "onemany",
+        Head::Hollow => "hollow",
+        Head::Diamond => "diamond",
+        Head::Composed => "composed",
     };
     let slug: String = color
         .chars()
@@ -1429,12 +1560,34 @@ fn marker_def(id: &str, head: Head, color: &str, background: &Option<String>) ->
         ),
         Head::Dot => format!(r#"<circle cx="5" cy="5" r="3.5"{fill}/>"#),
         Head::None => String::new(),
+        // UML. The two hollow ones are filled with the **surface** rather than
+        // left transparent: the line runs under the marker, and a see-through
+        // triangle reads as a triangle with a line through it (`W-125`).
+        Head::Hollow => format!(
+            r#"<path d="M0,0 L11,5.5 L0,11 z"{surface}{stroke} stroke-width="1.4" stroke-linejoin="round"/>"#,
+            surface = paint("fill", background.as_deref().unwrap_or("#ffffff"))
+        ),
+        Head::Diamond | Head::Composed => {
+            let paint_in = if head == Head::Composed {
+                paint("fill", color)
+            } else {
+                paint("fill", background.as_deref().unwrap_or("#ffffff"))
+            };
+            format!(
+                r#"<path d="M0,5.5 L8,1.6 L16,5.5 L8,9.4 z"{paint_in}{stroke} stroke-width="1.3" stroke-linejoin="miter"/>"#
+            )
+        }
         _ => unreachable!("cardinality is drawn by `cardinality_def`"),
     };
-    let ref_x = if head == Head::Dot { 5 } else { 10 };
+    let (ref_x, width) = match head {
+        Head::Dot => (5, 11),
+        Head::Hollow => (11, 12),
+        Head::Diamond | Head::Composed => (16, 17),
+        _ => (10, 11),
+    };
 
     format!(
-        r#"<marker id="{id}" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" refX="{ref_x}" refY="5" orient="auto-start-reverse">{inner}</marker>"#
+        r#"<marker id="{id}" markerUnits="userSpaceOnUse" markerWidth="{width}" markerHeight="11" refX="{ref_x}" refY="5.5" orient="auto-start-reverse">{inner}</marker>"#
     )
 }
 

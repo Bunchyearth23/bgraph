@@ -237,7 +237,10 @@ Aliases are marked. They behave identically to the property they alias; the edit
 | `text-offset` *(alias)* | both | `text-offset: <dx> <dy>` | Alias of `label-offset`. |
 | `arrow` | edge | `arrow: <solid\|open\|dot\|none>` | Arrow head style. The arrow token decides which ends carry one. |
 | `head` *(alias)* | edge | `head: <solid\|open\|dot\|none>` | Alias of `arrow`. |
-| `router` | edge | `router: <straight\|ortho>` | `straight` draws a direct line; `ortho` draws a right-angled elbow. |
+| `router` | edge | `router: <straight\|ortho\|curved>` | `straight` draws a direct line; `ortho` turns right angles and goes around the boxes in the way; `curved` bows between the two ends, which is what tells two lines between the same pair apart. |
+| `from-head` | edge | `from-head: <head>` | A mark at the tail, whatever kind. UML's diamond belongs at the *whole* and the whole is nearly always the tail, so without this a composition had to be written backwards to be drawn right. |
+| `to-head` | edge | `to-head: <head>` | A mark at the head end, whatever kind. `head` sets it too; this names the end explicitly, which is what lets the two differ. |
+| `bend` | edge | `bend: <radius>` | Round an `ortho` elbow by this much. A style on the router rather than a second router, so every other property keeps meaning what it meant. Sampled into the line rather than emitted as an arc, so the PDF, the JSON export and the label solver need learn nothing. |
 | `from` | edge | `from: <auto\|top\|bottom\|left\|right>` | Which side of the first box the line leaves by. `auto`, the default, lets the router pick — this is for when it picks badly, or when two lines have to leave by different sides. The route between the two attachments is still the engine's (`D-033`). |
 | `to` | edge | `to: <auto\|top\|bottom\|left\|right>` | Which side of the second box the line arrives at. |
 | `lane` | edge | `lane: <n>` | Where this line sits among the ones sharing its side. Lines on one side spread along it in declaration order; `lane` reorders them by hand, counting from 1 at the left or the top. |
@@ -328,6 +331,9 @@ slice <id> ["label"] <value>
 
 | Setting | Syntax | Meaning |
 |---|---|---|
+| `from-head` | `from-head: <head>` | A mark at the tail, whatever kind. UML's diamond belongs at the *whole* and the whole is nearly always the tail, so without this a composition had to be written backwards to be drawn right. |
+| `to-head` | `to-head: <head>` | A mark at the head end, whatever kind. `head` sets it too; this names the end explicitly, which is what lets the two differ. |
+| `bend` | `bend: <radius>` | Round an `ortho` elbow by this much. A style on the router rather than a second router, so every other property keeps meaning what it meant. Sampled into the line rather than emitted as an arc, so the PDF, the JSON export and the label solver need learn nothing. |
 | `from` | `from: "<file.csv>"` | Read the slices from a CSV, resolved relative to this file. The header names the columns: `name` (or `label`) and `value`. Carries a consequence worth knowing — a file that reads the disk at render time is no longer autonomous, so `check` can pass and the render still fail. |
 | `top` | `top: <number>` | Keep the largest n slices and fold the rest into one. The palette has eight colours and `check` already advises this when a pie has more; `top` is what lets the file do it instead of someone doing the arithmetic by hand outside the tool. |
 | `other` | `other: <text>` | What the folded slice is called. `"Other"` unless the file says otherwise. |
@@ -1979,11 +1985,11 @@ theme's ink for the surface.
 
 Several names denote the same shape; pick whichever reads best.
 
-**Arrow heads** — `solid` · `filled` · `triangle` · `open` · `line` · `thin` · `dot` · `circle` · `none`
+**Arrow heads** — `solid` · `filled` · `open` · `line` · `thin` · `dot` · `circle` · `none` · `triangle` · `generalisation` · `extends` · `diamond` · `aggregation` · `composition` · `filled-diamond`
 
 Used by `arrow:` on an edge.
 
-**Routers** — `straight` · `direct` · `line` · `ortho` · `orthogonal` · `elbow`
+**Routers** — `straight` · `direct` · `line` · `ortho` · `orthogonal` · `elbow` · `curved` · `curve`
 
 Used by `router:` on an edge.
 

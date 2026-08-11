@@ -37,6 +37,29 @@ impl Shape {
 pub enum Router {
     Straight,
     Ortho,
+    /// A bow between the two ends. Sampled into the polyline rather than
+    /// emitted as a Bezier, so the PDF writer, the JSON export, the bounds and
+    /// the label solver all keep working on the one shape they already know
+    /// (`W-125`) — the same choice the self-loop made.
+    Curved,
+}
+
+/// A head's name as written. Shared by `head`, `from-head` and `to-head`, so
+/// the three cannot drift into accepting different words.
+fn head_word(word: &str) -> Result<Head> {
+    Ok(match word {
+        "solid" | "filled" => Head::Solid,
+        "open" | "line" | "thin" => Head::Open,
+        "dot" | "circle" => Head::Dot,
+        "none" => Head::None,
+        // UML. `triangle` used to be a synonym for the solid arrow, which was
+        // a word spent on a shape the language already had; it is the hollow
+        // generalisation triangle now, which is a shape it did not.
+        "triangle" | "generalisation" | "extends" => Head::Hollow,
+        "diamond" | "aggregation" => Head::Diamond,
+        "composition" | "filled-diamond" => Head::Composed,
+        other => bail!("unknown arrow head `{other}`"),
+    })
 }
 
 /// Which side of a box a line attaches to.
@@ -107,6 +130,15 @@ pub enum Head {
     ZeroMany,
     /// One or many: a bar, then the foot.
     OneMany,
+    // UML's three, which `type class` had no way to draw at all until `W-125`
+    // — a class diagram without a generalisation is a class diagram missing
+    // the one relation the notation exists for.
+    /// Generalisation: a hollow triangle, pointing at the parent.
+    Hollow,
+    /// Aggregation: a hollow diamond, at the whole.
+    Diamond,
+    /// Composition: the same diamond filled, at the whole.
+    Composed,
 }
 
 impl Head {
@@ -142,10 +174,13 @@ pub struct Style {
     pub label_offset: Option<(f64, f64)>,
     pub head: Option<Head>,
     /// Cardinality at the tail of an edge — `er` only.
-    pub from_card: Option<Head>,
+    pub from_head: Option<Head>,
     /// Cardinality at the head of an edge — `er` only.
-    pub to_card: Option<Head>,
+    pub to_head: Option<Head>,
     pub router: Option<Router>,
+    /// How far to round an `ortho` elbow. A style on the router rather than a
+    /// second router, which is how it was asked for.
+    pub bend: Option<f64>,
     pub shadow: Option<bool>,
     /// Chart data, carried on the same layer stack as decoration so a class
     /// can supply it: `value` feeds `type pie`, `bits` feeds `type packet`.
@@ -284,9 +319,10 @@ impl Style {
             font_weight,
             label_offset,
             head,
-            from_card,
-            to_card,
+            from_head,
+            to_head,
             router,
+            bend,
             shadow,
             value,
             bits,
@@ -472,21 +508,28 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
         }
         "arrow" | "head" => {
             let word = first.and_then(|x| x.as_word()).unwrap_or_default();
-            style.head = Some(match word {
-                "solid" | "filled" | "triangle" => Head::Solid,
-                "open" | "line" | "thin" => Head::Open,
-                "dot" | "circle" => Head::Dot,
-                "none" => Head::None,
-                other => bail!("unknown arrow head `{other}`"),
-            });
+            style.head = Some(head_word(word)?);
+        }
+        // A mark at one named end, whatever kind. `from-card` and `to-card`
+        // are the ER spelling of the same idea and stay as aliases: UML's
+        // diamond belongs at the *whole*, which is nearly always the tail, and
+        // there was no way to put a mark there except a cardinality.
+        "from-head" | "to-head" => {
+            let word = first.and_then(|x| x.as_word()).unwrap_or_default();
+            let head = head_word(word)?;
+            if prop.name == "from-head" {
+                style.from_head = Some(head);
+            } else {
+                style.to_head = Some(head);
+            }
         }
         "from-card" | "to-card" => {
             let word = first.and_then(|x| x.as_word()).unwrap_or_default();
             let card = cardinality(word)?;
             if prop.name == "from-card" {
-                style.from_card = Some(card);
+                style.from_head = Some(card);
             } else {
-                style.to_card = Some(card);
+                style.to_head = Some(card);
             }
         }
         "router" | "route" => {
@@ -494,9 +537,11 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
             style.router = Some(match word {
                 "straight" | "direct" | "line" => Router::Straight,
                 "ortho" | "orthogonal" | "elbow" => Router::Ortho,
+                "curved" | "curve" => Router::Curved,
                 other => bail!("unknown router `{other}`"),
             });
         }
+        "bend" => style.bend = first.and_then(|x| x.as_num()),
         "value" => style.value = first.and_then(|x| x.as_num()),
         "points" => style.points = Some(v.iter().filter_map(|x| x.as_num()).collect()),
         "pairs" => style.pairs = Some(v.iter().filter_map(|x| x.as_num()).collect()),

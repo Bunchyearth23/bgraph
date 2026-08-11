@@ -155,11 +155,11 @@ fn render_pages(layout: &Layout, page: Option<Page>) -> Vec<u8> {
         let head = edge.style.head.unwrap_or(Head::Solid);
         let end = edge
             .style
-            .to_card
+            .to_head
             .or_else(|| edge.arrow.head_end.then_some(head));
         let start = edge
             .style
-            .from_card
+            .from_head
             .or_else(|| edge.arrow.head_start.then_some(head));
 
         if let Some(h) = end.filter(|h| *h != Head::None) {
@@ -548,6 +548,31 @@ impl Content {
                     h: r * 2.0,
                 });
                 let _ = writeln!(self.body, "f");
+            }
+            // UML, the same three shapes the SVG draws. A hollow one is
+            // stroked and not filled here rather than painted with the
+            // surface: a PDF has no transparency to see through in the first
+            // place, and `B` would paint over the line it sits on anyway.
+            Head::Hollow => {
+                self.path(&[to, at(size, size * 0.5), at(size, -size * 0.5)], true);
+                let _ = writeln!(self.body, "S");
+            }
+            Head::Diamond | Head::Composed => {
+                let long = size * 1.4;
+                self.path(
+                    &[
+                        to,
+                        at(long * 0.5, size * 0.42),
+                        at(long, 0.0),
+                        at(long * 0.5, -size * 0.42),
+                    ],
+                    true,
+                );
+                let _ = writeln!(
+                    self.body,
+                    "{}",
+                    if head == Head::Composed { "f" } else { "S" }
+                );
             }
             // Cardinality: a bar, a foot, or a circle, in the combinations the
             // crow's-foot notation gives them.

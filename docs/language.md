@@ -679,6 +679,60 @@ of three things, written the same way:
 | `(col 3, row 2)` | a cell of the grid `graph { grid }` declared — absolute in units you chose, so it survives a change of scale |
 | `(left-of c gap 20)` | a place beside a box, in the anchor vocabulary the rest of the language uses. **The form that survives an insertion** |
 
+### Arrow heads, and the three UML needs
+
+`head:` sets the mark at the arrow's head end; `from-head:` and `to-head:` name
+an end explicitly, which is what lets the two differ.
+
+| | |
+|---|---|
+| `solid` `open` `dot` `none` | direction |
+| `triangle` (`generalisation`, `extends`) | UML generalisation: a hollow triangle at the parent |
+| `diamond` (`aggregation`) | UML aggregation: a hollow diamond at the whole |
+| `composition` (`filled-diamond`) | UML composition: the same diamond, filled |
+| `one` `many` `zero-one` `zero-many` `one-many` | crow's-foot cardinality, in `type er` |
+
+```bgraph
+type class
+class vehicle "Vehicle"
+class car "Car" below vehicle gap 60
+class wheel "Wheel" right-of car gap 60
+
+car -> vehicle { head: triangle }
+car -> wheel { from-head: composition head: none }
+```
+
+The diamond belongs at the **whole**, which is nearly always the tail — that is
+what `from-head` is for. Before it, a composition had to be written backwards
+to be drawn right.
+
+`triangle` used to be a third spelling of the solid arrow. It is the hollow
+generalisation head now: a word spent on a shape the language already had, put
+to a shape it did not.
+
+### The shape of the line itself
+
+```bgraph
+node a "A" at (0, 0)
+node b "B" at (300, 160)
+node c "C" at (300, 0)
+
+a -> b { router: ortho bend: 16 }
+a -> c { router: curved }
+c -> a "back"
+```
+
+`bend:` rounds an `ortho` elbow — a style on the router rather than a second
+router, so every other property keeps meaning what it meant. `router: curved`
+bows between the two ends. Both are **sampled into the polyline** rather than
+emitted as arcs, so the bounds, the label solver, the PDF writer and the JSON
+export all keep working on the one shape they already understand.
+
+Two lines between the same pair bow apart on their own, without a word: drawn
+straight they lie on top of each other, and a reader sees one line. The bow's
+side follows the *pair* and not the direction each was written in, or `a -> b`
+and `b -> a` would lean the same way.
+
 A waypoint is a **passage, not a preference**: the line goes through each one,
 in the order written. What survives between them is the obstacle avoidance —
 every leg is routed by the same solver, so a line told to pass left of a box

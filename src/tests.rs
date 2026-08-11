@@ -943,6 +943,100 @@ fn after(source: &str) -> Vec<String> {
 }
 
 #[test]
+fn a_class_diagram_can_draw_the_three_relations_it_exists_for() {
+    // `W-125`. `type class` could not draw a generalisation, an aggregation or
+    // a composition — the three marks UML is *for* — and nobody had noticed,
+    // because the word `triangle` was quietly a third spelling of the solid
+    // arrow rather than the hollow head it names everywhere else.
+    let l = build(
+        "type class\nclass a \"A\"\nclass b \"B\" right-of a\n\
+         a -> b { head: triangle }\n\
+         a -> b { head: aggregation }\n\
+         a -> b { head: composition }\n",
+    );
+    use crate::style::Head;
+    assert_eq!(l.edges[0].style.head, Some(Head::Hollow));
+    assert_eq!(l.edges[1].style.head, Some(Head::Diamond));
+    assert_eq!(l.edges[2].style.head, Some(Head::Composed));
+
+    // Three distinct markers reach the document, and the two hollow ones are
+    // not painted in the line's own colour — a filled triangle is a different
+    // relation from a hollow one, so they may not render alike.
+    let svg = render_svg::render(&l);
+    for id in ["hollow", "diamond", "composed"] {
+        assert!(svg.contains(id), "no `{id}` marker in the document");
+    }
+
+    // And a mark can be put at the *tail*, which is where UML's diamond
+    // belongs: the whole owns the part, not the other way round.
+    let tail = build(
+        "type class\nclass a \"A\"\nclass b \"B\" right-of a\n\
+         a -> b { from-head: composition }\n",
+    );
+    assert_eq!(tail.edges[0].style.from_head, Some(Head::Composed));
+}
+
+#[test]
+fn a_bend_rounds_an_elbow_and_a_curve_is_a_polyline_like_everything_else() {
+    let square = build(
+        "node a \"A\" at (0, 0) { size: 60 40 }\n\
+         node b \"B\" at (300, 200) { size: 60 40 }\n\
+         a -> b { router: ortho }\n",
+    );
+    let rounded = build(
+        "node a \"A\" at (0, 0) { size: 60 40 }\n\
+         node b \"B\" at (300, 200) { size: 60 40 }\n\
+         a -> b { router: ortho bend: 16 }\n",
+    );
+    assert!(
+        render_svg::route_all(&rounded)[0].points.len()
+            > render_svg::route_all(&square)[0].points.len(),
+        "a rounded corner is sampled into the line"
+    );
+
+    // `curved` is sampled too, and that is the point: the bounds, the label
+    // solver, the PDF writer and the JSON export all keep working on the one
+    // shape they already understand.
+    let curved = build(
+        "node a \"A\" at (0, 0) { size: 60 40 }\n\
+         node b \"B\" at (300, 0) { size: 60 40 }\n\
+         a -> b { router: curved }\n",
+    );
+    let path = &render_svg::route_all(&curved)[0].points;
+    assert!(path.len() > 4, "a curve is many points: {}", path.len());
+    let straight = path.iter().all(|(_, y)| (y - path[0].1).abs() < 0.5);
+    assert!(!straight, "and it bows off the straight line");
+}
+
+#[test]
+fn two_lines_between_the_same_pair_do_not_lie_on_each_other() {
+    // `X-018`, narrowed. Direction is ignored: `a -> b` and `b -> a` share a
+    // corridor, and two lines drawn on top of each other are two lines a
+    // reader sees as one however they were written.
+    let l = build(
+        "node a \"A\" at (0, 0) { size: 60 40 }\n\
+         node b \"B\" at (300, 0) { size: 60 40 }\n\
+         a -> b \"there\"\nb -> a \"back\"\n",
+    );
+    let routes = render_svg::route_all(&l);
+    let mid = |r: &render_svg::Routed| r.points[r.points.len() / 2].1;
+    assert!(
+        (mid(&routes[0]) - mid(&routes[1])).abs() > 8.0,
+        "they bow apart: {} and {}",
+        mid(&routes[0]),
+        mid(&routes[1])
+    );
+
+    // One line to itself keeps the straight run it always had.
+    let alone = build(
+        "node a \"A\" at (0, 0) { size: 60 40 }\n\
+         node b \"B\" at (300, 0) { size: 60 40 }\n\
+         a -> b\n",
+    );
+    assert_eq!(render_svg::route_all(&alone)[0].points.len(), 2);
+}
+
+#[test]
 fn a_line_goes_through_every_place_it_is_told_to() {
     // `D-034`. A list, not a point — and each stop is parenthesised, which is
     // what lets the list need no separator, since `,` already separates

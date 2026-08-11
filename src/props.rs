@@ -51,7 +51,24 @@ pub const SHAPES: &[&str] = &[
 ];
 
 pub const HEADS: &[&str] = &[
-    "solid", "filled", "triangle", "open", "line", "thin", "dot", "circle", "none",
+    "solid",
+    "filled",
+    "open",
+    "line",
+    "thin",
+    "dot",
+    "circle",
+    "none",
+    // UML's three. `triangle` used to be a third spelling of the solid arrow —
+    // a word spent on a shape the language already had; it is the hollow
+    // generalisation head now, which is one it did not (`W-125`).
+    "triangle",
+    "generalisation",
+    "extends",
+    "diamond",
+    "aggregation",
+    "composition",
+    "filled-diamond",
 ];
 
 /// Which side of a box a line attaches to. `auto` is the default and is
@@ -59,7 +76,16 @@ pub const HEADS: &[&str] = &[
 /// side back to the engine's choice.
 pub const SIDES: &[&str] = &["auto", "top", "bottom", "left", "right"];
 
-pub const ROUTERS: &[&str] = &["straight", "direct", "line", "ortho", "orthogonal", "elbow"];
+pub const ROUTERS: &[&str] = &[
+    "straight",
+    "direct",
+    "line",
+    "ortho",
+    "orthogonal",
+    "elbow",
+    "curved",
+    "curve",
+];
 
 pub const DASHES: &[&str] = &["solid", "dashed", "dotted", "none"];
 
@@ -317,8 +343,39 @@ pub const PROPS: &[PropDef] = &[
         alias: false,
         ctx: Ctx::Edge,
         words: ROUTERS,
-        syntax: "router: <straight|ortho>",
-        doc: "`straight` draws a direct line; `ortho` draws a right-angled elbow.",
+        syntax: "router: <straight|ortho|curved>",
+        doc: "`straight` draws a direct line; `ortho` turns right angles and goes around the boxes in the way; `curved` bows between the two ends, which is what tells two lines between the same pair apart.",
+    },
+    PropDef {
+        name: "from-head",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: HEADS,
+        syntax: "from-head: <head>",
+        doc: "A mark at the tail, whatever kind. UML's diamond belongs at the \
+              *whole* and the whole is nearly always the tail, so without this \
+              a composition had to be written backwards to be drawn right.",
+    },
+    PropDef {
+        name: "to-head",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: HEADS,
+        syntax: "to-head: <head>",
+        doc: "A mark at the head end, whatever kind. `head` sets it too; this \
+              names the end explicitly, which is what lets the two differ.",
+    },
+    PropDef {
+        name: "bend",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: &[],
+        syntax: "bend: <radius>",
+        doc: "Round an `ortho` elbow by this much. A style on the router \
+              rather than a second router, so every other property keeps \
+              meaning what it meant. Sampled into the line rather than emitted \
+              as an arc, so the PDF, the JSON export and the label solver need \
+              learn nothing.",
     },
     PropDef {
         name: "from",
@@ -1894,6 +1951,37 @@ pub const PIE_LABELS: &[&str] = &["percent", "value", "both", "none"];
 pub const TOGGLE: &[&str] = &["on", "off", "true", "false"];
 
 pub const PIE_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "from-head",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: HEADS,
+        syntax: "from-head: <head>",
+        doc: "A mark at the tail, whatever kind. UML's diamond belongs at the \
+              *whole* and the whole is nearly always the tail, so without this \
+              a composition had to be written backwards to be drawn right.",
+    },
+    PropDef {
+        name: "to-head",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: HEADS,
+        syntax: "to-head: <head>",
+        doc: "A mark at the head end, whatever kind. `head` sets it too; this \
+              names the end explicitly, which is what lets the two differ.",
+    },
+    PropDef {
+        name: "bend",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: &[],
+        syntax: "bend: <radius>",
+        doc: "Round an `ortho` elbow by this much. A style on the router \
+              rather than a second router, so every other property keeps \
+              meaning what it meant. Sampled into the line rather than emitted \
+              as an arc, so the PDF, the JSON export and the label solver need \
+              learn nothing.",
+    },
     PropDef {
         name: "from",
         alias: false,
