@@ -181,6 +181,9 @@ disagree.
   no suggestion at all — that feedback is what drove the current rules
 - ALWAYS: regenerate `docs/reference.md` after touching `props.rs`. A test
   compares the checked-in file to `docgen::reference()` and fails on drift
+- NEVER: edit `docs/reference.md` by hand — prose included. It is generated,
+  it says so in its own banner, and the edit fails the same drift test. Write
+  the prose into `src/docgen.rs` and regenerate
 - NEVER: add a color to a chart by eye. The categorical palette in `props.rs`
   is validated (adjacent-pair CVD ΔE ≥ 8 in both modes); adding a ninth hue is
   not an option — `check` tells the author to merge the tail instead
