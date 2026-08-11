@@ -60,6 +60,7 @@ all-archetypes = [
     "treeview",
     "class",
     "state",
+    "bpmn",
 ]
 pie = []
 packet = []
@@ -89,6 +90,7 @@ mindmap = []
 treeview = []
 class = []
 state = []
+bpmn = []
 
 # PDF is vector output, so it needs no rasteriser and no dependency
 # (`D-027`). On by default; switch it off and the writer is not compiled.

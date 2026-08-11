@@ -212,6 +212,8 @@ type block      // block api "API" container { tech: "Rust" }
 type timeline   // event launch "Launch" 2026-03-15
 type state      // state a "A"
 type sequence   // participant a "A"
+type bpmn       // task t "Check" service, event e "Got it" start message,
+                //   gateway g "OK?" exclusive, data d "Form" object
 ```
 
 Every archetype reads the *same* statements, under its own word: a box is a

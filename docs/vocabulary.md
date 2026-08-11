@@ -194,6 +194,13 @@ still lists every one.
 | `kanban` | `card` | — |
 | `requirements` | `requirement` | on the **edge**: `link` |
 | `bytefield` | `field` | `bytes` — 2 values |
+| `bpmn` | `task` · `event` · `gateway` · `data` | `kind`; `stage` + `trigger`; `gate`; `artifact`; on the **edge**: `flow` |
 
 `node` remains a universal synonym in every genre, and every positional value
-can be written as its named property instead. Twenty-eight genres and `free`.
+can be written as its named property instead. Twenty-nine genres and `free`.
+
+`bpmn` is the one with **four** words rather than one or two, and it is the
+clearest case for `D-023`: a task, an event, a gateway and a data artefact are
+four different things carrying four different shapes of data, and choosing
+between them by counting the values after the label could not tell a task's one
+word from a gateway's one word.

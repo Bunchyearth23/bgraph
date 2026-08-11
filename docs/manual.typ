@@ -338,12 +338,18 @@ meant.
   [rack], [`device`], [lowest, highest U],     [network], [`host`], [role],
   [gitgraph], [`commit`], [branch],            [orgchart], [`position`], [—],
   [mindmap], [`topic`], [—],                   [treeview], [`entry`], [—],
+  [bpmn], [`task`], [kind],                    [bpmn], [`event`], [stage, trigger],
+  [bpmn], [`gateway`], [gate],                 [bpmn], [`data`], [artefact],
 )
 
 #v(0.4em)
 
-Twenty-eight genres and `free`. Six of them put data on the *edge* instead of
-on the item, because that is where the fact lives:
+Twenty-nine genres and `free`. `bpmn` is the one with four words rather than
+one or two: four different things carry four different shapes of data, and no
+count of values after the label could tell them apart.
+
+Seven of them put data on the *edge* instead of on the item, because that is
+where the fact lives:
 
 #dtable(
   header: ([`type`], [written], [meaning]),
@@ -355,6 +361,7 @@ on the item, because that is where the fact lives:
   [harness], [`j1 -> j2 "power" 1 3`], [The pin the wire lands on at each end.],
   [requirements], [`r2 -> r1 derive`], [What the relation asserts, read tail to head.],
   [network], [`sw -> srv "uplink" "10 GbE"`], [What the link runs at.],
+  [bpmn], [`check -> notify "rejected" default`], [What the connector means — a sequence flow, a message, an association.],
 )
 ]
 

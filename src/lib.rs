@@ -130,6 +130,8 @@ pub mod charts;
 #[cfg(feature = "window")]
 pub mod window;
 
+#[cfg(feature = "bpmn")]
+pub mod bpmn;
 pub mod fmt;
 #[allow(missing_docs)]
 pub mod layout;

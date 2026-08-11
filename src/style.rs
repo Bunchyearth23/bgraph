@@ -193,6 +193,20 @@ pub struct Style {
     /// `type venn` — how many things are in a set, and how many two share.
     pub set_size: Option<f64>,
     pub shared: Option<f64>,
+    /// `type bpmn` — which element this is, and what it carries.
+    ///
+    /// Kept as the written word rather than six more enums, the way `risk`,
+    /// `verify` and `link` are: `check` has already closed each set against
+    /// the archetype's own table, so a second closed set here would be the
+    /// same list written twice and one more place for it to fall behind.
+    pub task_kind: Option<String>,
+    pub stage: Option<String>,
+    pub trigger: Option<String>,
+    pub gate: Option<String>,
+    pub artifact: Option<String>,
+    pub flow: Option<String>,
+    /// The task a `boundary` event sits on. Placement, not decoration.
+    pub attach: Option<String>,
     /// `type network` — what the box is, and its address line.
     pub role: Option<NetRole>,
     pub addr: Option<String>,
@@ -277,6 +291,13 @@ impl Style {
             wire,
             set_size,
             shared,
+            task_kind,
+            stage,
+            trigger,
+            gate,
+            artifact,
+            flow,
+            attach,
             role,
             addr,
             speed,
@@ -473,9 +494,21 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
                 "database" => style.block_kind = Some(BlockKind::Database),
                 "queue" => style.block_kind = Some(BlockKind::Queue),
                 "external" => style.block_kind = Some(BlockKind::External),
+                // A BPMN task's kind. Three genres now answer to one word, and
+                // `check` is what keeps them apart — a `person` in a process
+                // and a `service` in a state machine are both refused before
+                // they reach here, naming the genre that does read them.
+                "plain" | "user" | "service" | "script" | "manual" | "send" | "receive"
+                | "rule" | "subprocess" => style.task_kind = Some(word.to_string()),
                 other => bail!("unknown kind `{other}`"),
             }
         }
+        "stage" => style.stage = first.and_then(|x| x.as_word()).map(String::from),
+        "trigger" => style.trigger = first.and_then(|x| x.as_word()).map(String::from),
+        "gate" => style.gate = first.and_then(|x| x.as_word()).map(String::from),
+        "artifact" => style.artifact = first.and_then(|x| x.as_word()).map(String::from),
+        "flow" => style.flow = first.and_then(|x| x.as_word()).map(String::from),
+        "attach" => style.attach = first.and_then(|x| x.as_word()).map(String::from),
         "tech" | "technology" => style.tech = first.and_then(|x| x.as_text()).map(String::from),
         // Three words `check` has already closed the set of; this only reads
         // them, and keeps them as written so the renderer can print them.

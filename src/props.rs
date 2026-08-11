@@ -789,6 +789,136 @@ pub const VENN_ITEM_PROPS: &[PropDef] = &[
     },
 ];
 
+/// What a BPMN task *is*. `plain` is the unmarked box, and it is spelled
+/// rather than left as the absence of a word, so a file can say "no, really,
+/// nothing" and completion has something to offer.
+pub const BPMN_TASK_KINDS: &[&str] = &[
+    "plain",
+    "user",
+    "service",
+    "script",
+    "manual",
+    "send",
+    "receive",
+    "rule",
+    "subprocess",
+];
+
+/// Where an event sits in the process. `boundary` is the one that is not a
+/// position in the flow but a position on a *box*, and it needs `attach`.
+pub const BPMN_STAGES: &[&str] = &["start", "intermediate", "end", "boundary"];
+
+/// What makes an event happen. Drawn as a glyph inside the circle, which is
+/// the whole reason BPMN is worth more than an ordinary flowchart: `plain`
+/// says "something", `timer` says "at four o'clock".
+pub const BPMN_TRIGGERS: &[&str] = &[
+    "plain",
+    "message",
+    "timer",
+    "error",
+    "signal",
+    "escalation",
+    "conditional",
+    "terminate",
+];
+
+pub const BPMN_GATES: &[&str] = &["exclusive", "parallel", "inclusive", "event", "complex"];
+
+pub const BPMN_ARTIFACTS: &[&str] = &["object", "store", "input", "output"];
+
+pub const BPMN_FLOWS: &[&str] = &[
+    "sequence",
+    "message",
+    "association",
+    "default",
+    "conditional",
+];
+
+pub const BPMN_PROPS: &[PropDef] = &[PropDef {
+    name: "title",
+    alias: false,
+    ctx: Ctx::Both,
+    words: &[],
+    syntax: "title: <text>",
+    doc: "Heading drawn above the diagram.",
+}];
+
+pub const BPMN_ITEM_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "kind",
+        alias: false,
+        ctx: Ctx::Node,
+        words: BPMN_TASK_KINDS,
+        syntax: "kind: <plain|user|service|script|manual|send|receive|rule|subprocess>",
+        doc: "What kind of task it is, drawn as a marker in the corner of the \
+              box. `subprocess` takes the `+` instead, and an *expanded* \
+              subprocess is a `group`. Usually written positionally — \
+              `task check \"Check credit\" service`.",
+    },
+    PropDef {
+        name: "stage",
+        alias: false,
+        ctx: Ctx::Node,
+        words: BPMN_STAGES,
+        syntax: "stage: <start|intermediate|end|boundary>",
+        doc: "Where the event sits: a thin ring starts, a thick one ends, a \
+              double ring is intermediate. `boundary` is the exception — it \
+              is not a place in the flow but a place on a task, so it needs \
+              `attach`.",
+    },
+    PropDef {
+        name: "trigger",
+        alias: false,
+        ctx: Ctx::Node,
+        words: BPMN_TRIGGERS,
+        syntax: "trigger: <plain|message|timer|error|signal|escalation|conditional|terminate>",
+        doc: "What makes the event happen, drawn inside the ring. Written \
+              second, after the stage — `event due \"Overdue\" boundary timer`.",
+    },
+    PropDef {
+        name: "attach",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "attach: <task>",
+        doc: "The task a `boundary` event sits on. It is placement, declared \
+              like every other placement (`D-001`): the event lands on that \
+              box's bottom edge, and several on one task spread along it in \
+              the order they are written. `label-offset` moves one by hand.",
+    },
+    PropDef {
+        name: "gate",
+        alias: false,
+        ctx: Ctx::Node,
+        words: BPMN_GATES,
+        syntax: "gate: <exclusive|parallel|inclusive|event|complex>",
+        doc: "Which gateway it is, drawn as the mark inside the diamond. \
+              Usually written positionally — `gateway ok \"Approved?\" exclusive`.",
+    },
+    PropDef {
+        name: "artifact",
+        alias: false,
+        ctx: Ctx::Node,
+        words: BPMN_ARTIFACTS,
+        syntax: "artifact: <object|store|input|output>",
+        doc: "Which data artefact it is. An object is a page with a folded \
+              corner, a store is a cylinder; `input` and `output` are objects \
+              carrying the arrow that says which way the data went.",
+    },
+    PropDef {
+        name: "flow",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: BPMN_FLOWS,
+        syntax: "flow: <sequence|message|association|default|conditional>",
+        doc: "What the connector means. A sequence flow is a solid arrow, a \
+              message flow is dashed with a hollow head, an association is \
+              dotted with none. `default` takes the slash and `conditional` \
+              the diamond, both at the gateway end. Usually written \
+              positionally — `check -> notify \"rejected\" default`.",
+    },
+];
+
 pub const NET_ROLES: &[&str] = &[
     "server", "switch", "router", "firewall", "storage", "client", "cloud",
 ];
@@ -1535,6 +1665,64 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         alt_items: &[],
         edge_slots: &[Slot {
             prop: "shared",
+            arity: 1,
+        }],
+    },
+    #[cfg(feature = "bpmn")]
+    ArchetypeDef {
+        name: "bpmn",
+        item: "task",
+        doc: "A business process. Tasks, gateways, events, data artefacts and \
+              the flows between them, with pools and lanes as `group`s. \
+              Placed by anchors exactly as in `free`: the archetype supplies \
+              the vocabulary, the shapes and the diagnostics, and the author \
+              still says where everything goes. Four words, because four \
+              things have four positional shapes (`D-023`) — a task has a \
+              kind, an event has a stage and a trigger, a gateway has a gate \
+              and a datum has an artefact.",
+        props: BPMN_PROPS,
+        item_props: BPMN_ITEM_PROPS,
+        slots: &[Slot {
+            prop: "kind",
+            arity: 1,
+        }],
+        members: false,
+        alt_items: &[
+            AltItem {
+                item: "event",
+                doc: "Something that happens: `event got \"Order received\" start message`. \
+                      The stage comes first and the trigger second, because a \
+                      stage is what every event has and a trigger is what some do.",
+                slots: &[
+                    Slot {
+                        prop: "stage",
+                        arity: 1,
+                    },
+                    Slot {
+                        prop: "trigger",
+                        arity: 1,
+                    },
+                ],
+            },
+            AltItem {
+                item: "gateway",
+                doc: "A branch or a join: `gateway ok \"Approved?\" exclusive`.",
+                slots: &[Slot {
+                    prop: "gate",
+                    arity: 1,
+                }],
+            },
+            AltItem {
+                item: "data",
+                doc: "What the process reads or writes: `data inv \"Invoice\" object`.",
+                slots: &[Slot {
+                    prop: "artifact",
+                    arity: 1,
+                }],
+            },
+        ],
+        edge_slots: &[Slot {
+            prop: "flow",
             arity: 1,
         }],
     },

@@ -100,6 +100,8 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "rack" => check_rack(diagram, &mut out),
         #[cfg(feature = "network")]
         "network" => check_network(diagram, &mut out),
+        #[cfg(feature = "bpmn")]
+        "bpmn" => check_bpmn(diagram, &mut out),
         #[cfg(feature = "venn")]
         "venn" => check_venn(diagram, &mut out),
         #[cfg(feature = "harness")]
@@ -205,7 +207,10 @@ pub fn after_layout(layout: &crate::layout::Layout) -> Vec<Diag> {
             continue;
         }
         for (i, node) in layout.nodes.iter().enumerate() {
-            if i == edge.from || i == edge.to {
+            // The same rule the router used. Asking the same question twice
+            // and answering it differently is how a validator ends up
+            // reporting the geometry it asked for.
+            if crate::layout::endpoint_of(layout, edge, i) {
                 continue;
             }
             if route
@@ -1647,6 +1652,198 @@ fn check_venn(diagram: &Diagram, out: &mut Vec<Diag>) {
 }
 
 /// A topology draws boxes and lines like `free`, so what is worth reporting is
+/// What a *process* diagram gets wrong.
+///
+/// Two families, and they are different in kind. The first is a statement that
+/// does not mean anything: a `stage` on a task, a `boundary` event with nothing
+/// to sit on, an `attach` naming a gateway. Those are errors, because the
+/// drawing would show something the file did not say.
+///
+/// The second is a process that does not work: a start event with something
+/// flowing into it, an end event with something flowing out, a gateway that
+/// decides nothing. Those are warnings, because they are legal pictures of
+/// illegal processes and the author may be drawing a fragment on purpose.
+#[cfg(feature = "bpmn")]
+fn check_bpmn(diagram: &Diagram, out: &mut Vec<Diag>) {
+    check_cycles_free(diagram, out);
+
+    // Which of the four each statement declared, from the word that was
+    // written. `node` is the universal synonym, so it falls back to the
+    // properties — which is exactly what the layout does.
+    let element = |node: &crate::ast::NodeDecl| -> &'static str {
+        match node.keyword.as_str() {
+            "task" | "event" | "gateway" | "data" => match node.keyword.as_str() {
+                "task" => "task",
+                "event" => "event",
+                "gateway" => "gateway",
+                _ => "data",
+            },
+            _ => {
+                let has = |name: &str| node.props.iter().any(|p| p.name == name);
+                if has("stage") {
+                    "event"
+                } else if has("gate") {
+                    "gateway"
+                } else if has("artifact") {
+                    "data"
+                } else {
+                    "task"
+                }
+            }
+        }
+    };
+
+    // A property belongs to one of the four words. Written under another, the
+    // element it names is the one that would be drawn, so the picture would
+    // disagree with the statement — which is what `D-005` refuses everywhere.
+    for node in &diagram.nodes {
+        let mine = element(node);
+        for (prop, owner) in [
+            ("stage", "event"),
+            ("trigger", "event"),
+            ("attach", "event"),
+            ("gate", "gateway"),
+            ("artifact", "data"),
+            ("kind", "task"),
+        ] {
+            if mine != owner
+                && let Some(p) = node.props.iter().find(|p| p.name == prop)
+            {
+                out.push(Diag::error(
+                    p.name_span,
+                    format!(
+                        "`{prop}` belongs to `{owner}`, and this is a `{mine}` — \
+                         write it as `{owner} {} …` or drop the property",
+                        node.id.as_str()
+                    ),
+                ));
+            }
+        }
+    }
+
+    let word = |name: &str| -> Option<&'static str> {
+        diagram
+            .nodes
+            .iter()
+            .find(|n| n.id.as_str() == name)
+            .map(element)
+    };
+
+    for node in &diagram.nodes {
+        // `props_for` folds the positional values in, so `event x "…" boundary
+        // timer` is read the same way as the long form. It builds a `Vec`, so
+        // the word is taken by value rather than borrowed out of it.
+        let props = node.props_for(archetype_of(diagram));
+        let word_of = |prop: &str| -> Option<String> {
+            props
+                .iter()
+                .find(|p| p.name == prop)
+                .and_then(|p| p.values.first())
+                .and_then(|v| v.as_word())
+                .map(String::from)
+        };
+        let stage = word_of("stage");
+        let stage = stage.as_deref();
+        let attach = word_of("attach");
+
+        if stage == Some("boundary") && attach.is_none() {
+            out.push(Diag::error(
+                node.id.span,
+                format!(
+                    "`{}` is a boundary event with no `attach` — a boundary event \
+                     is drawn *on* a task, so it has nowhere to go until one is named",
+                    node.id.as_str()
+                ),
+            ));
+        }
+        if let Some(host) = &attach {
+            if stage.is_some() && stage != Some("boundary") {
+                out.push(Diag::warn(
+                    node.id.span,
+                    format!(
+                        "`{}` names `attach` but is not a `boundary` event, so it is \
+                         placed by its anchors and `attach` does nothing",
+                        node.id.as_str()
+                    ),
+                ));
+            }
+            match word(host) {
+                None => out.push(Diag::error(
+                    node.id.span,
+                    format!(
+                        "`{}` attaches to `{host}`, which is not declared",
+                        node.id.as_str()
+                    ),
+                )),
+                Some(other) if other != "task" => out.push(Diag::error(
+                    node.id.span,
+                    format!(
+                        "`{}` attaches to `{host}`, which is a `{other}` — a boundary \
+                         event sits on a task, and nothing else has an edge to sit on",
+                        node.id.as_str()
+                    ),
+                )),
+                _ => {}
+            }
+        }
+    }
+
+    // A process that runs backwards through its own ends. Warnings rather than
+    // errors: a fragment of a process is a legitimate thing to draw, and this
+    // is the one place where refusing would stop somebody sketching.
+    let mut into: HashMap<&str, usize> = HashMap::new();
+    let mut outof: HashMap<&str, usize> = HashMap::new();
+    for edge in &diagram.edges {
+        *outof.entry(edge.from.as_str()).or_default() += 1;
+        *into.entry(edge.to.as_str()).or_default() += 1;
+    }
+
+    for node in &diagram.nodes {
+        let id = node.id.as_str();
+        let props = node.props_for(archetype_of(diagram));
+        let stage = props
+            .iter()
+            .find(|p| p.name == "stage")
+            .and_then(|p| p.values.first().and_then(|v| v.as_word()));
+        let (a, b) = (
+            into.get(id).copied().unwrap_or(0),
+            outof.get(id).copied().unwrap_or(0),
+        );
+
+        // Read only where it belongs. A `stage` on a task has already been
+        // reported as the wrong property; saying a second time that the task
+        // is a start event with a flow into it would be repeating the mistake
+        // back as though it were a fact.
+        let stage = if element(node) == "event" {
+            stage
+        } else {
+            None
+        };
+
+        match stage {
+            Some("start") if a > 0 => out.push(Diag::warn(
+                node.id.span,
+                format!("`{id}` is a start event with something flowing into it"),
+            )),
+            Some("end") if b > 0 => out.push(Diag::warn(
+                node.id.span,
+                format!("`{id}` is an end event with something flowing out of it"),
+            )),
+            _ => {}
+        }
+
+        if element(node) == "gateway" && a <= 1 && b <= 1 {
+            out.push(Diag::warn(
+                node.id.span,
+                format!(
+                    "`{id}` is a gateway with one way in and one way out, so it \
+                     branches nothing — either give it the other paths or make it a task"
+                ),
+            ));
+        }
+    }
+}
+
 /// what a *network* diagram gets wrong: a host nothing connects to, which is
 /// either a mistake or a fact the diagram is failing to state.
 #[cfg(feature = "network")]

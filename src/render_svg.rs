@@ -59,7 +59,7 @@ pub fn render(layout: &Layout) -> String {
     for guide in &layout.guides {
         body.push_str(&guide_line(guide));
     }
-    for shape in &layout.polylines {
+    for shape in layout.polylines.iter().filter(|p| !p.over) {
         if let Some(head) = shape.head
             && head != Head::None
         {
@@ -156,6 +156,13 @@ pub fn render(layout: &Layout) -> String {
         body.push_str(&node_label(node));
     }
 
+    // A mark that lives *inside* a shape goes on after it. There is exactly one
+    // kind — the glyph in a BPMN ring, diamond or corner — and under the box it
+    // would simply not be there.
+    for shape in layout.polylines.iter().filter(|p| p.over) {
+        body.push_str(&free_polyline(shape));
+    }
+
     for annotation in &layout.annotations {
         body.push_str(&annotation_text(annotation));
     }
@@ -239,7 +246,7 @@ pub fn route_all(layout: &Layout) -> Vec<Routed> {
                     .nodes
                     .iter()
                     .enumerate()
-                    .filter(|(i, _)| *i != edge.from && *i != edge.to)
+                    .filter(|(i, _)| !crate::layout::endpoint_of(layout, edge, *i))
                     .map(|(_, n)| n.rect)
                     .collect();
                 route(

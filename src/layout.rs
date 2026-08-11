@@ -90,6 +90,13 @@ pub struct Polyline {
     /// An arrow at the far end, sharing the marker machinery edges use.
     pub head: Option<crate::style::Head>,
     pub dash: Option<String>,
+    /// Drawn **after** the boxes rather than before them.
+    ///
+    /// Nearly every line here belongs underneath — a harness wire, a sankey
+    /// ribbon, a tree's guides — so `false` is the answer for all but one kind.
+    /// The exception is a mark that lives *inside* a shape: a BPMN gateway's
+    /// cross is drawn on the diamond, and under it, it is simply invisible.
+    pub over: bool,
 }
 
 pub struct Layout {
@@ -251,6 +258,26 @@ fn shape_allowance(shape: Option<Shape>, mut w: f64, mut h: f64) -> (f64, f64) {
         _ => {}
     }
     (w, h)
+}
+
+/// Whether box `i` is one of an edge's own ends, and so not something for that
+/// edge to route around or be reported for crossing.
+///
+/// The two endpoints are obvious. The third case is a **boundary event's host**:
+/// the event is drawn sitting *on* that box, so every flow leaving it starts
+/// inside one — treating the host as solid would make the router take a detour
+/// around the very box the event belongs to, and make `check` report a crossing
+/// that is the notation working correctly.
+///
+/// Shared so the router and the validator cannot disagree about it, which is
+/// the same reason `route_all` is public.
+pub fn endpoint_of(layout: &Layout, edge: &PlacedEdge, i: usize) -> bool {
+    if i == edge.from || i == edge.to {
+        return true;
+    }
+    let host = |end: usize| layout.nodes[end].style.attach.as_deref();
+    let id = layout.nodes[i].id.as_str();
+    host(edge.from) == Some(id) || host(edge.to) == Some(id)
 }
 
 fn natural_size(lines: &[String], style: &Style) -> (f64, f64) {
@@ -471,11 +498,15 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     let mut sizes = Vec::with_capacity(diagram.nodes.len());
     let mut styles = Vec::with_capacity(diagram.nodes.len());
     let mut labels = Vec::with_capacity(diagram.nodes.len());
+    // The label of a shape that cannot hold one, kept for the pass that draws
+    // it underneath. One entry per node, so the two stay in step.
+    let mut captions: Vec<Option<String>> = Vec::with_capacity(diagram.nodes.len());
 
     let item = crate::check::archetype_of(diagram);
     let machine = item.name == "state";
     let architecture = item.name == "block";
     let topology = item.name == "network";
+    let process = item.name == "bpmn";
 
     let dark = opts
         .background
@@ -493,10 +524,13 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             shape: None,
             ..Style::node_defaults()
         }
-    } else if topology {
+    } else if topology || process {
         // Only `shape` is left unset: a topology's colours usually already
         // mean something to its author (environment, tenancy, trust zone), so
-        // the archetype chooses the outline and keeps out of the palette.
+        // the archetype chooses the outline and keeps out of the palette. A
+        // process is the same bargain for a different reason — in BPMN the
+        // shape *is* the meaning, and the colour is free for whatever the
+        // author is tracking.
         Style {
             shape: None,
             ..Style::node_defaults()
@@ -522,7 +556,13 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                 node_base.clone(),
                 item.item,
                 &node.classes,
-                &node.effective_props(item.slots),
+                // `props_for`, not `effective_props(item.slots)`: the
+                // positional shape follows the **word the author wrote**
+                // (`D-023`). The free path read the archetype's primary slots
+                // instead, which was invisible for as long as `xy` was the only
+                // genre with a second word — and `xy` is a chart, so it never
+                // came through here. `bpmn` is the first to have four.
+                &node.props_for(item),
             )
             .map_err(|e| e.context(format!("in node `{}`", node.id.as_str())))?;
 
@@ -556,6 +596,48 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             }
         }
 
+        // A BPMN element's shape *is* its meaning — a ring is an event and a
+        // diamond is a gateway, and no label makes one into the other. So the
+        // shape follows the element and the two smallest are given a fixed
+        // size: a bigger circle does not mean a bigger event, and sizing one
+        // from its label would turn two lengths of text into two importances.
+        #[cfg(feature = "bpmn")]
+        if process {
+            use crate::bpmn::{EVENT, Element, GATE};
+            match crate::bpmn::element_of(&style) {
+                Element::Event => {
+                    style.shape = style.shape.or(Some(Shape::Ellipse));
+                    style.width = style.width.or(Some(EVENT));
+                    style.height = style.height.or(Some(EVENT));
+                    // The ring says where in the process it sits before the
+                    // glyph says what it is: thin starts, thick ends.
+                    if style.stage.as_deref() == Some("end") {
+                        style.stroke_width = Some(3.6);
+                    }
+                }
+                Element::Gateway => {
+                    style.shape = style.shape.or(Some(Shape::Diamond));
+                    style.width = style.width.or(Some(GATE));
+                    style.height = style.height.or(Some(GATE));
+                }
+                Element::Data => {
+                    style.shape =
+                        style
+                            .shape
+                            .or(Some(if style.artifact.as_deref() == Some("store") {
+                                Shape::Cylinder
+                            } else {
+                                Shape::Rect
+                            }));
+                    style.radius = Some(0.0);
+                }
+                Element::Task => {
+                    style.shape = style.shape.or(Some(Shape::Rect));
+                    style.radius = style.radius.or(Some(10.0));
+                }
+            }
+        }
+
         // The role picks the outline and nothing else.
         if topology {
             use crate::style::NetRole as R;
@@ -580,9 +662,32 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             }
         }
 
-        let mut lines: Vec<String> = if mark {
+        // An event and a gateway are sized by the notation, not by their text,
+        // so the label cannot go inside one — it is drawn underneath instead,
+        // which is also where BPMN puts it.
+        #[cfg(feature = "bpmn")]
+        let outside = process
+            && matches!(
+                crate::bpmn::element_of(&style),
+                crate::bpmn::Element::Event | crate::bpmn::Element::Gateway
+            );
+        #[cfg(not(feature = "bpmn"))]
+        let outside = false;
+
+        // A task carrying a corner marker needs room the label alone would not
+        // ask for.
+        #[cfg(feature = "bpmn")]
+        let marked = process
+            && crate::bpmn::element_of(&style) == crate::bpmn::Element::Task
+            && style.task_kind.as_deref().is_some_and(|k| k != "plain");
+        #[cfg(not(feature = "bpmn"))]
+        let marked = false;
+
+        let mut lines: Vec<String> = if mark || outside {
+            captions.push(node.label.clone());
             Vec::new()
         } else {
+            captions.push(None);
             node.label
                 .clone()
                 .unwrap_or_else(|| node.id.value.clone())
@@ -634,6 +739,17 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                         + if node.members.is_empty() { 0.0 } else { 8.0 },
                 ),
             )
+        } else if marked {
+            // A task's marker sits in its top-left corner and its label is
+            // centred, so a box sized to the text alone puts one on the other.
+            // The floor is what BPMN draws anyway — a task is a chunky box —
+            // and it is a floor rather than a size, so a long label still
+            // grows it.
+            let (w, h) = natural_size(&lines, &style);
+            (
+                style.width.unwrap_or(w.max(118.0)),
+                style.height.unwrap_or(h.max(60.0)),
+            )
         } else {
             natural_size(&lines, &style)
         };
@@ -683,9 +799,23 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         // `effective_props`, not `props`: an archetype with edge slots writes
         // its data after the label — `order -> line "contains" one many` — and
         // it has to reach the cascade like any other property.
+        // A process leaves the router, the head and the dash unset in the
+        // base, the way a topology leaves the shape unset: the connector's
+        // *kind* decides all three, and a default already in place would win
+        // the `or` below and the archetype would silently supply nothing.
+        // Getting this wrong is the same mistake four archetypes have made.
+        let edge_base = if process {
+            Style {
+                router: None,
+                head: None,
+                ..Style::edge_defaults()
+            }
+        } else {
+            Style::edge_defaults()
+        };
         let mut style = registry
             .resolve(
-                Style::edge_defaults(),
+                edge_base,
                 "edge",
                 &edge.classes,
                 &edge.effective_props(item.edge_slots),
@@ -730,6 +860,36 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                 Some(text) if !text.is_empty() => format!("{text} [{guard}]"),
                 _ => format!("[{guard}]"),
             });
+        }
+
+        // A BPMN connector says what it means with its *line*, which is the
+        // one thing about the notation a reader learns without being taught: a
+        // solid arrow is the process going on, a dashed one is a message
+        // crossing between participants, a dotted one only associates. Each is
+        // a default, so a class or an inline property still wins — the
+        // archetype supplies the vocabulary and the author keeps the last word.
+        #[cfg(feature = "bpmn")]
+        if process {
+            let (dash, head) = match style.flow.as_deref() {
+                Some("message") => (Some("dashed"), Some(crate::style::Head::Open)),
+                Some("association") => (Some("dotted"), Some(crate::style::Head::None)),
+                _ => (None, None),
+            };
+            if let Some(d) = dash {
+                style.dash = style.dash.or(Some(d.to_string()));
+            }
+            style.head = style.head.or(head).or(Some(crate::style::Head::Solid));
+            // A sequence flow is orthogonal, because a process is read as a
+            // circuit: a diagonal between two boxes looks like a suggestion
+            // where a right angle looks like a route. A message flow is not —
+            // it crosses the page between participants, and made orthogonal it
+            // would be mistaken for part of the process it is talking to.
+            let straight = matches!(style.flow.as_deref(), Some("message" | "association"));
+            style.router = style.router.or(Some(if straight {
+                crate::style::Router::Straight
+            } else {
+                crate::style::Router::Ortho
+            }));
         }
 
         // A dashed/dotted arrow token sets the pattern unless a style already did.
@@ -1000,6 +1160,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                 width: placed.style.stroke_width.unwrap_or(1.4),
                 head: None,
                 dash: placed.style.dash.clone(),
+                over: false,
             });
 
             // The pin pair is no longer written: the wire touches both, which
@@ -1195,6 +1356,18 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                 family: style.font_family.clone().unwrap_or_default(),
             });
         }
+    }
+
+    // A BPMN diagram's marks come last, because every one of them is placed
+    // against a box that is already where it is going to be — including the
+    // boundary events, which are moved onto their host's edge first so their
+    // glyphs and captions follow them there.
+    #[cfg(feature = "bpmn")]
+    if process {
+        crate::bpmn::attach_boundaries(&mut nodes);
+        let (marks, labels) = crate::bpmn::decorate(&nodes, &captions);
+        polylines.extend(marks);
+        annotations.extend(labels);
     }
 
     // `graph { title }` on a genre that draws boxes rather than a chart. The

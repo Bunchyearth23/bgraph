@@ -125,6 +125,7 @@ pub(crate) const EXAMPLES: &[(&str, &str)] = &[
     ("mindmap", include_str!("../examples/mindmap.bd")),
     ("treeview", include_str!("../examples/treeview.bd")),
     ("state", include_str!("../examples/state.bd")),
+    ("bpmn", include_str!("../examples/bpmn.bd")),
 ];
 
 fn archetypes(m: &mut String) {

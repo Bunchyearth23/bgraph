@@ -27,7 +27,7 @@ orders  -> cache   "read-through" { router: ortho }
 ```
 
 ```sh
-bgraph init pie > traffic.bd       # a working file for any of the 28 genres
+bgraph init pie > traffic.bd       # a working file for any of the 29 genres
 bgraph diagram.bd -o diagram.svg   # …or .pdf, .png, .json — the extension picks
 bgraph watch diagram.bd            # a native window, reloading on save
 bgraph watch docs/diagrams         # …or a whole directory, as a build loop
@@ -45,7 +45,8 @@ bgraph layout diagram.bd           # freeze the placements into the file
   themes, inline overrides. Unknown properties are errors, not silence.
 - **Shapes** — rect, stadium, ellipse, diamond, hexagon, cylinder, with edge
   endpoints clipped to the true outline.
-- **Edge control** — straight or orthogonal routing, four arrow heads, dash
+- **Edge control** — straight routing, or orthogonal routing that goes around
+  the boxes in the way, four arrow heads, dash
   patterns, labels.
 - **Self-sizing canvas** — the viewBox follows the content.
 - **A declared grid** — `graph { grid: 160 90 }` and `at (col 3, row 2)`.
@@ -59,7 +60,7 @@ bgraph layout diagram.bd           # freeze the placements into the file
   in two files is an error naming both.
 - **Text that belongs to no box** — `note`, and a `legend` derived from the
   style classes that asked to be in one.
-- **Archetypes** — twenty-eight genres reinterpret the same statements as
+- **Archetypes** — twenty-nine genres reinterpret the same statements as
   chart data, reusing the whole style cascade. `top: 8` folds a long tail;
   `from: "sales.csv"` reads the rows from a table.
 - **Themes** — `--theme light|dark|print`, laid *underneath* what the file

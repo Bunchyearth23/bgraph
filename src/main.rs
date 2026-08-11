@@ -405,8 +405,9 @@ fn format_files(inputs: &[PathBuf], check: bool, migrate: bool) -> Result<i32> {
             bgraph::fmt::migrate(&source)
                 .with_context(|| format!("cannot migrate {}", path.display()))?
         } else {
-            bgraph::fmt::format(&source)
-                .with_context(|| format!("{} does not parse, so it is left alone", path.display()))?
+            bgraph::fmt::format(&source).with_context(|| {
+                format!("{} does not parse, so it is left alone", path.display())
+            })?
         };
 
         if rewritten == source {

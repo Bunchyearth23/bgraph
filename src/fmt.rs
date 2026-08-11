@@ -100,7 +100,10 @@ pub fn migrate(source: &str) -> anyhow::Result<String> {
 
     for block in blocks_with_opacity(&decls) {
         let here = |d: &&Decl| d.block == block;
-        let fades: Vec<&Decl> = decls.iter().filter(|d| here(d) && d.name == OPACITY).collect();
+        let fades: Vec<&Decl> = decls
+            .iter()
+            .filter(|d| here(d) && d.name == OPACITY)
+            .collect();
         let paints: Vec<&Decl> = decls
             .iter()
             .filter(|d| here(d) && PAINTS.contains(&d.name.as_str()))
@@ -292,9 +295,7 @@ fn declarations(source: &str) -> Vec<Decl> {
                 while let Some(v) = toks.get(j) {
                     // A value runs until the next `name:` pair or a brace —
                     // which is what lets `stroke: #334155 1` keep both parts.
-                    if matches!(v.text, "{" | "}")
-                        || toks.get(j + 1).map(|t| t.text) == Some(":")
-                    {
+                    if matches!(v.text, "{" | "}") || toks.get(j + 1).map(|t| t.text) == Some(":") {
                         break;
                     }
                     values.push((v.start, v.end));

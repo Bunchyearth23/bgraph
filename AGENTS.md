@@ -64,7 +64,7 @@ disagree.
 - `cargo build --features window` — the native window (opt-in: +78 crates)
 - `cargo run --bin bgraph -- check examples/groups.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (512 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (519 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo build --no-default-features` — the four-dependency library. **A CI
   step, and it has been red before**: a `#[cfg]` on a type without one on its
   users compiles under `default` and not here
@@ -103,6 +103,7 @@ disagree.
 | `src/check.rs` | **The validator** — spanned diagnostics, one source of truth |
 | `src/style.rs` | Style cascade, `extends` flattening, `GraphOpts` |
 | `src/layout.rs` | Anchor solver → absolute `Rect`s |
+| `src/bpmn.rs` | `type bpmn` — the marks inside a shape (event glyph, gateway mark, task marker) and the boundary events that sit on a task's edge. Line segments, never a Unicode glyph: a `✉` is whatever the reader's font says it is |
 | `src/ortho.rs` | `router: ortho` — A\* over a channel grid, so an elbow goes round a box. Integer costs, no hash container: the golden test is byte for byte |
 | `src/render_svg.rs` | Shapes, edge routing, markers, text |
 | `src/render_pdf.rs` | PDF output, hand-written — vector, so no rasteriser |

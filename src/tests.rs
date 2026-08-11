@@ -682,10 +682,251 @@ fn the_manual_names_every_genre_and_its_word() {
 
     // And the count in the prose, which is the sentence a reader trusts.
     let genres = crate::props::ARCHETYPES.len() - 1;
-    assert_eq!(genres, 28, "the manual says twenty-eight genres and `free`");
+    assert_eq!(genres, 29, "the manual says twenty-nine genres and `free`");
     assert!(
-        manual.contains("Twenty-eight genres and `free`"),
+        manual.contains("Twenty-nine genres and `free`"),
         "the prose count"
+    );
+}
+
+// ---------------------------------------------------------------------- W-102
+
+#[cfg(feature = "bpmn")]
+const PROCESS: &str = "type bpmn\n\
+    event got \"Got it\" start message\n\
+    task check \"Check\" service right-of got\n\
+    gateway ok \"Ok?\" exclusive right-of check\n\
+    task fix \"Fix\" send below ok\n\
+    data form \"Form\" object below check\n\
+    data book \"Ledger\" store below fix\n\
+    event done \"Done\" end right-of ok\n\
+    got -> check\ncheck -> ok\nok -> done\nok -> fix\nfix -> check\n\
+    check -> form association\n";
+
+#[cfg(feature = "bpmn")]
+#[test]
+fn each_bpmn_word_reads_its_own_positional_shape() {
+    // `D-023`, and the defect finding it turned up: the free path resolved
+    // positional values against the archetype's **primary** slots rather than
+    // against the word the author wrote. `xy` was the only genre with a second
+    // word and it is a chart, so it never came through there — `bpmn` has four
+    // and is the first to prove the rule on the free path.
+    let l = build(PROCESS);
+    let by = |id: &str| {
+        l.nodes
+            .iter()
+            .find(|n| n.id == id)
+            .unwrap_or_else(|| panic!("`{id}` is placed"))
+    };
+
+    assert_eq!(by("got").style.stage.as_deref(), Some("start"));
+    assert_eq!(by("got").style.trigger.as_deref(), Some("message"));
+    assert_eq!(by("check").style.task_kind.as_deref(), Some("service"));
+    assert_eq!(by("ok").style.gate.as_deref(), Some("exclusive"));
+    assert_eq!(by("book").style.artifact.as_deref(), Some("store"));
+    // Not read as the *task* slot, which is what the defect did.
+    assert_eq!(by("ok").style.task_kind, None);
+}
+
+#[cfg(feature = "bpmn")]
+#[test]
+fn a_bpmn_shape_is_its_meaning_and_the_two_smallest_have_a_fixed_size() {
+    let l = build(PROCESS);
+    let by = |id: &str| l.nodes.iter().find(|n| n.id == id).expect("placed");
+
+    assert_eq!(by("got").style.shape, Some(crate::style::Shape::Ellipse));
+    assert_eq!(by("ok").style.shape, Some(crate::style::Shape::Diamond));
+    assert_eq!(by("book").style.shape, Some(crate::style::Shape::Cylinder));
+    assert_eq!(by("form").style.shape, Some(crate::style::Shape::Rect));
+
+    // A ring and a diamond are sized by the notation, never by their label —
+    // otherwise two lengths of text would read as two importances.
+    assert_eq!(by("got").rect.w, crate::bpmn::EVENT);
+    assert_eq!(by("got").rect.h, crate::bpmn::EVENT);
+    assert_eq!(by("ok").rect.w, crate::bpmn::GATE);
+
+    // And the label they cannot hold is drawn under them instead.
+    let captions: Vec<&str> = l.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert!(captions.contains(&"Got it"), "{captions:?}");
+    assert!(captions.contains(&"Ok?"), "{captions:?}");
+    assert!(!captions.contains(&"Check"), "a task keeps its own label");
+}
+
+#[cfg(feature = "bpmn")]
+#[test]
+fn a_bpmn_mark_is_drawn_over_the_shape_it_is_inside() {
+    // The whole point of the `over` flag. Under the box, a gateway's cross is
+    // behind an opaque fill and simply is not there — which is how the first
+    // draft of this rendered, and it looked like a blank diamond.
+    let l = build(PROCESS);
+    assert!(
+        l.polylines.iter().any(|p| p.over),
+        "no mark was queued to draw over the boxes"
+    );
+    assert!(
+        l.polylines.iter().filter(|p| p.over).count() >= 6,
+        "an event, a task, a gateway and a datum each carry one"
+    );
+
+    let svg = render_svg::render(&l);
+    let boxes = svg.find("<rect").expect("boxes are drawn");
+    let last_mark = svg.rfind("<polyline").expect("marks are drawn");
+    assert!(
+        last_mark > boxes,
+        "a mark was emitted before the boxes, so it is behind them"
+    );
+}
+
+#[cfg(feature = "bpmn")]
+#[test]
+fn a_boundary_event_sits_on_the_task_it_names() {
+    // Declared placement (`D-001`): the author says which box, and the rule
+    // for where on it is fixed rather than solved. Two on one task spread
+    // along the edge in the order they are written, so the picture follows
+    // the file.
+    let l = build(
+        "type bpmn\n\
+         task pay \"Pay\" service at (0, 0) { size: 200 80 }\n\
+         event late \"14 days\" boundary timer { attach: pay }\n\
+         event err \"Declined\" boundary error { attach: pay }\n\
+         task chase \"Chase\" at (0, 300)\n\
+         late -> chase\n",
+    );
+    let by = |id: &str| l.nodes.iter().find(|n| n.id == id).expect("placed");
+    let host = by("pay").rect;
+
+    for id in ["late", "err"] {
+        let e = by(id).rect;
+        assert!(
+            (e.cy() - host.bottom()).abs() < 0.01,
+            "`{id}` is not on the bottom edge: {} vs {}",
+            e.cy(),
+            host.bottom()
+        );
+        assert!(
+            e.cx() > host.x && e.cx() < host.right(),
+            "`{id}` is off the box"
+        );
+    }
+    assert!(
+        by("late").rect.cx() < by("err").rect.cx(),
+        "they spread in declaration order"
+    );
+
+    // And the host is not an obstacle for the event's own flow: the event sits
+    // *on* it, so every route out of one starts inside a box. Routing round it
+    // would be a detour around the very thing the event belongs to, and
+    // reporting the crossing would be the validator complaining about the
+    // notation working.
+    assert_eq!(
+        crate::check::after_layout(&l)
+            .into_iter()
+            .map(|d| d.message)
+            .collect::<Vec<_>>(),
+        Vec::<String>::new()
+    );
+}
+
+#[cfg(feature = "bpmn")]
+#[test]
+fn a_bpmn_connector_says_what_it_means_with_its_line() {
+    let l = build(PROCESS);
+    let edge = |from: &str, to: &str| {
+        let (a, b) = (
+            l.nodes.iter().position(|n| n.id == from).expect("from"),
+            l.nodes.iter().position(|n| n.id == to).expect("to"),
+        );
+        l.edges
+            .iter()
+            .find(|e| e.from == a && e.to == b)
+            .expect("edge")
+    };
+
+    // A sequence flow is orthogonal and solid, because a process is read as a
+    // circuit; an association is dotted, headless and straight, because it
+    // crosses the page rather than running through the process.
+    let seq = edge("got", "check");
+    assert_eq!(seq.style.router, Some(crate::style::Router::Ortho));
+    assert_eq!(seq.style.head, Some(crate::style::Head::Solid));
+    assert_eq!(seq.style.dash, None);
+
+    let assoc = edge("check", "form");
+    assert_eq!(assoc.style.router, Some(crate::style::Router::Straight));
+    assert_eq!(assoc.style.head, Some(crate::style::Head::None));
+    assert_eq!(assoc.style.dash.as_deref(), Some("dotted"));
+}
+
+#[cfg(feature = "bpmn")]
+#[test]
+fn a_bpmn_property_under_the_wrong_word_is_refused_and_named() {
+    // `D-005` applied between the four words rather than between genres: the
+    // element that would be *drawn* is the one the properties describe, so a
+    // `stage` on a task would silently make it an event. The message names the
+    // word that does read it.
+    let said =
+        |source: &str| -> Vec<String> { diags(source).into_iter().map(|d| d.message).collect() };
+    let has = |source: &str, want: &str| {
+        let found = said(source);
+        assert!(
+            found.iter().any(|m| m.contains(want)),
+            "expected {want:?} among {found:?}"
+        );
+    };
+
+    has(
+        "type bpmn\ntask t \"Do it\" { stage: start }\n",
+        "`stage` belongs to `event`, and this is a `task`",
+    );
+    has(
+        "type bpmn\ntask a \"A\"\ngateway g \"Where?\" exclusive { attach: a }\n",
+        "`attach` belongs to `event`, and this is a `gateway`",
+    );
+
+    // A boundary event with nowhere to sit, and one sitting on the wrong kind
+    // of thing.
+    has(
+        "type bpmn\nevent b \"Timeout\" boundary timer\n",
+        "boundary event with no `attach`",
+    );
+    has(
+        "type bpmn\ngateway g \"Where?\" exclusive\n\
+         event b \"Timeout\" boundary timer { attach: g }\n",
+        "which is a `gateway`",
+    );
+}
+
+#[cfg(feature = "bpmn")]
+#[test]
+fn a_process_that_runs_backwards_is_a_warning_and_not_an_error() {
+    // A fragment of a process is a legitimate thing to draw, so these are the
+    // one family here that does not refuse — but a start event with something
+    // flowing into it is still worth saying out loud.
+    let said =
+        |source: &str| -> Vec<String> { diags(source).into_iter().map(|d| d.message).collect() };
+    let found = said(
+        "type bpmn\nevent s \"Go\" start\ntask t \"Do\"\nevent e \"Stop\" end\n\
+         s -> t\nt -> e\ne -> s\n",
+    );
+    assert!(
+        found
+            .iter()
+            .any(|m| m.contains("start event with something flowing into it")),
+        "{found:?}"
+    );
+    assert!(
+        found
+            .iter()
+            .any(|m| m.contains("end event with something flowing out")),
+        "{found:?}"
+    );
+
+    // A gateway that branches nothing is one too — it is a task wearing a
+    // diamond, and the reader will look for a decision that is not there.
+    let idle =
+        said("type bpmn\ntask a \"A\"\ngateway g \"G?\" exclusive\ntask b \"B\"\na -> g\ng -> b\n");
+    assert!(
+        idle.iter().any(|m| m.contains("branches nothing")),
+        "{idle:?}"
     );
 }
 
@@ -717,8 +958,10 @@ fn an_ortho_edge_goes_round_the_box_it_used_to_go_through() {
     for seg in path.windows(2) {
         let (p, q) = (seg[0], seg[1]);
         assert!(
-            !(p.0.max(q.0) > wall.x && p.0.min(q.0) < wall.right()
-                && p.1.max(q.1) > wall.y && p.1.min(q.1) < wall.bottom()),
+            !(p.0.max(q.0) > wall.x
+                && p.0.min(q.0) < wall.right()
+                && p.1.max(q.1) > wall.y
+                && p.1.min(q.1) < wall.bottom()),
             "the route still enters `mid`: {path:?}"
         );
     }
@@ -929,8 +1172,8 @@ fn the_migration_declines_rather_than_inventing_a_colour() {
     assert!(named.contains("line 2"), "{named}");
     assert!(named.contains("tomato"), "{named}");
 
-    let silly = crate::fmt::migrate("node a { fill: #112233 opacity: 50 }\n")
-        .expect_err("not a fraction");
+    let silly =
+        crate::fmt::migrate("node a { fill: #112233 opacity: 50 }\n").expect_err("not a fraction");
     assert!(format!("{silly:#}").contains("not a fraction"), "{silly:#}");
 }
 
@@ -2658,7 +2901,16 @@ fn each_data_property_belongs_to_exactly_the_genres_that_read_it() {
         // `description` used to be here. It is shared now: every genre emits
         // one as an SVG `<title>`, and `block` is simply the genre that also
         // draws it. One property, one meaning — the case `D-015` is for.
-        ("kind", &["block", "state"]),
+        // Three genres now, and `D-019` is what makes that safe: `kind` reads
+        // the word list of the archetype in force, so `service` is a BPMN task
+        // and never an option while writing a state machine.
+        ("kind", &["block", "bpmn", "state"]),
+        ("stage", &["bpmn"]),
+        ("trigger", &["bpmn"]),
+        ("attach", &["bpmn"]),
+        ("gate", &["bpmn"]),
+        ("artifact", &["bpmn"]),
+        ("flow", &["bpmn"]),
     ] {
         let mut found = crate::props::genres_reading(prop);
         found.sort_unstable();

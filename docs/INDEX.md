@@ -25,16 +25,15 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**No question is open. One chantier is planned (`W-102`) and nothing is
-blocked.** The licence question closed on 2026-08-11 — `D-032` says
+**No question is open, nothing is planned and nothing is blocked.** The licence question closed on 2026-08-11 — `D-032` says
 proprietary, and says it as a decision rather than a silence, because the four
 built-and-unpublished chantiers will make somebody ask again. Thirty-nine ideas
 were triaged on 2026-08-10 — `I-023` … `I-061` —
 and the audience was settled: *first right for its author, then distributable*,
 which is the order that survives.
-Twenty-eight genres plus `free` ship, both editors have an extension, and the
-library renders SVG and PDF. (Earlier lines in this file said "thirty"; the
-table in `props.rs` has twenty-nine `ArchetypeDef` entries, one of them `free`.) The parked ideas were
+Twenty-nine genres plus `free` ship, both editors have an extension, and the
+library renders SVG and PDF. (The table in `props.rs` has thirty `ArchetypeDef`
+entries, one of them `free`; `bpmn` was the twenty-ninth genre, on 2026-08-11.) The parked ideas were
 reviewed on 2026-08-10 and every one of them moved: what was worth building
 became a work item, what was not was discarded, and the one language question
 the review raised was answered the same day (`D-023`). The one idea left parked
@@ -44,10 +43,17 @@ notation is the useful part; that was chosen on 2026-08-11, and it is `W-102`.
 The thirty-nine ideas raised on 2026-08-10 are all settled: **thirty built**
 (`W-071` … `W-100`), nine refused with a reason. The two that were still a
 decision rather than a piece of work were both taken on 2026-08-11: the licence
-(`D-032`) and BPMN's scope (`I-021` promoted to `W-102`). Two open risks were
-given a chantier at the same time and both were retired the same day — `X-004`
-by `W-105` and `X-008` by `W-104`. What `W-105` could not reach is `X-018`,
-written down rather than left as a gap somebody rediscovers.
+(`D-032`) and BPMN's scope (`I-021`, which became `W-102` and landed the same
+day). Two open risks were given a chantier at the same time and both were
+retired — `X-004` by `W-105` and `X-008` by `W-104`. What `W-105` could not
+reach is `X-018`, written down rather than left as a gap somebody rediscovers.
+
+The step this list expected to be a language decision was not one. `W-102`'s
+boundary events looked like they needed an anchor on a box's *perimeter*, which
+`D-001` has no vocabulary for; on building it, an `attach` property naming the
+host turned out to be enough, and it is declared placement like every other —
+the author says which box, and the rule for where on it is fixed rather than
+solved.
 
 ### Questions
 
@@ -55,13 +61,11 @@ Nothing open. `Q-005` was the last, and it was answered on 2026-08-11.
 
 ### Work planned
 
-Ordered. The order is not preference: `W-103` and `W-105` both regenerate
-checked-in SVG, and two waves of regeneration in one diff cannot be read by eye
-— which is the only proof that counts for geometry.
+Nothing. The four chantiers opened on 2026-08-11 all landed the same day, in the
+order they were opened — `W-103` and `W-105` both regenerate checked-in SVG, and
+two waves of regeneration in one diff cannot be read by eye, which is the only
+proof that counts for geometry.
 
-| id | state | title | notes |
-|---|---|---|---|
-| `W-102` | planned · **next** | `type bpmn`, extended scope. Promotes `I-021` | Six deliverable steps, each of which draws something readable: core (tasks, XOR/AND gateways, start/end events, sequence flow), pools and lanes as `group`s, typed event triggers, sub-processes, boundary and intermediate events, then data objects and associations. **Step five has no answer in the language yet**, and it is recorded here rather than discovered halfway: an event attached to the *edge* of a task needs an anchor on a box's perimeter, and `D-001` only knows anchors between whole boxes. That is a language decision, and it will be asked as one |
 
 
 ### Risks
@@ -125,6 +129,7 @@ not copies.
 
 | id | date | title | commit |
 |---|---|---|---|
+| `W-102` | 2026-08-11 | `type bpmn`, the twenty-ninth genre and the widest of them — the core, pools and lanes, typed event triggers, sub-processes, boundary and intermediate events, and data artefacts. Promotes `I-021`, parked for a day because the notation is mostly ceremony and nobody had chosen which part is the useful part. **Four words** — `task`, `event`, `gateway`, `data` — which is `D-023` read at its widest: four things carrying four shapes of data, and no count of values after the label could tell a task's one word from a gateway's one word. On the free path, per the `W-043` precedent: the archetype supplies the notation and the anchors still place. Three things it turned up. **A latent defect** — the free path resolved positional values against the archetype's *primary* slots rather than the word the author wrote, which was invisible while `xy` was the only genre with a second word, because `xy` is a chart and never came through there. **A missing layer**: a mark that lives *inside* a shape has to be drawn after it, and every polyline in the engine was drawn before, so a gateway's cross rendered behind an opaque diamond — `Polyline::over` is the fix, in both writers, and a test asserts the ordering rather than the picture. **A rule the router needed**: a boundary event sits *on* a task, so every flow out of one starts inside a box — its host is not an obstacle for it and not a crossing to report, and `layout::endpoint_of` is where the router and the validator now agree about that. The glyphs are line segments and never a Unicode character: `✉` is whatever the reader's font says it is, which for a notation whose whole value is an unambiguous mark is not a detail. What is **not** here, said rather than left as a gap: a lane's name is horizontal, because rotated text is a change to both writers and their bounds; and a message flow has no circle at its source | this commit |
 | `W-105` | 2026-08-11 | An `ortho` edge goes **around** the boxes. Retires `X-004`, open since the first router. A\* over a grid of the only lines an orthogonal path ever turns on — a channel either side of every box, plus the two centre lines being joined — with a **price on corners**, because shortest alone treats every staircase of the same length as equally good and the one it happens to find is the ugly one. It replaces `ortho` rather than standing beside it under a second name: nobody should have to learn a second word to get a drawing that is not wrong. Three things worth recording. **Determinism was the risk, not the search**: the golden test compares byte for byte and this project has already shipped a diagram that rendered differently run to run (`W-065`), so costs are `i64` thousandths, ties are settled by state index, and there is no hash container in the module — a test renders the same source nine times and a second declares the same boxes in another order. **It can decline**, past sixty boxes or where no path exists, and then it keeps the old elbow and lets `check::after_layout` report the crossing — a drawing that admits it is wrong beats a missing edge, and the diagnostic `W-064` added did not become wrong, it became rare. **The clearance is 16 because 8 looked wrong**: the detour ran close enough over a box that the arrow head of the edge *terminating* on it had nowhere to sit. Not one checked-in SVG moved, because **no example used `ortho`** — so the feature would have shipped with nothing to look at; `examples/ortho.bd` is the worked case, and it also shows the honest limit, which is that the router avoids boxes and not other edges | this commit |
 | `W-104` | 2026-08-11 | `bgraph fmt --migrate` — a removed `opacity` becomes the fourth channel of the colours it applied to. Retires `X-008`, which had been open since `D-016` on the strength of "the message names the fix", which is true and is not a migration. **Surgical, not a reprint**: the alpha digits go into the colour where it stands and the `opacity` declaration is cut out, so a comment on the same line and a column lined up by hand both survive — the discipline `relayout.rs` (`W-094`) follows, for the same reason. The existing alpha is **multiplied** rather than replaced, because an element opacity and a paint alpha composited, and a colour that comes out fully opaque loses its channel entirely, `ff` being the default the reference documents. Two refusals, both the same principle — this may move a value, it may not decide one: a block with no colour to carry the alpha, and a named colour like `tomato`, which has no fourth channel to write into. Both name the line. A short `#123` is expanded rather than given a one-digit alpha, since one hex digit cannot hold 0.5 and a migration may not change the number it was asked to preserve. `--migrate` is a **second mode and not a side effect of formatting**: a diff that both migrated and reflowed would be unreviewable, which is the whole reason `fmt` leaves interior alignment alone in the first place | this commit |
 | `W-103` | 2026-08-11 | The `treeview` draws its links the way an indented tree is drawn: a trunk in a reserved gutter, a short elbow into each row. It had been treated as a `mindmap` — a diagonal from the parent's right edge to the child's left — which on indented rows crossed every row between the two and ran **behind** the boxes, since nodes are painted after polylines. So the structure of the tree was the one thing the drawing hid. The fix is a **property, not a nicer picture**: the indent reserves a column for the guide, and a link cannot be drawn behind a box because the space is not the boxes' to occupy. The trunk stops at the *last* child, which is both what makes the junction read `└` and what keeps it clear of the rows below — every row between a parent and its last child is one of its descendants, and therefore indented past the trunk. The test asserts the property over every segment against every box rather than checking the picture, and it was **proven by reverting the fix and watching it fail**: it names the guide, the coordinates and the box it crosses | this commit |

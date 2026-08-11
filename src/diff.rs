@@ -194,6 +194,7 @@ fn strike(rect: Rect, colour: &str) -> Polyline {
         width: 1.2,
         head: None,
         dash: None,
+        over: false,
     }
 }
 

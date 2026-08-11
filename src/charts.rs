@@ -590,6 +590,7 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
                 width: 1.6,
                 head: None,
                 dash: None,
+                over: false,
             });
         }
     }
@@ -936,6 +937,7 @@ pub fn tree(
             width: 1.4,
             head: None,
             dash: None,
+            over: false,
         });
     };
     for (parent, kids) in children.iter().enumerate() {
@@ -1559,6 +1561,7 @@ pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
             width: style.stroke_width.unwrap_or(2.0),
             head: None,
             dash: None,
+            over: false,
         });
         for (x, y) in shape {
             nodes.push(PlacedNode {
@@ -1770,6 +1773,7 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
                 width: 2.0,
                 head: None,
                 dash: None,
+                over: false,
             });
         }
         for (x, y) in path {
@@ -3132,6 +3136,7 @@ fn draw_lane(
                 width: 1.6,
                 head: None,
                 dash: None,
+                over: false,
             });
         } else {
             line.clear();
@@ -3214,6 +3219,7 @@ fn draw_lane(
                     width: 1.6,
                     head: None,
                     dash: None,
+                    over: false,
                 });
 
                 if let Level::Data(_) = level {
@@ -3253,6 +3259,7 @@ fn draw_lane(
                         width: 1.2,
                         head: None,
                         dash: None,
+                        over: false,
                     });
                 }
                 i += 1;
@@ -3491,6 +3498,7 @@ pub fn sankey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             width: 0.0,
             head: None,
             dash: None,
+            over: false,
         });
     }
 
@@ -4178,6 +4186,7 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
                 width: 0.0,
                 head: None,
                 dash: None,
+                over: false,
             });
         }
 
@@ -4190,6 +4199,7 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
                 width: style.stroke_width.unwrap_or(2.0),
                 head: None,
                 dash: None,
+                over: false,
             });
         }
 
@@ -4500,6 +4510,7 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             width: style.stroke_width.unwrap_or(1.5),
             head: Some(style.head.unwrap_or(Head::Solid)),
             dash: style.dash_array(),
+            over: false,
         });
 
         if !label.is_empty() {

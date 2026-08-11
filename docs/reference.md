@@ -1428,6 +1428,108 @@ dev  -> arch 140
 
 </details>
 
+### `type bpmn`
+
+A business process. Tasks, gateways, events, data artefacts and the flows between them, with pools and lanes as `group`s. Placed by anchors exactly as in `free`: the archetype supplies the vocabulary, the shapes and the diagnostics, and the author still says where everything goes. Four words, because four things have four positional shapes (`D-023`) — a task has a kind, an event has a stage and a trigger, a gateway has a gate and a datum has an artefact.
+
+```
+task <id> ["label"] <kind>
+```
+
+```
+event <id> ["label"] <stage> <trigger>
+```
+
+Something that happens: `event got "Order received" start message`. The stage comes first and the trigger second, because a stage is what every event has and a trigger is what some do.
+
+```
+gateway <id> ["label"] <gate>
+```
+
+A branch or a join: `gateway ok "Approved?" exclusive`.
+
+```
+data <id> ["label"] <artifact>
+```
+
+What the process reads or writes: `data inv "Invoice" object`.
+
+```
+<from> -> <to> ["label"] <flow>
+```
+
+| Setting | Syntax | Meaning |
+|---|---|---|
+| `title` | `title: <text>` | Heading drawn above the diagram. |
+
+On a `task` — these are its own, and are not offered elsewhere:
+
+| Property | Where | Syntax | Meaning |
+|---|---|---|---|
+| `kind` | node | `kind: <plain\|user\|service\|script\|manual\|send\|receive\|rule\|subprocess>` | What kind of task it is, drawn as a marker in the corner of the box. `subprocess` takes the `+` instead, and an *expanded* subprocess is a `group`. Usually written positionally — `task check "Check credit" service`. |
+| `stage` | node | `stage: <start\|intermediate\|end\|boundary>` | Where the event sits: a thin ring starts, a thick one ends, a double ring is intermediate. `boundary` is the exception — it is not a place in the flow but a place on a task, so it needs `attach`. |
+| `trigger` | node | `trigger: <plain\|message\|timer\|error\|signal\|escalation\|conditional\|terminate>` | What makes the event happen, drawn inside the ring. Written second, after the stage — `event due "Overdue" boundary timer`. |
+| `attach` | node | `attach: <task>` | The task a `boundary` event sits on. It is placement, declared like every other placement (`D-001`): the event lands on that box's bottom edge, and several on one task spread along it in the order they are written. `label-offset` moves one by hand. |
+| `gate` | node | `gate: <exclusive\|parallel\|inclusive\|event\|complex>` | Which gateway it is, drawn as the mark inside the diamond. Usually written positionally — `gateway ok "Approved?" exclusive`. |
+| `artifact` | node | `artifact: <object\|store\|input\|output>` | Which data artefact it is. An object is a page with a folded corner, a store is a cylinder; `input` and `output` are objects carrying the arrow that says which way the data went. |
+| `flow` | edge | `flow: <sequence\|message\|association\|default\|conditional>` | What the connector means. A sequence flow is a solid arrow, a message flow is dashed with a hollow head, an association is dotted with none. `default` takes the slash and `conditional` the diamond, both at the gateway end. Usually written positionally — `check -> notify "rejected" default`. |
+
+<details>
+<summary>A complete file — <code>examples/bpmn.bd</code></summary>
+
+```
+// A business process. Four words, because four things have four positional
+// shapes: a task has a kind, an event has a stage and a trigger, a gateway has
+// a gate, a datum has an artefact. Placement is declared as it is everywhere
+// else — the archetype supplies the notation, the author says where it goes.
+type bpmn { title: "Expense claim" }
+graph { background: #ffffff padding: 36 gap: 40 }
+
+style node  { font: 13 #111827 stroke: #334155 1.2 fill: #ffffff }
+style edge  { stroke: #475569 1.3 font: 11 #475569 }
+style store { fill: #f1f5f9 }
+
+group filed "Employee" {
+  padding: 22
+
+  event submit "Claim submitted" start message
+  task  fill   "Fill the form"   user right-of submit gap 44
+}
+
+group review "Finance" below filed gap 34 {
+  padding: 22
+
+  task    check "Validate receipts" rule at (0, 0)
+  gateway ok    "Within policy?"    exclusive right-of check gap 52
+  task    pay   "Pay the claim"     service right-of ok gap 52
+  task    query "Ask for detail"    send below pay gap 74
+  event   done  "Reimbursed"        end right-of pay gap 52
+}
+
+// A boundary event sits *on* a task, and says so by naming it. Placement, and
+// declared like every other placement.
+event late "14 days" boundary timer { attach: pay }
+
+data claim  "Claim form" object right-of fill gap 46
+data ledger "Ledger"     store below done gap 40
+
+submit -> fill
+fill   -> check
+check  -> ok
+ok     -> pay   "within"
+ok     -> query "over"    default
+query  -> check
+pay    -> done
+late   -> query
+
+// A message crosses between participants; an association only relates.
+fill  -> claim  association
+pay   -> ledger association
+claim -> check  message
+```
+
+</details>
+
 ### `type network`
 
 Network topology: hosts, links and the segments that hold them. Placed by anchors exactly as in `free` — the archetype supplies the vocabulary, the shapes and the diagnostics, and a `group` is a segment or a zone.

@@ -102,7 +102,7 @@ fn render_pages(layout: &Layout, page: Option<Page>) -> Vec<u8> {
         c.line(shift(guide.from, dx, dy), shift(guide.to, dx, dy));
     }
 
-    for shape in &layout.polylines {
+    for shape in layout.polylines.iter().filter(|p| !p.over) {
         let points: Vec<(f64, f64)> = shape.points.iter().map(|p| shift(*p, dx, dy)).collect();
         c.path(&points, shape.closed);
         c.paint(shape.fill.as_deref(), shape.stroke.as_deref(), shape.width);
@@ -209,6 +209,14 @@ fn render_pages(layout: &Layout, page: Option<Page>) -> Vec<u8> {
         let rect = offset(node.rect, dx, dy);
         c.box_of(&rect, node.style.shape.unwrap_or(Shape::Rect), &node.style);
         c.text_lines(&node.lines, &rect, &node.style);
+    }
+
+    // The marks that live inside a shape, after it — the same second pass the
+    // SVG writer makes, in the same place, so the two cannot disagree.
+    for shape in layout.polylines.iter().filter(|p| p.over) {
+        let points: Vec<(f64, f64)> = shape.points.iter().map(|p| shift(*p, dx, dy)).collect();
+        c.path(&points, shape.closed);
+        c.paint(shape.fill.as_deref(), shape.stroke.as_deref(), shape.width);
     }
 
     for a in &layout.annotations {
