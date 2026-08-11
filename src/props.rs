@@ -1086,7 +1086,18 @@ pub const RACK_PROPS: &[PropDef] = &[
         ctx: Ctx::Both,
         words: &[],
         syntax: "units: <count>",
-        doc: "How tall the frame is, in rack units. 42 by default.",
+        doc: "How tall a rack is, in rack units. 42 by default. Written on a \
+              `group` it sets that one rack, so a bank can mix a half-height \
+              network rack in with full ones.",
+    },
+    PropDef {
+        name: "aisle",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "aisle: <gap>",
+        doc: "Space between one rack of a bank and the next. Wide enough by \
+              default that two sets of unit numbers do not read as one column.",
     },
     PropDef {
         name: "cell",
@@ -1106,16 +1117,31 @@ pub const RACK_PROPS: &[PropDef] = &[
     },
 ];
 
-pub const RACK_ITEM_PROPS: &[PropDef] = &[PropDef {
-    name: "u",
-    alias: false,
-    ctx: Ctx::Node,
-    words: &[],
-    syntax: "u: <lowest> <highest>",
-    doc: "The inclusive span of rack units a device occupies, counted from **1 \
-          at the bottom** as a rack is. `u: 12` is a single unit. Usually \
-          written positionally — `device srv \"Compute node\" 38 41`.",
-}];
+pub const RACK_ITEM_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "u",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "u: <lowest> <highest>",
+        doc: "The inclusive span of rack units a device occupies, counted from \
+              **1 at the bottom** as a rack is. `u: 12` is a single unit. \
+              Usually written positionally — `device srv \"Compute node\" 38 41`.",
+    },
+    // A group is a rack, so a group is where a rack's height is written. It
+    // lives on the item table because that is the table a group's block is
+    // validated against; `check_rack` says so when it lands on a device,
+    // where it means nothing.
+    PropDef {
+        name: "units",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "units: <count>",
+        doc: "On a `group`, how tall that one rack is. A bank whose racks \
+              differ stands on one floor, so a short rack is short at the top.",
+    },
+];
 
 pub const RADAR_PROPS: &[PropDef] = &[
     PropDef {

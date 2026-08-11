@@ -1975,12 +1975,17 @@ fn check_network(diagram: &Diagram, out: &mut Vec<Diag>) {
 /// A rack is validated like a packet with one difference that matters: an
 /// empty unit is a rack with **room**, not a rack that does not add up, so
 /// gaps are silent here where they are a warning there.
+///
+/// Every question here is asked **per rack**. A bank is a row of them, and two
+/// devices at U42 in two different racks is the ordinary case rather than a
+/// collision — which the checker can only know because it reads the same
+/// frames the drawing does (`W-132`).
 #[cfg(feature = "rack")]
 fn check_rack(diagram: &Diagram, out: &mut Vec<Diag>) {
     warn_ignored(diagram, "rack", out);
 
     let cfg = &diagram.archetype_props;
-    let units = cfg
+    let default_units = cfg
         .iter()
         .find(|p| p.name == "units")
         .and_then(|p| p.values.first())
@@ -1988,54 +1993,80 @@ fn check_rack(diagram: &Diagram, out: &mut Vec<Diag>) {
         .unwrap_or(42.0)
         .max(1.0) as u32;
 
-    let styles = resolved_nodes(diagram, crate::style::Style::node_defaults());
-    let mut placed: Vec<(u32, u32, &str, Span)> = Vec::new();
-
-    for (i, node) in diagram.nodes.iter().enumerate() {
-        match styles.get(i).and_then(|s| s.u) {
-            None if !awaits_binding(node, archetype_of(diagram), "u") => out.push(Diag::error(
-                node.id.span,
+    // `units` sets the height of a rack, and a rack is a group. On a device it
+    // is a property that reads as if it did something.
+    for node in &diagram.nodes {
+        if let Some(prop) = node.props.iter().find(|p| p.name == "units") {
+            out.push(Diag::warn(
+                prop.span,
                 format!(
-                    "`{}` has no `u` — every device sits in a span of rack units",
+                    "`units` on `{}` does nothing — it is the height of a rack, so it \
+                     belongs on the `group` that is one",
                     node.id.as_str()
                 ),
-            )),
-            None => {}
-            Some((low, high)) => {
-                if low < 1 {
+            ));
+        }
+    }
+
+    let styles = resolved_nodes(diagram, crate::style::Style::node_defaults());
+
+    for frame in crate::charts::rack_frames(diagram, default_units) {
+        let units = frame.units;
+        let mut placed: Vec<(u32, u32, &str, Span)> = Vec::new();
+
+        for i in frame.devices {
+            let node = &diagram.nodes[i];
+            match styles.get(i).and_then(|s| s.u) {
+                None if !awaits_binding(node, archetype_of(diagram), "u") => {
                     out.push(Diag::error(
                         node.id.span,
                         format!(
-                            "`{}` starts below U1; a rack counts from 1",
-                            node.id.as_str()
-                        ),
-                    ));
-                } else if high > units {
-                    out.push(Diag::error(
-                        node.id.span,
-                        format!(
-                            "`{}` reaches U{high}, past the top of a {units}U frame",
+                            "`{}` has no `u` — every device sits in a span of rack units",
                             node.id.as_str()
                         ),
                     ));
                 }
-                placed.push((low, high, node.id.as_str(), node.id.span));
+                None => {}
+                Some((low, high)) => {
+                    if low < 1 {
+                        out.push(Diag::error(
+                            node.id.span,
+                            format!(
+                                "`{}` starts below U1; a rack counts from 1",
+                                node.id.as_str()
+                            ),
+                        ));
+                    } else if high > units {
+                        let rack = match &frame.label {
+                            Some(name) => format!(" of `{name}`"),
+                            None => String::new(),
+                        };
+                        out.push(Diag::error(
+                            node.id.span,
+                            format!(
+                                "`{}` reaches U{high}, past the top{rack} of a {units}U frame",
+                                node.id.as_str()
+                            ),
+                        ));
+                    }
+                    placed.push((low, high, node.id.as_str(), node.id.span));
+                }
             }
         }
-    }
 
-    placed.sort_by_key(|d| d.0);
-    for pair in placed.windows(2) {
-        let (a_low, a_high, a_id, _) = pair[0];
-        let (b_low, b_high, b_id, b_span) = pair[1];
-        if b_low <= a_high {
-            out.push(Diag::error(
-                b_span,
-                format!(
-                    "`{b_id}` occupies U{b_low}–U{b_high}, which overlap `{a_id}` at \
-                     U{a_low}–U{a_high} — two devices cannot share a unit"
-                ),
-            ));
+        placed.sort_by_key(|d| d.0);
+        for pair in placed.windows(2) {
+            let (a_low, a_high, a_id, _) = pair[0];
+            let (b_low, b_high, b_id, b_span) = pair[1];
+            if b_low <= a_high {
+                out.push(Diag::error(
+                    b_span,
+                    format!(
+                        "`{b_id}` occupies U{b_low}–U{b_high}, which overlap `{a_id}` at \
+                         U{a_low}–U{a_high} — two devices cannot share a unit"
+                    ),
+                ));
+            }
         }
     }
 }

@@ -603,28 +603,49 @@ series electric "Electric"     78 95 52 40 62 96
 "##;
 
 const RACK: &str = r##"// A rack elevation. Units count from 1 at the bottom, as a rack is labelled —
-// and a device occupies an inclusive span of them (W-044).
+// and a device occupies an inclusive span of them (W-044). A `group` is one
+// rack, so a bank is a row of them: they stand on one floor, and a short rack
+// is short at the top (W-132).
 type rack {
-  title: "Rack A3 — capture row"
+  title: "Row A — capture hall"
   units: 24
-  cell: 280 20
+  cell: 230 19
   ruler: on
 }
 
 graph { background: #0b1120 padding: 28 }
 
-style device  { fill: #1e293b stroke: #334155 1 radius: 3 font: 12 #e2e8f0 }
+style device  { fill: #1e293b stroke: #334155 1 radius: 3 font: 11 #e2e8f0 }
 style network extends device { fill: #0c2a3e stroke: #38bdf8 1 }
 style power   extends device { fill: #422006 stroke: #f59e0b 1 }
+style group   { stroke: #475569 1 }
 
 // `device <id> ["label"] <lowest> <highest>`
-device tor    "Top-of-rack switch"   .network 24 24
-device patch  "Patch panel"          .network 23 23
-device proc01 "snds-p01-proc01"               19 22
-device proc02 "snds-p01-proc02"               15 18
-device cap01  "hp-capture02"                  11 14
-device store  "Storage shelf"                  6 9
-device ups    "UPS"                  .power     1 4
+group a1 "A1 — capture" {
+  device tor1   "Top-of-rack switch"  .network 24 24
+  device patch1 "Patch panel"         .network 23 23
+  device proc01 "snds-p01-proc01"              19 22
+  device proc02 "snds-p01-proc02"              15 18
+  device cap01  "hp-capture02"                 11 14
+  device store1 "Storage shelf"                 6  9
+  device ups1   "UPS"                 .power    1  4
+}
+
+group a2 "A2 — compute" {
+  device tor2   "Top-of-rack switch"  .network 24 24
+  device proc03 "snds-p02-proc01"              18 21
+  device proc04 "snds-p02-proc02"              14 17
+  device gpu01  "snds-p02-gpu01"                8 11
+  device ups2   "UPS"                 .power    1  4
+}
+
+// A rack of its own height: the network rack is half a cabinet.
+group a3 "A3 — edge" {
+  units: 12
+  device edge1  "Border router"       .network 12 12
+  device edge2  "Aggregation switch"  .network 10 11
+  device fw     "Firewall"                      6  7
+}
 "##;
 
 const NETWORK: &str = r##"// Topology: hosts, links and the segments that hold them. The role picks the

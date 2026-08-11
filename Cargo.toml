@@ -163,7 +163,7 @@ serde_json = "1.0"
 
 # Only with `--features completions`, and binary-only either way.
 clap_complete = { version = "4", optional = true }
-clap_mangen = { version = "0.2", optional = true }
+clap_mangen = { version = "0.3.2", optional = true }
 
 # Only with `--features window`; see the note above. `minifb` is a window and a
 # pixel buffer in one crate, which is why this costs 128 packages where

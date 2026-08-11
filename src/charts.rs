@@ -1280,19 +1280,102 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
     })
 }
 
-/// A rack elevation: a numbered frame, devices occupying spans of units.
+/// One rack of a bank: which devices stand in it, and how tall it is.
+///
+/// A `group` is a rack. That is the whole of the mapping, and it is the
+/// mapping the language already had — a container holds items, and a rack
+/// holds devices. A file that declares no group is the single rack every
+/// rack file used to be, drawn from the same code by the same path (`W-132`).
+#[cfg(feature = "rack")]
+pub(crate) struct RackFrame {
+    /// The name written over the rails. `None` for the implicit rack that
+    /// holds devices declared outside any group — it has no name because
+    /// nobody gave it one, and inventing one would put a caption over every
+    /// single-rack diagram that has never had one.
+    pub label: Option<String>,
+    pub units: u32,
+    /// Indices into `diagram.nodes`, in declaration order.
+    pub devices: Vec<usize>,
+}
+
+/// The bank, left to right in declaration order.
+///
+/// Shared with `check` so that "which rack is this device in" is answered once.
+/// Two devices at U42 in two different racks is the ordinary case, not a
+/// collision, and the checker can only know that if it sees the same frames
+/// the drawing does.
+#[cfg(feature = "rack")]
+pub(crate) fn rack_frames(diagram: &Diagram, default_units: u32) -> Vec<RackFrame> {
+    let mut frames: Vec<RackFrame> = Vec::new();
+    let mut taken = vec![false; diagram.nodes.len()];
+
+    for group in diagram.groups.iter().filter(|g| !g.activates) {
+        let mut devices = Vec::new();
+        for member in &group.members {
+            let found = diagram
+                .nodes
+                .iter()
+                .position(|n| n.id.as_str() == member.as_str());
+            // A member naming another group is skipped here rather than
+            // nested: that group is a rack in its own right and gets its own
+            // frame from this same loop. Racks do not stand inside racks.
+            if let Some(i) = found
+                && !taken[i]
+            {
+                taken[i] = true;
+                devices.push(i);
+            }
+        }
+        frames.push(RackFrame {
+            label: Some(
+                group
+                    .label
+                    .clone()
+                    .unwrap_or_else(|| group.id.value.clone()),
+            ),
+            units: group
+                .props
+                .iter()
+                .find(|p| p.name == "units")
+                .and_then(|p| p.values.first())
+                .and_then(|v| v.as_num())
+                .map_or(default_units, |n| n.max(1.0) as u32),
+            devices,
+        });
+    }
+
+    let loose: Vec<usize> = (0..diagram.nodes.len()).filter(|i| !taken[*i]).collect();
+    if !loose.is_empty() || frames.is_empty() {
+        frames.insert(
+            0,
+            RackFrame {
+                label: None,
+                units: default_units,
+                devices: loose,
+            },
+        );
+    }
+
+    frames
+}
+
+/// A rack elevation: numbered frames, devices occupying spans of units.
 ///
 /// Units count from **1 at the bottom**, which is how a rack is labelled and
 /// how anyone standing in front of one reads it. Getting that inverted would
 /// produce a diagram that is right about everything except where to put your
 /// hands.
+///
+/// A bank is a row of them. Racks stand on a floor, so they are aligned at the
+/// bottom and a short one is short at the top — which is also where the U
+/// numbers stop agreeing, and why each rack carries its own ruler.
 #[cfg(feature = "rack")]
 pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
     let cfg = &diagram.archetype_props;
     let theme = Theme::of(&opts);
     let def = crate::check::archetype_of(diagram);
 
-    let units = number(cfg, "units", 42.0).max(1.0) as u32;
+    let default_units = number(cfg, "units", 42.0).max(1.0) as u32;
     let frame_w = setting(cfg, "cell")
         .and_then(|v| v.first())
         .and_then(|v| v.as_num())
@@ -1304,6 +1387,9 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         .unwrap_or(18.0)
         .max(6.0);
     let ruler = toggle(cfg, "ruler", true);
+    // Aisle between one rack and the next. Wide enough that two sets of unit
+    // numbers do not read as one column.
+    let aisle = number(cfg, "aisle", 24.0).max(0.0);
     // `graph { title }` is the fallback: every genre can be titled there, and
     // a chart that names itself in its own settings still wins (I-053).
     let title = text(cfg, "title").or_else(|| opts.title.clone());
@@ -1316,17 +1402,23 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
     } else {
         0.0
     };
-    let gutter = if ruler {
-        // Room for the widest number *and* air between it and the rail. Four
-        // pixels put the digits under the frame's own border.
-        text_width(&[format!("{units}")], 9.0) + 20.0
+
+    let frames = rack_frames(diagram, default_units);
+    const LABEL_SIZE: f64 = 11.0;
+    let label_h = if frames.iter().any(|f| f.label.is_some()) {
+        LABEL_SIZE * 1.9
     } else {
         0.0
     };
-    let top = title_h;
-
-    // U1 is the bottom row, so a unit's y grows as its number shrinks.
-    let row_y = |u: u32| -> f64 { top + (units.saturating_sub(u)) as f64 * unit_h };
+    let top = title_h + label_h;
+    // Racks stand on one floor, so the tallest sets it and the rest reach up
+    // from it as far as they go.
+    let tallest = frames
+        .iter()
+        .map(|f| f.units)
+        .max()
+        .unwrap_or(default_units);
+    let floor = top + tallest as f64 * unit_h;
 
     let mut nodes = Vec::new();
     let groups = Vec::new();
@@ -1347,85 +1439,121 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         });
     }
 
-    // **Two rails, not a frame.** A rack is a pair of mounting posts: the
-    // horizontals a rounded rectangle draws across the top and the bottom are
-    // not part of one, and they are exactly where a device in the topmost or
-    // bottommost unit had to fight for room. Drawing them as `Guide`s also
-    // retires the corner problem rather than solving it — a straight line has
-    // no radius for a device to clash with (`W-119`).
-    let rail = registry.resolve(Style::group_defaults(), "group", &[], &[])?;
-    let bottom = top + units as f64 * unit_h;
-    for x in [gutter, gutter + frame_w] {
-        guides.push(Guide {
-            from: (x, top),
-            to: (x, bottom),
-            color: rail.stroke.clone().unwrap_or_else(|| theme.muted.clone()),
-            width: rail.stroke_width.unwrap_or(1.0),
-            dash: rail.dash.clone().or_else(|| Some("dashed".into())),
-        });
-    }
+    let rail_style = registry.resolve(Style::group_defaults(), "group", &[], &[])?;
+    let rule = if theme.dark { "#1e293b" } else { "#e4e4e7" };
+    let mut cursor = 0.0;
 
-    if ruler {
-        let rail = if theme.dark { "#1e293b" } else { "#e4e4e7" };
-        for u in 1..=units {
-            let y = row_y(u);
-            // Every unit is numbered, as a real rail is — the number is what
-            // you count against when you are holding a server.
+    for frame in &frames {
+        let gutter = if ruler {
+            // Room for the widest number *and* air between it and the rail.
+            // Four pixels put the digits under the frame's own border.
+            text_width(&[format!("{}", frame.units)], 9.0) + 20.0
+        } else {
+            0.0
+        };
+        let left = cursor + gutter;
+        let frame_top = floor - frame.units as f64 * unit_h;
+        // U1 is the bottom row, so a unit's y grows as its number shrinks.
+        let row_y = |u: u32| -> f64 { frame_top + (frame.units.saturating_sub(u)) as f64 * unit_h };
+
+        // **Two rails, not a frame.** A rack is a pair of mounting posts: the
+        // horizontals a rounded rectangle draws across the top and the bottom
+        // are not part of one, and they are exactly where a device in the
+        // topmost or bottommost unit had to fight for room. Drawing them as
+        // `Guide`s also retires the corner problem rather than solving it — a
+        // straight line has no radius for a device to clash with (`W-119`).
+        for x in [left, left + frame_w] {
+            guides.push(Guide {
+                from: (x, frame_top),
+                to: (x, floor),
+                color: rail_style
+                    .stroke
+                    .clone()
+                    .unwrap_or_else(|| theme.muted.clone()),
+                width: rail_style.stroke_width.unwrap_or(1.0),
+                dash: rail_style.dash.clone().or_else(|| Some("dashed".into())),
+            });
+        }
+
+        if let Some(name) = &frame.label {
             annotations.push(Annotation {
-                text: format!("{u}"),
-                x: gutter - 9.0,
-                y: y + unit_h * 0.5 + 3.0,
-                anchor: Anchor::End,
-                size: 9.0,
-                color: theme.muted.clone(),
-                weight: "400".into(),
+                text: name.clone(),
+                x: left + frame_w * 0.5,
+                y: frame_top - LABEL_SIZE * 0.6,
+                anchor: Anchor::Middle,
+                size: LABEL_SIZE,
+                color: ink(&base, &theme),
+                weight: "600".into(),
                 family: family(&base),
                 title: false,
             });
-            guides.push(Guide {
-                from: (gutter, y),
-                to: (gutter + frame_w, y),
-                color: rail.to_string(),
-                width: 0.5,
-                dash: None,
+        }
+
+        if ruler {
+            for u in 1..=frame.units {
+                let y = row_y(u);
+                // Every unit is numbered, as a real rail is — the number is
+                // what you count against when you are holding a server.
+                annotations.push(Annotation {
+                    text: format!("{u}"),
+                    x: left - 9.0,
+                    y: y + unit_h * 0.5 + 3.0,
+                    anchor: Anchor::End,
+                    size: 9.0,
+                    color: theme.muted.clone(),
+                    weight: "400".into(),
+                    family: family(&base),
+                    title: false,
+                });
+                guides.push(Guide {
+                    from: (left, y),
+                    to: (left + frame_w, y),
+                    color: rule.to_string(),
+                    width: 0.5,
+                    dash: None,
+                });
+            }
+        }
+
+        for &i in &frame.devices {
+            let node = &diagram.nodes[i];
+            let style = registry.resolve(
+                Style::node_defaults(),
+                def.item,
+                &node.classes,
+                &node.props_for(def),
+            )?;
+            let Some((low, high)) = style.u else { continue };
+            let label = node.label.clone().unwrap_or_else(|| node.id.value.clone());
+            let span = high.saturating_sub(low) + 1;
+
+            // **Rail to rail, and nothing between.** `W-110` inset the device
+            // three pixels on every side to keep its stroke off the frame's;
+            // `W-119` then took the frame away and left the inset behind, so
+            // every unit rule — which runs the full width between the rails —
+            // poked three pixels out of each side of every device. Rails and
+            // rules are `Guide`s and therefore drawn first, so a device that
+            // spans the whole width simply covers the ones it should hide. Its
+            // own border landing on the rail is not an overhang: that is where
+            // a device is screwed to a rack.
+            //
+            // The vertical inset stays, and is what separates one unit from
+            // the next (`W-123`).
+            const GAP: f64 = 2.0;
+            nodes.push(PlacedNode {
+                id: node.id.as_str().to_string(),
+                lines: vec![label],
+                rect: Rect {
+                    x: left,
+                    y: row_y(high.min(frame.units)) + GAP,
+                    w: frame_w,
+                    h: (span as f64 * unit_h - GAP * 2.0).max(unit_h / 2.0),
+                },
+                style,
             });
         }
-    }
 
-    for node in &diagram.nodes {
-        let style = registry.resolve(
-            Style::node_defaults(),
-            def.item,
-            &node.classes,
-            &node.props_for(def),
-        )?;
-        let Some((low, high)) = style.u else { continue };
-        let label = node.label.clone().unwrap_or_else(|| node.id.value.clone());
-        let span = high.saturating_sub(low) + 1;
-
-        // **Rail to rail, and nothing between.** `W-110` inset the device three
-        // pixels on every side to keep its stroke off the frame's; `W-119` then
-        // took the frame away and left the inset behind, so every unit rule —
-        // which runs the full width between the rails — poked three pixels out
-        // of each side of every device. Rails and rules are `Guide`s and
-        // therefore drawn first, so a device that spans the whole width simply
-        // covers the ones it should hide. Its own border landing on the rail is
-        // not an overhang: that is where a device is screwed to a rack.
-        //
-        // The vertical inset stays, and is what separates one unit from the
-        // next (`W-123`).
-        const GAP: f64 = 2.0;
-        nodes.push(PlacedNode {
-            id: node.id.as_str().to_string(),
-            lines: vec![label],
-            rect: Rect {
-                x: gutter,
-                y: row_y(high) + GAP,
-                w: frame_w,
-                h: (span as f64 * unit_h - GAP * 2.0).max(unit_h / 2.0),
-            },
-            style,
-        });
+        cursor = left + frame_w + aisle;
     }
 
     Ok(Layout {

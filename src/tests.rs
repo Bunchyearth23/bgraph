@@ -2772,6 +2772,100 @@ fn empty_units_are_room_not_a_mistake() {
     assert!(!d.iter().any(|x| x.message.contains("unassigned")), "{d:?}");
 }
 
+// ---------------------------------------------------------------------- W-132
+
+#[test]
+fn a_group_is_a_rack_and_a_bank_is_a_row_of_them() {
+    let l = build(
+        "type rack { units: 10 cell: 200 20 ruler: off }\n\
+         group a1 \"A1\" {\n  device x \"X\" 10 10\n}\n\
+         group a2 \"A2\" {\n  device y \"Y\" 10 10\n}\n",
+    );
+
+    assert_eq!(l.nodes.len(), 2);
+    let (x, y) = (&l.nodes[0], &l.nodes[1]);
+    assert_eq!(x.rect.y, y.rect.y, "U10 is U10 in both racks");
+    assert!(
+        x.rect.x + x.rect.w <= y.rect.x,
+        "the second rack stands beside the first, not on it: {x:?} {y:?}",
+        x = x.rect,
+        y = y.rect
+    );
+
+    // Each rack is named over its own rails, not in a caption somewhere.
+    let named: Vec<&str> = l.annotations.iter().map(|a| a.text.as_str()).collect();
+    assert!(named.contains(&"A1") && named.contains(&"A2"), "{named:?}");
+}
+
+#[test]
+fn two_racks_may_both_have_a_device_in_the_same_unit() {
+    // The ordinary case for a row of racks, and an error for one rack. The
+    // checker can only tell them apart by reading the frames.
+    let d = diags(
+        "type rack { units: 10 }\n\
+         group a1 \"A1\" {\n  device x \"X\" 10 10\n}\n\
+         group a2 \"A2\" {\n  device y \"Y\" 10 10\n}\n",
+    );
+    assert!(!d.iter().any(|x| x.message.contains("overlap")), "{d:?}");
+
+    // Inside one rack it is still a collision, and the message still names it.
+    let e = err("type rack { units: 10 }\n\
+         group a1 \"A1\" {\n  device x \"X\" 9 10\n  device y \"Y\" 10 10\n}\n");
+    assert!(e.contains("cannot share a unit"), "{e}");
+}
+
+#[test]
+fn a_rack_may_be_shorter_than_the_bank_and_stands_on_the_same_floor() {
+    let l = build(
+        "type rack { units: 10 cell: 200 20 ruler: off }\n\
+         group tall \"Tall\" {\n  device t \"T\" 1 1\n}\n\
+         group short \"Short\" { units: 4\n  device s \"S\" 1 1\n}\n",
+    );
+    let (t, s) = (&l.nodes[0], &l.nodes[1]);
+    assert_eq!(t.rect.y, s.rect.y, "U1 is the floor, and racks stand on it");
+
+    // And U5 does not exist in a 4U rack.
+    let e = err("type rack { units: 10 }\n\
+         group short \"Short\" { units: 4\n  device s \"S\" 5 5\n}\n");
+    assert!(e.contains("past the top of `Short` of a 4U frame"), "{e}");
+}
+
+#[test]
+fn a_rack_file_with_no_group_is_the_single_rack_it_always_was() {
+    // The compatibility hinge: the bank is drawn by the same code, and a file
+    // that declares no rack is one unnamed rack holding everything.
+    let l = build(
+        "type rack { units: 10 cell: 200 20 ruler: off }\n\
+         device a \"A\" 1 1\ndevice b \"B\" 5 5\n",
+    );
+    assert_eq!(l.nodes.len(), 2);
+    assert_eq!(l.nodes[0].rect.x, l.nodes[1].rect.x, "one frame");
+    assert!(
+        !l.annotations.iter().any(|a| !a.text.parse::<u32>().is_ok()),
+        "nothing is captioned over a rack nobody named"
+    );
+
+    // A device left outside the groups gets a frame of its own rather than
+    // being dropped on the floor.
+    let l = build(
+        "type rack { units: 10 cell: 200 20 ruler: off }\n\
+         device loose \"Loose\" 1 1\n\
+         group a1 \"A1\" {\n  device x \"X\" 1 1\n}\n",
+    );
+    assert_eq!(l.nodes.len(), 2);
+    assert_ne!(l.nodes[0].rect.x, l.nodes[1].rect.x);
+}
+
+#[test]
+fn units_on_a_device_says_so_rather_than_looking_like_it_works() {
+    let d = diags("type rack { units: 10 }\ndevice a \"A\" 1 1 { units: 4 }\n");
+    assert!(
+        d.iter()
+            .any(|x| x.message.contains("it is the height of a rack")),
+        "{d:?}"
+    );
+}
+
 // ---------------------------------------------------------------------- W-046
 
 #[cfg(test)]

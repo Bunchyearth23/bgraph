@@ -498,9 +498,11 @@ field etype "e_type"              16 17
   [A connector's pins are its member lines, and a wire lands *on* the pin it
    names. A pin wired twice, or one that does not exist, is an error.],
 
-  [`rack`], [Rack elevations.],
-  [Units count from 1 at the bottom, as a rack is labelled. Empty units are
-   room, not a mistake — unlike a packet's unassigned bits.],
+  [`rack`], [Rack elevations, one rack or a row of them.],
+  [Units count from 1 at the bottom, as a rack is labelled. A `group` is a
+   rack, so a bank is a row of them: they stand on one floor, each carries its
+   own U numbers, and `units` on a group makes that one rack shorter. Empty
+   units are room, not a mistake — unlike a packet's unassigned bits.],
 
   [`network`], [Topology.],
   [The role picks the outline and deliberately not the fill: a network
@@ -1032,7 +1034,7 @@ positions; the first is a property of the format itself.
    widest — four words, because four things carry four shapes of data. An
    `ortho` link now routes *around* the boxes, so the note saying it avoids
    nothing has been rewritten to say what it still does not avoid: the other
-   links. `bgraph fmt --migrate` rewrites a removed `opacity`. Completion
+   links. `type rack` draws a bank rather than one cabinet: a group is a rack. `bgraph fmt --migrate` rewrites a removed `opacity`. Completion
    inside a container offers statements, which is what a container is for. The
    licence question is closed: proprietary, recorded as a decision.],
 

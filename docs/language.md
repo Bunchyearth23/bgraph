@@ -210,7 +210,7 @@ type packet     // field a "A" 0 7        — bits
 type kanban     // group todo "To do" { card a "A" }
 type journey    // step pay "Pay" 2 4        — one score per actor
 type radar      // series a "A" 92 48 70     — one per axis
-type rack       // device srv "Compute" 38 41 — U38 to U41
+type rack       // device srv "Compute" 38 41 — U38 to U41; a group is a rack
 type network    // host fw "Firewall" firewall
 type venn       // set a "A" 210, then a -> b 85
 type harness    // connector j1 "J1" { - 1: +12V }, then j1 -> j2 1 3
