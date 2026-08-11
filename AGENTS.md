@@ -192,6 +192,13 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-08-11] **A helper that returns a short list is worse than one that
+  fails.** `resolved_nodes` gave back nothing when the style registry would not
+  build; seventeen callers walk it beside `diagram.nodes`, most silently
+  checking nothing and one panicking on an index. If a function's contract is
+  "one per node", it has to keep that contract on the failure path too — and a
+  hostile-input corpus has to cross its axes, because the bug lived where
+  "broken style" met "genre that indexes" and neither alone reached it.
 - [2026-08-11] **`include_str!` makes a data directory a build dependency.**
   Thirty-one of them pointed at `examples/`, so deleting a directory of *sample
   files* stopped the crate compiling. Anything the code needs at build time

@@ -897,9 +897,22 @@ fn resolved_groups(diagram: &Diagram, base: crate::style::Style) -> Vec<crate::s
         .collect()
 }
 
+/// One resolved style per node — **always**, and that is the contract.
+///
+/// It used to return nothing when the style registry would not build, which is
+/// a second failure mode stacked on a first: the broken style is already
+/// reported by `check_styles`, and seventeen callers here were left holding a
+/// list shorter than `diagram.nodes`. Most of them `zip`, so they quietly
+/// checked nothing; `check_state` indexes, so a `style a extends b` /
+/// `style b extends a` cycle in a state machine **panicked** — in a library
+/// whose stated promise is that hostile input cannot bring down the host
+/// (`W-027`, `W-130`).
+///
+/// A registry that will not build means every node falls back to the base,
+/// which is exactly what an unresolvable class should give.
 fn resolved_nodes(diagram: &Diagram, base: crate::style::Style) -> Vec<crate::style::Style> {
     let Ok(registry) = crate::style::Registry::build(&diagram.styles) else {
-        return Vec::new();
+        return vec![base; diagram.nodes.len()];
     };
     let def = archetype_of(diagram);
     diagram

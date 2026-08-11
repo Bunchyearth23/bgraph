@@ -6029,6 +6029,33 @@ fn hostile_corpus() -> Vec<(&'static str, String)> {
         ));
     }
 
+    // A style registry that will not build, **crossed with every genre**.
+    //
+    // The corpus had broken styles and it had every genre; it never had the
+    // two together, and that is where the hole was. A cycle makes
+    // `Registry::build` fail, `resolved_nodes` then returned nothing, and the
+    // seventeen checks that walk it alongside `diagram.nodes` were handed a
+    // list of the wrong length — most silently, `check_state` by panicking on
+    // `kinds[i]` (`W-130`). Crossing them is what makes this a guard rather
+    // than a memory of one bug.
+    for def in crate::props::ARCHETYPES {
+        cases.push((
+            "style cycle in a genre",
+            format!(
+                "type {}\nstyle a extends b {{ }}\nstyle b extends a {{ }}\n\
+                 {} one \"One\" .a\n{} two \"Two\" .b\none -> two\n",
+                def.name, def.item, def.item
+            ),
+        ));
+        cases.push((
+            "unknown class in a genre",
+            format!(
+                "type {}\n{} one \"One\" .nope\n{} two \"Two\"\none -> two\n",
+                def.name, def.item, def.item
+            ),
+        ));
+    }
+
     cases
 }
 
