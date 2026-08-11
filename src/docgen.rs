@@ -637,6 +637,24 @@ Completion is deliberately quiet: it never fires inside a label or a comment,
 are hidden, and `value` / `bits` appear only under the archetype that reads
 them.
 
+What it offers follows the block you are in:
+
+| Inside | You are offered |
+|---|---|
+| `graph { }` | the graph properties |
+| `type <genre> { }` | that genre's own settings |
+| `style node { }` / `style edge { }` | one side's vocabulary — the side the theme applies to |
+| `style <name> { }` | both sides, since a generic class may be applied to either |
+| `node a { }`, `use … { }`, `note … { }` | the node properties |
+| `a -> b { }` | the edge properties |
+| `group { }`, `component { }`, `activate { }` | **statements and properties both** — declaring first, since that is what a container is for |
+
+The last row is the one worth knowing. A group's block nests a whole diagram,
+so completion there offers the genre's declaring word, the statement keywords,
+anchors that name the group's own members, and the group's properties after
+them. Asking on a blank line — indentation and nothing else — answers with
+that same list rather than with nothing.
+
 ## Grammar
 
 The authoritative grammar is [`../src/syntax.pest`](../src/syntax.pest); the
