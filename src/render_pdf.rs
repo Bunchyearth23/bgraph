@@ -603,7 +603,15 @@ impl Content {
         self.fill_colour(&colour);
 
         let step = size * 1.35;
-        let top = r.cy() - (lines.len() as f64 - 1.0) * step / 2.0 + size * 0.34;
+        // The same sink the SVG writer applies, from the same function: a
+        // cylinder's cap eats only from the top, so centring on the box puts
+        // the text over the ellipse.
+        let sink = if style.shape == Some(Shape::Cylinder) {
+            crate::render_svg::cylinder_cap(r) / 2.0
+        } else {
+            0.0
+        };
+        let top = r.cy() + sink - (lines.len() as f64 - 1.0) * step / 2.0 + size * 0.34;
         let (dx, dy) = style.label_offset.unwrap_or((0.0, 0.0));
         for (i, line) in lines.iter().enumerate() {
             self.show(

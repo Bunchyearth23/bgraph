@@ -1344,14 +1344,21 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         let label = node.label.clone().unwrap_or_else(|| node.id.value.clone());
         let span = high.saturating_sub(low) + 1;
 
+        // Inset on **all four** sides. It was two pixels left and right and
+        // nothing top or bottom, so a device in the top or the bottom unit had
+        // its stroke straddling the frame's own and read as breaking out of the
+        // rack — which is what it looked like, because half the stroke was
+        // outside. Three is also enough that an 8px corner clears the dashed
+        // line instead of cutting through it (`W-110`).
+        const INSET: f64 = 3.0;
         nodes.push(PlacedNode {
             id: node.id.as_str().to_string(),
             lines: vec![label],
             rect: Rect {
-                x: gutter + 2.0,
-                y: row_y(high),
-                w: frame_w - 4.0,
-                h: span as f64 * unit_h,
+                x: gutter + INSET,
+                y: row_y(high) + INSET,
+                w: frame_w - INSET * 2.0,
+                h: (span as f64 * unit_h - INSET * 2.0).max(unit_h / 2.0),
             },
             style,
         });
@@ -1683,7 +1690,9 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
     } else {
         0.0
     };
-    const SECTION_H: f64 = 24.0;
+    // Tall enough that the band clears the top gridline instead of resting
+    // on it, which read as the sections belonging to the plot (`W-115`).
+    const SECTION_H: f64 = 34.0;
     let band = if diagram.groups.is_empty() {
         0.0
     } else {
@@ -1715,7 +1724,7 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
     let mut guides = Vec::new();
     let mut polylines = Vec::new();
     let mut nodes = Vec::new();
-    let mut groups = Vec::new();
+    let groups = Vec::new();
     let mut annotations = Vec::new();
 
     if let Some(title) = title {
@@ -1822,21 +1831,59 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
             &group.classes,
             &group.props,
         )?;
-        groups.push(PlacedGroup {
-            id: String::new(),
-            lines: vec![
-                group
-                    .label
+
+        // A **band**, not a box. It was a `PlacedGroup`, which draws a rounded
+        // border and puts the name in its corner — so three sections read as
+        // three objects floating over the plot rather than as three stretches
+        // of the axis, and nothing said which steps each one covered. A filled
+        // strip with its name centred in it says both (`W-115`).
+        //
+        // The span reaches half a step past the outermost members it holds, so
+        // the band covers the steps rather than the line between their centres.
+        let reach = if steps.len() > 1 {
+            plot.w / (steps.len() as f64 - 1.0) * 0.5
+        } else {
+            plot.w / 2.0
+        };
+        // Two pixels back on each side, so consecutive sections do not meet.
+        // Touching, three bands read as one strip carrying three labels, and
+        // where one section ends is the thing a reader is looking for.
+        let (bx0, bx1) = (
+            (x0 - reach + 2.0).max(plot.x),
+            (x1 + reach - 2.0).min(plot.right()),
+        );
+        let top = title_h + 2.0;
+        let bottom = title_h + SECTION_H - 8.0;
+        polylines.push(Polyline {
+            points: vec![(bx0, top), (bx1, top), (bx1, bottom), (bx0, bottom)],
+            closed: true,
+            fill: Some(
+                style
+                    .fill
                     .clone()
-                    .unwrap_or_else(|| group.id.value.clone()),
-            ],
-            rect: Rect {
-                x: x0 - 8.0,
-                y: title_h,
-                w: (x1 - x0) + 16.0,
-                h: SECTION_H - 6.0,
-            },
-            style,
+                    .unwrap_or_else(|| if theme.dark { "#1e293b" } else { "#eef2f7" }.into()),
+            ),
+            stroke: None,
+            width: 0.0,
+            head: None,
+            dash: None,
+            over: false,
+        });
+        annotations.push(Annotation {
+            text: group
+                .label
+                .clone()
+                .unwrap_or_else(|| group.id.value.clone()),
+            x: (bx0 + bx1) / 2.0,
+            y: (top + bottom) / 2.0 + 4.0,
+            anchor: Anchor::Middle,
+            size: 11.0,
+            color: style
+                .font_color
+                .clone()
+                .unwrap_or_else(|| theme.ink.clone()),
+            weight: "600".into(),
+            family: family(&base),
         });
     }
 

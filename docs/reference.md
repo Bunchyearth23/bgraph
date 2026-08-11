@@ -1510,7 +1510,10 @@ group review "Finance" below filed gap 34 {
 // declared like every other placement.
 event late "14 days" boundary timer { attach: pay }
 
-data claim  "Claim form" object right-of fill gap 46
+// The form sits between the two participants, on the side the reader's eye
+// already travels: to the right of it, both its association and its message
+// flow had to double back across the picture.
+data claim  "Claim form" object right-of filed gap 40 align top
 data ledger "Ledger"     store below done gap 40
 
 submit -> fill

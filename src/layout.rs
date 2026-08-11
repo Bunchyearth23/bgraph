@@ -769,7 +769,26 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     // honest order is: decide the sizes, then place.
     constrain_sizes(diagram, &index, &mut sizes);
 
-    let mut solved = place_all(diagram, &index, &sizes, &opts)?;
+    // What each node's drawing reaches past its own box. Only a caption does
+    // that, and only two genres draw one — everywhere else this is zeros and
+    // the group frames are exactly what they always were.
+    let overhang: Vec<(f64, f64, f64, f64)> = captions
+        .iter()
+        .zip(sizes.iter())
+        .zip(styles.iter())
+        .map(|((caption, (w, _)), style)| {
+            let Some(text) = caption else {
+                return (0.0, 0.0, 0.0, 0.0);
+            };
+            let size = style.font_size.unwrap_or(14.0) * 0.85;
+            let lines: Vec<String> = text.split('\n').map(|l| l.trim().to_string()).collect();
+            let side = ((text_width(&lines, size) - w) / 2.0).max(0.0);
+            let below = 6.0 + lines.len() as f64 * size * 1.3;
+            (side, 0.0, side, below)
+        })
+        .collect();
+
+    let mut solved = place_all(diagram, &index, &sizes, &overhang, &opts)?;
     // Alignment runs after, because it is the one constraint that genuinely
     // needs positions to exist.
     constrain_alignment(diagram, &index, &mut solved);
@@ -808,6 +827,16 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             Style {
                 router: None,
                 head: None,
+                ..Style::edge_defaults()
+            }
+        } else if topology {
+            // A topology reads as a circuit, so its links turn right angles —
+            // and since `W-105` they go around the boxes as well. `router` has
+            // to be unset here rather than `or`-ed below, because
+            // `edge_defaults()` already fills it and a default in place beats
+            // an archetype's `or` every time.
+            Style {
+                router: None,
                 ..Style::edge_defaults()
             }
         } else {
@@ -849,6 +878,9 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         }
         // What a link runs at, bracketed under its label — the same shape the
         // C4 view uses for a protocol, because it is the same kind of fact.
+        if topology {
+            style.router = style.router.or(Some(crate::style::Router::Ortho));
+        }
         if topology && let Some(speed) = &style.speed {
             label = Some(match label {
                 Some(text) if !text.is_empty() => format!("{text}\n[{speed}]"),
@@ -954,30 +986,22 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
 
             // The name heads the box; taking it out of `lines` stops the
             // renderer centring it over the members.
-            // A name centred in a box far wider than itself floats away from
-            // the left-aligned lines beneath it. Past twice its own width the
-            // box is being sized by its content, so the name joins it.
-            let widest = placed
-                .lines
-                .iter()
-                .map(|l| text_width(std::slice::from_ref(l), font))
-                .fold(0.0_f64, f64::max);
-            let adrift = placed.rect.w > widest * 2.0 + pad * 2.0;
-
+            //
+            // **Always centred.** `W-065` made it left-align once the box was
+            // more than twice the title's width, on the grounds that a centred
+            // name floats away from the left-aligned members beneath it. That
+            // reading was right about one box and wrong about a diagram: the
+            // threshold is crossed by some boxes and not others, so one picture
+            // came out with `OrderLine` centred and `User`, `Order` and `Money`
+            // not — and a rule that changes its mind between two boxes reads as
+            // a defect even where each case on its own is defensible.
+            // Consistency wins, and centred is what UML draws (`W-108`).
             for (i, line) in std::mem::take(&mut placed.lines).into_iter().enumerate() {
                 annotations.push(Annotation {
                     text: line,
-                    x: if adrift {
-                        placed.rect.x + pad
-                    } else {
-                        placed.rect.cx()
-                    },
+                    x: placed.rect.cx(),
                     y: placed.rect.y + pad + (i as f64 + 0.5) * font * 1.45,
-                    anchor: if adrift {
-                        Anchor::Start
-                    } else {
-                        Anchor::Middle
-                    },
+                    anchor: Anchor::Middle,
                     size: font,
                     color: s.font_color.clone().unwrap_or_else(|| "#111827".into()),
                     weight: s.font_weight.clone().unwrap_or_else(|| "600".into()),
@@ -1596,6 +1620,13 @@ fn place_all(
     diagram: &Diagram,
     index: &HashMap<&str, Entity>,
     sizes: &[(f64, f64)],
+    // How far each node's *drawing* reaches past its box — left, top, right,
+    // bottom. A group is sized by what it holds, and a caption drawn beside a
+    // box is part of what it holds: a BPMN event's ring is forty pixels and its
+    // name is three times that, so a frame built from the rings alone cut the
+    // names off (`W-112`). Zero for every node in every other genre, so nothing
+    // else moves.
+    overhang: &[(f64, f64, f64, f64)],
     opts: &GraphOpts,
 ) -> Result<Solved> {
     let mut node_rect: Vec<Option<Rect>> = vec![None; diagram.nodes.len()];
@@ -1713,11 +1744,19 @@ fn place_all(
             }
 
             let padding = group_padding(diagram, g);
-            let Some(inner) = bbox(
-                members
-                    .iter()
-                    .filter_map(|m| rect_of(*m, &node_rect, &group_rect)),
-            ) else {
+            let Some(inner) = bbox(members.iter().filter_map(|m| {
+                let r = rect_of(*m, &node_rect, &group_rect)?;
+                let (l, t, rr, b) = match m {
+                    Entity::Node(i) => overhang[*i],
+                    Entity::Group(_) => (0.0, 0.0, 0.0, 0.0),
+                };
+                Some(Rect {
+                    x: r.x - l,
+                    y: r.y - t,
+                    w: r.w + l + rr,
+                    h: r.h + t + b,
+                })
+            })) else {
                 // An empty group has nothing to enclose; `check` reports it.
                 group_rect[g] = Some(Rect {
                     x: 0.0,

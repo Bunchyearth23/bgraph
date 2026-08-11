@@ -682,20 +682,18 @@ fn described(shape: &str, description: Option<&str>) -> String {
     let Some(text) = description.filter(|t| !t.is_empty()) else {
         return shape.to_string();
     };
-    // The shapes are written self-closing, so the tag is reopened to hold the
-    // title. Done here rather than in each of the eight shape branches, which
-    // would be eight places to forget.
-    let Some(stripped) = shape.strip_suffix("/>") else {
-        return shape.to_string();
-    };
-    let tag = stripped
-        .split_once(|c: char| c.is_whitespace())
-        .map(|(head, _)| head.trim_start_matches('<'))
-        .unwrap_or_default();
-    if tag.is_empty() {
-        return shape.to_string();
-    }
-    format!("{stripped}><title>{}</title></{tag}>", esc(text))
+    // A group, rather than reopening the shape's own tag to hold the title.
+    //
+    // Reopening it was the first answer and it was **wrong for any shape drawn
+    // from more than one element**: it took the tag name from the first `<` and
+    // the closing `/>` from the last, so a cylinder — a `<path>` for the body
+    // and an `<ellipse>` for the cap — came out as
+    // `<ellipse …><title>…</title></path>`. A browser is lenient enough to draw
+    // that, which is why the preview and the golden test never saw it; resvg is
+    // not, so `--window` and `--png` failed on any diagram with a described
+    // cylinder. A `<g>` is valid whatever the shape is made of, and it takes
+    // the tag-sniffing out entirely.
+    format!("<g><title>{}</title>{shape}</g>", esc(text))
 }
 
 /// A deterministic offset in `[-amount, amount]`, from a shape's own numbers.
@@ -843,7 +841,7 @@ fn node_shape(node: &PlacedNode) -> String {
                 .join(" ")
         ),
         Shape::Cylinder => {
-            let ry = (r.h * 0.16).min(14.0);
+            let ry = cylinder_cap(r);
             let rx = r.w / 2.0;
             let body = format!(
                 "M {} {} L {} {} A {} {} 0 0 0 {} {} L {} {} Z",
@@ -1007,6 +1005,16 @@ fn boundary(node: &PlacedNode, target: (f64, f64)) -> (f64, f64) {
 
 // ---------------------------------------------------------------- text
 
+/// Half-height of the ellipse a cylinder is capped with.
+///
+/// Shared with the label, which has to sit clear of it: `shape_allowance` adds
+/// the cap's room to the box's *height*, and centring then splits that room
+/// evenly while the cap only eats from the top. Two copies of this expression
+/// would be two chances for the text and the drawing to disagree (`W-109`).
+pub(crate) fn cylinder_cap(r: &Rect) -> f64 {
+    (r.h * 0.16).min(14.0)
+}
+
 fn node_label(node: &PlacedNode) -> String {
     if node.lines.iter().all(|l| l.is_empty()) {
         return String::new();
@@ -1016,7 +1024,14 @@ fn node_label(node: &PlacedNode) -> String {
     let line_h = font_size * 1.3;
     let (ox, oy) = s.label_offset.unwrap_or((0.0, 0.0));
     let cx = node.rect.cx() + ox;
-    let start = node.rect.cy() + oy - (node.lines.len() as f64 - 1.0) * line_h / 2.0;
+    // A cylinder's readable area starts below its cap, so its text sits half a
+    // cap lower than the box's own middle.
+    let sink = if s.shape == Some(Shape::Cylinder) {
+        cylinder_cap(&node.rect) / 2.0
+    } else {
+        0.0
+    };
+    let start = node.rect.cy() + oy + sink - (node.lines.len() as f64 - 1.0) * line_h / 2.0;
 
     let mut out = format!(
         r#"<text x="{}" y="{}" text-anchor="middle" dominant-baseline="central" font-family="{}" font-size="{}" font-weight="{}"{}>"#,

@@ -2333,8 +2333,16 @@ fn a_device_is_as_tall_as_the_units_it_occupies() {
          device one \"1U\" 1 1\n\
          device four \"4U\" 5 8\n",
     );
-    assert_eq!(l.nodes[0].rect.h, 20.0);
-    assert_eq!(l.nodes[1].rect.h, 80.0, "U5 through U8 inclusive is four");
+    // A device is inset three pixels on every side, so its stroke sits inside
+    // the frame rather than straddling it (`W-110`) — the height it occupies
+    // is still the units it spans.
+    const INSET: f64 = 3.0;
+    assert_eq!(l.nodes[0].rect.h, 20.0 - INSET * 2.0);
+    assert_eq!(
+        l.nodes[1].rect.h,
+        80.0 - INSET * 2.0,
+        "U5 through U8 inclusive is four"
+    );
 }
 
 #[test]
@@ -2506,12 +2514,41 @@ fn sections_band_over_the_steps_they_hold() {
          step three \"Three\" 5\n",
     );
 
-    assert_eq!(l.groups.len(), 1);
-    let band = &l.groups[0];
-    assert_eq!(band.lines, vec!["Early"]);
-    // It spans the first two steps and stops short of the third.
-    let third = l.nodes.iter().map(|n| n.rect.x).fold(0.0_f64, f64::max);
-    assert!(band.rect.right() < third, "{:?} vs {third}", band.rect);
+    // A **band**, not a group frame (`W-115`): a bordered rounded box read as
+    // an object floating over the plot rather than as a stretch of the axis.
+    assert!(l.groups.is_empty(), "a section is no longer a frame");
+    let band = l
+        .polylines
+        .iter()
+        .find(|p| p.closed && p.fill.is_some())
+        .expect("the section is drawn as a filled strip");
+    let (left, right) = band
+        .points
+        .iter()
+        .fold((f64::MAX, f64::MIN), |(a, b), (x, _)| {
+            (a.min(*x), b.max(*x))
+        });
+
+    assert!(
+        l.annotations.iter().any(|a| a.text == "Early"),
+        "the section is named in the band"
+    );
+    // It covers the first two steps — past their centres, since a band is over
+    // the steps and not over the line between them — and stops short of the
+    // third.
+    let mut xs: Vec<f64> = l.nodes.iter().map(|n| n.rect.cx()).collect();
+    xs.sort_by(|a, b| a.partial_cmp(b).expect("finite"));
+    let (first, second, third) = (xs[0], xs[1], xs[2]);
+    // Clamped to the plot on the left, since the first step sits on its edge.
+    assert!(left <= first, "the band starts at the first step: {left}");
+    assert!(
+        right > second,
+        "and reaches past the second, not merely to its centre: {right} vs {second}"
+    );
+    assert!(
+        right < third,
+        "and stops before the third: {right} vs {third}"
+    );
 }
 
 #[test]
@@ -6253,6 +6290,102 @@ fn every_checked_in_svg_is_the_one_the_renderer_produces() {
     }
 
     assert!(seen >= 25, "only {seen} rendered examples found");
+}
+
+/// Whether a document's tags open and close in order, and nothing is left open.
+///
+/// Hand-rolled, like the base64 writer and the nesting guard, and for the same
+/// reason: it is forty lines against a dependency, in a crate whose whole shape
+/// is that it writes its own SVG. Returns the first mismatch as a sentence,
+/// because "invalid" without a place is not a diagnosis.
+#[cfg(test)]
+fn ill_formed(doc: &str) -> Option<String> {
+    let b = doc.as_bytes();
+    let mut open: Vec<&str> = Vec::new();
+    let mut i = 0;
+
+    while let Some(lt) = doc[i..].find('<').map(|k| i + k) {
+        i = lt + 1;
+        if doc[i..].starts_with("!--") {
+            i = doc[i..].find("-->").map_or(b.len(), |k| i + k + 3);
+            continue;
+        }
+        if doc[i..].starts_with('!') || doc[i..].starts_with('?') {
+            i = doc[i..].find('>').map_or(b.len(), |k| i + k + 1);
+            continue;
+        }
+
+        let closing = doc[i..].starts_with('/');
+        if closing {
+            i += 1;
+        }
+        let name_end = doc[i..]
+            .find(|c: char| c.is_whitespace() || c == '>' || c == '/')
+            .map_or(b.len(), |k| i + k);
+        let name = &doc[i..name_end];
+        i = name_end;
+
+        // Past the attributes, minding that a `>` inside a quoted value is not
+        // the end of the tag — which it is, in half the paths this emits.
+        let mut quote = None::<u8>;
+        while i < b.len() {
+            match (quote, b[i]) {
+                (Some(q), c) if c == q => quote = None,
+                (None, c @ (b'"' | b'\'')) => quote = Some(c),
+                (None, b'>') => break,
+                _ => {}
+            }
+            i += 1;
+        }
+        let self_closing = i > 0 && b[i - 1] == b'/';
+        i += 1;
+
+        if closing {
+            match open.pop() {
+                Some(want) if want == name => {}
+                Some(want) => return Some(format!("`</{name}>` closes an open `<{want}>`")),
+                None => return Some(format!("`</{name}>` closes nothing")),
+            }
+        } else if !self_closing {
+            open.push(name);
+        }
+    }
+
+    open.last()
+        .map(|name| format!("`<{name}>` is never closed"))
+}
+
+#[test]
+fn every_rendered_example_is_well_formed_xml() {
+    // The golden test compares bytes and says nothing about validity, so an
+    // SVG could be — and was — checked in with an `<ellipse>` closed by a
+    // `</path>`. A browser draws that anyway; resvg refuses it, which is what
+    // made `--window` and `--png` fail on `type block` and nothing else notice
+    // (`W-107`).
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/examples");
+    let mut seen = 0;
+
+    for entry in std::fs::read_dir(dir).expect("examples/ is readable") {
+        let path = entry.expect("readable entry").path();
+        if path.extension().is_none_or(|e| e != "svg") {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().to_string();
+        let svg = std::fs::read_to_string(&path).expect("readable");
+        assert_eq!(ill_formed(&svg), None, "{name}");
+        seen += 1;
+    }
+
+    assert!(seen >= 25, "only {seen} rendered examples found");
+
+    // And the scanner is worth believing: it catches the exact shape of the
+    // defect it exists for.
+    assert!(ill_formed("<svg><ellipse cx=\"1\"><title>x</title></path></svg>").is_some());
+    assert!(
+        ill_formed("<svg><rect a=\"1 > 0\"/></svg>").is_none(),
+        "a `>` in a value"
+    );
+    assert_eq!(ill_formed("<svg><g><rect/></g></svg>"), None);
 }
 
 #[test]
