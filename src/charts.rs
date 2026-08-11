@@ -191,6 +191,99 @@ fn family(style: &Style) -> String {
         .unwrap_or_default()
 }
 
+/// The diagram's own furniture: the rules a chart draws behind its data, the
+/// numbers along them, and the heading.
+///
+/// None of it belonged to any item, and all of it was hardcoded to the theme —
+/// so a rack's unit rules could not be recoloured at all, and its heading took
+/// the colour of `style device`, which is the one thing on the drawing that is
+/// certainly not a device (`W-134`). `style grid` and `style title` name them.
+///
+/// Resolved off the registry directly rather than through `Registry::resolve`,
+/// because `resolve` overlays `style node` onto everything: a diagram that
+/// fills its boxes must not thereby fill its gridlines.
+#[derive(Debug, Clone)]
+pub(crate) struct Chrome {
+    pub rule: String,
+    /// Width and dash are per-chart defaults too: a gantt's rules are drawn
+    /// heavier than a rack's. Only an override lands here.
+    pub rule_width: Option<f64>,
+    pub rule_dash: Option<String>,
+    /// The numbers along a rule. Size is per-chart — a gantt's dates and a
+    /// rack's unit numbers are not the same text — so only an override lands
+    /// here.
+    pub tick: String,
+    pub tick_size: Option<f64>,
+    pub tick_family: Option<String>,
+    pub heading: String,
+    pub heading_size: Option<f64>,
+    pub heading_family: Option<String>,
+    pub heading_weight: Option<String>,
+}
+
+/// Built where it is read rather than threaded through every chart. Two
+/// lookups in a map already resolved, called a handful of times per drawing —
+/// cheap enough that a binding in eighteen functions would be the more
+/// expensive thing to maintain.
+fn chrome_of(registry: &Registry, theme: &Theme) -> Chrome {
+    Chrome::of(registry, theme)
+}
+
+impl Chrome {
+    pub(crate) fn of(registry: &Registry, theme: &Theme) -> Chrome {
+        let grid = registry.get("grid");
+        let title = registry.get("title");
+        Chrome {
+            rule: grid
+                .and_then(|g| g.stroke.clone())
+                .unwrap_or_else(|| if theme.dark { "#1e293b" } else { "#e4e4e7" }.into()),
+            rule_width: grid.and_then(|g| g.stroke_width),
+            rule_dash: grid.and_then(|g| g.dash.clone()),
+            tick: grid
+                .and_then(|g| g.font_color.clone())
+                .unwrap_or_else(|| theme.muted.clone()),
+            tick_size: grid.and_then(|g| g.font_size),
+            tick_family: grid.and_then(|g| g.font_family.clone()),
+            heading: title
+                .and_then(|t| t.font_color.clone())
+                .unwrap_or_else(|| theme.ink.clone()),
+            heading_size: title.and_then(|t| t.font_size),
+            heading_family: title.and_then(|t| t.font_family.clone()),
+            heading_weight: title.and_then(|t| t.font_weight.clone()),
+        }
+    }
+
+    /// The width a rule is drawn at, given what this chart would have used.
+    pub(crate) fn rule_at(&self, fallback: f64) -> f64 {
+        self.rule_width.unwrap_or(fallback)
+    }
+
+    /// The size a tick is drawn at, given what this chart would have used.
+    pub(crate) fn tick_at(&self, fallback: f64) -> f64 {
+        self.tick_size.unwrap_or(fallback)
+    }
+
+    pub(crate) fn tick_font(&self, fallback: &str) -> String {
+        self.tick_family
+            .clone()
+            .unwrap_or_else(|| fallback.to_string())
+    }
+
+    pub(crate) fn heading_at(&self, fallback: f64) -> f64 {
+        self.heading_size.unwrap_or(fallback)
+    }
+
+    pub(crate) fn heading_font(&self, fallback: &str) -> String {
+        self.heading_family
+            .clone()
+            .unwrap_or_else(|| fallback.to_string())
+    }
+
+    pub(crate) fn heading_bold(&self) -> String {
+        self.heading_weight.clone().unwrap_or_else(|| "600".into())
+    }
+}
+
 // ------------------------------------------------------------------- pie
 
 pub(crate) const TITLE_SIZE: f64 = 16.0;
@@ -279,10 +372,10 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
@@ -548,10 +641,10 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
@@ -922,10 +1015,10 @@ pub fn tree(
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
@@ -1174,10 +1267,10 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
@@ -1431,16 +1524,17 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
 
     let rail_style = registry.resolve(Style::group_defaults(), "group", &[], &[])?;
-    let rule = if theme.dark { "#1e293b" } else { "#e4e4e7" };
+    let chrome = chrome_of(registry, &theme);
+    let rule = chrome.rule.as_str();
     let mut cursor = 0.0;
 
     for frame in &frames {
@@ -1476,15 +1570,22 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         }
 
         if let Some(name) = &frame.label {
+            // A rack's name belongs to the rack, so it is painted by
+            // `style group` — the same style as its rails. It used to take the
+            // colour of `style device`, which is the one thing on the drawing
+            // it is certainly not (`W-134`).
             annotations.push(Annotation {
                 text: name.clone(),
                 x: left + frame_w * 0.5,
                 y: frame_top - LABEL_SIZE * 0.6,
                 anchor: Anchor::Middle,
-                size: LABEL_SIZE,
-                color: ink(&base, &theme),
-                weight: "600".into(),
-                family: family(&base),
+                size: rail_style.font_size.unwrap_or(LABEL_SIZE),
+                color: ink(&rail_style, &theme),
+                weight: rail_style
+                    .font_weight
+                    .clone()
+                    .unwrap_or_else(|| "600".into()),
+                family: family(&rail_style),
                 title: false,
             });
         }
@@ -1499,18 +1600,18 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
                     x: left - 9.0,
                     y: y + unit_h * 0.5 + 3.0,
                     anchor: Anchor::End,
-                    size: 9.0,
-                    color: theme.muted.clone(),
+                    size: chrome.tick_at(9.0),
+                    color: chrome.tick.clone(),
                     weight: "400".into(),
-                    family: family(&base),
+                    family: chrome.tick_font(&family(&base)),
                     title: false,
                 });
                 guides.push(Guide {
                     from: (left, y),
                     to: (left + frame_w, y),
                     color: rule.to_string(),
-                    width: 0.5,
-                    dash: None,
+                    width: chrome.rule_at(0.5),
+                    dash: chrome.rule_dash.clone(),
                 });
             }
         }
@@ -1677,15 +1778,16 @@ pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
 
-    let rule = if theme.dark { "#1e293b" } else { "#e4e4e7" };
+    let chrome = chrome_of(registry, &theme);
+    let rule = chrome.rule.as_str();
     let axis = if theme.dark { "#334155" } else { "#d4d4d8" };
 
     // A ring per tick, drawn as the same polygon the data uses — a circle
@@ -1699,8 +1801,8 @@ pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
                 from,
                 to,
                 color: rule.to_string(),
-                width: 1.0,
-                dash: None,
+                width: chrome.rule_at(1.0),
+                dash: chrome.rule_dash.clone(),
             });
         }
     }
@@ -1927,10 +2029,10 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
@@ -1946,6 +2048,7 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
         &x_labels,
         &theme,
         &base,
+        &chrome_of(registry, &theme),
         &mut guides,
         &mut annotations,
     );
@@ -2160,10 +2263,10 @@ pub fn kanban(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
@@ -2363,10 +2466,10 @@ fn packet_like(
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
@@ -2543,10 +2646,10 @@ pub fn treemap(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
@@ -2898,6 +3001,7 @@ fn worst_ratio(areas: &[f64], sum: f64, short: f64) -> f64 {
 pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
     let cfg = &diagram.archetype_props;
     let theme = Theme::of(&opts);
+    let chrome = chrome_of(registry, &theme);
     let def = crate::check::archetype_of(diagram);
     let palette = theme.palette();
 
@@ -2965,10 +3069,10 @@ pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
@@ -3016,10 +3120,10 @@ pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             x,
             y,
             anchor,
-            size: 12.0,
-            color: theme.muted.clone(),
+            size: chrome.tick_at(12.0),
+            color: chrome.tick.clone(),
             weight: "600".into(),
-            family: family(&base),
+            family: chrome.tick_font(&family(&base)),
             title: false,
         });
     }
@@ -3049,10 +3153,10 @@ pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
                 x,
                 y,
                 anchor,
-                size: 12.0,
-                color: theme.muted.clone(),
+                size: chrome.tick_at(12.0),
+                color: chrome.tick.clone(),
                 weight: "500".into(),
-                family: family(&base),
+                family: chrome.tick_font(&family(&base)),
                 title: false,
             });
         }
@@ -3237,16 +3341,17 @@ pub fn wave(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
 
     let lanes_h = signals.len() as f64 * (lane_h + lane_gap);
-    let rule = if theme.dark { "#1e293b" } else { "#e4e4e7" };
+    let chrome = chrome_of(registry, &theme);
+    let rule = chrome.rule.as_str();
 
     if grid {
         for p in 0..=periods {
@@ -3255,8 +3360,8 @@ pub fn wave(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
                 from: (x, top),
                 to: (x, top + lanes_h - lane_gap),
                 color: rule.into(),
-                width: 1.0,
-                dash: None,
+                width: chrome.rule_at(1.0),
+                dash: chrome.rule_dash.clone(),
             });
         }
     }
@@ -3268,10 +3373,10 @@ pub fn wave(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
                 x: names_w + p as f64 * period + 3.0,
                 y: title_h + ruler_h / 2.0,
                 anchor: Anchor::Start,
-                size: 10.0,
-                color: theme.muted.clone(),
+                size: chrome.tick_at(10.0),
+                color: chrome.tick.clone(),
                 weight: "400".into(),
-                family: family(&base),
+                family: chrome.tick_font(&family(&base)),
                 title: false,
             });
         }
@@ -3657,10 +3762,10 @@ pub fn sankey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
@@ -3893,10 +3998,13 @@ fn draw_frame(
     x_labels: &[(f64, String)],
     theme: &Theme,
     base: &Style,
+    // The diagram's furniture, resolved by the caller: this helper is handed
+    // a plot to draw a frame around and has no registry of its own.
+    chrome: &Chrome,
     guides: &mut Vec<Guide>,
     annotations: &mut Vec<Annotation>,
 ) {
-    let rule = if theme.dark { "#1e293b" } else { "#e4e4e7" };
+    let rule = chrome.rule.as_str();
     let axis = if theme.dark { "#334155" } else { "#d4d4d8" };
 
     for value in &scale.ticks {
@@ -3905,8 +4013,8 @@ fn draw_frame(
             from: (plot.x, y),
             to: (plot.right(), y),
             color: if *value == 0.0 { axis } else { rule }.into(),
-            width: 1.0,
-            dash: None,
+            width: chrome.rule_at(1.0),
+            dash: chrome.rule_dash.clone(),
         });
         annotations.push(Annotation {
             text: trim_number(*value),
@@ -4106,10 +4214,10 @@ pub fn bar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
@@ -4126,6 +4234,7 @@ pub fn bar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
         &x_labels,
         &theme,
         &base,
+        &chrome_of(registry, &theme),
         &mut guides,
         &mut annotations,
     );
@@ -4413,10 +4522,10 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
@@ -4427,6 +4536,7 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
         &x_labels,
         &theme,
         &base,
+        &chrome_of(registry, &theme),
         &mut guides,
         &mut annotations,
     );
@@ -4568,10 +4678,10 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
@@ -4935,10 +5045,10 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
@@ -4960,7 +5070,8 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
         }
     }
 
-    let rule = if theme.dark { "#1e293b" } else { "#e4e4e7" };
+    let chrome = chrome_of(registry, &theme);
+    let rule = chrome.rule.as_str();
     let step = pick_tick(span, (width / 52.0) as usize);
     let mut d = first;
     while d <= last {
@@ -4969,8 +5080,8 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
             from: (x, top),
             to: (x, top + ordered.len() as f64 * row_h),
             color: rule.into(),
-            width: 1.0,
-            dash: None,
+            width: chrome.rule_at(1.0),
+            dash: chrome.rule_dash.clone(),
         });
         let (y, m, dd) = civil_from_days(d);
         annotations.push(Annotation {
@@ -4981,10 +5092,10 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
             x: x + 3.0,
             y: title_h + AXIS_H / 2.0,
             anchor: Anchor::Start,
-            size: 10.0,
-            color: theme.muted.clone(),
+            size: chrome.tick_at(10.0),
+            color: chrome.tick.clone(),
             weight: "400".into(),
-            family: family(&base),
+            family: chrome.tick_font(&family(&base)),
             title: false,
         });
         d += step;
@@ -5239,17 +5350,18 @@ pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: TITLE_SIZE,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
+            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
+            color: chrome_of(registry, &theme).heading,
+            weight: chrome_of(registry, &theme).heading_bold(),
+            family: chrome_of(registry, &theme).heading_font(&family(&base)),
             title: true,
         });
     }
 
     // Gridlines carry the axis labels down to the strip at the foot, so a date
     // is read off the same vertical the event sits on.
-    let rule = if theme.dark { "#1e293b" } else { "#e4e4e7" };
+    let chrome = chrome_of(registry, &theme);
+    let rule = chrome.rule.as_str();
     let step = match text(cfg, "ticks").as_deref() {
         Some("day") => 1,
         Some("week") => 7,
@@ -5265,8 +5377,8 @@ pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             from: (x, title_h),
             to: (x, height - AXIS_H),
             color: rule.into(),
-            width: 1.0,
-            dash: None,
+            width: chrome.rule_at(1.0),
+            dash: chrome.rule_dash.clone(),
         });
         let (y, m, dd) = civil_from_days(d);
         annotations.push(Annotation {
@@ -5278,10 +5390,10 @@ pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             x,
             y: height - AXIS_H / 2.0,
             anchor: Anchor::Middle,
-            size: 10.0,
-            color: theme.muted.clone(),
+            size: chrome.tick_at(10.0),
+            color: chrome.tick.clone(),
             weight: "400".into(),
-            family: family(&base),
+            family: chrome.tick_font(&family(&base)),
             title: false,
         });
         d += step;
@@ -5348,10 +5460,10 @@ pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             x,
             y: tip + font * 1.15,
             anchor: Anchor::Middle,
-            size: font * 0.8,
-            color: theme.muted.clone(),
+            size: chrome.tick_at(font * 0.8),
+            color: chrome.tick.clone(),
             weight: "400".into(),
-            family: family(&base),
+            family: chrome.tick_font(&family(&base)),
             title: false,
         });
     }

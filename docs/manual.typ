@@ -227,9 +227,16 @@ node db "Postgres" .store {
 came from `service`, `shape` and `fill` from `store`, `stroke` from the
 statement itself.
 
-*Two style names are implicit.* `style node` and `style edge` apply to every
-box and every link without being referenced. Use them for the diagram's theme
-and keep named classes for what differs.
+*Some style names are themes.* A theme is a style the renderer looks up on its
+own — `node`, `edge`, `group`, `grid`, `title`, and the genre's own item word.
+It paints without being referenced. Everything else is a class, and a class
+paints where `.name` is written and nowhere else; a style on neither list is
+reported rather than silently drawn nowhere.
+
+*The diagram's furniture is not its items.* `style grid` paints the rules a
+chart draws behind its data and the numbers along them; `style title` paints
+the heading. Each theme reads a named part of the vocabulary, and the editor
+offers only that part.
 
 *Classes apply in the order written.* `.a .b` lets `b` win, which is the only
 reading that makes the list mean anything.
@@ -1034,7 +1041,10 @@ positions; the first is a property of the format itself.
    widest — four words, because four things carry four shapes of data. An
    `ortho` link now routes *around* the boxes, so the note saying it avoids
    nothing has been rewritten to say what it still does not avoid: the other
-   links. `type rack` draws a bank rather than one cabinet: a group is a rack. `bgraph fmt --migrate` rewrites a removed `opacity`. Completion
+   links. `type rack` draws a bank rather than one cabinet: a group is a rack.
+   `style grid` and `style title` name a diagram's own furniture, which was
+   hardcoded and took its heading's colour from whatever the genre calls its
+   items. `bgraph fmt --migrate` rewrites a removed `opacity`. Completion
    inside a container offers statements, which is what a container is for. The
    licence question is closed: proprietary, recorded as a decision.],
 

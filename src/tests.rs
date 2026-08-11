@@ -1059,6 +1059,42 @@ fn a_heading_goes_where_the_file_says() {
 }
 
 #[test]
+fn a_centred_heading_is_centred_on_everything_drawn() {
+    // `W-133`. Boxes and text are not the drawing. A rack's rails and unit
+    // rules are `Guide`s, so a bank whose right-hand racks are still empty
+    // put its heading over the fourth rack: the box only knew about the two
+    // racks holding equipment.
+    let l = build(
+        "type rack { title: \"Row A\" units: 8 cell: 120 16 }\n\
+         graph { title-align: center }\n\
+         group r1 \"R1\" {\n  device a \"A\" 1 2\n}\n\
+         group r2 \"R2\" {\n}\n\
+         group r3 \"R3\" {\n}\n",
+    );
+    let t = l.annotations.iter().find(|a| a.title).expect("a heading");
+    let right = l
+        .guides
+        .iter()
+        .map(|g| g.from.0.max(g.to.0))
+        .fold(f64::MIN, f64::max);
+    let left = l
+        .guides
+        .iter()
+        .map(|g| g.from.0.min(g.to.0))
+        .fold(f64::MAX, f64::min);
+
+    // Not exactly the rails' midpoint — the U numbers hang to the left of the
+    // leftmost rail — but well past the middle of the boxes, which is the
+    // whole failure.
+    let boxes = l.nodes.iter().map(|n| n.rect.cx()).fold(f64::MIN, f64::max);
+    assert!(
+        t.x > boxes && t.x > (left + right) * 0.5 - 20.0 && t.x < right,
+        "heading at {t_x}, rails {left}..{right}, boxes end {boxes}",
+        t_x = t.x
+    );
+}
+
+#[test]
 fn two_ortho_lines_do_not_run_along_each_other() {
     // `X-018`. The router avoided boxes and not other lines, so two edges whose
     // tidiest routes crossed the same tall obstacle both took the one channel
@@ -2864,6 +2900,135 @@ fn units_on_a_device_says_so_rather_than_looking_like_it_works() {
             .any(|x| x.message.contains("it is the height of a rack")),
         "{d:?}"
     );
+}
+
+// ---------------------------------------------------------------------- W-134
+
+#[test]
+fn a_chart_s_own_furniture_is_styled_by_the_diagram_not_by_its_items() {
+    // The heading used to take the colour of whatever the genre calls its
+    // items — in a rack, `style device`, which is the one thing on the drawing
+    // it is certainly not.
+    let l = build(
+        "type rack { title: \"T\" units: 4 cell: 120 16 }\n\
+         style device { font: 11 #ff0000 }\n\
+         device a \"A\" 1 1\n",
+    );
+    let head = l.annotations.iter().find(|a| a.title).expect("a heading");
+    assert_ne!(head.color, "#ff0000", "the heading is not a device");
+
+    // And `style title` is what does colour it.
+    let l = build(
+        "type rack { title: \"T\" units: 4 cell: 120 16 }\n\
+         style device { font: 11 #ff0000 }\n\
+         style title { font: 20 #00ff00 }\n\
+         device a \"A\" 1 1\n",
+    );
+    let head = l.annotations.iter().find(|a| a.title).expect("a heading");
+    assert_eq!(head.color, "#00ff00");
+    assert_eq!(head.size, 20.0);
+}
+
+#[test]
+fn style_grid_paints_the_rules_and_the_numbers_along_them() {
+    // There was no way to recolour a rack's unit rules at all: they were the
+    // theme's, and the theme is decided by the background.
+    let plain = build("type rack { units: 4 cell: 120 16 }\ndevice a \"A\" 1 1\n");
+    let styled = build(
+        "type rack { units: 4 cell: 120 16 }\n\
+         style grid { stroke: #123456 2 dash: dotted font: 7 #654321 }\n\
+         device a \"A\" 1 1\n",
+    );
+
+    assert!(plain.guides.iter().all(|g| g.color != "#123456"));
+    let rules: Vec<&crate::layout::Guide> = styled
+        .guides
+        .iter()
+        .filter(|g| g.color == "#123456")
+        .collect();
+    assert!(!rules.is_empty(), "the unit rules take the grid's stroke");
+    assert!(rules.iter().all(|g| g.width == 2.0));
+    assert!(rules.iter().all(|g| g.dash.as_deref() == Some("dotted")));
+
+    let ticks: Vec<&crate::layout::Annotation> = styled
+        .annotations
+        .iter()
+        .filter(|a| a.text.parse::<u32>().is_ok())
+        .collect();
+    assert!(!ticks.is_empty());
+    assert!(ticks.iter().all(|a| a.color == "#654321" && a.size == 7.0));
+}
+
+#[test]
+fn a_theme_says_what_it_does_not_read() {
+    let d = diags("type rack { units: 4 }\nstyle grid { fill: #f00 }\ndevice a \"A\" 1 1\n");
+    assert!(
+        d.iter()
+            .any(|x| x.message.contains("no effect on `style grid`")),
+        "{d:?}"
+    );
+
+    // And what it does read is accepted in silence.
+    let d = diags("type rack { units: 4 }\nstyle grid { stroke: #f00 }\ndevice a \"A\" 1 1\n");
+    assert!(!d.iter().any(|x| x.message.contains("no effect")), "{d:?}");
+}
+
+#[test]
+fn a_style_that_paints_nothing_says_so() {
+    // `style device` is a theme in a rack and dead text in a pie, and the
+    // difference was invisible.
+    let d = diags(
+        "type pie\nstyle device { fill: #f00 }\nslice a \"A\" 1\nslice b \"B\" 2\nslice c \"C\" 3\n",
+    );
+    let m = d
+        .iter()
+        .find(|x| x.message.contains("paints nothing here"))
+        .unwrap_or_else(|| panic!("{d:?}"));
+    assert!(m.message.contains("themes `type rack`"), "{}", m.message);
+    assert!(
+        m.message.contains("calls its items `slice`"),
+        "{}",
+        m.message
+    );
+
+    // A class nobody applies is the milder version of the same thing.
+    let d = diags("style warn { fill: #f00 }\nnode a \"A\"\n");
+    assert!(
+        d.iter().any(|x| x.message.contains("never applied")),
+        "{d:?}"
+    );
+
+    // Applied, extended, or a theme — all silent.
+    for quiet in [
+        "style warn { fill: #f00 }\nnode a \"A\" .warn\n",
+        "style warn { fill: #f00 }\nstyle worse extends warn { }\nnode a \"A\" .worse\n",
+        "style node { fill: #f00 }\nnode a \"A\"\n",
+        "style grid { stroke: #f00 }\nnode a \"A\"\n",
+        "type rack { units: 4 }\nstyle device { fill: #f00 }\ndevice a \"A\" 1 1\n",
+    ] {
+        let d = diags(quiet);
+        assert!(
+            !d.iter().any(
+                |x| x.message.contains("paints nothing") || x.message.contains("never applied")
+            ),
+            "{quiet:?} → {d:?}"
+        );
+    }
+}
+
+#[test]
+fn every_theme_reads_properties_that_exist() {
+    // The narrowing is a list of names matched against what somebody wrote, so
+    // a renamed property would silently make a theme read nothing.
+    for t in crate::props::THEME_STYLES {
+        for name in t.only {
+            assert!(
+                crate::props::lookup(name, crate::props::PROPS).is_some(),
+                "`style {}` claims to read `{name}`, which is not a property",
+                t.name
+            );
+        }
+    }
 }
 
 // ---------------------------------------------------------------------- W-046

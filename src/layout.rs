@@ -288,6 +288,12 @@ fn place_title(layout: &mut Layout) {
     let Some(align) = layout.opts.title_align else {
         return;
     };
+    // **Everything drawn, lines included.** Boxes and text alone are not the
+    // drawing: a rack's rails and unit rules are `Guide`s, a chart's axes are
+    // `Guide`s, and an empty rack of a bank contributes nothing else at all.
+    // Centring on the boxes left the heading of a six-rack bank sitting over
+    // the fourth rack, because the two racks holding equipment and the six
+    // sets of U numbers were the only things the box knew about (`W-133`).
     let content = bbox(
         layout
             .nodes
@@ -300,7 +306,9 @@ fn place_title(layout: &mut Layout) {
                     .iter()
                     .filter(|a| !a.title)
                     .map(crate::charts::annotation_bounds),
-            ),
+            )
+            .chain(layout.guides.iter().map(|g| span(&[g.from, g.to])))
+            .chain(layout.polylines.iter().map(|p| span(&p.points))),
     );
     let Some(area) = content else { return };
 
@@ -2107,6 +2115,32 @@ fn settle_subtree(
             }
             None => {}
         }
+    }
+}
+
+/// The rectangle a run of points occupies — a line's own bounding box.
+fn span(points: &[(f64, f64)]) -> Rect {
+    let (mut x0, mut y0) = (f64::MAX, f64::MAX);
+    let (mut x1, mut y1) = (f64::MIN, f64::MIN);
+    for (x, y) in points {
+        x0 = x0.min(*x);
+        y0 = y0.min(*y);
+        x1 = x1.max(*x);
+        y1 = y1.max(*y);
+    }
+    if points.is_empty() {
+        return Rect {
+            x: 0.0,
+            y: 0.0,
+            w: 0.0,
+            h: 0.0,
+        };
+    }
+    Rect {
+        x: x0,
+        y: y0,
+        w: x1 - x0,
+        h: y1 - y0,
     }
 }
 

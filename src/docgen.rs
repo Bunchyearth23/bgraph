@@ -11,6 +11,7 @@ pub fn reference() -> String {
 
     m.push_str(HEAD);
     properties(&mut m);
+    themes(&mut m);
     graph_settings(&mut m);
     archetypes(&mut m);
     vocabulary(&mut m);
@@ -66,6 +67,48 @@ fn properties(m: &mut String) {
     for def in props::PROPS {
         row(m, def, true);
     }
+}
+
+fn themes(m: &mut String) {
+    m.push_str(
+        "\n## Themes\n\n\
+         A **theme** is a style the renderer looks up on its own: it paints \
+         without being referenced. Everything else is a **class**, and a class \
+         paints where `.name` is written and nowhere else. The list is fixed, \
+         which is what lets a style whose name is on neither list be \
+         reported rather than silently drawn nowhere.\n\n\
+         Each genre adds one more theme: its own item word, so `style slice` \
+         themes a pie and `style device` a rack.\n",
+    );
+
+    m.push_str("\n| Theme | Reads | What it paints |\n|---|---|---|\n");
+    for t in props::THEME_STYLES {
+        let reads = if !t.only.is_empty() {
+            t.only
+                .iter()
+                .filter(|n| props::lookup(n, props::PROPS).is_some_and(|d| !d.alias))
+                .map(|n| format!("`{n}`"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        } else {
+            match t.ctx {
+                Some(Ctx::Node) => "the node vocabulary".into(),
+                Some(Ctx::Edge) => "the edge vocabulary".into(),
+                _ => "everything".into(),
+            }
+        };
+        let _ = writeln!(
+            m,
+            "| `style {}` | {reads} | {} |",
+            t.name,
+            cell(&squash(t.doc))
+        );
+    }
+
+    m.push_str(
+        "\nA property outside what a theme reads is a warning, not a line that \
+         quietly draws nothing.\n",
+    );
 }
 
 fn graph_settings(m: &mut String) {
@@ -483,16 +526,32 @@ The implicit theme is the archetype's own word — `style slice { … }` in a
 pie — with `style node` and `style edge` remaining universal aliases, applied
 first so the specific name wins where both are declared. `extends` flattens a chain
 child-first. An unknown property or an unknown `.class` is an error.
+
+### Themes, and everything else
+
+A **theme** is a style the renderer looks up on its own; it paints without
+being referenced. Everything else is a **class**, and a class paints where
+`.name` is written and nowhere else. There is a fixed list of themes, and a
+style whose name is not on it and is never applied is reported — that is the
+difference between `style grid` and a typo.
+
+Each theme reads a named part of the vocabulary, and a property outside it is
+a warning rather than a line that draws nothing.
 "##;
 
 const ARCHETYPE_NOTES: &str = r#"
 Edges and placement are ignored by the chart archetypes — and reported, not
 silently dropped.
 
-`style node { … }` is the only text hook a chart has, so it governs the
-title, the on-slice labels and the legend alike. On-slice text defaults to
-white, which reads on all eight palette hues; everything else defaults to the
-theme's ink for the surface.
+A chart's own furniture is not any item's. `style grid` paints the rules a
+chart draws behind its data — a rack's unit rules, a chart's gridlines — and
+the numbers and axis labels along them; `style title` paints the heading. Both
+used to be hardcoded to the surface, and the heading used to take the colour of
+whatever the genre calls its items, which is the one thing on the drawing it is
+certainly not.
+
+On-slice text defaults to white, which reads on all eight palette hues;
+everything else defaults to the theme's ink for the surface.
 "#;
 
 const DIAGNOSTICS: &str = r#"

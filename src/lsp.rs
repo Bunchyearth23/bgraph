@@ -340,17 +340,25 @@ impl Server {
             let want = match block {
                 Block::Node | Block::Container => Some(Ctx::Node),
                 Block::Edge => Some(Ctx::Edge),
-                // `style node` and `style edge` are themes for one side, and
-                // `check_styles` warns when they reach across; offering the
-                // other side's vocabulary is offering that warning.
-                Block::Style(theme) => theme,
+                // A theme reads a named part of the vocabulary and
+                // `check_styles` warns when a style reaches outside it;
+                // offering what it does not read is offering that warning.
+                Block::Style(name) => name.and_then(props::theme_style).and_then(|t| t.ctx),
                 _ => None,
+            };
+
+            let only: &[&str] = match block {
+                Block::Style(name) => name
+                    .and_then(props::theme_style)
+                    .map_or(&[][..], |t| t.only),
+                _ => &[],
             };
 
             let offered: Vec<Value> = table
                 .iter()
                 .filter(|p| !p.alias)
                 .filter(|p| want.is_none_or(|c| p.ctx.allows(c)))
+                .filter(|p| only.is_empty() || only.contains(&p.name))
                 .enumerate()
                 .map(|(i, p)| {
                     let mut it = completion(p.name, 10, p.syntax, p.doc);
@@ -411,6 +419,35 @@ impl Server {
                 .iter()
                 .map(|a| completion(a, 20, "align", "Cross-axis alignment against the anchor."))
                 .collect();
+        }
+
+        // `style <here>` — the names the renderer looks up by itself, and the
+        // genre's own item word. A class can be called anything, which is
+        // exactly why the handful of names that are *not* free had to be
+        // offered: `style grid` looked like a typo and a typo looked like a
+        // theme (`W-134`).
+        if preceding == "style" {
+            let mut out: Vec<Value> = props::THEME_STYLES
+                .iter()
+                .map(|t| completion(t.name, 7, "theme", t.doc))
+                .collect();
+            if let Some(def) = props::archetype(archetype) {
+                for (i, word) in def.items().enumerate() {
+                    out.insert(
+                        i,
+                        completion(
+                            word,
+                            7,
+                            "theme",
+                            &format!(
+                                "Every `{word}` on the diagram, without being referenced — \
+                                 what `type {archetype}` calls its items."
+                            ),
+                        ),
+                    );
+                }
+            }
+            return out;
         }
 
         if preceding == "extends" {
@@ -1099,10 +1136,13 @@ pub(crate) fn diagnostics(text: &str) -> Vec<Value> {
 enum Block {
     Type,
     Graph,
-    /// A style block, carrying the vocabulary its *name* narrows it to: the
-    /// implicit `node` and `edge` themes take one side each, and anything
-    /// else takes both — which is the rule `check_styles` already applies.
-    Style(Option<Ctx>),
+    /// A style block, carrying the name it was declared under. A style the
+    /// renderer looks up by itself reads a named part of the vocabulary —
+    /// `node` one half, `grid` a handful of properties — and anything else is
+    /// a class, which takes both halves because it may be applied to either.
+    /// The narrowing is `props::THEME_STYLES`, the same table `check_styles`
+    /// reads, so the editor and the checker cannot disagree.
+    Style(Option<&'static str>),
     Node,
     /// A block that holds statements as well as properties — `group`,
     /// `activate`, `component`. The grammar calls it `group_block`, and the
@@ -1163,11 +1203,12 @@ impl Context {
                 // them plain nodes is what left completion offering `fill`
                 // to somebody typing `service api "API"` (`W-131`).
                 Some("group") | Some("activate") | Some("component") => Block::Container,
-                Some("style") => Block::Style(match head.split_whitespace().nth(1) {
-                    Some("node") => Some(Ctx::Node),
-                    Some("edge") => Some(Ctx::Edge),
-                    _ => None,
-                }),
+                Some("style") => Block::Style(
+                    head.split_whitespace()
+                        .nth(1)
+                        .and_then(props::theme_style)
+                        .map(|t| t.name),
+                ),
                 // Everything else is an item or an edge, and the arrow is what
                 // tells them apart. Matching the *keyword* instead would mean
                 // knowing all sixteen of them — which is how `slice a "A" {`
@@ -1552,13 +1593,13 @@ mod tests {
         let text = "style node {\n  fill";
         assert_eq!(
             Context::at(text, text.len()).block,
-            Some(Block::Style(Some(Ctx::Node)))
+            Some(Block::Style(Some("node")))
         );
 
         let text = "style edge {\n  rou";
         assert_eq!(
             Context::at(text, text.len()).block,
-            Some(Block::Style(Some(Ctx::Edge)))
+            Some(Block::Style(Some("edge")))
         );
 
         // The three heads the grammar gives a `group_block`.
@@ -1775,6 +1816,52 @@ mod tests {
         let items = server.items_for(text, "  ", text.len());
         let labels: Vec<&str> = items.iter().filter_map(|i| i["label"].as_str()).collect();
         assert!(labels.contains(&"shape") && labels.contains(&"router"));
+    }
+
+    /// A theme reads a named part of the vocabulary, so offering the rest is
+    /// offering the warning `check_styles` is about to write.
+    #[test]
+    fn a_theme_is_offered_only_what_it_reads() {
+        let server = Server {
+            docs: HashMap::new(),
+        };
+
+        let text = "style grid {\n  ";
+        let items = server.items_for(text, "  ", text.len());
+        let labels: Vec<&str> = items.iter().filter_map(|i| i["label"].as_str()).collect();
+        assert!(labels.contains(&"stroke") && labels.contains(&"font-color"));
+        assert!(!labels.contains(&"shape"), "a grid is lines and numbers");
+        assert!(!labels.contains(&"fill"), "{labels:?}");
+
+        let text = "style title {\n  ";
+        let items = server.items_for(text, "  ", text.len());
+        let labels: Vec<&str> = items.iter().filter_map(|i| i["label"].as_str()).collect();
+        assert!(labels.contains(&"font-size"));
+        assert!(!labels.contains(&"stroke"), "a heading is text");
+    }
+
+    /// The handful of names that are *not* free to choose. Without them
+    /// `style grid` looked like a typo and a typo looked like a theme.
+    #[test]
+    fn completion_offers_the_theme_names_after_style() {
+        let server = Server {
+            docs: HashMap::new(),
+        };
+
+        let text = "type rack\nstyle ";
+        let items = server.items_for(text, "style ", text.len());
+        let labels: Vec<&str> = items.iter().filter_map(|i| i["label"].as_str()).collect();
+        for name in ["device", "node", "edge", "group", "grid", "title"] {
+            assert!(labels.contains(&name), "`{name}` missing from {labels:?}");
+        }
+        // The genre's own word comes first: it is the one that changes per file.
+        assert_eq!(labels.first(), Some(&"device"));
+
+        // And another genre offers its own word, not this one.
+        let text = "type pie\nstyle ";
+        let items = server.items_for(text, "style ", text.len());
+        let labels: Vec<&str> = items.iter().filter_map(|i| i["label"].as_str()).collect();
+        assert!(labels.contains(&"slice") && !labels.contains(&"device"));
     }
 
     #[test]

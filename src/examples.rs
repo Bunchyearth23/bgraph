@@ -619,6 +619,10 @@ style device  { fill: #1e293b stroke: #334155 1 radius: 3 font: 11 #e2e8f0 }
 style network extends device { fill: #0c2a3e stroke: #38bdf8 1 }
 style power   extends device { fill: #422006 stroke: #f59e0b 1 }
 style group   { stroke: #475569 1 }
+// The diagram's own furniture, not any device's: `grid` is the unit rules and
+// the U numbers, `title` is the heading (W-134).
+style grid    { stroke: #1e293b 0.5 font: 9 #64748b }
+style title   { font: 16 #f8fafc }
 
 // `device <id> ["label"] <lowest> <highest>`
 group a1 "A1 — capture" {

@@ -105,6 +105,96 @@ pub const CARDINALITIES: &[&str] = &[
     "one-many",
 ];
 
+/// A style the renderer looks up **by itself**.
+///
+/// Everything else is a class: it paints where it is written and nowhere else.
+/// The distinction was real from the start — `style node` has always themed
+/// every box without being referenced — but it lived in `resolve`'s argument
+/// list and in nobody's documentation, so `style grid` looked exactly like a
+/// typo and a typo looked exactly like a theme (`W-134`).
+pub struct ThemeStyle {
+    pub name: &'static str,
+    /// The half of the vocabulary it reads, when it reads only one half.
+    pub ctx: Option<Ctx>,
+    /// The properties it reads, when it reads only a few. Empty means
+    /// everything its `ctx` allows. Aliases are spelled out, because this is
+    /// matched against what somebody wrote.
+    pub only: &'static [&'static str],
+    pub doc: &'static str,
+}
+
+/// Reads a colour and a line, and the text that labels them.
+const CHROME_PROPS: &[&str] = &[
+    "stroke",
+    "border",
+    "color",
+    "stroke-width",
+    "weight",
+    "dash",
+    "font",
+    "font-size",
+    "font-family",
+    "font-color",
+    "text-color",
+    "font-weight",
+];
+
+/// Reads text and nothing else.
+const TEXT_PROPS: &[&str] = &[
+    "font",
+    "font-size",
+    "font-family",
+    "font-color",
+    "text-color",
+    "font-weight",
+];
+
+/// The themes every genre honours. A genre adds one more: its own item word,
+/// so `style slice` themes a pie and `style device` a rack.
+pub const THEME_STYLES: &[ThemeStyle] = &[
+    ThemeStyle {
+        name: "node",
+        ctx: Some(Ctx::Node),
+        only: &[],
+        doc: "Every box on the diagram, without being referenced. The theme \
+              layer: put what is common here and keep named classes for what \
+              differs.",
+    },
+    ThemeStyle {
+        name: "edge",
+        ctx: Some(Ctx::Edge),
+        only: &[],
+        doc: "Every link on the diagram, without being referenced.",
+    },
+    ThemeStyle {
+        name: "group",
+        ctx: Some(Ctx::Node),
+        only: &[],
+        doc: "Every container's frame — and a rack's mounting rails, which are \
+              what a rack has instead of a frame.",
+    },
+    ThemeStyle {
+        name: "grid",
+        ctx: None,
+        only: CHROME_PROPS,
+        doc: "The rules a chart draws behind its data — a rack's unit rules, a \
+              chart's gridlines — and the numbers and axis labels along \
+              them. `stroke`, `stroke-width` and `dash` are the line; `font` \
+              and `font-color` are the text.",
+    },
+    ThemeStyle {
+        name: "title",
+        ctx: None,
+        only: TEXT_PROPS,
+        doc: "The diagram's heading. It is the diagram's text, not an item's, \
+              which is why colouring the items no longer colours it.",
+    },
+];
+
+pub fn theme_style(name: &str) -> Option<&'static ThemeStyle> {
+    THEME_STYLES.iter().find(|t| t.name == name)
+}
+
 pub const PROPS: &[PropDef] = &[
     PropDef {
         name: "legend",

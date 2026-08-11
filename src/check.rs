@@ -370,24 +370,111 @@ fn check_styles(diagram: &Diagram, def: &'static props::ArchetypeDef, out: &mut 
             ));
         }
 
-        // `node` and `edge` are the implicit themes; anything else is generic
-        // and validated against the union of both vocabularies.
-        let ctx = match style.name.as_str() {
-            "node" => Some(Ctx::Node),
-            "edge" => Some(Ctx::Edge),
-            _ => None,
-        };
+        // The themes the renderer looks up on its own each read a named part
+        // of the vocabulary; a style under any other name is generic and takes
+        // the union of both halves, because a class can be applied to either.
+        let theme = props::theme_style(style.name.as_str());
         check_props_refined(
             &style.props,
-            ctx,
+            theme.and_then(|t| t.ctx),
             def.item_props,
             props::PROPS,
             "property",
             out,
         );
+
+        // A theme that reads only a few properties says so, rather than
+        // accepting `fill` on a gridline and drawing nothing with it.
+        if let Some(theme) = theme.filter(|t| !t.only.is_empty()) {
+            for prop in &style.props {
+                if !theme.only.contains(&prop.name.as_str()) {
+                    out.push(Diag::warn(
+                        prop.name_span,
+                        format!(
+                            "`{}` has no effect on `style {}` — it reads {}",
+                            prop.name,
+                            theme.name,
+                            theme
+                                .only
+                                .iter()
+                                .filter(|n| {
+                                    props::lookup(n, props::PROPS).is_some_and(|d| !d.alias)
+                                })
+                                .map(|n| format!("`{n}`"))
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        ),
+                    ));
+                }
+            }
+        }
     }
 
+    check_dead_styles(diagram, def, out);
+
     check_extends_cycles(diagram, out);
+}
+
+/// A style that paints nothing.
+///
+/// The renderer looks up a fixed set of names by itself — `node`, `edge`,
+/// `group`, `grid`, `title`, and the genre's own item word. Everything else is
+/// a **class**: it paints where it is written and nowhere else. That
+/// distinction was real from the first commit and documented nowhere, so
+/// `style device` in a `type pie` file was a theme in the author's head and
+/// dead text on the page (`W-134`).
+///
+/// The near-miss matters more than the fact. A style named after *another*
+/// genre's item word is somebody who knows exactly what they meant.
+fn check_dead_styles(diagram: &Diagram, def: &'static props::ArchetypeDef, out: &mut Vec<Diag>) {
+    let mut used: HashSet<&str> = HashSet::new();
+    for node in &diagram.nodes {
+        used.extend(node.classes.iter().map(|c| c.as_str()));
+    }
+    for edge in &diagram.edges {
+        used.extend(edge.classes.iter().map(|c| c.as_str()));
+    }
+    for group in &diagram.groups {
+        used.extend(group.classes.iter().map(|c| c.as_str()));
+    }
+    for note in diagram.notes.iter().chain(&diagram.legends) {
+        used.extend(note.classes.iter().map(|c| c.as_str()));
+    }
+    for style in &diagram.styles {
+        if let Some(parent) = &style.extends {
+            used.insert(parent.as_str());
+        }
+    }
+
+    for style in &diagram.styles {
+        let name = style.name.as_str();
+        if used.contains(name)
+            || props::theme_style(name).is_some()
+            || def.items().any(|w| w == name)
+        {
+            continue;
+        }
+
+        // Named after a word this genre does not use, but another one does.
+        let elsewhere = props::ARCHETYPES
+            .iter()
+            .find(|a| a.name != def.name && a.items().any(|w| w == name));
+
+        out.push(Diag::warn(
+            style.name.span,
+            match elsewhere {
+                Some(other) => format!(
+                    "`style {name}` paints nothing here — `{name}` themes `type {}`, and \
+                     `type {}` calls its items `{}`",
+                    other.name, def.name, def.item
+                ),
+                None => format!(
+                    "`style {name}` is written and never applied — a class paints only \
+                     where `.{name}` is written"
+                ),
+            },
+        ));
+    }
 }
 
 fn check_extends_cycles(diagram: &Diagram, out: &mut Vec<Diag>) {

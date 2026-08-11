@@ -11,7 +11,7 @@ repository = "https://github.com/Bunchyearth23/bgraph"
 # ./editors/zed/install.sh to point it at the current HEAD.
 [grammars.bgraph]
 repository = "file:///home/bunchy/Desktop/prj/p12"
-rev = "e79ef65c15b5ae152479e9aa454ba3e2262b41ec"
+rev = "cbe35efc6777c02543c4dc6ec011875f5b7bfb16"
 path = "tree-sitter-bgraph"
 
 [language_servers.bgraph-lsp]
