@@ -64,7 +64,7 @@ disagree.
 - `cargo build --features window` — the native window (opt-in: +78 crates)
 - `cargo run --bin bgraph -- check examples/groups.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (519 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (521 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo build --no-default-features` — the four-dependency library. **A CI
   step, and it has been red before**: a `#[cfg]` on a type without one on its
   users compiles under `default` and not here
@@ -72,7 +72,10 @@ disagree.
 - `./typst/build.sh` — the module Typst's plugin protocol expects (its imports
   make it unloadable anywhere else, hence a second feature and a second file)
 - `cargo clippy --all-targets` / `cargo fmt`
-- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` (27 corpus cases)
+- `cd tree-sitter-bgraph && tree-sitter generate && tree-sitter test` — 15 cases
+  in `test/corpus/bgraph.txt`, which pin the **tree shape**. Separate from
+  `tests/grammar/` (32 accept + 6 reject), which pins that pest and tree-sitter
+  accept the *same language*; `cargo test` runs that one
 - `cd editors/zed && cargo build --target wasm32-wasip1`
 - `./editors/zed/install.sh` — installs the server, regenerates + pins the grammar
 - `./editors/vscode/package.sh` — builds `bgraph-<version>.vsix` (`--no-server` skips npm)
@@ -150,6 +153,21 @@ disagree.
   Zed loudly; a stale TextMate grammar just stops colouring a word, which
   nobody notices — `the_textmate_grammar_knows_every_word_the_compiler_does`
   is what makes it loud
+- ALWAYS: read an archetype's positional values with `NodeDecl::props_for(def)`,
+  never `effective_props(def.slots)`. The shape follows the **word the author
+  wrote** (`D-023`), and `def.slots` is only the primary word's. The free path
+  had this wrong from `W-048` until `W-102`, invisible the whole time because
+  `xy` was the only genre with a second word and `xy` is a chart
+- ALWAYS: ask the archetype for **all** its words — `def.items()` — anywhere a
+  declaration is looked for by keyword. Taking `def.item` alone means a box
+  declared under a second word is invisible; that is what broke go-to-definition
+  and anchor completion in `W-102`'s catch-up
+- ALWAYS: when an archetype is meant to choose a `shape`, a `router` or a
+  `head`, leave that field **unset in the base style** the way `topology` and
+  `process` do. `Style::node_defaults()` and `edge_defaults()` already fill
+  them, so an archetype's `style.x = style.x.or(…)` silently loses and the
+  genre supplies nothing. Five archetypes have made this mistake now, twice on
+  the same afternoon
 - ALWAYS: keep completion quiet. It must not fire inside strings or comments,
   must not offer aliases, and must not offer a property the current archetype
   does not read. A suggestion that appears while you type prose is worse than
@@ -167,6 +185,23 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-08-11] **Go-to-definition looked for `node` and nothing else.** It
+  searched the literal keywords `node` and `style`, so in the twenty-eight
+  genres with a word of their own the jump silently did nothing — and returning
+  `null` is also what "no such name" looks like, so it never read as a bug. Two
+  guards now cover it, both proven by reverting the fix. The general rule is
+  now a Pattern above: ask the archetype for `items()`, never assume one word.
+- [2026-08-11] **A default already in place beats an archetype's `.or()`.**
+  `Style::node_defaults()` sets `shape: Some(Rect)` and `edge_defaults()` sets
+  `router: Some(Straight)`, so `style.shape = style.shape.or(…)` in an
+  archetype does nothing at all. Every BPMN element rendered as a rounded
+  rectangle and every sequence flow as a diagonal, both silently correct-looking
+  enough to miss. The base style must leave the field unset — see the Pattern.
+- [2026-08-11] **A polyline is drawn under the boxes, always was, and nobody
+  needed otherwise until a mark had to go *inside* a shape.** A BPMN gateway's
+  cross rendered behind an opaque diamond, which looks exactly like "the glyph
+  code never ran". `Polyline::over` splits the pass in both writers; a test
+  asserts the emission order rather than the picture.
 - [2026-07-31] **A hard-coded list of keywords in the LSP goes stale silently.**
   `Context::at` matched a block's owner against five words, so all sixteen
   archetype item keywords read as *edges* — wrong completions in every genre

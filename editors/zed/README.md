@@ -32,7 +32,7 @@ left undone. `bgraph watch` beside the editor is the answer meanwhile.
 | after `type` | archetype names |
 | after `.` | declared style names |
 | after `extends` | declared style names |
-| after `right-of` / `above` / … | declared node ids |
+| after `right-of` / `above` / … | every item the file declares, under **any** of the genre's words |
 | inside `node { }` | node properties only |
 | inside an edge `{ }` | edge properties only |
 | inside `graph { }` | graph settings only |
@@ -50,7 +50,10 @@ like an obstacle.
 **Hover** — a property's syntax and meaning; a node's label, styles and
 **resolved position and size**; a style's flattened property list.
 
-**Go to definition** — from any node reference or `.class` to its declaration.
+**Go to definition** — from any item reference or `.class` to its declaration,
+under whichever word the genre uses: a `slice`, a `field`, a `gateway`. It only
+looked for `node` until 2026-08-11, so in every genre with a word of its own it
+quietly did nothing.
 
 **Outline** — styles and nodes in the symbol list.
 

@@ -35,6 +35,7 @@ bgraph check diagram.bd            # every mistake, with a caret under each
 bgraph explain diagram.bd api      # why that box is where it is
 bgraph diff old.bd new.bd          # what appeared, what left, what moved
 bgraph layout diagram.bd           # freeze the placements into the file
+bgraph fmt --migrate old.bd        # rewrite what a language change removed
 ```
 
 ## What you get
@@ -45,9 +46,10 @@ bgraph layout diagram.bd           # freeze the placements into the file
   themes, inline overrides. Unknown properties are errors, not silence.
 - **Shapes** — rect, stadium, ellipse, diamond, hexagon, cylinder, with edge
   endpoints clipped to the true outline.
-- **Edge control** — straight routing, or orthogonal routing that goes around
-  the boxes in the way, four arrow heads, dash
-  patterns, labels.
+- **Edge control** — straight routing, or orthogonal routing that goes **around
+  the boxes in the way** rather than through them, four arrow heads, dash
+  patterns, labels. Where there is no way round, the edge says so instead of
+  pretending.
 - **Self-sizing canvas** — the viewBox follows the content.
 - **A declared grid** — `graph { grid: 160 90 }` and `at (col 3, row 2)`.
   Still `at`, in units you chose: a coordinate system, never a solver.
@@ -62,7 +64,8 @@ bgraph layout diagram.bd           # freeze the placements into the file
   style classes that asked to be in one.
 - **Archetypes** — twenty-nine genres reinterpret the same statements as
   chart data, reusing the whole style cascade. `top: 8` folds a long tail;
-  `from: "sales.csv"` reads the rows from a table.
+  `from: "sales.csv"` reads the rows from a table. `type bpmn` is the widest:
+  tasks, events, gateways and data artefacts, with pools and lanes as groups.
 - **Themes** — `--theme light|dark|print`, laid *underneath* what the file
   declares, so the one box you coloured on purpose survives.
 - **Sketch mode** — `graph { sketch: on }`, and deterministic: the same file

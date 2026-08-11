@@ -224,7 +224,7 @@ properties carry meaning — `check` tells you when one is in the wrong place.
 ### A second word for a second shape
 
 An archetype may have **more than one word**, when the same picture can be
-described by data of a different shape. `xy` is the one that does:
+described by data of a different shape. `xy` is the smallest case of it:
 
 ```bgraph
 type xy { size: 400 200 legend: off }
@@ -246,6 +246,40 @@ x two meanings at once, so it is refused rather than blended. A scatter also
 draws dots by default — joining scattered points would claim a continuity the
 data does not have — and `mark: line` sorts them by x first, so the line runs
 left to right whatever order you wrote them in.
+
+`bpmn` is the widest case: **four** words, because a task, an event, a gateway
+and a data artefact are four different things carrying four different shapes.
+
+```bgraph
+type bpmn { title: "Order to cash" }
+
+event   got   "Order received" start message
+task    check "Check credit"   service right-of got gap 44
+gateway ok    "Approved?"      exclusive right-of check gap 44
+data    form  "Claim form"     object below check gap 40
+event   done  "Approved"       end right-of ok gap 44
+
+got   -> check
+check -> ok
+ok    -> done "yes"
+check -> form association
+```
+
+A task's kind, an event's stage and trigger, a gateway's gate and a datum's
+artefact are all drawn as marks: the shape says what the element *is* and the
+mark says which one. A `group` is a pool or a lane. Because the shape carries
+the meaning, the colour is free for whatever you are tracking.
+
+A **boundary event** sits on a task rather than in the flow, and says so by
+naming it — `event late "14 days" boundary timer { attach: pay }`. That is
+declared placement like every other: you say which box, and where on it is a
+fixed rule rather than something solved. Several on one task spread along its
+edge in the order you wrote them.
+
+Sequence flows are orthogonal by default and route around the boxes in the way;
+a message flow is dashed and straight, an association dotted and headless. Two
+limits worth knowing: a lane's name is drawn horizontally rather than turned on
+its side, and a message flow carries no circle at its source.
 
 The two sections below walk through `pie` and `packet` in prose.
 **[`reference.md`](reference.md) is the exhaustive list** — every archetype,

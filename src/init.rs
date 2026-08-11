@@ -1,6 +1,6 @@
 //! `bgraph init <genre>` — a working file to start from.
 //!
-//! Twenty-eight genres is more than anyone remembers, and the gap between
+//! Twenty-nine genres is more than anyone remembers, and the gap between
 //! "which archetype do I want" and "what does a statement look like in it" is
 //! where a reference gets opened and a diagram does not get written.
 //!

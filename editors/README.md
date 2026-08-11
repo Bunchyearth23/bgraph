@@ -12,7 +12,7 @@ What the server gives you, in every editor below:
 | Completion | properties, keywords and archetype settings, filtered by where the cursor is |
 | Hover | the resolved style of a box, and what a property means |
 | Signature help | the positional shape of the statement being written |
-| Go to definition | from an edge endpoint or an anchor to the item it names |
+| Go to definition | from an edge endpoint, an anchor or an `attach` to the item it names, under whichever word the genre declares it with |
 | Document symbols | the outline |
 | Colours | a swatch beside every colour literal, and a picker |
 | Highlight | every other mention of the identifier under the cursor |

@@ -382,7 +382,7 @@ impl Server {
         }
 
         if is_rel_dir(preceding) {
-            return declared_items(text, item)
+            return declared_items(text, archetype)
                 .into_iter()
                 .map(|(name, label)| completion(&name, 6, item, &label))
                 .collect();
@@ -472,7 +472,7 @@ impl Server {
             }
             if archetype == "free" && !current.is_empty() {
                 out.extend(
-                    declared_items(text, item)
+                    declared_items(text, archetype)
                         .into_iter()
                         .map(|(name, label)| completion(&name, 6, item, &label)),
                 );
@@ -835,11 +835,15 @@ impl Server {
         let before = text[..span.start].trim_end();
         let style_first = before.ends_with('.') || before.ends_with("extends");
 
-        let order: [&str; 2] = if style_first {
-            ["style", "node"]
-        } else {
-            ["node", "style"]
-        };
+        // Every word this genre declares an item under, not just `node`. The
+        // universal synonym was the only one looked for, so in twenty-eight of
+        // the twenty-nine genres — every one that has a word of its own —
+        // go-to-definition on a reference silently found nothing.
+        let mut order: Vec<&str> = if style_first { vec!["style"] } else { vec![] };
+        order.extend(item_words(declared_archetype(text)));
+        if !style_first {
+            order.push("style");
+        }
 
         for kind in order {
             if let Some(target) = declaration_span(text, kind, &word) {
@@ -1214,14 +1218,31 @@ fn word_at(text: &str, offset: usize) -> Option<(String, Span)> {
     Some((text[start..end].to_string(), Span { start, end }))
 }
 
-/// Items declared with either the archetype's keyword or the universal `node`.
-fn declared_items(text: &str, item: &str) -> Vec<(String, String)> {
-    let mut out = declared(text, item);
-    if item != "node" {
-        out.extend(declared(text, "node"));
+/// Every word an item can be declared under in this genre.
+///
+/// **All** of the archetype's words, not only its primary one. An archetype may
+/// declare more than one (`D-023`) — `xy` has `scatter` beside `series`, and
+/// `bpmn` has four — and asking for the first alone means a box declared under
+/// any of the others is invisible to completion and to go-to-definition. Plus
+/// `node`, the universal synonym, and `group`, which is a perfectly good
+/// anchor.
+fn item_words(archetype: &str) -> Vec<&'static str> {
+    let mut out: Vec<&'static str> = props::archetype(archetype)
+        .map(|a| a.items().collect())
+        .unwrap_or_default();
+    if !out.contains(&"node") {
+        out.push("node");
     }
-    // A group is a perfectly good anchor.
-    out.extend(declared(text, "group"));
+    out.push("group");
+    out
+}
+
+/// Items declared under any of this genre's words.
+fn declared_items(text: &str, archetype: &str) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for word in item_words(archetype) {
+        out.extend(declared(text, word));
+    }
     out
 }
 
@@ -1982,12 +2003,55 @@ mod tests {
         // In an archetype with its own word, both spellings declare items, so
         // both must be offered as references.
         let text = "type pie\nslice alpha \"A\" 1\nnode beta \"B\" { value: 2 }\n";
-        let found: Vec<String> = declared_items(text, "slice")
+        let found: Vec<String> = declared_items(text, "pie")
             .into_iter()
             .map(|(name, _)| name)
             .collect();
         assert!(found.contains(&"alpha".to_string()), "{found:?}");
         assert!(found.contains(&"beta".to_string()), "{found:?}");
+    }
+
+    #[cfg(feature = "bpmn")]
+    #[test]
+    fn every_word_of_a_genre_declares_something_the_editor_can_see() {
+        // An archetype may have more than one word (`D-023`), and only the
+        // first was being looked for — so in `xy` a `scatter` and in `bpmn` an
+        // `event`, a `gateway` and a `data` were invisible to completion and
+        // to go-to-definition alike. Four words is what made it obvious.
+        let text = "type bpmn\ntask t \"T\"\nevent e \"E\" start\n\
+                    gateway g \"G\" exclusive\ndata d \"D\" object\ngroup lane \"Lane\" { }\n";
+        let found: Vec<String> = declared_items(text, "bpmn")
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect();
+        for want in ["t", "e", "g", "d", "lane"] {
+            assert!(found.contains(&want.to_string()), "{want}: {found:?}");
+        }
+    }
+
+    #[cfg(feature = "bpmn")]
+    #[test]
+    fn go_to_definition_finds_a_box_declared_under_its_genres_own_word() {
+        // It looked for `node` and `style` and nothing else, so in every genre
+        // with a word of its own — twenty-eight of twenty-nine — the jump
+        // silently did nothing. The failure was invisible because returning
+        // `null` is also what "no such name" looks like.
+        let text = "type bpmn\ntask pay \"Pay\" service\n\
+                    event late \"Late\" boundary timer { attach: pay }\n";
+        let server = server_with(text);
+        // The cursor sits on `pay` inside `attach: pay`, the last occurrence.
+        let at = text.rfind("pay").expect("the reference is there");
+        let (line, col) = LineIndex::new(text).line_col(at + 1);
+        let answer = server.definition(&json!({
+            "textDocument": { "uri": "file:///t.bd" },
+            "position": { "line": line, "character": col },
+        }));
+
+        assert_eq!(
+            answer["range"]["start"]["line"].as_u64(),
+            Some(1),
+            "expected the `task pay` line, got {answer}"
+        );
     }
 
     #[test]

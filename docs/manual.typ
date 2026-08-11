@@ -16,7 +16,7 @@
   title: "bgraph",
   subtitle: "A diagram language where you decide the layout",
   author: "Soundnodes",
-  date: "10 August 2026 · version 1.2",
+  date: "11 August 2026 · version 1.3",
 )
 #v(1fr)
 #pagebreak(weak: true)
@@ -275,8 +275,10 @@ syntax of each.
 
   [*Edges*],
   [`arrow` `router` `label-offset`],
-  [`router: ortho` draws a right-angled elbow. `label-offset` on an edge also
-   *pins* the label, so automatic avoidance stops moving it.],
+  [`router: ortho` draws right angles, and routes *around* the boxes in the way
+   rather than through them — shortest first, then fewest corners among the
+   paths of that length. `label-offset` on an edge also *pins* the label, so
+   automatic avoidance stops moving it.],
 )
 
 #v(0.8em)
@@ -285,7 +287,9 @@ syntax of each.
 
 *There is no `opacity`.* Alpha is the fourth channel of the colour, defaulting
 to opaque — which is what lets a shape keep a solid border over a translucent
-fill. `#38bdf880` is that colour at half alpha.
+fill. `#38bdf880` is that colour at half alpha. A file written before that
+change is rewritten by `bgraph fmt --migrate`, which folds the fraction into
+every paint in the block and leaves the rest of the line exactly as it was.
 
 #v(0.4em)
 
@@ -721,6 +725,7 @@ bgraph diff old.bd new.bd
 bgraph explain diagram.bd api
 bgraph layout diagram.bd
 bgraph fmt diagram.bd
+bgraph fmt --migrate old.bd
 bgraph completions fish
 bgraph init pie
 bgraph diagram.bd --theme dark
@@ -774,7 +779,7 @@ structural and so its business, alignment is taste and is not. `--check`
 reports instead of writing, and exits non-zero, so one command serves a person
 and a build.
 
-Given a **directory**, `watch` is a build loop rather than a view: every `.bd`
+Given a *directory*, `watch` is a build loop rather than a view: every `.bd`
 in it is rendered whenever it changes, which is what a repository of sources
 beside their committed pictures needs. `--once` builds and stops, exiting
 non-zero if anything failed, so a person and a build run the same command. One
@@ -973,11 +978,15 @@ here.
    removed the larger half of the error; the rest cannot be removed. It does
    not apply to PDF, where the font is guaranteed.],
 
-  [*Orthogonal routing avoids nothing*],
-  [An `ortho` link can pass straight through a box — but it says so.],
-  [A router that avoids obstacles is a different piece of work. Drawing a wrong
-   picture *in silence* was the part worth fixing first, so the crossing is
-   reported and the message names the ways out.],
+  [*Orthogonal routing avoids boxes, not other links*],
+  [Two links whose tidiest routes share a channel share it, and a reader sees
+   one line.],
+  [Since 2026-08-11 an `ortho` link goes *around* the boxes in the way; what it
+   does not do is consider the other links. Fixing that means routing them
+   together — which makes the result depend on declaration order — or a
+   lane-assignment pass over the finished routes. Where no path exists at all
+   the link keeps its old elbow and the crossing is reported, because a drawing
+   that admits it is wrong beats a missing edge.],
 
   [*Edge labels avoid lines, not each other*],
   [On a busy diagram a label can end up somewhere no cost function would have
@@ -1011,6 +1020,13 @@ positions; the first is a property of the format itself.
 #dtable(
   header: ([Version], [Date], [What changed]),
   columns: (auto, auto, 1fr),
+
+  [*1.3*], [11 August 2026], [`type bpmn`, the twenty-ninth genre and the
+   widest — four words, because four things carry four shapes of data. An
+   `ortho` link now routes *around* the boxes, so the note saying it avoids
+   nothing has been rewritten to say what it still does not avoid: the other
+   links. `bgraph fmt --migrate` rewrites a removed `opacity`. The licence
+   question is closed: proprietary, recorded as a decision.],
 
   [*1.2*], [10 August 2026], [`watch` shows a picture as readily as a source,
    and opens a native window when the build has one. Records that the viewer is
