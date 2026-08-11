@@ -666,6 +666,10 @@ On a `state` — these are its own, and are not offered elsewhere:
 <summary>A complete file — <code>examples/state.bd</code></summary>
 
 ```
+// The gaps are wide where the transition carries a long label: a guard is
+// text on the line, and a gap narrower than it lets the next box paint over
+// it. `check` says so rather than widening anything itself — moving a box is
+// the author's call (`D-001`).
 type state { title: "Order lifecycle" }
 graph { background: #0b1120 padding: 32 gap: 54 }
 
@@ -679,8 +683,8 @@ state placed "Placed"      right-of draft
 
 group fulfil "fulfilment" {
   padding: 22
-  state picking "Picking"  right-of placed gap 60
-  state shipped "Shipped"  right-of picking gap 46
+  state picking "Picking"  right-of placed gap 150
+  state shipped "Shipped"  right-of picking gap 80
 }
 
 state done "Delivered"     right-of fulfil gap 56
@@ -1408,6 +1412,12 @@ On a `set` — these are its own, and are not offered elsewhere:
 // Three sets. With two the lens is *solved* to the number written; with three
 // the overlaps are labelled but arranged, and `check` says so — three circles
 // cannot honour all seven regions at once (W-053).
+//
+// **On a white surface on purpose**, and one of only two examples that is
+// (`Q-006`). A Venn is read through its overlaps, which are translucent fills
+// composited on top of each other; on a dark surface each layer darkens the
+// one beneath and the three-way region goes to near black. Light is the only
+// surface on which "more layers" reads as "more".
 type venn {
   title: "Who reads which diagram"
   radius: 105
@@ -1482,6 +1492,11 @@ On a `task` — these are its own, and are not offered elsewhere:
 // shapes: a task has a kind, an event has a stage and a trigger, a gateway has
 // a gate, a datum has an artefact. Placement is declared as it is everywhere
 // else — the archetype supplies the notation, the author says where it goes.
+//
+// **On a white surface on purpose**, and one of only two examples that is
+// (`Q-006`). BPMN is a notation people already know from somewhere else, and
+// everywhere else draws it black on white; a process diagram in this project's
+// house dark would be the first thing a reader has to translate.
 type bpmn { title: "Expense claim" }
 graph { background: #ffffff padding: 36 gap: 40 }
 

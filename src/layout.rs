@@ -1197,7 +1197,12 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                 annotations.push(Annotation {
                     text: label.clone(),
                     x: xa + out * 1.4,
-                    y: ya - 4.0,
+                    // `Annotation::y` is the text's **middle**, not its
+                    // baseline, so four pixels above the wire still put the
+                    // name across it — and a wire is the one thing in a loom
+                    // drawing a reader follows with a finger. Half the text
+                    // plus a little clears it.
+                    y: ya - placed.style.font_size.unwrap_or(11.0) / 2.0 - 4.0,
                     anchor: if out > 0.0 {
                         Anchor::Start
                     } else {

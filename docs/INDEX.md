@@ -25,8 +25,10 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**One question is open (`Q-006`) and two chantiers are planned (`W-113` and
-`W-114`), both of them from the author rendering every `bgraph init <genre>` on
+**No question is open, nothing is planned and nothing is blocked.** The twelve
+faults the author found by rendering every `bgraph init <genre>` on 2026-08-11
+are all answered — nine chantiers, `W-107` … `W-115`, all landed the same day.
+That sweep was from the author rendering every `bgraph init <genre>` on
 2026-08-11 and saying what he saw. Nothing is blocked.** The licence question closed on 2026-08-11 — `D-032` says
 proprietary, and says it as a decision rather than a silence, because the four
 built-and-unpublished chantiers will make somebody ask again. Thirty-nine ideas
@@ -59,22 +61,21 @@ solved.
 
 ### Questions
 
-| id | state | title | notes |
-|---|---|---|---|
-| `Q-006` | open | Two examples of twenty-nine are on a white surface. Accident or choice? | `venn` and `bpmn` declare `background: #ffffff`; the other twenty-seven are dark. `bgraph init <genre>` is the first thing a newcomer meets, and two white files among twenty-seven dark ones read as an oversight rather than a decision. Both have a real reason — a Venn rests on translucent fills that compose badly on a dark surface, and BPMN is conventionally drawn on white — but nothing in either file says so |
+Nothing open. `Q-006` was answered the day it was asked.
 
 ### Work planned
 
 **The author rendered every `bgraph init <genre>` and reported twelve faults on
 2026-08-11.** They were nine chantiers, not twelve, because three of the reports
 were one defect and two more were another — and only one was a failure rather
-than a drawing that is merely wrong to look at. Seven landed the same day; two
-are left, and one of those needs a decision before any code.
+than a drawing that is merely wrong to look at. All nine landed the same day. `W-113`
+looked like it needed a decision first — a label wider than its gap seemed to
+force a choice between clipping text and letting the engine move a box — and it
+did not: the example declared too small a gap, and the engine's part is to
+**say so**, which is what `D-001` has always implied.
 
 | id | state | title | notes |
 |---|---|---|---|
-| `W-113` | planned · **decide first** | `type state`: a guard is truncated and the frame lies over its transitions | `[funds clear]` is wider than the gap between the two boxes. Widening a gap automatically is **moving a box**, which `D-001` forbids the engine — so establish first whether the example simply declares too small a gap. Only if it does not is there a question here, and it is a question |
-| `W-114` | planned | Four drawings that are right and ugly | The sequence activation bar reads as a hole rather than a bar; a harness label sits on the wire a reader is meant to follow with a finger; gitgraph's merge rails look detached from their commits; a Venn's set labels sit on the circles instead of outside them |
 
 
 
@@ -140,6 +141,8 @@ not copies.
 
 | id | date | title | commit |
 |---|---|---|---|
+| `W-113` | 2026-08-11 | A `type state` guard is readable, and a label a box swallows is **reported**. It was not truncated — nodes are painted after labels, so `[funds cleared]` was overpainted by `Picking` and the text was simply gone. The example declared a gap narrower than its own label, which is the author's to widen, so the engine says so instead of doing it: widening a gap **moves a box**, and `D-001` forbids the engine that. The diagnostic includes the edge's **own endpoints**, unlike the crossing check — excluding them missed the only case it exists for, because the box that swallows a label is nearly always one of the two it runs between. It fires on one example of thirty and on none of the other twenty-nine, which is what makes it worth having rather than worth switching off | this commit |
+| `W-114` | 2026-08-11 | Four drawings that were right and ugly. **The sequence activation bar** took the participant's own fill, which on a dark surface is the same slate as the header — so it read as a hole punched in the picture; it takes the participant's *stroke* now, the colour of the lifeline it covers. **A harness label** sat on the wire a reader follows with a finger, because `Annotation::y` is the text's middle and not its baseline, so four pixels above the wire still put it across it. **A gitgraph branch** turned halfway between its two commits in both directions, so a branch line began in mid-air a half-step from the commit it came from; it turns near the commit it *leaves* going down and near the one it *joins* coming up. **A Venn's set names** sat above their circles, which only works for one circle — with three on a triangle the top of the lower-left one is inside the upper one, so a name landed in somebody else's set. Outward from the arrangement's centre is the one direction guaranteed clear of every other circle | this commit |
 | `W-107` | 2026-08-11 | A cylinder that carries a `description` no longer emits invalid SVG. **The one hard failure of the twelve.** `render_svg::described` assumed a shape was one element: it took the tag name from the first `<` and the closing `/>` from the last, so a cylinder — a `<path>` body and an `<ellipse>` cap — came out as `<ellipse …><title>…</title></path>`. A browser draws that, which is why the HTTP preview never showed it and the golden test, which compares bytes and says nothing about validity, never caught it; **resvg refuses it**, so `--window` and `--png` failed on `type block` and on nothing else. Reachable by any diagram with a cylinder *and* a description, a pair that only became possible when `W-085` gave every genre a `description`. The fix is a `<g><title>…</title>…</g>`, valid whatever the shape is made of, and it removes the tag-sniffing rather than repairing it. The guard that was missing is now there: a hand-rolled well-formedness scan over every checked-in SVG, which named the defect exactly when it first ran | this commit |
 | `W-108` | 2026-08-11 | A compartment's name is centred, in every box. Three of the author's twelve reports — `class`, `er`, `requirements` — were one heuristic: `W-065` made the name left-align once its box passed twice the title's width. **This reverses that half of `W-065`, and says so rather than quietly dropping it.** The reasoning then was sound about a single box: a short name centred in a wide box floats away from the left-aligned members under it. What it missed is that the threshold is crossed by some boxes and not others, so one picture came out with `OrderLine` centred and `User`, `Order` and `Money` not — and a rule that changes its mind between two boxes in the same drawing reads as a defect even where each case alone is defensible. Consistency wins, and centred is what UML draws | this commit |
 | `W-109` | 2026-08-11 | A cylinder's text sits below its cap instead of across it. `shape_allowance` adds the cap's room to the box's height, but `node_label` centred on `rect.cy()` for every shape — so the allowance was split evenly while the cap only eats from the top. Visible on `block`'s Postgres and `network`'s storage shelf. The half-cap is now one function both writers call, because two copies of the expression would be two chances for the text and the drawing to disagree | this commit |
@@ -259,6 +262,7 @@ Nothing is marked `landed` without a commit to point at.
 
 | id | date | title | became | was |
 |---|---|---|---|---|
+| `Q-006` | 2026-08-11 | Two examples of twenty-nine are on a white surface. Accident or choice? | **Choice, now written down** | Asked because `bgraph init <genre>` is the first thing a newcomer meets, and two white files among twenty-seven dark ones read as an oversight. Both had a real reason and neither said it, which is the whole of the problem: a Venn is read through translucent fills composited on each other, and on a dark surface each layer darkens the one beneath until the three-way region goes to near black; BPMN is a notation people already know from somewhere else, and everywhere else draws it black on white. Both files now carry the reason in a comment. The alternative — making all twenty-nine match — was refused because it would cost the Venn its readability to buy a uniformity nobody asked for |
 | `Q-001` | 2026-07-31 | What does `type` select — a placement strategy or a diagram genre? | `D-007` | |
 | `Q-002` | 2026-07-31 | Which archetype after `pie` and `packet`? | answered by the work — `W-016` … `W-026` all landed, so the ordering question stopped having a subject | **Restored 2026-08-10.** This line had been *deleted* rather than closed, which is exactly what the rule at the top of this file forbids: an identifier never changes and is never reused, and state is explicit. A deleted question reads as a question that was never asked. Its last recorded note said the survey had answered it in part and what remained was the order, naming `W-019`, `W-024`, `W-018` and `W-016` as the ones with no prerequisite |
 | `Q-003` | 2026-07-31 | What shape should the embeddable API take? | `D-017` | |

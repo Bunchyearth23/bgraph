@@ -2,6 +2,11 @@
 // shapes: a task has a kind, an event has a stage and a trigger, a gateway has
 // a gate, a datum has an artefact. Placement is declared as it is everywhere
 // else — the archetype supplies the notation, the author says where it goes.
+//
+// **On a white surface on purpose**, and one of only two examples that is
+// (`Q-006`). BPMN is a notation people already know from somewhere else, and
+// everywhere else draws it black on white; a process diagram in this project's
+// house dark would be the first thing a reader has to translate.
 type bpmn { title: "Expense claim" }
 graph { background: #ffffff padding: 36 gap: 40 }
 

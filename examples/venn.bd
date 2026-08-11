@@ -1,6 +1,12 @@
 // Three sets. With two the lens is *solved* to the number written; with three
 // the overlaps are labelled but arranged, and `check` says so — three circles
 // cannot honour all seven regions at once (W-053).
+//
+// **On a white surface on purpose**, and one of only two examples that is
+// (`Q-006`). A Venn is read through its overlaps, which are translucent fills
+// composited on top of each other; on a dark surface each layer darkens the
+// one beneath and the three-way region goes to near black. Light is the only
+// surface on which "more layers" reads as "more".
 type venn {
   title: "Who reads which diagram"
   radius: 105

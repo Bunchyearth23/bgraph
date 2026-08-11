@@ -199,6 +199,43 @@ pub fn after_layout(layout: &crate::layout::Layout) -> Vec<Diag> {
     let mut out = Vec::new();
     let routed = crate::render_svg::route_all(layout);
 
+    // An edge label drawn over a box. Nodes are painted after labels, so the
+    // box wins and the text is simply gone — which is what `[funds cleared]`
+    // looked like in `examples/state.bd`: not truncated, overpainted.
+    //
+    // Reported rather than repaired, and that is the whole point. The fix is to
+    // widen the gap or move the label, and both are the author's to make:
+    // widening a gap **moves a box**, which `D-001` forbids the engine. So this
+    // says which edge and names the two ways out, the same bargain `X-004`
+    // struck before there was a router (`W-113`).
+    for (i, (edge, route)) in layout.edges.iter().zip(&routed).enumerate() {
+        let Some((text, label)) = &route.label else {
+            continue;
+        };
+        // **Including its own endpoints.** They are not excluded the way they
+        // are for a crossing, because the box that swallows a label is nearly
+        // always one of the two it runs between: the gap is too narrow for the
+        // text and the text is centred in it. Excluding them missed the one
+        // case this exists for.
+        let hidden = layout.nodes.iter().find(|node| {
+            label.x < node.rect.right()
+                && label.right() > node.rect.x
+                && label.y < node.rect.bottom()
+                && label.bottom() > node.rect.y
+        });
+        if let Some(node) = hidden {
+            let _ = i;
+            out.push(Diag::warn(
+                edge.span,
+                format!(
+                    "the label `{text}` is drawn over `{}`, which is painted after it — \
+                     widen the gap, or move the label with `label-offset`",
+                    node.id
+                ),
+            ));
+        }
+    }
+
     for (edge, route) in layout.edges.iter().zip(&routed) {
         // A straight edge is clipped against both shapes and goes nowhere
         // near anything else by construction. An elbow is routed around

@@ -1,3 +1,7 @@
+// The gaps are wide where the transition carries a long label: a guard is
+// text on the line, and a gap narrower than it lets the next box paint over
+// it. `check` says so rather than widening anything itself — moving a box is
+// the author's call (`D-001`).
 type state { title: "Order lifecycle" }
 graph { background: #0b1120 padding: 32 gap: 54 }
 
@@ -11,8 +15,8 @@ state placed "Placed"      right-of draft
 
 group fulfil "fulfilment" {
   padding: 22
-  state picking "Picking"  right-of placed gap 60
-  state shipped "Shipped"  right-of picking gap 46
+  state picking "Picking"  right-of placed gap 150
+  state shipped "Shipped"  right-of picking gap 80
 }
 
 state done "Delivered"     right-of fulfil gap 56

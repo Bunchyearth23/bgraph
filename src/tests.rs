@@ -943,6 +943,43 @@ fn after(source: &str) -> Vec<String> {
 }
 
 #[test]
+fn a_label_wider_than_its_gap_is_reported_rather_than_repaired() {
+    // `W-113`. Nodes are painted after labels, so a label that does not fit
+    // between the two boxes it runs between is not truncated — it is
+    // overpainted, and the text is simply gone. That is what `[funds cleared]`
+    // looked like in `examples/state.bd`.
+    //
+    // The engine says so instead of fixing it, because both fixes are the
+    // author's: widening a gap **moves a box**, which `D-001` forbids it to do.
+    // Tall boxes, because the label solver *does* slide a label off a short
+    // one — this is the case it cannot escape, and the case that reaches a
+    // reader.
+    let tight = after(
+        "node a \"A\" at (0, 0) { size: 60 200 }\n\
+         node b \"B\" right-of a gap 20 { size: 60 200 }\n\
+         a -> b \"a rather long transition label\"\n",
+    );
+    assert!(
+        tight.iter().any(|m| m.contains("is drawn over")),
+        "{tight:?}"
+    );
+    assert!(
+        tight.iter().any(|m| m.contains("label-offset")),
+        "the message names a way out: {tight:?}"
+    );
+
+    // Room for it, and nothing is said. The diagnostic fires on one example of
+    // thirty and on none of the other twenty-nine, which is what makes it worth
+    // having rather than worth turning off.
+    let roomy = after(
+        "node a \"A\" at (0, 0) { size: 60 200 }\n\
+         node b \"B\" right-of a gap 320 { size: 60 200 }\n\
+         a -> b \"a rather long transition label\"\n",
+    );
+    assert_eq!(roomy, Vec::<String>::new());
+}
+
+#[test]
 fn an_ortho_edge_goes_round_the_box_it_used_to_go_through() {
     // `X-004`, both halves. This case is what `W-064` added the diagnostic for
     // — a line drawn straight through `mid` and saying nothing about it — and

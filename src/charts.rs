@@ -575,11 +575,24 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             let colour = palette[rail.min(palette.len() - 1)].to_string();
             // A right angle, not a diagonal into the dot: the message sits
             // above its commit, and a line rising into it crosses the text.
-            // The turn happens between the two commits, where nothing is.
+            //
+            // **Which end the turn sits at follows the direction.** A branch
+            // going *down* to a new rail leaves its parent, so it turns just
+            // after it; one coming *up* is a merge, so it turns just before the
+            // commit it merges into. Turning before the child in both cases —
+            // which is what this did — left a branch line starting in mid-air,
+            // a whole step to the right of the commit it came from (`W-114`).
             let points = if (py - cy).abs() < 0.5 {
                 vec![(px, py), (cx, cy)]
             } else {
-                let turn = cx - along * 0.45;
+                // Close to the commit it leaves or joins, not halfway between:
+                // at half a step the vertical reads as its own thing rather
+                // than as this branch coming off that commit.
+                let turn = if cy > py {
+                    px + along * 0.22
+                } else {
+                    cx - along * 0.22
+                };
                 vec![(px, py), (turn, py), (turn, cy), (cx, cy)]
             };
             polylines.push(Polyline {
@@ -1165,6 +1178,15 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         (x - min_x, y - min_y + title_h + 18.0)
     };
 
+    // The middle of the arrangement, which is what "outward" is measured from.
+    let hub = {
+        let n = sets.len().max(1) as f64;
+        let (sx, sy) = (0..sets.len())
+            .map(place)
+            .fold((0.0, 0.0), |(ax, ay), (x, y)| (ax + x, ay + y));
+        (sx / n, sy / n)
+    };
+
     for (i, (_, name, count, colour, style)) in sets.iter().enumerate() {
         let r = radius(*count);
         let (cx, cy) = place(i);
@@ -1187,13 +1209,31 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
             },
         });
 
-        // The name sits above its circle rather than inside it: the inside is
-        // where the overlaps are, and a name there would compete with them.
+        // The name sits **outside its circle, on the side facing away from the
+        // pile**. Straight above was the first answer and it only works for one
+        // circle: with three arranged on a triangle, the top of the lower-left
+        // circle is inside the upper one, so its name landed in somebody else's
+        // set — which is where a reader looks for an overlap count. The
+        // direction away from the arrangement's centre is the one direction
+        // guaranteed to be clear of every other circle (`W-114`).
+        let (dx, dy) = (cx - hub.0, cy - hub.1);
+        let away = dx.hypot(dy);
+        let (ux, uy) = if away < 1.0 {
+            (0.0, -1.0)
+        } else {
+            (dx / away, dy / away)
+        };
         annotations.push(Annotation {
             text: format!("{name}  {}", trim_number(*count)),
-            x: cx,
-            y: cy - r - 8.0,
-            anchor: Anchor::Middle,
+            x: cx + ux * (r + 14.0),
+            y: cy + uy * (r + 14.0),
+            anchor: if ux < -0.3 {
+                Anchor::End
+            } else if ux > 0.3 {
+                Anchor::Start
+            } else {
+                Anchor::Middle
+            },
             size: 12.0,
             color: ink(&base, &theme),
             weight: "600".into(),
@@ -4431,6 +4471,14 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             },
             style: Style {
                 radius: Some(2.0),
+                // A bar, not a box. Taking the participant's own fill made it
+                // the same dark slate as the header on a dark surface, so it
+                // read as a hole punched in the picture rather than as a mark
+                // on the lifeline — which is exactly how it was reported. The
+                // participant's **stroke** is the right paint: it is already
+                // the colour of the lifeline this bar covers, and it stands off
+                // the background on either surface (`W-114`).
+                fill: style.stroke.clone().or(style.fill),
                 ..style
             },
         });

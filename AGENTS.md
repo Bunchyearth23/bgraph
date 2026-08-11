@@ -64,7 +64,7 @@ disagree.
 - `cargo build --features window` — the native window (opt-in: +78 crates)
 - `cargo run --bin bgraph -- check examples/groups.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (521 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (523 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo build --no-default-features` — the four-dependency library. **A CI
   step, and it has been red before**: a `#[cfg]` on a type without one on its
   users compiles under `default` and not here
@@ -185,6 +185,20 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-08-11] **The golden test compares bytes and says nothing about
+  validity.** An SVG with an `<ellipse>` closed by a `</path>` was checked in
+  and passed every run: browsers draw it, so the preview looked fine, and only
+  resvg refused — which meant `--window` and `--png` failed on one genre and
+  nothing else noticed. `every_rendered_example_is_well_formed_xml` is the
+  guard. Any new writer needs the same question asked of it: does anything
+  check that what we emit *parses*, or only that it has not changed?
+- [2026-08-11] **A drawing helper that assumes one element breaks on the two
+  shapes made of two.** `described` took the tag name from the first `<` and
+  the closing `/>` from the last. A cylinder is a `<path>` and an `<ellipse>`.
+  Wrap, do not sniff.
+- [2026-08-11] **`Annotation::y` is the text's middle, not its baseline.** Four
+  pixels above a wire still drew the label across it. Anything positioning an
+  annotation relative to a line has to subtract half the font size too.
 - [2026-08-11] **Go-to-definition looked for `node` and nothing else.** It
   searched the literal keywords `node` and `style`, so in the twenty-eight
   genres with a word of their own the jump silently did nothing — and returning
