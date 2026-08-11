@@ -1009,6 +1009,75 @@ fn a_bend_rounds_an_elbow_and_a_curve_is_a_polyline_like_everything_else() {
 }
 
 #[test]
+fn two_ortho_lines_do_not_run_along_each_other() {
+    // `X-018`. The router avoided boxes and not other lines, so two edges whose
+    // tidiest routes crossed the same tall obstacle both took the one channel
+    // over it and a reader saw a single line for the length of the overlap.
+    //
+    // Three edges, one obstacle they must all get past, and a floor below so
+    // the space is genuinely contended.
+    let source = "node a1 \"A1\" at (0, 0) { size: 90 50 }\n\
+                  node a2 \"A2\" at (0, 90) { size: 90 50 }\n\
+                  node a3 \"A3\" at (0, 180) { size: 90 50 }\n\
+                  node wall \"W\" at (220, -60) { size: 90 360 }\n\
+                  node b1 \"B1\" at (440, 0) { size: 90 50 }\n\
+                  node b2 \"B2\" at (440, 90) { size: 90 50 }\n\
+                  node b3 \"B3\" at (440, 180) { size: 90 50 }\n\
+                  node floor \"F\" at (0, 340) { size: 530 40 }\n\
+                  style edge { router: ortho }\n\
+                  a1 -> b1\na2 -> b2\na3 -> b3\n";
+    let l = build(source);
+    let routes = render_svg::route_all(&l);
+
+    // How much any two of them run along each other, collinear.
+    let mut shared = 0.0_f64;
+    for i in 0..routes.len() {
+        for j in (i + 1)..routes.len() {
+            for p in routes[i].points.windows(2) {
+                for q in routes[j].points.windows(2) {
+                    let span = |a: f64, b: f64, c: f64, d: f64| {
+                        (a.max(b).min(c.max(d)) - a.min(b).max(c.min(d))).max(0.0)
+                    };
+                    if (p[0].1 - p[1].1).abs() < 0.01
+                        && (q[0].1 - q[1].1).abs() < 0.01
+                        && (p[0].1 - q[0].1).abs() < 0.01
+                    {
+                        shared += span(p[0].0, p[1].0, q[0].0, q[1].0);
+                    }
+                    if (p[0].0 - p[1].0).abs() < 0.01
+                        && (q[0].0 - q[1].0).abs() < 0.01
+                        && (p[0].0 - q[0].0).abs() < 0.01
+                    {
+                        shared += span(p[0].1, p[1].1, q[0].1, q[1].1);
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        shared < 1.0,
+        "{shared} points of line run along another line"
+    );
+
+    // And no run passes nearer a box than the clearance — which is what the
+    // clearance was always meant to mean, and what the lanes this fix creates
+    // would otherwise have quietly broken.
+    for route in &routes {
+        for seg in route.points.windows(2) {
+            for node in l.nodes.iter().filter(|n| n.id == "wall" || n.id == "floor") {
+                let r = node.rect;
+                let m = 10.0;
+                let hit = seg[0].0.max(seg[1].0) > r.x - m
+                    && seg[0].0.min(seg[1].0) < r.right() + m
+                    && seg[0].1.max(seg[1].1) > r.y - m
+                    && seg[0].1.min(seg[1].1) < r.bottom() + m;
+                assert!(!hit, "a run hugs `{}`: {seq:?}", node.id, seq = seg);
+            }
+        }
+    }
+}
+
+#[test]
 fn two_lines_between_the_same_pair_do_not_lie_on_each_other() {
     // `X-018`, narrowed. Direction is ignored: `a -> b` and `b -> a` share a
     // corridor, and two lines drawn on top of each other are two lines a

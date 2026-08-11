@@ -728,6 +728,14 @@ bows between the two ends. Both are **sampled into the polyline** rather than
 emitted as arcs, so the bounds, the label solver, the PDF writer and the JSON
 export all keep working on the one shape they already understand.
 
+Two `ortho` lines no longer run along each other either. Edges are routed in
+the order they are declared, and each remembers the runs it took; a later one
+pays for overlapping them and takes another channel where one exists —
+contention creates a lane either side of a run already taken, so there usually
+is one. Where there genuinely is not, the two still share, because refusing
+would mean a missing edge rather than a doubled line. Which edge gets the
+direct channel follows the order you wrote them in.
+
 Two lines between the same pair bow apart on their own, without a word: drawn
 straight they lie on top of each other, and a reader sees one line. The bow's
 side follows the *pair* and not the direction each was written in, or `a -> b`

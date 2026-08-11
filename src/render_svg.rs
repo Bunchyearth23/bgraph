@@ -398,6 +398,12 @@ pub fn route_all(layout: &Layout) -> Vec<Routed> {
     let ports = attachments(layout);
     let siblings = parallels(layout);
 
+    // What earlier lines have already run along. Accumulated in declaration
+    // order, which is what makes the answer the same every run — and what makes
+    // it the author's to change, since reordering two statements reorders who
+    // gets the direct channel (`X-018`).
+    let mut used: Vec<crate::ortho::Used> = Vec::new();
+
     let mut routed: Vec<Routed> = layout
         .edges
         .iter()
@@ -423,8 +429,9 @@ pub fn route_all(layout: &Layout) -> Vec<Routed> {
                     edge.style.router.unwrap_or(Router::Straight),
                     &obstacles,
                     ports[e],
+                    &used,
                 );
-                let line = through(line, &edge.via, &obstacles, edge.style.router);
+                let line = through(line, &edge.via, &obstacles, edge.style.router, &used);
                 // Two lines between the same pair lie on top of each other
                 // when both are straight. Each takes its own bow, alternating
                 // sides so a pair separates rather than both leaning one way.
@@ -441,6 +448,14 @@ pub fn route_all(layout: &Layout) -> Vec<Routed> {
                     }
                     _ => line,
                 };
+                // Only an orthogonal run is worth remembering: a straight line
+                // is a diagonal and two of them meeting is a crossing, which
+                // reads fine, and a curve already bows clear of its twin.
+                if edge.style.router == Some(Router::Ortho) {
+                    for pair in line.windows(2) {
+                        used.push((pair[0], pair[1]));
+                    }
+                }
                 round_corners(&line, edge.style.bend.unwrap_or(0.0))
             },
             label: None,
@@ -1086,6 +1101,7 @@ fn outline(r: &Rect, shape: Shape) -> Vec<(f64, f64)> {
 
 // ---------------------------------------------------------------- edges
 
+#[allow(clippy::too_many_arguments)]
 fn route(
     from: &PlacedNode,
     to: &PlacedNode,
@@ -1095,6 +1111,7 @@ fn route(
     // line (`D-033`). `None` leaves that end exactly where it always was, so a
     // diagram nobody has crowded draws the same as it did.
     ports: [Option<(f64, f64)>; 2],
+    used: &[crate::ortho::Used],
 ) -> Vec<(f64, f64)> {
     let a = &from.rect;
     let b = &to.rect;
@@ -1123,7 +1140,7 @@ fn route(
         // than dropping the edge is deliberate: `check::after_layout` then says
         // the line crosses something, which is a drawing that admits it is
         // wrong, where a missing edge is one that lies.
-        Router::Ortho if let Some(path) = crate::ortho::route(*a, *b, obstacles) => {
+        Router::Ortho if let Some(path) = crate::ortho::route(*a, *b, obstacles, used) => {
             // The solver runs centre to centre and is clipped to the two
             // outlines; a declared attachment replaces the clipped end with the
             // point that was asked for, and a short stub joins the two so the
@@ -1217,6 +1234,7 @@ fn through(
     via: &[(f64, f64)],
     obstacles: &[Rect],
     router: Option<Router>,
+    used: &[crate::ortho::Used],
 ) -> Vec<(f64, f64)> {
     if via.is_empty() || line.len() < 2 {
         return line;
@@ -1231,7 +1249,8 @@ fn through(
         // the solver is given two degenerate rectangles: it routes from one to
         // the other and avoids everything else, which is exactly the question.
         let leg = if router == Some(Router::Ortho) {
-            crate::ortho::route(dot(at), dot(*stop), obstacles).unwrap_or_else(|| vec![at, *stop])
+            crate::ortho::route(dot(at), dot(*stop), obstacles, used)
+                .unwrap_or_else(|| vec![at, *stop])
         } else {
             vec![at, *stop]
         };

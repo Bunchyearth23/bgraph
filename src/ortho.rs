@@ -68,24 +68,45 @@ const GRID: f64 = 1000.0;
 /// box at the boundary, and a channel line sits exactly `CLEARANCE` outside.
 const EPS: f64 = 1e-6;
 
+/// An axis-aligned run some earlier line already occupies.
+pub type Used = ((f64, f64), (f64, f64));
+
+/// How much a shared run costs, per point of overlap.
+///
+/// A price and not a wall (`X-018`). Blocking a used run outright would make a
+/// line that has no alternative simply fail, and a missing edge is worse than a
+/// doubled one — the same reasoning that made the router decline rather than
+/// draw through a box. At this weight a detour is preferred wherever one
+/// exists, and where none does the lines still overlap and the drawing is no
+/// worse than it was.
+const SHARE_COST: f64 = 2.5;
+
+/// How far a lane sits from the run it is avoiding.
+///
+/// Contention creates its own grid lines rather than the grid being enriched
+/// everywhere: parallel channels are only wanted where two lines actually want
+/// the same one, and doubling the grid for every diagram would cost every
+/// diagram.
+const LANE: f64 = 11.0;
+
 /// A path from `a` to `b` that enters no box in `obstacles`, or `None` when
 /// there is none to find.
 ///
 /// The returned points start on `a`'s boundary and end on `b`'s, with the
 /// elbows in between — the same shape the old router returned, so nothing
 /// downstream learns that this exists.
-pub fn route(a: Rect, b: Rect, obstacles: &[Rect]) -> Option<Vec<(f64, f64)>> {
+pub fn route(a: Rect, b: Rect, obstacles: &[Rect], used: &[Used]) -> Option<Vec<(f64, f64)>> {
     if obstacles.len() > MAX_OBSTACLES {
         return None;
     }
 
-    let (xs, ys) = lines(a, b, obstacles);
+    let (xs, ys) = lines(a, b, obstacles, used);
     let nx = xs.len();
     let at = |v: &[f64], want: f64| v.binary_search_by(|p| order(*p, want)).ok();
     let start = at(&xs, snap(a.cx()))? + at(&ys, snap(a.cy()))? * nx;
     let goal = at(&xs, snap(b.cx()))? + at(&ys, snap(b.cy()))? * nx;
 
-    let path = search(start, goal, &xs, &ys, obstacles)?;
+    let path = search(start, goal, &xs, &ys, obstacles, used)?;
     let points: Vec<(f64, f64)> = path.iter().map(|p| (xs[p % nx], ys[p / nx])).collect();
 
     clip(straighten(points), a, b)
@@ -98,7 +119,7 @@ pub fn route(a: Rect, b: Rect, obstacles: &[Rect]) -> Option<Vec<(f64, f64)>> {
 /// of from a corner. An obstacle's own centre lines are deliberately absent:
 /// they buy no path that the channels do not already offer, and every extra
 /// line costs a column of grid.
-fn lines(a: Rect, b: Rect, obstacles: &[Rect]) -> (Vec<f64>, Vec<f64>) {
+fn lines(a: Rect, b: Rect, obstacles: &[Rect], used: &[Used]) -> (Vec<f64>, Vec<f64>) {
     let mut xs = vec![snap(a.cx()), snap(b.cx())];
     let mut ys = vec![snap(a.cy()), snap(b.cy())];
 
@@ -107,6 +128,21 @@ fn lines(a: Rect, b: Rect, obstacles: &[Rect]) -> (Vec<f64>, Vec<f64>) {
         xs.push(snap(r.right() + CLEARANCE));
         ys.push(snap(r.y - CLEARANCE));
         ys.push(snap(r.bottom() + CLEARANCE));
+    }
+
+    // A lane either side of every run an earlier line took. Without these the
+    // penalty below has nowhere to send anything: the only horizontal channel
+    // over a tall box is the one that box defines, so two lines crossing it
+    // both take it however dearly it is priced (`X-018`).
+    for ((x0, y0), (x1, y1)) in used {
+        if (y0 - y1).abs() < EPS {
+            ys.push(snap(y0 - LANE));
+            ys.push(snap(y0 + LANE));
+        }
+        if (x0 - x1).abs() < EPS {
+            xs.push(snap(x0 - LANE));
+            xs.push(snap(x0 + LANE));
+        }
     }
 
     let tidy = |v: &mut Vec<f64>| {
@@ -136,12 +172,14 @@ const V: usize = 1;
 const NONE: usize = 2;
 
 /// A\* over the grid, returning the point indices of a least-cost path.
+#[allow(clippy::too_many_arguments)]
 fn search(
     start: usize,
     goal: usize,
     xs: &[f64],
     ys: &[f64],
     obstacles: &[Rect],
+    used: &[Used],
 ) -> Option<Vec<usize>> {
     let nx = xs.len();
     let point = |p: usize| (xs[p % nx], ys[p / nx]);
@@ -205,7 +243,11 @@ fn search(
             } else {
                 0
             };
-            let cost = here + step as i64 + corner;
+            // What this step would cost by running on top of a line already
+            // drawn. Priced by how much of it is shared, so brushing past one
+            // is cheap and running with it for a screen is not.
+            let shared = (overlap((x, y), to, used) * SHARE_COST * GRID) as i64;
+            let cost = here + step as i64 + corner + shared;
             let reached = next * AXES + next_axis;
             if cost < best[reached] {
                 best[reached] = cost;
@@ -218,13 +260,43 @@ fn search(
     None
 }
 
-/// Whether an axis-aligned segment enters a rectangle's interior. Running along
-/// an edge is not entering it, which is what makes a channel usable.
+/// How much of an axis-aligned segment lies on top of a run already taken.
+///
+/// Collinear overlap only: two lines that cross are two lines a reader can
+/// follow, and charging for a crossing would make every route wander.
+fn overlap(p: (f64, f64), q: (f64, f64), used: &[Used]) -> f64 {
+    let mut total = 0.0;
+    for ((x0, y0), (x1, y1)) in used {
+        let along = |a: f64, b: f64, c: f64, d: f64| {
+            (a.max(b).min(c.max(d)) - a.min(b).max(c.min(d))).max(0.0)
+        };
+        if (p.1 - q.1).abs() < EPS && (y0 - y1).abs() < EPS && (p.1 - y0).abs() < EPS {
+            total += along(p.0, q.0, *x0, *x1);
+        }
+        if (p.0 - q.0).abs() < EPS && (x0 - x1).abs() < EPS && (p.0 - x0).abs() < EPS {
+            total += along(p.1, q.1, *y0, *y1);
+        }
+    }
+    total
+}
+
+/// Whether an axis-aligned segment comes closer to a box than the clearance.
+///
+/// The box is grown by `CLEARANCE` before the test, so this asks the question
+/// the clearance was always meant to answer: *no run passes nearer than that*.
+/// It used to ask only whether the run entered the box, which was the same
+/// thing while every candidate line sat exactly a clearance out — and stopped
+/// being the same thing the moment contention started creating lanes of its
+/// own, one of which hugged an obstacle at five pixels (`X-018`).
+///
+/// A hair less than the clearance, so a line *on* a channel — which is exactly
+/// a clearance away — is still allowed.
 fn enters(p: (f64, f64), q: (f64, f64), r: &Rect) -> bool {
-    p.0.max(q.0) > r.x + EPS
-        && p.0.min(q.0) < r.right() - EPS
-        && p.1.max(q.1) > r.y + EPS
-        && p.1.min(q.1) < r.bottom() - EPS
+    let m = CLEARANCE - 0.5;
+    p.0.max(q.0) > r.x - m + EPS
+        && p.0.min(q.0) < r.right() + m - EPS
+        && p.1.max(q.1) > r.y - m + EPS
+        && p.1.min(q.1) < r.bottom() + m - EPS
 }
 
 /// Drop the points that say nothing: a repeat, or a corner that does not turn.
