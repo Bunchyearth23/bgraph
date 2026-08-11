@@ -15,6 +15,13 @@ faces="${BTYP_FONTS:-$HOME/Desktop/typ-base/btyp}"
 font_args=()
 [[ -d "$faces" ]] && font_args=(--font-path "$faces")
 
+# The documents render their diagrams through bgraph's own Typst plugin
+# (`W-138`), which is a wasm module and not a checked-in file. Built here when
+# it is missing, so `./compile.sh docs/manual.typ` is still one command on a
+# fresh clone.
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+[[ -f "$here/typst/bgraph.wasm" ]] || "$here/typst/build.sh"
+
 [[ $# -eq 1 ]] || { echo "usage: ./compile.sh docs/<name>.typ" >&2; exit 1; }
 src="$1"
 name="$(basename "$src" .typ)"

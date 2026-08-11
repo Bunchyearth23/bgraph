@@ -657,6 +657,54 @@ fn the_design_note_still_lists_every_keyword() {
     }
 }
 
+/// The manual is illustrated by the compiler it documents.
+///
+/// There were nine `.svg` files beside their sources, and on the day the
+/// renderer changed eight of the nine were quietly out of date — a document
+/// describing one language and illustrating another, with nothing to say so.
+/// It reads the `.bd` through bgraph's own Typst plugin now, so a diagram that
+/// stops parsing stops the build (`W-138`).
+#[test]
+fn the_manual_draws_its_diagrams_rather_than_embedding_them() {
+    let manual = include_str!("../docs/manual.typ");
+
+    assert!(
+        manual.contains(r#"#import "../typst/bgraph.typ""#),
+        "the manual does not use the plugin"
+    );
+    assert!(
+        !manual.contains(".svg\""),
+        "the manual embeds a rendered picture again"
+    );
+
+    // Every source it reads has to be there, and every source there has to be
+    // read — an orphan `.bd` in that directory is one nobody renders, so
+    // nobody notices when it breaks.
+    let dir = std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/docs/diagrams"));
+    let mut on_disk: Vec<String> = std::fs::read_dir(dir)
+        .expect("docs/diagrams")
+        .filter_map(|e| e.ok())
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    on_disk.sort();
+
+    assert!(
+        on_disk.iter().all(|n| n.ends_with(".bd")),
+        "a rendered picture is checked in beside its source: {on_disk:?}"
+    );
+    for name in &on_disk {
+        assert!(
+            manual.contains(&format!("diagrams/{name}")),
+            "`{name}` is in docs/diagrams and the manual never draws it"
+        );
+    }
+    assert_eq!(
+        manual.matches("read(\"diagrams/").count(),
+        on_disk.len(),
+        "the manual reads a source that is not there"
+    );
+}
+
 #[test]
 fn the_manual_names_every_genre_and_its_word() {
     // The manual carries a table of every `type` and the word it calls its

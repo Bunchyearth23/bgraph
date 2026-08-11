@@ -9,6 +9,17 @@
 
 #import "btyp/btyp.typ": *
 
+// The diagrams in this document are rendered *by the thing it documents*, from
+// the `.bd` sources beside it — `docs/diagrams/*.bd` — through bgraph's own
+// Typst plugin. There were checked-in `.svg` files here until `W-138`, which
+// meant a language change could leave the manual illustrating an older one and
+// nothing would say so. Now a diagram that no longer parses fails the build.
+//
+// It needs the module: `./typst/build.sh`, which `compile.sh` runs when it is
+// missing. Imported under a second name because the theme already has a
+// `diagram` — that one is the figure, this one is the picture inside it.
+#import "../typst/bgraph.typ": diagram as render
+
 #show: bunchy-theme.with()
 
 #v(1fr)
@@ -141,7 +152,7 @@ idiomatic one.
 #slide(title: "Placement")[
 
 #diagram(
-  image("diagrams/anchors.svg", width: 76%),
+  render(read("diagrams/anchors.bd"), width: 76%),
   caption: [Four boxes, three of them placed against a neighbour.],
 )
 
@@ -197,7 +208,7 @@ auto-layout by another name.
 #slide(title: "Style is a cascade")[
 
 #diagram(
-  image("diagrams/cascade.svg", width: 92%),
+  render(read("diagrams/cascade.bd"), width: 92%),
   caption: [Each layer overwrites only what it mentions.],
 )
 
@@ -383,7 +394,7 @@ where the fact lives:
 `pie` · `bar` · `xy` · `radar` · `treemap` · `sankey` · `quadrant` · `venn`
 
 #diagram(
-  image("diagrams/family-charts.svg", width: 78%),
+  render(read("diagrams/family-charts.bd"), width: 78%),
   caption: [`type bar` — one series per statement, its numbers in category order.],
 )
 
@@ -435,7 +446,7 @@ series amer "AMER" 200 210 265 280
 `class` · `er` · `sequence` · `state` · `block` · `requirements`
 
 #diagram(
-  image("diagrams/family-software.svg", width: 80%),
+  render(read("diagrams/family-software.bd"), width: 80%),
   caption: [`type er` — a bare `- ` line in the block is a column.],
 )
 
@@ -474,7 +485,7 @@ series amer "AMER" 200 210 265 280
 `packet` · `bytefield` · `wave` · `harness` · `rack` · `network`
 
 #diagram(
-  image("diagrams/family-wire.svg", width: 88%),
+  render(read("diagrams/family-wire.bd"), width: 88%),
   caption: [`type bytefield` — the ruler counts bytes, and the range is inclusive.],
 )
 
@@ -524,7 +535,7 @@ field etype "e_type"              16 17
 `gantt` · `timeline` · `journey` · `kanban` · `gitgraph`
 
 #diagram(
-  image("diagrams/family-planning.svg", width: 86%),
+  render(read("diagrams/family-planning.bd"), width: 86%),
   caption: [`type gantt` — dates and durations are literals, not strings.],
 )
 
@@ -565,7 +576,7 @@ field etype "e_type"              16 17
 #two-col(
   [
 #diagram(
-  image("diagrams/family-trees.svg", width: 100%),
+  render(read("diagrams/family-trees.bd"), width: 100%),
   caption: [`type orgchart` — the hierarchy is the edges.],
 )
 
@@ -608,7 +619,7 @@ so.
 #slide(title: "What the compiler refuses")[
 
 #diagram(
-  image("diagrams/pipeline.svg", width: 100%),
+  render(read("diagrams/pipeline.bd"), width: 100%),
   caption: [The language server reuses the first four stages, so the editor and the command line can never disagree.],
 )
 
@@ -706,7 +717,7 @@ larger promise than this makes.
 #v(0.3em)
 
 #diagram(
-  image("diagrams/compose.svg", width: 88%),
+  render(read("diagrams/compose.bd"), width: 88%),
   caption: [Three files, one diagram. The prefix is what makes the second
   include safe: without it, two files declaring `api` would be an error
   naming both.],

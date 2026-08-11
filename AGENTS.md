@@ -64,7 +64,7 @@ disagree.
 - `cargo run --bin bgraph -- watch a.svg` — the same viewer, on a picture
 - `cargo run --bin bgraph -- check /tmp/a.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
-- `cargo test` (552 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
+- `cargo test` (553 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
 - `cargo build --no-default-features` — the four-dependency library. **A CI
   step, and it has been red before**: a `#[cfg]` on a type without one on its
   users compiles under `default` and not here
@@ -195,6 +195,13 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-08-11] **A picture checked in beside its source goes stale silently.**
+  `docs/diagrams/` held nine `.svg` files; the day the renderer changed, eight
+  were out of date and the manual illustrated a language it no longer
+  described. The manual renders them through `typst/bgraph.typ` now
+  (`./compile.sh` builds the module when missing) — so a diagram that stops
+  parsing stops the build. Never re-add a rendered picture beside a `.bd`; a
+  test refuses it.
 - [2026-08-11] **A style's *name* decides whether it paints anything.** A fixed
   set — `props::THEME_STYLES` plus the genre's item word — is looked up by the
   renderer itself; everything else paints only where `.name` is written. Add a

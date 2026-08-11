@@ -12,9 +12,13 @@ bgraph arch.bd -o arch.svg
 #image("arch.svg")
 ```
 
-This is what this project's own manual does. It is the right answer when the
-diagram is a file beside the document: the `.bd` is versioned next to the
-`.svg`, both are reviewable, and the document build stays a document build.
+It is the right answer when the picture must exist as a file in its own right
+— a README, a wiki, anything that embeds an image it does not build.
+
+It is **not** what this project's own manual does any more. Nine `.svg` files
+sat beside their sources in `docs/diagrams/`, and on the day the renderer
+changed, eight of the nine were quietly out of date: the manual illustrated a
+language it no longer described, and nothing said so (`W-138`).
 
 ## The plugin: source inside the document
 
@@ -24,6 +28,10 @@ compiles to wasm, so `bgraph.typ` is that module wrapped for `plugin()`.
 ```sh
 ./typst/build.sh               # → typst/bgraph.wasm
 ```
+
+This is what the manual does: `docs/manual.typ` imports this file and reads
+its `.bd` sources, so the document is illustrated by the compiler it documents
+and a diagram that stops parsing stops the build.
 
 ```typst
 #import "bgraph.typ": diagram, diagram-file
