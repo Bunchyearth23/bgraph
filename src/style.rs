@@ -39,6 +39,19 @@ pub enum Router {
     Ortho,
 }
 
+/// Which side of a box a line attaches to.
+///
+/// Declared, unlike the route between two of them — `D-033`. Nothing here says
+/// *where* on the side: several lines sharing one spread along it, which is a
+/// rule and not a decision, so it stays clear of `D-001`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Side {
+    Top,
+    Bottom,
+    Left,
+    Right,
+}
+
 /// What a state is, in `type state`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StateKind {
@@ -193,6 +206,12 @@ pub struct Style {
     /// `type venn` — how many things are in a set, and how many two share.
     pub set_size: Option<f64>,
     pub shared: Option<f64>,
+    /// Which side of each box the line attaches to, and where it sits among
+    /// the lines sharing that side (`D-033`). `None` is `auto`: the router
+    /// picks, which is right nearly always and is the reason this is opt-in.
+    pub from_side: Option<Side>,
+    pub to_side: Option<Side>,
+    pub lane: Option<f64>,
     /// `type bpmn` — which element this is, and what it carries.
     ///
     /// Kept as the written word rather than six more enums, the way `risk`,
@@ -291,6 +310,9 @@ impl Style {
             wire,
             set_size,
             shared,
+            from_side,
+            to_side,
+            lane,
             task_kind,
             stage,
             trigger,
@@ -503,6 +525,23 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
                 other => bail!("unknown kind `{other}`"),
             }
         }
+        "from" | "to" => {
+            let word = first.and_then(|x| x.as_word()).unwrap_or("auto");
+            let side = match word {
+                "auto" => None,
+                "top" => Some(Side::Top),
+                "bottom" => Some(Side::Bottom),
+                "left" => Some(Side::Left),
+                "right" => Some(Side::Right),
+                other => bail!("unknown side `{other}`"),
+            };
+            if prop.name == "from" {
+                style.from_side = side;
+            } else {
+                style.to_side = side;
+            }
+        }
+        "lane" => style.lane = first.and_then(|x| x.as_num()),
         "stage" => style.stage = first.and_then(|x| x.as_word()).map(String::from),
         "trigger" => style.trigger = first.and_then(|x| x.as_word()).map(String::from),
         "gate" => style.gate = first.and_then(|x| x.as_word()).map(String::from),

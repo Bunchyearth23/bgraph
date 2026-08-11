@@ -641,7 +641,7 @@ host fw  "Edge firewall" firewall below net gap 60 { addr: "203.0.113.1" }
 host tor "Top-of-rack" switch below fw gap 60 { addr: "10.0.0.1" }
 
 group core "Core segment — 10.0.0.0/24" {
-  host proc01 "snds-p01-proc01" server right-of tor gap 90 { addr: "10.0.0.11" }
+  host proc01 "snds-p01-proc01" server right-of tor gap 190 { addr: "10.0.0.11" }
   host proc02 "snds-p01-proc02" server below proc01 gap 40 { addr: "10.0.0.12" }
   host shelf  "Storage shelf"   storage below proc02 gap 40 { addr: "10.0.0.20" }
 }
@@ -650,7 +650,10 @@ net -> fw  "uplink" "1 GbE"
 fw  -> tor "trunk"  "10 GbE"
 tor -> proc01 "" "10 GbE"
 tor -> proc02 "" "10 GbE"
-tor -> shelf  "" "10 GbE"
+// Told which side to leave by (`D-033`). Three links off one switch share its
+// right-hand side; sending the longest one out of the bottom keeps its label
+// off the switch and its line out of the other two's way.
+tor -> shelf  "" "10 GbE" { from: bottom to: left }
 "##;
 
 const VENN: &str = r##"// Three sets. With two the lens is *solved* to the number written; with three

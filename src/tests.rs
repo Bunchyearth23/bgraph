@@ -943,6 +943,91 @@ fn after(source: &str) -> Vec<String> {
 }
 
 #[test]
+fn an_edge_attaches_where_it_is_told_to() {
+    // `D-033`. Placement was declared and attachment was not, so an author
+    // could say where every box goes and still not stop two heads landing on
+    // the same three pixels.
+    let l = build(
+        "node a \"A\" at (0, 0) { size: 100 100 }\n\
+         node b \"B\" at (300, 300) { size: 100 100 }\n\
+         a -> b { router: ortho from: bottom to: left }\n",
+    );
+    let path = &render_svg::route_all(&l)[0].points;
+    let (a, b) = (l.nodes[0].rect, l.nodes[1].rect);
+
+    let start = path[0];
+    let end = *path.last().expect("a routed edge has an end");
+    assert!(
+        (start.1 - a.bottom()).abs() < 0.5,
+        "it leaves by the bottom: {start:?}"
+    );
+    assert!(
+        (end.0 - b.x).abs() < 0.5,
+        "and arrives at the left: {end:?}"
+    );
+}
+
+#[test]
+fn lines_arriving_at_one_side_share_it_instead_of_stacking() {
+    // The half of `D-033` nobody has to write a word for. Two heads at one
+    // point is what the author reported; two *tails* at one point is the same
+    // ambiguity seen from the other end, so both spread.
+    let l = build(
+        "node hub \"Hub\" at (400, 0) { size: 120 200 }\n\
+         node p \"P\" at (0, 0) { size: 80 60 }\n\
+         node q \"Q\" at (0, 100) { size: 80 60 }\n\
+         p -> hub\nq -> hub\n",
+    );
+    let routes = render_svg::route_all(&l);
+    let (first, second) = (
+        *routes[0].points.last().unwrap(),
+        *routes[1].points.last().unwrap(),
+    );
+    assert!(
+        (first.1 - second.1).abs() > 10.0,
+        "two arrivals on one side are apart: {first:?} and {second:?}"
+    );
+
+    // A line arriving and a line leaving are **not** in each other's way — a
+    // head and a tail at one point read perfectly well — so separating them
+    // would only bend two lines that were straight.
+    let l = build(
+        "node a \"A\" at (0, 0) { size: 80 60 }\n\
+         node m \"M\" at (200, 0) { size: 80 60 }\n\
+         node z \"Z\" at (400, 0) { size: 80 60 }\n\
+         a -> m\nm -> z\n",
+    );
+    let routes = render_svg::route_all(&l);
+    let into_m = *routes[0].points.last().unwrap();
+    let out_of_m = routes[1].points[0];
+    let m = l.nodes[1].rect;
+    assert!((into_m.1 - m.cy()).abs() < 0.5, "{into_m:?}");
+    assert!((out_of_m.1 - m.cy()).abs() < 0.5, "{out_of_m:?}");
+}
+
+#[test]
+fn an_attachment_lands_on_the_outline_and_not_on_the_bounding_box() {
+    // A hexagon's widest point is at mid-height, so a port two thirds of the
+    // way down its right-hand side sits *outside* the shape and the line
+    // starts in mid-air — which is what `type network` drew the first time
+    // spreading ran.
+    let l = build(
+        "node hex \"Hex\" at (0, 0) { size: 200 120 shape: hexagon }\n\
+         node p \"P\" at (400, -80) { size: 80 60 }\n\
+         node q \"Q\" at (400, 80) { size: 80 60 }\n\
+         hex -> p\nhex -> q\n",
+    );
+    let hexagon = l.nodes[0].rect;
+    for route in render_svg::route_all(&l) {
+        let start = route.points[0];
+        assert!(
+            start.0 < hexagon.right() - 1.0,
+            "a hexagon is narrower than its box away from mid-height: {start:?}"
+        );
+    }
+}
+
+#[test]
 fn a_label_wider_than_its_gap_is_reported_rather_than_repaired() {
     // `W-113`. Nodes are painted after labels, so a label that does not fit
     // between the two boxes it runs between is not truncated — it is

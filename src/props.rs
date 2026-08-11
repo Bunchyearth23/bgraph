@@ -54,6 +54,11 @@ pub const HEADS: &[&str] = &[
     "solid", "filled", "triangle", "open", "line", "thin", "dot", "circle", "none",
 ];
 
+/// Which side of a box a line attaches to. `auto` is the default and is
+/// spelled rather than left as the absence of a word, so a class can put a
+/// side back to the engine's choice.
+pub const SIDES: &[&str] = &["auto", "top", "bottom", "left", "right"];
+
 pub const ROUTERS: &[&str] = &["straight", "direct", "line", "ortho", "orthogonal", "elbow"];
 
 pub const DASHES: &[&str] = &["solid", "dashed", "dotted", "none"];
@@ -314,6 +319,35 @@ pub const PROPS: &[PropDef] = &[
         words: ROUTERS,
         syntax: "router: <straight|ortho>",
         doc: "`straight` draws a direct line; `ortho` draws a right-angled elbow.",
+    },
+    PropDef {
+        name: "from",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: SIDES,
+        syntax: "from: <auto|top|bottom|left|right>",
+        doc: "Which side of the first box the line leaves by. `auto`, the \
+              default, lets the router pick — this is for when it picks badly, \
+              or when two lines have to leave by different sides. The route \
+              between the two attachments is still the engine's (`D-033`).",
+    },
+    PropDef {
+        name: "to",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: SIDES,
+        syntax: "to: <auto|top|bottom|left|right>",
+        doc: "Which side of the second box the line arrives at.",
+    },
+    PropDef {
+        name: "lane",
+        alias: false,
+        ctx: Ctx::Edge,
+        words: &[],
+        syntax: "lane: <n>",
+        doc: "Where this line sits among the ones sharing its side. Lines on \
+              one side spread along it in declaration order; `lane` reorders \
+              them by hand, counting from 1 at the left or the top.",
     },
     PropDef {
         name: "route",

@@ -226,15 +226,154 @@ pub fn render(layout: &Layout) -> String {
     svg
 }
 
+/// Where each edge attaches, at each end: `None` where the router still picks.
+///
+/// Two passes, because the second needs the first finished. **Which side** is
+/// declared by `from` / `to`, or failing that derived the way the elbow router
+/// always derived it — the dominant direction between the two centres. **Where
+/// on that side** is then a share: every line arriving at one side of one box
+/// takes its own slice of it, in declaration order, so two heads can no longer
+/// land on the same three pixels. `lane` reorders them by hand.
+///
+/// Spreading decides no order and moves no box, so it stays clear of `D-001`;
+/// it only stops the engine from putting several answers in one place.
+fn attachments(layout: &Layout) -> Vec<[Option<(f64, f64)>; 2]> {
+    use crate::style::Side;
+
+    /// One end of one edge: which edge, and whether this is its tail.
+    type End = (usize, bool);
+    /// Everything wanting one side of one box, in one direction.
+    type Bucket = (usize, Side, bool, Vec<End>);
+
+    // Which side each end of each edge uses, declared or derived.
+    let side_of = |edge: &crate::layout::PlacedEdge, at_from: bool| -> Option<Side> {
+        let declared = if at_from {
+            edge.style.from_side
+        } else {
+            edge.style.to_side
+        };
+        if declared.is_some() {
+            return declared;
+        }
+        let (a, b) = (layout.nodes[edge.from].rect, layout.nodes[edge.to].rect);
+        let (dx, dy) = (b.cx() - a.cx(), b.cy() - a.cy());
+        // The same rule the elbow used: whichever axis dominates decides.
+        Some(match (dx.abs() >= dy.abs(), at_from) {
+            (true, true) => {
+                if dx >= 0.0 {
+                    Side::Right
+                } else {
+                    Side::Left
+                }
+            }
+            (true, false) => {
+                if dx >= 0.0 {
+                    Side::Left
+                } else {
+                    Side::Right
+                }
+            }
+            (false, true) => {
+                if dy >= 0.0 {
+                    Side::Bottom
+                } else {
+                    Side::Top
+                }
+            }
+            (false, false) => {
+                if dy >= 0.0 {
+                    Side::Top
+                } else {
+                    Side::Bottom
+                }
+            }
+        })
+    };
+
+    // Every (box, side, direction) and the ends that want it, in declaration
+    // order. **Direction is part of the key**, and that is what keeps the rule
+    // from being a nuisance: a line arriving at a side and a line leaving it
+    // are not in each other's way — a head and a tail at one point read
+    // perfectly well — so separating them only bends two lines that were
+    // straight. Two heads at one point is the thing worth fixing, and two
+    // heads are two arrivals.
+    let mut buckets: Vec<Bucket> = Vec::new();
+    for (e, edge) in layout.edges.iter().enumerate() {
+        if edge.from == edge.to {
+            continue;
+        }
+        for at_from in [true, false] {
+            let node = if at_from { edge.from } else { edge.to };
+            let Some(side) = side_of(edge, at_from) else {
+                continue;
+            };
+            match buckets
+                .iter_mut()
+                .find(|(n, s, out, _)| *n == node && *s == side && *out == at_from)
+            {
+                Some((_, _, _, ends)) => ends.push((e, at_from)),
+                None => buckets.push((node, side, at_from, vec![(e, at_from)])),
+            }
+        }
+    }
+
+    let mut out = vec![[None, None]; layout.edges.len()];
+    for (node, side, _, ends) in buckets {
+        // One line on a side keeps the middle, which is what every drawing did
+        // before this existed — so a diagram with no crowding does not move.
+        if ends.len() < 2 && !declares(&layout.edges[ends[0].0], ends[0].1) {
+            continue;
+        }
+        let r = layout.nodes[node].rect;
+        let n = ends.len() as f64;
+        for (k, (e, at_from)) in ends.iter().enumerate() {
+            // `lane` counts from 1 and is clamped rather than refused: a lane
+            // past the end is a diagram that still has to draw.
+            let slot = layout.edges[*e]
+                .style
+                .lane
+                .map(|l| (l - 1.0).clamp(0.0, n - 1.0))
+                .unwrap_or(k as f64);
+            let along = (slot + 1.0) / (n + 1.0);
+            let on_rect = match side {
+                Side::Top => (r.x + r.w * along, r.y),
+                Side::Bottom => (r.x + r.w * along, r.bottom()),
+                Side::Left => (r.x, r.y + r.h * along),
+                Side::Right => (r.right(), r.y + r.h * along),
+            };
+            // Onto the **outline**, not the bounding box. A hexagon's widest
+            // point is at mid-height, so a port two thirds of the way down its
+            // right-hand side sits outside the shape entirely and the line
+            // starts in mid-air — which is exactly what `type network` drew the
+            // first time this ran. `boundary` follows the ray from the centre,
+            // so the offset survives and the point lands on the drawn edge.
+            out[*e][usize::from(!at_from)] = Some(boundary(&layout.nodes[node], on_rect));
+        }
+    }
+    out
+}
+
+/// Whether this end of this edge names its own side.
+fn declares(edge: &crate::layout::PlacedEdge, at_from: bool) -> bool {
+    if at_from {
+        edge.style.from_side.is_some()
+    } else {
+        edge.style.to_side.is_some()
+    }
+}
+
 /// Route every edge and place every edge label.
 ///
 /// Public because three writers need the same answer — SVG, PDF and the JSON
 /// export — and a second implementation would be a second diagram.
 pub fn route_all(layout: &Layout) -> Vec<Routed> {
+    let ports = attachments(layout);
+
     let mut routed: Vec<Routed> = layout
         .edges
         .iter()
-        .map(|edge| Routed {
+        .enumerate()
+        .map(|(e, edge)| Routed {
             points: if edge.from == edge.to {
                 self_loop(&layout.nodes[edge.from])
             } else {
@@ -254,6 +393,7 @@ pub fn route_all(layout: &Layout) -> Vec<Routed> {
                     &layout.nodes[edge.to],
                     edge.style.router.unwrap_or(Router::Straight),
                     &obstacles,
+                    ports[e],
                 )
             },
             label: None,
@@ -904,14 +1044,22 @@ fn route(
     to: &PlacedNode,
     router: Router,
     obstacles: &[crate::layout::Rect],
+    // Where each end attaches, when it was declared or shared with another
+    // line (`D-033`). `None` leaves that end exactly where it always was, so a
+    // diagram nobody has crowded draws the same as it did.
+    ports: [Option<(f64, f64)>; 2],
 ) -> Vec<(f64, f64)> {
     let a = &from.rect;
     let b = &to.rect;
 
     match router {
         Router::Straight => {
-            let start = boundary(from, (b.cx(), b.cy()));
-            let end = boundary(to, (a.cx(), a.cy()));
+            // An attachment aims the ray: the line still leaves the shape's
+            // real outline, so a diamond or an ellipse is clipped as before —
+            // it is the *direction* the port decides, not the clipping.
+            let start =
+                ports[0].unwrap_or_else(|| boundary(from, ports[1].unwrap_or((b.cx(), b.cy()))));
+            let end = ports[1].unwrap_or_else(|| boundary(to, start));
             vec![start, end]
         }
         // `X-004`. The solver goes around the boxes; the elbow below is what is
@@ -920,12 +1068,18 @@ fn route(
         // than dropping the edge is deliberate: `check::after_layout` then says
         // the line crosses something, which is a drawing that admits it is
         // wrong, where a missing edge is one that lies.
-        Router::Ortho if let Some(path) = crate::ortho::route(*a, *b, obstacles) => path,
+        Router::Ortho if let Some(path) = crate::ortho::route(*a, *b, obstacles) => {
+            // The solver runs centre to centre and is clipped to the two
+            // outlines; a declared attachment replaces the clipped end with the
+            // point that was asked for, and a short stub joins the two so the
+            // line still leaves the box square rather than at an angle.
+            attach(path, ports, *a, *b)
+        }
         Router::Ortho => {
             let dx = b.cx() - a.cx();
             let dy = b.cy() - a.cy();
 
-            if dx.abs() >= dy.abs() {
+            let elbow = if dx.abs() >= dy.abs() {
                 let sx = if dx >= 0.0 { a.right() } else { a.x };
                 let ex = if dx >= 0.0 { b.x } else { b.right() };
                 let mid = (sx + ex) / 2.0;
@@ -935,9 +1089,65 @@ fn route(
                 let ey = if dy >= 0.0 { b.y } else { b.bottom() };
                 let mid = (sy + ey) / 2.0;
                 vec![(a.cx(), sy), (a.cx(), mid), (b.cx(), mid), (b.cx(), ey)]
-            }
+            };
+            // The fallback honours an attachment too: which line you get when
+            // the solver declines is not a reason to lose what you declared.
+            attach(elbow, ports, *a, *b)
         }
     }
+}
+
+/// Move a routed path's ends onto their declared attachment points.
+///
+/// The solver runs centre to centre and clips to the two outlines, which is the
+/// right answer when nobody has said otherwise. When somebody has, the clipped
+/// end is replaced and a **stub** is inserted from the port to the first point
+/// the path already had inside the box — so the line still leaves square
+/// through the side that was named, rather than cutting to it at an angle.
+fn attach(
+    mut path: Vec<(f64, f64)>,
+    ports: [Option<(f64, f64)>; 2],
+    a: Rect,
+    b: Rect,
+) -> Vec<(f64, f64)> {
+    if path.len() < 2 {
+        return path;
+    }
+    if let Some(p) = ports[0] {
+        let next = path[1];
+        path[0] = p;
+        // A right angle out of the side: horizontal off a left or right edge,
+        // vertical off a top or bottom one.
+        let stub = if (p.0 - a.x).abs() < 0.01 || (p.0 - a.right()).abs() < 0.01 {
+            (next.0, p.1)
+        } else {
+            (p.0, next.1)
+        };
+        if long_enough(p, stub) {
+            path.insert(1, stub);
+        }
+    }
+    if let Some(p) = ports[1] {
+        let last = path.len() - 1;
+        let prev = path[last - 1];
+        path[last] = p;
+        let stub = if (p.0 - b.x).abs() < 0.01 || (p.0 - b.right()).abs() < 0.01 {
+            (prev.0, p.1)
+        } else {
+            (p.0, prev.1)
+        };
+        if long_enough(p, stub) {
+            path.insert(last, stub);
+        }
+    }
+    path
+}
+
+/// Whether a stub is worth having. A one-pixel elbow is not a right angle, it
+/// is a kink — and the label solver anchors on whichever segment it finds, so a
+/// degenerate one puts the text on the box the line has just left.
+fn long_enough(a: (f64, f64), b: (f64, f64)) -> bool {
+    (a.0 - b.0).abs() + (a.1 - b.1).abs() > 6.0
 }
 
 /// An edge from a node to itself: a loop over its top edge. Sampled as a

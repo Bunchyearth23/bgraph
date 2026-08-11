@@ -238,6 +238,9 @@ Aliases are marked. They behave identically to the property they alias; the edit
 | `arrow` | edge | `arrow: <solid\|open\|dot\|none>` | Arrow head style. The arrow token decides which ends carry one. |
 | `head` *(alias)* | edge | `head: <solid\|open\|dot\|none>` | Alias of `arrow`. |
 | `router` | edge | `router: <straight\|ortho>` | `straight` draws a direct line; `ortho` draws a right-angled elbow. |
+| `from` | edge | `from: <auto\|top\|bottom\|left\|right>` | Which side of the first box the line leaves by. `auto`, the default, lets the router pick — this is for when it picks badly, or when two lines have to leave by different sides. The route between the two attachments is still the engine's (`D-033`). |
+| `to` | edge | `to: <auto\|top\|bottom\|left\|right>` | Which side of the second box the line arrives at. |
+| `lane` | edge | `lane: <n>` | Where this line sits among the ones sharing its side. Lines on one side spread along it in declaration order; `lane` reorders them by hand, counting from 1 at the left or the top. |
 | `route` *(alias)* | edge | `route: <straight\|ortho>` | Alias of `router`. |
 | `shadow` | node | `shadow: <on\|off>` | Soft drop shadow under the shape. |
 
@@ -1591,7 +1594,7 @@ host fw  "Edge firewall" firewall below net gap 60 { addr: "203.0.113.1" }
 host tor "Top-of-rack" switch below fw gap 60 { addr: "10.0.0.1" }
 
 group core "Core segment — 10.0.0.0/24" {
-  host proc01 "snds-p01-proc01" server right-of tor gap 90 { addr: "10.0.0.11" }
+  host proc01 "snds-p01-proc01" server right-of tor gap 190 { addr: "10.0.0.11" }
   host proc02 "snds-p01-proc02" server below proc01 gap 40 { addr: "10.0.0.12" }
   host shelf  "Storage shelf"   storage below proc02 gap 40 { addr: "10.0.0.20" }
 }
@@ -1600,7 +1603,10 @@ net -> fw  "uplink" "1 GbE"
 fw  -> tor "trunk"  "10 GbE"
 tor -> proc01 "" "10 GbE"
 tor -> proc02 "" "10 GbE"
-tor -> shelf  "" "10 GbE"
+// Told which side to leave by (`D-033`). Three links off one switch share its
+// right-hand side; sending the longest one out of the bottom keeps its label
+// off the switch and its line out of the other two's way.
+tor -> shelf  "" "10 GbE" { from: bottom to: left }
 ```
 
 </details>
