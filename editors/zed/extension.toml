@@ -3,7 +3,7 @@ name = "bgraph"
 description = "Syntax highlighting and language server for the bgraph diagram DSL"
 version = "0.1.0"
 schema_version = 1
-authors = ["Arnaud De Cafmeyer <adecafmeyer@duck.com>"]
+authors = ["Bunchyearth23"]
 repository = "https://github.com/Bunchyearth23/bgraph"
 
 # The grammar lives in this same repository, under tree-sitter-bgraph/.

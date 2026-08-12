@@ -9763,6 +9763,36 @@ fn every_manifest_names_the_licence_the_repository_carries() {
         "LICENSE does not name itself, or carries no copyright line"
     );
 
+    // The rights holder, in one form, everywhere. `D-039` put a pseudonym in
+    // the notice; a manifest still carrying a different name would undo that
+    // in the one file a package manager reads and a reader never opens.
+    //
+    // Asserted by agreement rather than by naming what must be absent: a test
+    // that spelled out the name being replaced would put it straight back
+    // into the tree it was taken out of.
+    let holder = licence
+        .lines()
+        .find_map(|l| l.strip_prefix("Copyright 2026 "))
+        .map(|l| l.trim_end_matches('.').to_string())
+        .expect("a copyright line naming a holder");
+    for (what, text) in [
+        ("the crate", include_str!("../Cargo.toml")),
+        ("the Typst package", include_str!("../typst/typst.toml")),
+        (
+            "the Zed extension",
+            include_str!("../editors/zed/extension.toml"),
+        ),
+    ] {
+        let authors = text
+            .lines()
+            .find(|l| l.starts_with("authors = "))
+            .unwrap_or_else(|| panic!("{what} names no author"));
+        assert!(
+            authors.contains(&holder),
+            "{what} says {authors}, and LICENSE says {holder}"
+        );
+    }
+
     // What it grants, and what it holds back. Each of these was somebody's
     // answer to a question, and a heading going missing is that answer being
     // dropped without anyone deciding to.
