@@ -195,6 +195,12 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-08-12] **Every GitHub Release carries auto-generated source archives**
+  and there is no way to turn them off. Fine while the repository is private,
+  because the release audience is the source audience (`D-040`). If a build
+  ever has to reach somebody without repo access, do not look for a flag —
+  there isn't one; publish from a second repository that holds only
+  artefacts.
 - [2026-08-12] **The licence is `LICENSE`, written for this project**
   (`D-038`): noncommercial use, builds may be passed on unchanged, the source
   is confidential, no changes. Five manifests say
