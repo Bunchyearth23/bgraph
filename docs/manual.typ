@@ -27,7 +27,7 @@
   title: "bgraph",
   subtitle: "A diagram language where you decide the layout",
   author: "Bunchyearth23",
-  date: "11 August 2026 · version 1.3",
+  date: "12 August 2026 · version 1.3",
 )
 #v(1fr)
 #pagebreak(weak: true)

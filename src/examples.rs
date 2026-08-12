@@ -607,7 +607,7 @@ const RACK: &str = r##"// A rack elevation. Units count from 1 at the bottom, as
 // rack, so a bank is a row of them: they stand on one floor, and a short rack
 // is short at the top (W-132).
 type rack {
-  title: "Row A — capture hall"
+  title: "Row A — hall 1"
   units: 24
   cell: 230 19
   ruler: on
@@ -625,21 +625,21 @@ style grid    { stroke: #1e293b 0.5 font: 9 #64748b }
 style title   { font: 16 #f8fafc }
 
 // `device <id> ["label"] <lowest> <highest>`
-group a1 "A1 — capture" {
+group a1 "A1 — general" {
   device tor1   "Top-of-rack switch"  .network 24 24
   device patch1 "Patch panel"         .network 23 23
-  device proc01 "snds-p01-proc01"              19 22
-  device proc02 "snds-p01-proc02"              15 18
-  device cap01  "hp-capture02"                 11 14
+  device proc01 "rk1-app01"                    19 22
+  device proc02 "rk1-app02"                    15 18
+  device cap01  "rk1-db01"                     11 14
   device store1 "Storage shelf"                 6  9
   device ups1   "UPS"                 .power    1  4
 }
 
 group a2 "A2 — compute" {
   device tor2   "Top-of-rack switch"  .network 24 24
-  device proc03 "snds-p02-proc01"              18 21
-  device proc04 "snds-p02-proc02"              14 17
-  device gpu01  "snds-p02-gpu01"                8 11
+  device proc03 "rk2-app01"                    18 21
+  device proc04 "rk2-app02"                    14 17
+  device gpu01  "rk2-gpu01"                     8 11
   device ups2   "UPS"                 .power    1  4
 }
 
@@ -654,7 +654,7 @@ group a3 "A3 — edge" {
 
 const NETWORK: &str = r##"// Topology: hosts, links and the segments that hold them. The role picks the
 // shape; placement stays declared, as in `free` (W-043).
-type network { title: "Capture site — edge to core" }
+type network { title: "One site — edge to core" }
 graph { background: #0b1120 padding: 30 gap: 70 }
 
 style host  { fill: #1e293b stroke: #334155 1.2 font: 12 #e2e8f0 radius: 5 }
@@ -666,8 +666,8 @@ host fw  "Edge firewall" firewall below net gap 60 { addr: "203.0.113.1" }
 host tor "Top-of-rack" switch below fw gap 60 { addr: "10.0.0.1" }
 
 group core "Core segment — 10.0.0.0/24" {
-  host proc01 "snds-p01-proc01" server right-of tor gap 190 { addr: "10.0.0.11" }
-  host proc02 "snds-p01-proc02" server below proc01 gap 40 { addr: "10.0.0.12" }
+  host proc01 "rk1-app01" server right-of tor gap 190 { addr: "10.0.0.11" }
+  host proc02 "rk1-app02" server below proc01 gap 40 { addr: "10.0.0.12" }
   host shelf  "Storage shelf"   storage below proc02 gap 40 { addr: "10.0.0.20" }
 }
 
