@@ -73,9 +73,6 @@ cp -r package.json language-configuration.json README.md src syntaxes "$staging/
 [[ -f bgraph.wasm ]] && cp bgraph.wasm "$staging/extension/"
 (( with_server )) && cp -r node_modules "$staging/extension/"
 cp ../../LICENSE "$staging/extension/LICENSE"
-# Both halves travel together, or the permission that lets this VSIX be
-# passed on is the half that went missing (`D-037`).
-cp ../../ADDITIONAL-PERMISSION.md "$staging/extension/"
 
 # The OPC part. `.json` has to be declared or VS Code will not read the grammar
 # or the manifest's own companion files.

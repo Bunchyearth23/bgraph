@@ -156,18 +156,21 @@ cargo test
 
 ## Licence
 
-[PolyForm Strict 1.0.0](LICENSE), plus one
-[additional permission](ADDITIONAL-PERMISSION.md).
+[bgraph Noncommercial License 1.0](LICENSE) — two pages, written for this
+project and meant to be read.
 
-Noncommercial use is permitted: personal work, study, research, hobby
+**Noncommercial use is permitted**: personal work, study, research, hobby
 projects, and use inside a charity, a school, a public research body or a
-government. A company using it for its own work is commercial use, whatever
-the diagram is for, and needs a separate agreement.
+government. Running a shared instance for the people around you is use like
+any other and is covered.
 
-The additional permission lets you pass on a build you received — unchanged,
-free, with both files, to someone whose use is also noncommercial. The licence
-itself grants no distribution at all.
+**Commercial use is not**, and needs a separate written agreement. Use by or
+for a company in the course of its own work is commercial, whatever the
+diagram is of and whether or not anything is sold.
 
-The **source is confidential**. Access to this repository is personal to
-whoever was given it, and carries no right to copy the source, publish it, or
-pass it on.
+**You may pass on a build** you were given — unchanged, free, with the licence,
+to someone whose use is also noncommercial.
+
+**You may not change it, and the source is confidential.** Access to this
+repository is personal to whoever was given it, and carries no right to copy
+the source, publish it, or pass it on.

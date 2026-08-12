@@ -126,7 +126,7 @@ jobs:
           for binary in bgraph bgraph-lsp; do
             cp "target/${{ matrix.target }}/release/$binary$suffix" "out/$name/"
           done
-          cp LICENSE ADDITIONAL-PERMISSION.md README.md docs/reference.md "out/$name/"
+          cp LICENSE README.md docs/reference.md "out/$name/"
           cd out
           if [[ "${{ matrix.os }}" == windows-latest ]]; then
             7z a -tzip "$name.zip" "$name" >/dev/null
@@ -171,7 +171,7 @@ jobs:
           cp -r editors/zed/extension.toml editors/zed/languages editors/zed/src \
                 editors/zed/Cargo.toml editors/zed/Cargo.lock editors/zed/README.md \
                 "stage/$name/"
-          cp LICENSE ADDITIONAL-PERMISSION.md "stage/$name/"
+          cp LICENSE "stage/$name/"
           sed -i \
             -e "s|^repository = \"file://.*\"|repository = \"https://github.com/${{ github.repository }}\"|" \
             -e "s|^rev = \".*\"|rev = \"$GITHUB_SHA\"|" \
@@ -206,7 +206,7 @@ jobs:
           ./typst/build.sh
           mkdir -p "stage/$name"
           cp typst/typst.toml typst/bgraph.typ typst/bgraph.wasm typst/README.md "stage/$name/"
-          cp LICENSE ADDITIONAL-PERMISSION.md "stage/$name/"
+          cp LICENSE "stage/$name/"
           mkdir -p out
           tar czf "out/$name.tar.gz" -C stage "$name"
 

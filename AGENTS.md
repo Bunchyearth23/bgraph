@@ -195,15 +195,15 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
-- [2026-08-12] **The licence is PolyForm Strict 1.0.0 plus one additional
-  permission** (`D-037`), in two files that must travel together — an archive
-  with `LICENSE` and no `ADDITIONAL-PERMISSION.md` withdraws the only thing
-  that lets a build be passed on. Five manifests say
-  `LicenseRef-PolyForm-Strict-1.0.0`; Strict has no SPDX id, so do not invent
-  one. **Never edit the PolyForm text** — their terms say a modified PolyForm
-  licence must stop calling itself PolyForm, which is why the extra grant is a
-  separate file that only ever adds. The source is confidential by access, not
-  by a clause: the private repository is what does that work.
+- [2026-08-12] **The licence is `LICENSE`, written for this project**
+  (`D-038`): noncommercial use, builds may be passed on unchanged, the source
+  is confidential, no changes. Five manifests say
+  `LicenseRef-bgraph-noncommercial-1.0` — it is on nobody's list, so do not
+  invent an SPDX id for it. A test asserts each clause is still present:
+  every one of them was somebody's answer to a question, and a heading going
+  missing is that answer being dropped without anyone deciding to. It is
+  drafted in the PolyForm *shape* and says so; never let it read as though it
+  were one of theirs.
 - [2026-08-11] **Releasing is one channel, and it is named.** `D-035` turned
   the GitHub Release on and left crates.io, the VS Code Marketplace, Open VSX
   and the Zed registry off — the workflow names all four and a test asserts it

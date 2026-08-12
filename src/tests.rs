@@ -9742,63 +9742,70 @@ fn the_release_ships_everything_and_publishes_only_here() {
     assert!(!release.contains("libwayland-dev"), "{release}");
 }
 
-/// One licence, in five manifests and two files.
+/// One licence, in one file, and five manifests that name it.
 ///
-/// `D-037`: PolyForm Strict 1.0.0, reproduced **verbatim** — PolyForm's own
-/// terms say a modified PolyForm text must stop calling itself PolyForm — plus
-/// one permission granted separately, which is what lets a build be passed on.
-/// The two halves have to travel together: an archive carrying the licence and
-/// not the permission has silently withdrawn the one thing the permission
-/// grants.
+/// `D-038`: written for this project after the standard texts were tried and
+/// each one gave up something the author wanted. Two properties are worth a
+/// test rather than a reading. The four grants have to still be there — use,
+/// passing on a build, and the two refusals that pay for them — because a
+/// licence loses a clause the way any other text does, in an edit that looked
+/// small. And it must not claim to be somebody else's: it is modelled on the
+/// PolyForm shape and says so, and PolyForm's own terms are that a text
+/// derived from theirs stops using their name.
 #[test]
 fn every_manifest_names_the_licence_the_repository_carries() {
-    const ID: &str = "LicenseRef-PolyForm-Strict-1.0.0";
+    const ID: &str = "LicenseRef-bgraph-noncommercial-1.0";
 
     let licence = include_str!("../LICENSE");
-    let extra = include_str!("../ADDITIONAL-PERMISSION.md");
 
     assert!(
-        licence.contains("# PolyForm Strict License 1.0.0"),
-        "LICENSE is not the licence the manifests claim"
+        licence.starts_with("bgraph Noncommercial License 1.0\n\nCopyright 2026"),
+        "LICENSE does not name itself, or carries no copyright line"
     );
-    // Strict grants use and nothing else. If a `Distribution License` heading
-    // ever appears here, somebody has pasted the wrong member of the family.
-    assert!(
-        !licence.contains("## Distribution License")
-            && !licence.contains("## Changes and New Works License"),
-        "LICENSE is Noncommercial wearing Strict's name"
-    );
+
+    // What it grants, and what it holds back. Each of these was somebody's
+    // answer to a question, and a heading going missing is that answer being
+    // dropped without anyone deciding to.
     for clause in [
-        "Noncommercial Purposes",
-        "Noncommercial Organizations",
-        "No Liability",
+        "## Copyright Licence",
+        "## Permitted Purposes",
+        "## Running It For Others",
+        "## Passing On A Build",
+        "## The Source Is Confidential",
+        "## No Changes",
+        "## Patent Licence",
+        "## Violations",
+        "## No Liability",
+        "## Definitions",
     ] {
         assert!(
             licence.contains(clause),
             "`{clause}` is missing from LICENSE"
         );
     }
-    assert!(
-        licence.starts_with("Copyright 2026 Arnaud De Cafmeyer"),
-        "no copyright line, so a copy carries no attribution"
-    );
-    assert!(
-        licence.contains("ADDITIONAL-PERMISSION.md"),
-        "LICENSE does not send the reader to the other half"
-    );
-
-    // The permission adds and never subtracts — the moment it takes something
-    // away it is a modified PolyForm licence wearing a different filename.
-    assert!(
-        extra.contains("adds; it removes nothing"),
-        "the permission does not say which direction it runs in"
-    );
-    for promise in ["unchanged", "noncommercial", "No source", "No changes"] {
-        assert!(
-            extra.contains(promise),
-            "the permission never says `{promise}`"
-        );
+    for said in [
+        "Commercial use is not permitted",
+        "unchanged",
+        "personal to",
+        "You may not modify the software",
+    ] {
+        assert!(licence.contains(said), "LICENSE no longer says `{said}`");
     }
+
+    // Modelled on PolyForm's shape, and saying so — their terms are that a
+    // text derived from theirs stops using their name, so it must not read as
+    // one of theirs anywhere else.
+    assert!(
+        licence.contains("in the shape of the PolyForm licences")
+            && licence.contains("it is not endorsed by them"),
+        "the licence borrows a shape without saying whose, or without disclaiming it"
+    );
+    assert!(
+        !licence.contains("PolyForm Noncommercial License")
+            && !licence.contains("PolyForm Strict License")
+            && !licence.contains("polyformproject.org"),
+        "the licence presents itself as a PolyForm licence"
+    );
 
     for (what, text) in [
         ("the crate", include_str!("../Cargo.toml")),
@@ -9815,17 +9822,17 @@ fn every_manifest_names_the_licence_the_repository_carries() {
         assert!(text.contains(ID), "{what} does not name `{ID}`");
     }
 
-    // Both halves in every artefact. A `.vsix` that carries the licence and
-    // not the permission forbids exactly the thing it was handed over for.
+    // It travels with everything the release hands out — a build passed on
+    // without it is a build passed on outside the clause that allows it.
     let release = include_str!("../.github/workflows/release.yml");
     assert_eq!(
-        release.matches("ADDITIONAL-PERMISSION.md").count(),
+        release.matches("cp LICENSE").count(),
         3,
-        "an archive ships the licence without the permission"
+        "an archive ships without the licence"
     );
     assert!(
-        include_str!("../editors/vscode/package.sh").contains("ADDITIONAL-PERMISSION.md"),
-        "the VSIX ships the licence without the permission"
+        include_str!("../editors/vscode/package.sh").contains("LICENSE"),
+        "the VSIX ships without the licence"
     );
 
     // crates.io and the marketplaces are still a separate decision.
@@ -9840,7 +9847,7 @@ fn every_manifest_names_the_licence_the_repository_carries() {
     )
     .expect("release notes");
     assert!(
-        notes.contains("PolyForm Strict 1.0.0"),
+        notes.contains("bgraph Noncommercial License 1.0"),
         "the notes do not say what licence the artefacts come under"
     );
     for said in ["separate agreement", "pass on a build", "confidential"] {
