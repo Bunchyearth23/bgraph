@@ -156,11 +156,18 @@ cargo test
 
 ## Licence
 
-[PolyForm Noncommercial 1.0.0](LICENSE) — use it for anything that is not
-commercial: personal projects, study, research, hobby work, and inside a
-charity, a school, a public research body or a government. Changing it and
-running it for the people around you are both covered.
+[PolyForm Strict 1.0.0](LICENSE), plus one
+[additional permission](ADDITIONAL-PERMISSION.md).
 
-A company using it for its own work is commercial use, whatever the diagram is
-for, and so is anything that ends up in something sold. That needs a separate
-agreement.
+Noncommercial use is permitted: personal work, study, research, hobby
+projects, and use inside a charity, a school, a public research body or a
+government. A company using it for its own work is commercial use, whatever
+the diagram is for, and needs a separate agreement.
+
+The additional permission lets you pass on a build you received — unchanged,
+free, with both files, to someone whose use is also noncommercial. The licence
+itself grants no distribution at all.
+
+The **source is confidential**. Access to this repository is personal to
+whoever was given it, and carries no right to copy the source, publish it, or
+pass it on.

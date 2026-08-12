@@ -9742,28 +9742,32 @@ fn the_release_ships_everything_and_publishes_only_here() {
     assert!(!release.contains("libwayland-dev"), "{release}");
 }
 
-/// One licence, in five files, and it is the one the repository ships.
+/// One licence, in five manifests and two files.
 ///
-/// `D-036` answered it: PolyForm Noncommercial 1.0.0. The text is the
-/// canonical one from SPDX rather than a paraphrase — a licence somebody
-/// rewrote from memory is a licence nobody can rely on — and every manifest
-/// names it by its SPDX identifier so no reader has to open a file to find out.
+/// `D-037`: PolyForm Strict 1.0.0, reproduced **verbatim** — PolyForm's own
+/// terms say a modified PolyForm text must stop calling itself PolyForm — plus
+/// one permission granted separately, which is what lets a build be passed on.
+/// The two halves have to travel together: an archive carrying the licence and
+/// not the permission has silently withdrawn the one thing the permission
+/// grants.
 #[test]
 fn every_manifest_names_the_licence_the_repository_carries() {
-    const SPDX: &str = "PolyForm-Noncommercial-1.0.0";
+    const ID: &str = "LicenseRef-PolyForm-Strict-1.0.0";
 
     let licence = include_str!("../LICENSE");
+    let extra = include_str!("../ADDITIONAL-PERMISSION.md");
+
     assert!(
-        licence.contains("PolyForm Noncommercial License 1.0.0"),
+        licence.contains("# PolyForm Strict License 1.0.0"),
         "LICENSE is not the licence the manifests claim"
     );
-    // The clause that makes the copyright holder's name travel with a copy.
+    // Strict grants use and nothing else. If a `Distribution License` heading
+    // ever appears here, somebody has pasted the wrong member of the family.
     assert!(
-        licence.starts_with("Required Notice: Copyright"),
-        "no `Required Notice:` line, so a copy carries no attribution"
+        !licence.contains("## Distribution License")
+            && !licence.contains("## Changes and New Works License"),
+        "LICENSE is Noncommercial wearing Strict's name"
     );
-    // The two halves a reader must be able to find: what is permitted, and
-    // what is not.
     for clause in [
         "Noncommercial Purposes",
         "Noncommercial Organizations",
@@ -9772,6 +9776,27 @@ fn every_manifest_names_the_licence_the_repository_carries() {
         assert!(
             licence.contains(clause),
             "`{clause}` is missing from LICENSE"
+        );
+    }
+    assert!(
+        licence.starts_with("Copyright 2026 Arnaud De Cafmeyer"),
+        "no copyright line, so a copy carries no attribution"
+    );
+    assert!(
+        licence.contains("ADDITIONAL-PERMISSION.md"),
+        "LICENSE does not send the reader to the other half"
+    );
+
+    // The permission adds and never subtracts — the moment it takes something
+    // away it is a modified PolyForm licence wearing a different filename.
+    assert!(
+        extra.contains("adds; it removes nothing"),
+        "the permission does not say which direction it runs in"
+    );
+    for promise in ["unchanged", "noncommercial", "No source", "No changes"] {
+        assert!(
+            extra.contains(promise),
+            "the permission never says `{promise}`"
         );
     }
 
@@ -9787,8 +9812,21 @@ fn every_manifest_names_the_licence_the_repository_carries() {
             include_str!("../editors/vscode/package.json"),
         ),
     ] {
-        assert!(text.contains(SPDX), "{what} does not name `{SPDX}`");
+        assert!(text.contains(ID), "{what} does not name `{ID}`");
     }
+
+    // Both halves in every artefact. A `.vsix` that carries the licence and
+    // not the permission forbids exactly the thing it was handed over for.
+    let release = include_str!("../.github/workflows/release.yml");
+    assert_eq!(
+        release.matches("ADDITIONAL-PERMISSION.md").count(),
+        3,
+        "an archive ships the licence without the permission"
+    );
+    assert!(
+        include_str!("../editors/vscode/package.sh").contains("ADDITIONAL-PERMISSION.md"),
+        "the VSIX ships the licence without the permission"
+    );
 
     // crates.io and the marketplaces are still a separate decision.
     assert!(
@@ -9796,21 +9834,18 @@ fn every_manifest_names_the_licence_the_repository_carries() {
         "a licence is not a decision to publish"
     );
 
-    // And the notes say it, because that is the page somebody reads before
-    // downloading rather than after.
     let notes = std::fs::read_to_string(
         std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/docs/release-notes"))
             .join(format!("{}.md", env!("CARGO_PKG_VERSION"))),
     )
     .expect("release notes");
     assert!(
-        notes.contains("PolyForm Noncommercial 1.0.0"),
+        notes.contains("PolyForm Strict 1.0.0"),
         "the notes do not say what licence the artefacts come under"
     );
-    assert!(
-        notes.contains("Commercial use needs a separate agreement"),
-        "the notes leave the one restriction unstated"
-    );
+    for said in ["separate agreement", "pass on a build", "confidential"] {
+        assert!(notes.contains(said), "the notes never mention `{said}`");
+    }
 }
 
 /// One version, in five files.

@@ -7,10 +7,12 @@ description = "Stylable diagrams from a layout-first DSL — you place the boxes
 repository = "https://github.com/Bunchyearth23/bgraph"
 readme = "README.md"
 authors = ["Arnaud De Cafmeyer"]
-# Noncommercial, and a real SPDX identifier rather than a file nobody parses
-# (`D-036`). `publish = false` stays: crates.io is a second channel and
-# nobody has decided on it.
-license = "PolyForm-Noncommercial-1.0.0"
+# PolyForm Strict 1.0.0 plus one additional permission, in two files
+# (`D-037`). A `LicenseRef-` identifier because Strict is not in the SPDX list
+# — only Noncommercial and Small Business are — and claiming an id that does
+# not exist is worse than admitting there is none. `publish = false` stays:
+# crates.io is a second channel and nobody has decided on it.
+license = "LicenseRef-PolyForm-Strict-1.0.0"
 
 publish = false
 

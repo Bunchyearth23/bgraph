@@ -195,13 +195,15 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
-- [2026-08-11] **The licence is PolyForm Noncommercial 1.0.0** (`D-036`), and
-  five manifests name it by SPDX id — crate, Zed extension crate, Typst
-  package, VS Code `package.json`, plus `LICENSE` itself. A test holds them
-  together. The text is the canonical SPDX one; never hand-edit or paraphrase
-  a licence. Note what it does *not* do: it permits redistributing the source
-  within the noncommercial scope, so the private repository is what keeps the
-  source in, not the text.
+- [2026-08-12] **The licence is PolyForm Strict 1.0.0 plus one additional
+  permission** (`D-037`), in two files that must travel together — an archive
+  with `LICENSE` and no `ADDITIONAL-PERMISSION.md` withdraws the only thing
+  that lets a build be passed on. Five manifests say
+  `LicenseRef-PolyForm-Strict-1.0.0`; Strict has no SPDX id, so do not invent
+  one. **Never edit the PolyForm text** — their terms say a modified PolyForm
+  licence must stop calling itself PolyForm, which is why the extra grant is a
+  separate file that only ever adds. The source is confidential by access, not
+  by a clause: the private repository is what does that work.
 - [2026-08-11] **Releasing is one channel, and it is named.** `D-035` turned
   the GitHub Release on and left crates.io, the VS Code Marketplace, Open VSX
   and the Zed registry off — the workflow names all four and a test asserts it

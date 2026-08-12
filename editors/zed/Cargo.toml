@@ -3,7 +3,7 @@ name = "zed_bgraph"
 version = "0.1.0"
 edition = "2024"
 publish = false
-license = "PolyForm-Noncommercial-1.0.0"
+license = "LicenseRef-PolyForm-Strict-1.0.0"
 
 [lib]
 path = "src/lib.rs"
