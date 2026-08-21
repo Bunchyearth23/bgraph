@@ -1,4 +1,5 @@
 /target
+/.tools/
 /editors/zed/target
 /tree-sitter-bgraph/node_modules
 /tree-sitter-bgraph/package-lock.json

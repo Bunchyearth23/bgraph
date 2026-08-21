@@ -10,8 +10,8 @@ repository = "file:///home/bunchy/Desktop/bgraph"
 # `rev` must be a real commit that contains the generated parser — run
 # ./editors/zed/install.sh to point it at the current HEAD.
 [grammars.bgraph]
-repository = "https://github.com/Bunchyearth23/bgraph"
-rev = "0b9327a480e767bbdc771f7ea2d00cdaa8590cfd"
+repository = "file:///home/bunchy/Desktop/bgraph"
+rev = "6a307cf"
 path = "tree-sitter-bgraph"
 
 [language_servers.bgraph-lsp]
