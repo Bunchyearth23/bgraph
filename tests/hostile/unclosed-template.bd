@@ -1,0 +1,2 @@
+type pie
+slice {{sales.region "{{sales.value}}" 42

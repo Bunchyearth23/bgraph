@@ -25,6 +25,10 @@ path = "src/lib.rs"
 # both without a second profile to keep in step.
 crate-type = ["cdylib", "rlib"]
 
+[[bench]]
+name = "pipeline"
+harness = false
+
 [[bin]]
 name = "bgraph"
 path = "src/main.rs"

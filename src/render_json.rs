@@ -90,12 +90,42 @@ fn to_value(layout: &Layout) -> Value {
             "points": r.points.iter().map(|(x, y)| json!([x + dx, y + dy])).collect::<Vec<_>>(),
             "label_rect": r.label.as_ref().map(|(_, rect)| at(rect)),
         })).collect::<Vec<_>>(),
+        "label_conflicts": label_conflicts(layout, &routed),
         "annotations": layout.annotations.iter().map(|a| text(a, dx, dy)).collect::<Vec<_>>(),
         "guides": layout.guides.iter().map(|g| json!({
             "from": [g.from.0 + dx, g.from.1 + dy],
             "to": [g.to.0 + dx, g.to.1 + dy],
         })).collect::<Vec<_>>(),
     })
+}
+
+/// Residual conflicts are data, not a second validator: the renderer has
+/// already picked the least-cost deterministic arrangement, and an editor can
+/// now show the remaining trade-off or offer `label-offset` to its author.
+fn label_conflicts(layout: &Layout, routed: &[crate::render_svg::Routed]) -> Vec<Value> {
+    let mut out = Vec::new();
+    for (edge, route) in routed.iter().enumerate() {
+        let Some((_, label)) = &route.label else {
+            continue;
+        };
+        for placed in &layout.nodes {
+            if overlaps(label, &placed.rect) {
+                out.push(json!({ "kind": "label-node", "edge": edge, "node": placed.id }));
+            }
+        }
+        for (other, other_route) in routed.iter().enumerate().skip(edge + 1) {
+            if let Some((_, other_label)) = &other_route.label
+                && overlaps(label, other_label)
+            {
+                out.push(json!({ "kind": "label-label", "edge": edge, "other": other }));
+            }
+        }
+    }
+    out
+}
+
+fn overlaps(a: &Rect, b: &Rect) -> bool {
+    a.x < b.right() && a.right() > b.x && a.y < b.bottom() && a.bottom() > b.y
 }
 
 fn rect(r: &Rect, dx: f64, dy: f64) -> Value {

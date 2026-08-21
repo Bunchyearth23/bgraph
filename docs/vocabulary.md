@@ -197,7 +197,7 @@ still lists every one.
 | `bpmn` | `task` · `event` · `gateway` · `data` | `kind`; `stage` + `trigger`; `gate`; `artifact`; on the **edge**: `flow` |
 
 `node` remains a universal synonym in every genre, and every positional value
-can be written as its named property instead. Twenty-nine genres and `free`.
+can be written as its named property instead. 29 specialised genres, plus `free`.
 
 `bpmn` is the one with **four** words rather than one or two, and it is the
 clearest case for `D-023`: a task, an event, a gateway and a data artefact are

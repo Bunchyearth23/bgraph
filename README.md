@@ -27,7 +27,7 @@ orders  -> cache   "read-through" { router: ortho }
 ```
 
 ```sh
-bgraph init pie > traffic.bd       # a working file for any of the 29 genres
+bgraph init pie > traffic.bd       # a working file for any of the 29 specialised genres
 bgraph diagram.bd -o diagram.svg   # …or .pdf, .png, .json — the extension picks
 bgraph watch diagram.bd            # a browser preview, reloading on save
 bgraph watch docs/diagrams         # …or a whole directory, as a build loop
@@ -37,6 +37,33 @@ bgraph diff old.bd new.bd          # what appeared, what left, what moved
 bgraph layout diagram.bd           # freeze the placements into the file
 bgraph fmt --migrate old.bd        # rewrite what a language change removed
 ```
+
+## Start here
+
+1. Create a file from a worked archetype:
+
+   ```sh
+   bgraph init free > architecture.bd
+   ```
+
+2. Render it, then keep the preview open while you edit:
+
+   ```sh
+   bgraph architecture.bd -o architecture.svg
+   bgraph watch architecture.bd
+   ```
+
+3. Make it yours with a style and a relative placement — the opening example
+   above shows both. Use `bgraph check architecture.bd` whenever a line does
+   not draw as expected.
+
+4. When the picture has data behind it, use `type pie`, `type bar`, `type xy`
+   or one of the other specialised genres. For a calling program, start with
+   the small Rust examples in [`src/lib.rs`](src/lib.rs); for a browser, use
+   the [playground](playground).
+
+The guided tour in [`docs/language.md`](docs/language.md) follows this same
+order: source, placement, style, data, then composition.
 
 ## What you get
 
@@ -62,7 +89,7 @@ bgraph fmt --migrate old.bd        # rewrite what a language change removed
   in two files is an error naming both.
 - **Text that belongs to no box** — `note`, and a `legend` derived from the
   style classes that asked to be in one.
-- **Archetypes** — twenty-nine genres reinterpret the same statements as
+- **Archetypes** — 29 specialised genres, plus `free`, reinterpret the same statements as
   chart data, reusing the whole style cascade. `top: 8` folds a long tail;
   `from: "sales.csv"` reads the rows from a table. `type bpmn` is the widest:
   tasks, events, gateways and data artefacts, with pools and lanes as groups.
@@ -101,6 +128,9 @@ a dependency and a build step for four functions whose job is to move bytes.
 `include` and `from:` are refused there: both need a path to resolve against
 and a page has no disk, which is why the wasm build exposes `render_source`
 and nothing that touches a filesystem.
+
+For a Rust integration, see the supported embedding boundary in
+[`docs/API.md`](docs/API.md).
 
 ## In a Typst document
 
@@ -143,7 +173,7 @@ Guided tour: [`docs/language.md`](docs/language.md).
 Exhaustive reference (generated from the compiler's own tables):
 [`docs/reference.md`](docs/reference.md).
 Worked examples: `bgraph init <genre>` prints a complete file for any of the
-twenty-nine, and the reference reproduces every one of them. They live in
+29 specialised genres, plus `free`, and the reference reproduces every one of them. They live in
 `src/examples.rs`, so the crate needs no directory of sample files to build.
 
 ## Build

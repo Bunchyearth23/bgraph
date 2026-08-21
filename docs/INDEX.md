@@ -70,7 +70,8 @@ solved.
 
 ### Questions
 
-Nothing open. `Q-006` was answered the day it was asked.
+| id | state | title | notes |
+|---|---|---|---|
 
 ### Work planned
 
@@ -111,6 +112,7 @@ Known ways this goes wrong. `X-004` and `X-008` were retired on 2026-08-11 by `W
 ### Decisions
 | id | state | date | title | was |
 |---|---|---|---|---|
+| `D-041` | active | 2026-08-21 | **Pas de distribution externe.** bgraph reste un projet privé/interne : aucun artefact n'est publié à l'extérieur et aucun canal public supplémentaire n'est préparé. `W-151` est abandonné. | `Q-007` |
 | `D-034` | active | 2026-08-11 | **A waypoint is a list, it is written like a placement, and it is a passage rather than a preference.** Extends `D-033`, which gave an edge its two ends and left everything between them to the engine. Three parts. (1) **`via` takes several stops**, each parenthesised — that is what lets the list need no separator, since `,` already separates statements, and it is why an absolute point, a grid cell and a place beside a box are all written the same way. (2) **A stop is a `Placement`**, not a point: `(left-of c gap 20)` is the form that survives a neighbour being inserted, and a bare `(300, 120)` is the escape hatch that `D-001` refuses for boxes for exactly the same reason. A grid cell is free, because `at` already reads one. (3) **The passage is not negotiable, and the avoidance survives between the stops**: every leg is routed by `W-105`'s solver, so a line told to pass left of a box still goes around whatever stands in the way of getting there. Joining the stops with straight lines would have traded the guarantee one chantier bought for the control another one did, and there is no reason to pay twice. A stop inside a box is **reported, not repaired** — `X-004`'s bargain again | |
 | `D-033` | active | 2026-08-11 | **An edge's *attachment* is declared; its *route* is not.** `D-001` made placement declared and stopped at the boxes — where a line leaves and where it arrives was left to the engine, computed from the two centres. That is the gap the author found: he had said where every box goes and still could not stop two arrow heads landing on the same three pixels. So `from` and `to` join the language as ordinary edge properties, taking `top`, `bottom`, `left`, `right` or `auto`, and the router keeps everything between them. The dotted form `a.bottom` is not available and it is `D-029` that forbids it: a qualified name is one token, so `check.top` lexes as a name in another file's namespace. Two consequences. **Several edges on one side spread along it** rather than converging on its midpoint, in declaration order, with `lane` to reorder them by hand — spreading decides no order, so it does not touch `D-001`. And **`auto` stays the default**, because the engine choosing well is the common case and the point of this is the uncommon one | |
 | `D-032` | superseded by `D-035` | 2026-08-11 | **The licence is proprietary, and that is the answer rather than the absence of one.** Answers `Q-005` by confirming `D-020` after the distribution half was built: the playground (`W-096`), the release binaries and CI action (`W-097`), the Markdown preview (`W-098`) and the Typst plugin (`W-099`) all exist, all work, and **none of them ship**. Recorded as a decision rather than left as a closed question because the four will keep prompting the same question from anyone who finds them, and a repository that answers "we never decided" invites somebody to decide it by accident. Nothing in the repository changes: `LICENSE` grants nothing, `Cargo.toml` keeps `license-file` and `publish = false`, and the test asserting `release.yml` creates no release and runs no `cargo publish` is now load-bearing rather than precautionary. The order `D-014` set holds — **first right for its author, then distributable** — and only the second half is declined | |
@@ -153,6 +155,18 @@ not copies.
 
 | id | date | title | commit |
 |---|---|---|---|
+| `W-150` | 2026-08-21 | Schéma généré du vocabulaire | non committé |
+| `W-149` | 2026-08-21 | Snapshots visuels représentatifs | non committé |
+| `W-148` | 2026-08-21 | Cohérence des chiffres et du vocabulaire documentaire | non committé |
+| `W-147` | 2026-08-21 | Parcours d'onboarding | non committé |
+| `W-146` | 2026-08-21 | Diagnostics JSON CLI | non committé |
+| `W-144` | 2026-08-21 | Benchmarks de performance | non committé |
+| `W-143` | 2026-08-21 | Fuzzing du pipeline | non committé |
+| `W-140` | 2026-08-21 | Matrice de compilation et de tests des fonctionnalités | non committé |
+| `W-152` | 2026-08-21 | Prévisibilité du core et contrat LSP professionnel | non committé |
+| `W-141` | 2026-08-21 | Découpage et contrat JSON-RPC avancé du language server | non committé |
+| `W-145` | 2026-08-21 | Clarification de l'API publique | non committé |
+| `W-142` | 2026-08-21 | Optimisation bornée et déterministe des labels et des arêtes | non committé |
 | `W-139` | 2026-08-11 | **A release pipeline: test, then build, then release.** `release.yml` gates every artefact on the full suite — fmt, clippy at `-D warnings`, `--all-features`, the grammar guards proven to have actually run, and `--no-default-features` — then builds binaries for three platforms, the `.vsix`, the Zed extension, the Typst package and the playground, then makes the GitHub Release from `docs/release-notes/0.1.0.md`. Three things it does that a first draft would not: the version comes from `Cargo.toml` and the **tag must match it**, because a tag is a label somebody typed; `workflow_dispatch` builds everything and stops short of the release, so the whole pipeline can be rehearsed without publishing; and the released Zed manifest is repointed from the `file:///home/...` grammar pin — right for `install.sh`, useless to anyone else — at this repository and the tagged commit, with a step that fails if a `file://` survives. Found while rehearsing it locally: `package.sh` still copied the playground's wasm from the path it had before `W-135` moved it, so the VSIX had been shipping without its Markdown preview. `typst/typst.toml` is new — the module is an installable package now, verified by installing it and compiling against `@local/bgraph:0.1.0`. One version in five manifests, and a test that says so | this commit |
 | `W-138` | 2026-08-11 | **The manual is illustrated by the compiler it documents.** Nine `.svg` files sat in `docs/diagrams/` beside their `.bd` sources, and the day the renderer changed **eight of the nine were out of date** — a document describing one language and drawing another, with nothing to say so. `docs/manual.typ` reads the sources through bgraph's own Typst plugin now, which is the plugin's own argument made on the plugin: a diagram that stops parsing stops the build, with the compiler's message and the line that asked for it. The pictures are deleted, `compile.sh` builds the wasm module when it is missing so one command still works on a fresh clone, and a test refuses both halves of the old arrangement — a `.svg` back in that directory, and a `.bd` the manual never draws | this commit |
 | `W-137` | 2026-08-11 | **The playground's line numbers were brighter than the code they number, and the editor waited on the module.** CodeMirror paints its own gutter, and paints it for a *light* editor unless told otherwise; the page said so in a stylesheet, which is a specificity race the build order decides, and lost. It says so through an `EditorView.theme` in a compartment now — injected above the base, reconfigured when the theme flips — and the current line's number is the one exception, brighter because that one you are looking for. The editor also mounts before the wasm does: a megabyte is noticeable on a cold cache, and blanking the page for it made the thing you came to do wait on the thing you did not. Verified by sampling the pixels, not by squinting — every token's colour is the palette's, and the gutter is `--faint` | this commit |
@@ -304,6 +318,13 @@ Nothing is marked `landed` without a commit to point at.
 | `Q-003` | 2026-07-31 | What shape should the embeddable API take? | `D-017` | |
 | `Q-005` | 2026-08-11 | Is the proprietary licence (`D-020`) final? | `D-032` | Asked with the distribution half already built, which is what made it answerable: the question was never "could we ship" but "do we want to", and the four chantiers proved the first half so the second could be decided on its own terms. Answered **yes** at the time; reopened and answered differently the same day by `D-036`, once a release made "grants nothing" untenable. The *unpublished* half was reversed the same day by `D-035`: the artefacts go out as a GitHub Release, under a licence that still grants nothing, and the notes say so |
 | `Q-004` | 2026-08-10 | How does an archetype declare a **second** slot form? | `D-023` | Raised by the idea review the same day: a true scatter for `xy` wants `(x, y)` pairs, which `D-015` had no way to express inside one archetype. Asked before it was built, because the answer lands in `props.rs`, both grammars and completion at once |
+| `Q-007` | 2026-08-21 | Quelle stratégie de distribution veut-on réellement soutenir ? | `D-041` | Réponse : aucune distribution externe. Le projet reste privé/interne ; les artefacts ne sont pas publiés et aucun canal public supplémentaire n'est préparé. |
+
+### Work dropped
+
+| id | date | title | reason |
+|---|---|---|---|
+| `W-151` | 2026-08-21 | Préparation d'une stratégie de distribution | Abandonné par `D-041` : aucune distribution externe n'est souhaitée. |
 
 ### Risks retired
 

@@ -462,7 +462,10 @@ pub fn route_all(layout: &Layout) -> Vec<Routed> {
         })
         .collect();
 
-    // Placed greedily in source order, each one avoiding what is already down.
+    // Seed in source order, then improve against the complete set. The seed
+    // preserves the old deterministic answer when every candidate ties; the
+    // two coordinate-descent passes let an early label step aside once a later
+    // one proves the original choice was globally expensive.
     let mut taken: Vec<Rect> = Vec::new();
     for i in 0..routed.len() {
         let Some(text) = layout.edges[i].label.clone() else {
@@ -471,6 +474,29 @@ pub fn route_all(layout: &Layout) -> Vec<Routed> {
         let rect = place_label(&text, i, &routed, layout, &taken, &layout.edges[i].style);
         taken.push(rect);
         routed[i].label = Some((text, rect));
+    }
+
+    // Coordinate descent is deliberately bounded: it improves the global
+    // arrangement without making rendering time depend on convergence. Four
+    // passes are enough for a label to move aside and let the next one settle
+    // without turning a pathological document into an unbounded search.
+    for _ in 0..4 {
+        for i in 0..routed.len() {
+            if layout.edges[i].style.label_offset.is_some() {
+                continue;
+            }
+            let Some((text, _)) = routed[i].label.clone() else {
+                continue;
+            };
+            let taken: Vec<Rect> = routed
+                .iter()
+                .enumerate()
+                .filter(|(other, _)| *other != i)
+                .filter_map(|(_, route)| route.label.as_ref().map(|(_, rect)| *rect))
+                .collect();
+            let rect = place_label(&text, i, &routed, layout, &taken, &layout.edges[i].style);
+            routed[i].label = Some((text, rect));
+        }
     }
 
     routed

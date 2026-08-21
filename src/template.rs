@@ -12,7 +12,7 @@
 //! quoted if it is text. Blind replacement would let a stray quote turn a
 //! label into a syntax error, or worse, into different statements.
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fmt::Write;
 
 use anyhow::{Result, bail};
@@ -359,7 +359,7 @@ fn from_json_value(name: &str, value: &serde_json::Value, top: bool) -> Result<V
 
 /// The values a render is given, by hole name.
 #[derive(Debug, Clone, Default, PartialEq)]
-pub struct Bindings(HashMap<String, Value>);
+pub struct Bindings(BTreeMap<String, Value>);
 
 impl Bindings {
     /// Empty bindings.
@@ -420,7 +420,7 @@ impl Template {
             let mut values = Bindings::new();
             // A dotted hole is a row hole; probing with a single row is enough
             // to see whether the line it sits on is well-formed.
-            let mut probe_rows: HashMap<String, Bindings> = HashMap::new();
+            let mut probe_rows: BTreeMap<String, Bindings> = BTreeMap::new();
             for name in &holes {
                 match name.split_once('.') {
                     Some((prefix, field)) => {

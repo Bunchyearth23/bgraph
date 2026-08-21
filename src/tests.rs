@@ -730,9 +730,12 @@ fn the_manual_names_every_genre_and_its_word() {
 
     // And the count in the prose, which is the sentence a reader trusts.
     let genres = crate::props::ARCHETYPES.len() - 1;
-    assert_eq!(genres, 29, "the manual says twenty-nine genres and `free`");
+    assert_eq!(
+        genres, 29,
+        "the manual says 29 specialised genres plus `free`"
+    );
     assert!(
-        manual.contains("Twenty-nine genres and `free`"),
+        manual.contains("29 specialised genres, plus `free`"),
         "the prose count"
     );
 }
@@ -6402,6 +6405,79 @@ fn hostile_input_never_panics_in_the_language_server() {
     }
 }
 
+/// Inputs found in the wild (or reduced from a fuzz case) live as files so a
+/// regression is reviewable, reproducible and shared by every pipeline.
+fn versioned_hostile_corpus() -> Vec<(String, String)> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/hostile");
+    let mut cases = Vec::new();
+    for entry in std::fs::read_dir(root).expect("the hostile corpus exists") {
+        let path = entry.expect("read hostile corpus entry").path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("bd") {
+            continue;
+        }
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        let source = std::fs::read_to_string(&path).expect("read hostile corpus case");
+        cases.push((name, source));
+    }
+    cases.sort_by(|left, right| left.0.cmp(&right.0));
+    assert!(!cases.is_empty(), "the hostile corpus must not be empty");
+    cases
+}
+
+#[test]
+fn versioned_hostile_inputs_cover_every_renderer() {
+    for (name, source) in versioned_hostile_corpus() {
+        let Ok(diagram) = crate::parser::parse(&source) else {
+            continue;
+        };
+        let diagnostics = crate::check::check(&diagram);
+        assert!(
+            diagnostics
+                .iter()
+                .all(|diagnostic| !diagnostic.message.is_empty()),
+            "{name}"
+        );
+        let Ok(layout) = crate::layout::solve(&diagram) else {
+            continue;
+        };
+        let svg = crate::render_svg::render(&layout);
+        assert!(svg.starts_with("<svg"), "{name}: invalid SVG root");
+        let pdf = crate::render_pdf::render(&layout);
+        assert!(pdf.starts_with(b"%PDF-"), "{name}: invalid PDF header");
+        let json = crate::render_json::render(&layout);
+        serde_json::from_str::<serde_json::Value>(&json)
+            .unwrap_or_else(|error| panic!("{name}: invalid JSON: {error}"));
+    }
+}
+
+#[test]
+fn generated_hostile_inputs_do_not_panic_in_any_front_end_stage() {
+    let alphabet = b"abcdefghijklmnopqrstuvwxyz{}[]()#:.-/\\\" \n0123456789";
+    let mut state = 0x9e37_79b9_u32;
+    for case in 0..512 {
+        let len = 1 + (state as usize % 384);
+        let mut source = String::with_capacity(len);
+        for _ in 0..len {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            source.push(alphabet[state as usize % alphabet.len()] as char);
+        }
+        if let Ok(diagram) = crate::parser::parse(&source) {
+            let _ = crate::check::check(&diagram);
+            if let Ok(layout) = crate::layout::solve(&diagram) {
+                let _ = crate::render_svg::render(&layout);
+                let _ = crate::render_pdf::render(&layout);
+                let json = crate::render_json::render(&layout);
+                assert!(
+                    serde_json::from_str::<serde_json::Value>(&json).is_ok(),
+                    "case {case}"
+                );
+            }
+        }
+    }
+}
+
 #[test]
 fn a_bound_value_cannot_escape_its_template() {
     // The one place hostile input arrives as *data* rather than as source: a
@@ -7092,6 +7168,46 @@ fn fnv1a(text: &str) -> u64 {
         h = h.wrapping_mul(0x0000_0100_0000_01b3);
     }
     h
+}
+
+#[cfg(feature = "png")]
+fn png_snapshot_fixtures() -> [(&'static str, &'static str); 3] {
+    [
+        (
+            "shapes",
+            "node a \"\" at (0, 0) { shape: cylinder size: 100 60 }\nnode b \"\" right-of a { shape: hexagon size: 100 60 }\na -> b { router: ortho }\n",
+        ),
+        (
+            "labels",
+            "node api \"Public API\" at (0, 0) { size: 130 64 }\nnode queue \"Job queue\" right-of api gap 80\napi -> queue \"enqueue request\" { router: ortho }\n",
+        ),
+        (
+            "charts",
+            "type pie { title: \"Traffic sources\" }\nslice organic \"Organic\" 4820\nslice direct \"Direct\" 2310\nslice referral \"Referral\" 970\n",
+        ),
+    ]
+}
+
+#[cfg(feature = "png")]
+#[test]
+fn representative_png_snapshots_are_byte_stable() {
+    let manifest = include_str!("../docs/png-goldens.txt");
+    for (name, source) in png_snapshot_fixtures() {
+        let expected = manifest
+            .lines()
+            .find_map(|line| line.split_once(' ').filter(|(found, _)| *found == name))
+            .and_then(|(_, hash)| u64::from_str_radix(hash, 16).ok())
+            .unwrap_or_else(|| panic!("no PNG snapshot for `{name}`"));
+        let png = crate::render_png::render(&build(source), 1.0).expect("PNG snapshot renders");
+        let got = png.iter().fold(0xcbf29ce484222325_u64, |hash, byte| {
+            (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
+        });
+        assert_ne!(
+            expected, 0,
+            "add `{name} {got:016x}` to docs/png-goldens.txt"
+        );
+        assert_eq!(got, expected, "{name}: PNG changed (threshold: 0 bytes)");
+    }
 }
 
 /// Whether a document's tags open and close in order, and nothing is left open.
@@ -7800,6 +7916,17 @@ fn the_json_geometry_is_in_the_same_space_as_the_svg() {
 
     assert_eq!(node["rect"]["x"].as_f64().unwrap(), l.nodes[0].rect.x + dx);
     assert_eq!(node["rect"]["y"].as_f64().unwrap(), l.nodes[0].rect.y + dy);
+}
+
+#[test]
+fn the_json_layout_names_residual_label_conflicts() {
+    let json =
+        geometry("node a \"A\" at (0, 0)\nnode b \"B\" right-of a\na -> b \"one\"\nb -> a \"two\"");
+    assert!(json["label_conflicts"].is_array(), "{json}");
+    for conflict in json["label_conflicts"].as_array().unwrap() {
+        assert!(conflict["kind"].is_string(), "{conflict}");
+        assert!(conflict["edge"].is_u64(), "{conflict}");
+    }
 }
 
 #[test]
@@ -8977,6 +9104,23 @@ fn folding_is_the_same_every_run() {
 }
 
 #[test]
+fn every_public_render_is_byte_stable() {
+    let source = r#"graph { title: "Stable" }
+        node a "A" at (0, 0)
+        node b "B" right-of a gap 40
+        a -> b "route" { router: ortho }
+    "#;
+    let svg = crate::render_source(source).unwrap();
+    let pdf = crate::render_source_pdf(source).unwrap();
+    let json = crate::render_json::render(&build(source));
+    for _ in 0..5 {
+        assert_eq!(crate::render_source(source).unwrap(), svg);
+        assert_eq!(crate::render_source_pdf(source).unwrap(), pdf);
+        assert_eq!(crate::render_json::render(&build(source)), json);
+    }
+}
+
+#[test]
 fn top_larger_than_the_data_changes_nothing() {
     let l = build(
         r#"type pie { top: 10 }
@@ -9937,9 +10081,81 @@ fn every_manifest_agrees_on_the_version() {
     }
     // The count in the prose, which is the sentence a reader trusts.
     assert!(
-        notes.contains("Twenty-nine genres and `free`") && crate::props::ARCHETYPES.len() - 1 == 29,
+        notes.contains("29 specialised genres, plus `free`")
+            && crate::props::ARCHETYPES.len() - 1 == 29,
         "the notes give a genre count the compiler does not"
     );
+}
+
+#[test]
+fn every_public_document_uses_the_same_genre_count() {
+    let phrase = "29 specialised genres, plus `free`";
+    for (name, text) in [
+        ("README", include_str!("../README.md")),
+        ("reference", include_str!("../docs/reference.md")),
+        ("manual", include_str!("../docs/manual.typ")),
+        ("vocabulary", include_str!("../docs/vocabulary.md")),
+        (
+            "release notes",
+            include_str!("../docs/release-notes/0.1.0.md"),
+        ),
+    ] {
+        assert!(
+            text.contains(phrase),
+            "{name} does not use the canonical count"
+        );
+    }
+    assert_eq!(
+        crate::props::ARCHETYPES.len(),
+        30,
+        "one `free` archetype plus 29 specialised genres"
+    );
+}
+
+#[test]
+fn the_embedding_api_boundary_is_documented_and_exercised() {
+    let api = include_str!("../docs/API.md");
+    for name in [
+        "render_source",
+        "render_file",
+        "Template",
+        "Bindings",
+        "parser",
+        "check",
+    ] {
+        assert!(api.contains(name), "the embedding guide omits `{name}`");
+    }
+    let library = include_str!("lib.rs");
+    assert!(library.contains("# What semver covers"));
+    assert!(library.contains("public to be inspected, not\n//! relied on"));
+}
+
+#[test]
+fn the_readme_onboarding_uses_supported_commands_and_examples() {
+    let readme = include_str!("../README.md");
+    for command in [
+        "bgraph init free",
+        "bgraph architecture.bd -o architecture.svg",
+        "bgraph watch architecture.bd",
+        "bgraph check architecture.bd",
+        "--theme light|dark|print",
+        "type pie",
+    ] {
+        assert!(
+            readme.contains(command),
+            "onboarding command `{command}` is missing"
+        );
+    }
+    for source in [
+        "node browser \"Browser\"",
+        "node api \"API\"",
+        "browser -> api",
+    ] {
+        assert!(
+            parse_diagram(source).is_ok(),
+            "README example no longer parses: {source}"
+        );
+    }
 }
 
 #[test]
@@ -9961,6 +10177,42 @@ fn the_manifest_still_refuses_to_publish_itself() {
     // accident from becoming a distribution.
     let manifest = include_str!("../Cargo.toml");
     assert!(manifest.contains("publish = false"), "{manifest}");
+}
+
+#[test]
+fn ci_builds_the_small_feature_surfaces_the_library_promises() {
+    let ci = include_str!("../.github/workflows/ci.yml");
+    assert!(ci.contains("feature-builds"), "CI has no feature-build job");
+    assert!(
+        ci.contains("cargo build --no-default-features"),
+        "CI skips the minimal build"
+    );
+    for features in [
+        "pie",
+        "packet",
+        "packet,json,csv,pdf",
+        "wasm",
+        "png",
+        "cli,completions",
+    ] {
+        assert!(ci.contains(features), "CI does not build `{features}`");
+    }
+}
+
+#[test]
+fn the_generated_vocabulary_schema_matches_the_compiler_table() {
+    let schema: serde_json::Value =
+        serde_json::from_str(&crate::docgen::schema()).expect("schema is JSON");
+    assert_eq!(schema["schemaVersion"], 1);
+    assert_eq!(schema["compilerVersion"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(
+        schema["archetypes"].as_array().map(Vec::len),
+        Some(crate::props::ARCHETYPES.len())
+    );
+    assert_eq!(
+        schema["properties"].as_array().map(Vec::len),
+        Some(crate::props::PROPS.len())
+    );
 }
 
 // ------------------------------------------------- Markdown preview (I-023)

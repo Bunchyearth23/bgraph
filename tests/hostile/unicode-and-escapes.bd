@@ -1,0 +1,3 @@
+node café "Une étiquette avec \"guillemets\", emoji 🦀 et <xml>" at (-20, 10)
+node other "Deuxième ligne" right-of café
+café -> other "liaison → stable"

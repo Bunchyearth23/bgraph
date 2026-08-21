@@ -1,0 +1,3 @@
+style first extends second { fill: #123456 }
+style second extends first { fill: #abcdef }
+node a "A" .first

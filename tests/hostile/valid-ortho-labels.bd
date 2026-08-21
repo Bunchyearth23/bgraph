@@ -1,0 +1,7 @@
+graph { flow: right }
+node api "Public API" at (0, 0) { size: 120 56 }
+node cache "Cache" at (280, 0) { size: 100 56 }
+node worker "Worker" at (140, 150) { size: 120 56 }
+api -> cache "read-through cache" { router: ortho }
+api -> worker "enqueue a job" { router: ortho }
+worker -> cache "write result" { router: ortho }

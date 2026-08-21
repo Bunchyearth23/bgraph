@@ -14,6 +14,10 @@ time the diagram grows.
 - **This file is the exhaustive reference**, generated from the compiler's own
   tables, so it always describes the binary you have.
 
+There are **29 specialised genres, plus `free`**. `free` is the plain
+node-and-edge language; each genre gives those statements a domain-specific
+meaning without creating a second grammar.
+
 ## Commands
 
 ```
@@ -30,6 +34,7 @@ bgraph watch docs/diagrams          # a directory: build every .bd as it changes
 bgraph watch docs/diagrams --once   # …once, non-zero on failure — a build step
 bgraph check diagram.bd             # diagnostics only; non-zero on error
 bgraph check diagram.bd --ci        # …the flat form, whatever stdout is
+bgraph check diagram.bd --json      # …a stable JSON array for tools and CI
 bgraph diff old.bd new.bd -o d.svg  # what appeared, what left, what moved
 bgraph explain diagram.bd api     # why that box is where it is
 bgraph layout diagram.bd            # write the placements in; the picture is unchanged
@@ -43,6 +48,7 @@ bgraph init pie                     # a working file for a genre; no genre lists
 bgraph completions fish             # a completion script; bash|zsh|fish|elvish|powershell
 bgraph completions man              # …or the man page, from the same flags
 bgraph docs -o docs/reference.md    # regenerate this file
+bgraph schema -o vocabulary.json    # vocabulary metadata for editor integrations
 bgraph-lsp                          # language server, LSP over stdin/stdout
 ```
 
@@ -2091,6 +2097,15 @@ There is no ninth hue. Past eight slices `check` tells you to merge the tail int
 
 `check` and the language server report exactly the same things — one
 validator serves both, so the editor can never disagree with the build.
+
+`bgraph check diagram.bd --json` is the stable interchange form for CI and
+editor integrations. It writes one JSON array to standard output, including
+when there are no diagnostics. Every entry has `file`, `line`, `column`,
+`severity` (`error` or `warning`) and `message`; `line` and `column` are
+`null` only when composition prevents a source location from existing. It
+exits 1 if the array contains an error, otherwise 0. The same form is used
+for a composed diagram and attributes an included-file diagnostic to its own
+path.
 
 **Errors**
 

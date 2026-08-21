@@ -366,7 +366,7 @@ meant.
 
 #v(0.4em)
 
-Twenty-nine genres and `free`. `bpmn` is the one with four words rather than
+29 specialised genres, plus `free`. `bpmn` is the one with four words rather than
 one or two: four different things carry four different shapes of data, and no
 count of values after the label could tell them apart.
 

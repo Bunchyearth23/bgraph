@@ -14,6 +14,31 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  feature-builds:
+    name: Feature build (${{ matrix.features || 'none' }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features:
+          - ""
+          - pie
+          - packet
+          - "packet,json,csv,pdf"
+          - wasm
+          - png
+          - "cli,completions"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the selected library surface
+        run: |
+          if [[ -z "${{ matrix.features }}" ]]; then
+            cargo build --no-default-features
+          else
+            cargo build --no-default-features --features "${{ matrix.features }}"
+          fi
+
   check:
     runs-on: ubuntu-latest
     steps:
@@ -44,6 +69,9 @@ jobs:
       # the failing one. Both have already reported a broken tree as green.
       - name: Test
         run: cargo test --all-features
+
+      - name: Performance regression guard
+        run: cargo bench --bench pipeline -- --check
 
       - name: The grammar guards really ran
         run: |

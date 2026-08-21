@@ -98,6 +98,12 @@ enum Command {
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
+    /// Write the machine-readable vocabulary schema
+    Schema {
+        /// Output file; stdout when omitted
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
     /// Report diagnostics for a file without rendering it
     Check {
         /// Input DSL file
@@ -107,6 +113,10 @@ enum Command {
         /// stdout is attached to
         #[arg(long)]
         ci: bool,
+
+        /// Emit a stable JSON array for editor and CI integrations
+        #[arg(long)]
+        json: bool,
     },
     /// Reformat a file to the canonical shape
     Fmt {
@@ -406,7 +416,7 @@ fn run() -> Result<i32> {
             }
             return show_or_serve(input, data, port);
         }
-        Some(Command::Check { input, ci }) => return check_file(&input, ci),
+        Some(Command::Check { input, ci, json }) => return check_file(&input, ci, json),
         Some(Command::Fmt {
             inputs,
             check,
@@ -439,6 +449,15 @@ fn run() -> Result<i32> {
                     println!("reference written to {}", path.display());
                 }
                 None => print!("{manual}"),
+            }
+            return Ok(0);
+        }
+        Some(Command::Schema { output }) => {
+            let schema = bgraph::docgen::schema();
+            match output {
+                Some(path) => fs::write(&path, schema)
+                    .with_context(|| format!("cannot write {}", path.display()))?,
+                None => print!("{schema}"),
             }
             return Ok(0);
         }
@@ -655,6 +674,7 @@ fn report_composed(
     input: &std::path::Path,
     composed: &bgraph::compose::Composed,
     ci: bool,
+    json_output: bool,
 ) -> Result<i32> {
     use bgraph::check::Severity;
     use bgraph::report;
@@ -668,6 +688,7 @@ fn report_composed(
     let (rich, colour) = report::decorate(ci);
     let mut errors = 0;
 
+    let mut machine = Vec::new();
     for diag in &diagnostics {
         // Through the map, so a problem in an included file is reported
         // against *that* file at *its* line — the whole reason the composer
@@ -677,7 +698,15 @@ fn report_composed(
         if diag.severity == Severity::Error {
             errors += 1;
         }
-        if rich {
+        if json_output {
+            machine.push(serde_json::json!({
+                "file": path,
+                "line": line + 1,
+                "column": col + 1,
+                "severity": if diag.severity == Severity::Error { "error" } else { "warning" },
+                "message": diag.message,
+            }));
+        } else if rich {
             let text = composed.map.source_of(diag.span.start);
             println!("{}\n", report::rich(&path, text, line, col, diag, colour));
         } else {
@@ -685,7 +714,9 @@ fn report_composed(
         }
     }
 
-    if diagnostics.is_empty() {
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&machine)?);
+    } else if diagnostics.is_empty() {
         println!("{}: no problems found", input.display());
     }
     Ok(i32::from(errors > 0))
@@ -693,7 +724,7 @@ fn report_composed(
 
 /// Prints every diagnostic in `file:line:col: severity: message` form so it
 /// drops straight into an editor's error list.
-fn check_file(input: &PathBuf, ci: bool) -> Result<i32> {
+fn check_file(input: &PathBuf, ci: bool, json_output: bool) -> Result<i32> {
     use bgraph::check::Severity;
     use bgraph::lsp::LineIndex;
     use bgraph::report;
@@ -708,11 +739,24 @@ fn check_file(input: &PathBuf, ci: bool) -> Result<i32> {
     match bgraph::compose::load(input) {
         Ok(composed) => {
             if !composed.diagram.includes.is_empty() || composed.map.text != source {
-                return report_composed(input, &composed, ci);
+                return report_composed(input, &composed, ci, json_output);
             }
         }
         Err(err) => {
-            eprintln!("error: {err:#}");
+            if json_output {
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&vec![serde_json::json!({
+                        "file": input.display().to_string(),
+                        "line": null,
+                        "column": null,
+                        "severity": "error",
+                        "message": format!("{err:#}"),
+                    })])?
+                );
+            } else {
+                eprintln!("error: {err:#}");
+            }
             return Ok(1);
         }
     }
@@ -744,12 +788,21 @@ fn check_file(input: &PathBuf, ci: bool) -> Result<i32> {
     let path = input.display().to_string();
 
     let mut errors = 0;
+    let mut machine = Vec::new();
     for diag in &diagnostics {
         let (line, col) = index.line_col(diag.span.start);
         if diag.severity == Severity::Error {
             errors += 1;
         }
-        if rich {
+        if json_output {
+            machine.push(serde_json::json!({
+                "file": path,
+                "line": line + 1,
+                "column": col + 1,
+                "severity": if diag.severity == Severity::Error { "error" } else { "warning" },
+                "message": diag.message,
+            }));
+        } else if rich {
             // A blank line between them, or two diagnostics from adjacent
             // lines read as one five-line block.
             println!(
@@ -761,8 +814,45 @@ fn check_file(input: &PathBuf, ci: bool) -> Result<i32> {
         }
     }
 
-    if diagnostics.is_empty() {
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&machine)?);
+    } else if diagnostics.is_empty() {
         println!("{}: no problems found", input.display());
     }
     Ok(i32::from(errors > 0))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn json_check_contract_has_the_stable_fields_and_exit_status() {
+        let source = "node a .missing\n";
+        let diagram = parser::parse_diagram(source).expect("parses");
+        let diagnostics = bgraph::check::check(&diagram);
+        let index = bgraph::lsp::LineIndex::new(source);
+        let machine: Vec<_> = diagnostics
+            .iter()
+            .map(|diagnostic| {
+                let (line, column) = index.line_col(diagnostic.span.start);
+                serde_json::json!({
+                    "file": "diagram.bd",
+                    "line": line + 1,
+                    "column": column + 1,
+                    "severity": if diagnostic.severity == bgraph::check::Severity::Error { "error" } else { "warning" },
+                    "message": diagnostic.message,
+                })
+            })
+            .collect();
+        assert_eq!(machine[0]["file"], "diagram.bd");
+        assert!(machine[0]["line"].is_u64());
+        assert!(machine[0]["column"].is_u64());
+        assert!(machine[0]["message"].is_string());
+        assert!(
+            machine
+                .iter()
+                .any(|diagnostic| diagnostic["severity"] == "error")
+        );
+    }
 }
