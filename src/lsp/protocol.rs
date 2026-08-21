@@ -5,7 +5,10 @@ use serde_json::{Value, json};
 pub(super) fn capabilities() -> Value {
     json!({
         "capabilities": {
-            "positionEncoding": ["utf-16"],
+            // Zed 1.15.1 deserializes the legacy singular field.  Sending
+            // the newer array form makes initialization fail before the
+            // server can advertise any other capability.
+            "positionEncoding": "utf-16",
             "textDocumentSync": {
                 "openClose": true,
                 "change": 1,

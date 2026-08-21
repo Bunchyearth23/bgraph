@@ -82,14 +82,13 @@ fn lsp_binary_answers_initialize_and_shutdown_over_jsonrpc() {
     let initialized = read_frame(&output, &mut cursor);
     assert_eq!(initialized["id"], 1);
     assert_eq!(
-        initialized["result"]["capabilities"]["positionEncoding"][0],
+        initialized["result"]["capabilities"]["positionEncoding"],
         "utf-16"
     );
     assert_eq!(
         initialized["result"]["serverInfo"]["name"],
         "bgraph Language Server"
     );
-
     let shutdown = read_frame(&output, &mut cursor);
     assert_eq!(shutdown["id"], 2);
     assert!(shutdown["result"].is_null());
