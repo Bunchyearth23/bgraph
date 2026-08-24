@@ -136,6 +136,8 @@ pub mod fmt;
 pub mod layout;
 pub mod ortho;
 #[allow(missing_docs)]
+pub mod placement;
+#[allow(missing_docs)]
 pub mod props;
 pub mod relayout;
 pub mod render_json;

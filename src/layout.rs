@@ -9,6 +9,8 @@ use std::collections::HashMap;
 use anyhow::{Result, bail};
 
 use crate::ast::*;
+pub use crate::placement::Entity;
+use crate::placement::{EffectivePlacement, PlacementPlan};
 use crate::style::{GraphOpts, Registry, Shape, StateKind, Style};
 
 #[derive(Debug, Clone, Copy)]
@@ -567,13 +569,8 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         return Ok(chart);
     }
 
-    let mut index: HashMap<&str, Entity> = HashMap::new();
-    for (i, node) in diagram.nodes.iter().enumerate() {
-        index.insert(node.id.as_str(), Entity::Node(i));
-    }
-    for (i, group) in diagram.groups.iter().enumerate() {
-        index.insert(group.id.as_str(), Entity::Group(i));
-    }
+    let placement = PlacementPlan::new(diagram);
+    let index = placement.index();
 
     // Pass 1 — resolve styles and intrinsic sizes; positions come later.
     let mut sizes = Vec::with_capacity(diagram.nodes.len());
@@ -869,7 +866,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         })
         .collect();
 
-    let mut solved = place_all(diagram, &index, &sizes, &overhang, &opts)?;
+    let mut solved = place_all(diagram, &placement, &sizes, &overhang, &opts)?;
     // Alignment runs after, because it is the one constraint that genuinely
     // needs positions to exist.
     constrain_alignment(diagram, &index, &mut solved);
@@ -1631,12 +1628,6 @@ fn offset_from(a: &Rect, dir: RelDir, gap: f64, align: Option<Align>, w: f64, h:
 
 // ---------------------------------------------------------------- containers
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Entity {
-    Node(usize),
-    Group(usize),
-}
-
 pub struct Solved {
     pub nodes: Vec<Option<Rect>>,
     pub groups: Vec<Option<Rect>>,
@@ -1774,7 +1765,7 @@ fn constrain_alignment(diagram: &Diagram, index: &HashMap<&str, Entity>, solved:
 
 fn place_all(
     diagram: &Diagram,
-    index: &HashMap<&str, Entity>,
+    plan: &PlacementPlan<'_>,
     sizes: &[(f64, f64)],
     // How far each node's *drawing* reaches past its box — left, top, right,
     // bottom. A group is sized by what it holds, and a caption drawn beside a
@@ -1785,6 +1776,7 @@ fn place_all(
     overhang: &[(f64, f64, f64, f64)],
     opts: &GraphOpts,
 ) -> Result<Solved> {
+    let index = plan.index();
     let mut node_rect: Vec<Option<Rect>> = vec![None; diagram.nodes.len()];
     let mut group_rect: Vec<Option<Rect>> = vec![None; diagram.groups.len()];
 
@@ -1792,13 +1784,10 @@ fn place_all(
     let mut node_settled = vec![false; diagram.nodes.len()];
     let mut group_settled = vec![false; diagram.groups.len()];
 
-    let owner = ownership(diagram, index);
-    let previous_sibling = siblings(diagram, &owner);
-
     // Two entities that will be translated by the same delta may anchor to
     // each other as soon as they have coordinates — they move together. Only
     // an anchor reaching *out* of its translation unit has to wait.
-    let unit = |e: Entity| placed_unit(diagram, &owner, e);
+    let unit = |e: Entity| plan.placed_unit(e);
 
     let settled = |e: Entity, ns: &[bool], gs: &[bool]| match e {
         Entity::Node(i) => ns[i],
@@ -1816,24 +1805,21 @@ fn place_all(
             if node_rect[i].is_some() {
                 continue;
             }
-            let node = &diagram.nodes[i];
             let (w, h) = sizes[i];
 
             // No placement: flow from the previous sibling — the previous
             // declaration inside the same container, not merely the previous
             // line in the file.
-            let placement = node.placement.clone().or_else(|| {
-                previous_sibling[i].map(|prev| Placement::Rel {
-                    dir: opts.flow,
-                    anchor: diagram.nodes[prev].id.clone(),
+            let placement = match plan.node(i, opts.flow) {
+                EffectivePlacement::Declared(placement) => Some(placement.resolved(opts.grid)),
+                EffectivePlacement::Flow { dir, anchor } => Some(Placement::Rel {
+                    dir,
+                    anchor: anchor.clone(),
                     gap: None,
                     align: None,
-                })
-            });
-
-            // A grid cell resolves to an absolute position here, in one
-            // place, so nothing downstream has to know cells exist.
-            let placement = placement.map(|p| p.resolved(opts.grid));
+                }),
+                EffectivePlacement::Origin => None,
+            };
             let rect = match placement {
                 None => Rect {
                     x: 0.0,
@@ -2023,52 +2009,6 @@ fn place_all(
         nodes: node_rect,
         groups: group_rect,
     })
-}
-
-/// Which group, if any, declares each entity.
-fn ownership(diagram: &Diagram, index: &HashMap<&str, Entity>) -> HashMap<Entity, usize> {
-    let mut owner = HashMap::new();
-    for (g, group) in diagram.groups.iter().enumerate() {
-        for member in &group.members {
-            if let Some(entity) = index.get(member.as_str()) {
-                owner.insert(*entity, g);
-            }
-        }
-    }
-    owner
-}
-
-/// The node an unplaced node flows from: the previous *node* declared in the
-/// same container, so a group does not inherit the drift of the one before it.
-fn siblings(diagram: &Diagram, owner: &HashMap<Entity, usize>) -> Vec<Option<usize>> {
-    let mut previous: HashMap<Option<usize>, usize> = HashMap::new();
-    let mut out = Vec::with_capacity(diagram.nodes.len());
-
-    for i in 0..diagram.nodes.len() {
-        let container = owner.get(&Entity::Node(i)).copied();
-        out.push(previous.get(&container).copied());
-        previous.insert(container, i);
-    }
-
-    out
-}
-
-/// The innermost ancestor group that carries a placement — the block this
-/// entity will be translated with, if any.
-fn placed_unit(diagram: &Diagram, owner: &HashMap<Entity, usize>, entity: Entity) -> Option<usize> {
-    let mut cursor = owner.get(&entity).copied();
-    let mut seen = Vec::new();
-    while let Some(g) = cursor {
-        if seen.contains(&g) {
-            return None;
-        }
-        seen.push(g);
-        if diagram.groups[g].placement.is_some() {
-            return Some(g);
-        }
-        cursor = owner.get(&Entity::Group(g)).copied();
-    }
-    None
 }
 
 fn translate_subtree(
