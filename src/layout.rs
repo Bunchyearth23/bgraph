@@ -845,7 +845,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     // the fact does not push its neighbours along — it lands on top of them.
     // Placement already knows how to lay out boxes of a given size, so the
     // honest order is: decide the sizes, then place.
-    constrain_sizes(diagram, &index, &mut sizes);
+    constrain_sizes(diagram, index, &mut sizes);
 
     // What each node's drawing reaches past its own box. Only a caption does
     // that, and only two genres draw one — everywhere else this is zeros and
@@ -869,7 +869,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     let mut solved = place_all(diagram, &placement, &sizes, &overhang, &opts)?;
     // Alignment runs after, because it is the one constraint that genuinely
     // needs positions to exist.
-    constrain_alignment(diagram, &index, &mut solved);
+    constrain_alignment(diagram, index, &mut solved);
     let placed = solved.nodes;
 
     let mut nodes: Vec<PlacedNode> = diagram

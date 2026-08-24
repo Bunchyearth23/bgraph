@@ -15,7 +15,7 @@ rustup target list --installed | grep -qx "$target" \
   || { echo "build.sh: rustup target add $target" >&2; exit 1; }
 
 cargo build --lib --release --target "$target" \
-  --no-default-features --features all-archetypes,json,typst
+  --no-default-features --features all-archetypes,json,typst,kasuari-spike
 
 cp "target/$target/release/bgraph.wasm" typst/bgraph.wasm
 printf 'typst/bgraph.wasm — %s\n' "$(du -h typst/bgraph.wasm | cut -f1)"

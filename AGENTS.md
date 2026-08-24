@@ -55,7 +55,8 @@ disagree.
 - SVG, PDF, the watch server, base64 and the TrueType subsetter are all
   hand-rolled — no dependency for any of them
 - Optional, each behind its own feature: `png` (a rasteriser, `resvg` — the
-  only dependency tree left), `completions`, `wasm`, `typst`
+  only dependency tree in a shipped surface), `completions`, `wasm`, `typst`;
+  `kasuari-spike` is the gated `W-153` candidate and is not yet the layout core
 
 ## Setup commands
 - `cargo build` — builds both `bgraph` and `bgraph-lsp`

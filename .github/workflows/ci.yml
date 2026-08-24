@@ -26,6 +26,8 @@ jobs:
           - packet
           - "packet,json,csv,pdf"
           - wasm
+          - kasuari-spike
+          - "wasm,kasuari-spike"
           - png
           - "cli,completions"
     steps:
