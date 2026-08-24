@@ -118,7 +118,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
         "timeline" => check_timeline(diagram, &mut out),
         #[cfg(feature = "state")]
         "state" => {
-            check_cycles(diagram, &nodes, &mut out);
+            check_cycles(diagram, &mut out);
             check_state(diagram, &mut out);
         }
         #[cfg(feature = "sankey")]
@@ -132,7 +132,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
             }
         }
         _ => {
-            check_cycles(diagram, &nodes, &mut out);
+            check_cycles(diagram, &mut out);
             check_unused_data(diagram, &mut out);
         }
     }
@@ -899,53 +899,32 @@ fn check_graph(diagram: &Diagram, out: &mut Vec<Diag>) {
     );
 }
 
-/// Detects anchor loops the same way the solver does: repeatedly place what
-/// can be placed; whatever never becomes placeable forms a cycle.
-fn check_cycles(diagram: &Diagram, nodes: &HashMap<&str, usize>, out: &mut Vec<Diag>) {
-    let placement = crate::placement::PlacementPlan::new(diagram);
-    let mut resolved = vec![false; diagram.nodes.len()];
-    let mut pending: Vec<usize> = (0..diagram.nodes.len()).collect();
+/// Detect anchor and containment loops with the same readiness model as the
+/// solver. Nodes and groups are one placement graph; checking only nodes lets
+/// a frame wait for one of its own unsettled members until render time.
+fn check_cycles(diagram: &Diagram, out: &mut Vec<Diag>) {
+    use crate::placement::Entity;
 
-    loop {
-        let before = pending.len();
-        let mut deferred = Vec::new();
-
-        for &i in &pending {
-            let anchor = match &diagram.nodes[i].placement {
-                Some(Placement::Rel { anchor, .. }) => Some(anchor.as_str()),
-                Some(Placement::At { .. } | Placement::Cell { .. }) => None,
-                // The solver's rule: the previous sibling in the same
-                // container, not the previous node in the flat AST.
-                None => placement
-                    .implicit_anchor(i)
-                    .map(|anchor| diagram.nodes[anchor].id.as_str()),
-            };
-
-            match anchor.and_then(|a| nodes.get(a)) {
-                // An unknown anchor was already reported; treat it as resolved
-                // so it doesn't masquerade as a cycle too.
-                Some(&a) if !resolved[a] && a != i => deferred.push(i),
-                _ => resolved[i] = true,
-            }
-        }
-
-        if deferred.is_empty() {
-            return;
-        }
-        if deferred.len() == before {
-            let names: Vec<&str> = deferred
-                .iter()
-                .map(|&i| diagram.nodes[i].id.as_str())
-                .collect();
-            for &i in &deferred {
-                out.push(Diag::error(
-                    diagram.nodes[i].id.span,
-                    format!("anchor cycle between: {}", names.join(", ")),
-                ));
-            }
-            return;
-        }
-        pending = deferred;
+    let unresolved = crate::placement::PlacementPlan::new(diagram).unresolved();
+    if unresolved.is_empty() {
+        return;
+    }
+    let names: Vec<&str> = unresolved
+        .iter()
+        .map(|entity| match entity {
+            Entity::Node(i) => diagram.nodes[*i].id.as_str(),
+            Entity::Group(g) => diagram.groups[*g].id.as_str(),
+        })
+        .collect();
+    for entity in unresolved {
+        let span = match entity {
+            Entity::Node(i) => diagram.nodes[i].id.span,
+            Entity::Group(g) => diagram.groups[g].id.span,
+        };
+        out.push(Diag::error(
+            span,
+            format!("anchor cycle between: {}", names.join(", ")),
+        ));
     }
 }
 
@@ -2482,13 +2461,7 @@ fn check_er(diagram: &Diagram, out: &mut Vec<Diag>) {
 
 /// Archetypes that keep the free solver still need its cycle check.
 fn check_cycles_free(diagram: &Diagram, out: &mut Vec<Diag>) {
-    let index: HashMap<&str, usize> = diagram
-        .nodes
-        .iter()
-        .enumerate()
-        .map(|(i, n)| (n.id.as_str(), i))
-        .collect();
-    check_cycles(diagram, &index, out);
+    check_cycles(diagram, out);
 }
 
 fn check_state(diagram: &Diagram, out: &mut Vec<Diag>) {

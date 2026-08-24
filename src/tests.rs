@@ -4570,8 +4570,13 @@ fn an_empty_group_says_so() {
 #[test]
 fn a_group_cycle_is_reported() {
     // The frame cannot be placed relative to something it encloses.
-    let e = err("group g right-of a {\n node a\n}");
-    assert!(e.contains("anchor cycle"), "{e}");
+    let diagnostics = diags("group g right-of a {\n node a\n}");
+    assert!(
+        diagnostics
+            .iter()
+            .any(|d| d.message.contains("anchor cycle") && d.message.contains("g")),
+        "{diagnostics:?}"
+    );
 }
 
 #[test]

@@ -113,6 +113,133 @@ impl<'a> PlacementPlan<'a> {
         }
         None
     }
+
+    /// Entities whose coordinates or final position can never become ready.
+    ///
+    /// This mirrors the solver's two states without doing geometry: a member
+    /// of a placed group can have coordinates while still waiting for the
+    /// group translation. Keeping that distinction is what catches a frame
+    /// placed relative to one of its own descendants.
+    pub fn unresolved(&self) -> Vec<Entity> {
+        let mut node_coordinates = vec![false; self.diagram.nodes.len()];
+        let mut group_coordinates = vec![false; self.diagram.groups.len()];
+        let mut node_settled = vec![false; self.diagram.nodes.len()];
+        let mut group_settled = vec![false; self.diagram.groups.len()];
+
+        let has_coordinates = |entity: Entity, nodes: &[bool], groups: &[bool]| match entity {
+            Entity::Node(i) => nodes[i],
+            Entity::Group(i) => groups[i],
+        };
+        let is_settled = |entity: Entity, nodes: &[bool], groups: &[bool]| match entity {
+            Entity::Node(i) => nodes[i],
+            Entity::Group(i) => groups[i],
+        };
+
+        loop {
+            let mut progress = false;
+
+            for i in 0..self.diagram.nodes.len() {
+                if node_coordinates[i] {
+                    continue;
+                }
+                let entity = Entity::Node(i);
+                let dependency = match self.node(i, RelDir::RightOf) {
+                    EffectivePlacement::Declared(Placement::Rel { anchor, .. }) => {
+                        self.index.get(anchor.as_str()).copied()
+                    }
+                    EffectivePlacement::Flow { anchor, .. } => {
+                        self.index.get(anchor.as_str()).copied()
+                    }
+                    EffectivePlacement::Declared(Placement::At { .. } | Placement::Cell { .. })
+                    | EffectivePlacement::Origin => None,
+                };
+                let ready = dependency.is_none_or(|target| {
+                    // Self references and unknown names are diagnosed by the
+                    // name validator and must not masquerade as a second error.
+                    target == entity
+                        || if self.placed_unit(entity).is_some()
+                            && self.placed_unit(entity) == self.placed_unit(target)
+                        {
+                            has_coordinates(target, &node_coordinates, &group_coordinates)
+                        } else {
+                            is_settled(target, &node_settled, &group_settled)
+                        }
+                });
+                if ready {
+                    node_coordinates[i] = true;
+                    node_settled[i] = self.placed_unit(entity).is_none();
+                    progress = true;
+                }
+            }
+
+            for g in 0..self.diagram.groups.len() {
+                if group_coordinates[g] {
+                    continue;
+                }
+                let group = &self.diagram.groups[g];
+                let members_ready = group
+                    .members
+                    .iter()
+                    .filter_map(|member| self.index.get(member.as_str()).copied())
+                    .all(|member| has_coordinates(member, &node_coordinates, &group_coordinates));
+                if !members_ready {
+                    continue;
+                }
+
+                let entity = Entity::Group(g);
+                let anchor_ready = match &group.placement {
+                    Some(Placement::Rel { anchor, .. }) => self
+                        .index
+                        .get(anchor.as_str())
+                        .copied()
+                        .is_none_or(|target| {
+                            target == entity || is_settled(target, &node_settled, &group_settled)
+                        }),
+                    Some(Placement::At { .. } | Placement::Cell { .. }) | None => true,
+                };
+                if !anchor_ready {
+                    continue;
+                }
+
+                group_coordinates[g] = true;
+                group_settled[g] = true;
+                self.settle_subtree(g, &mut node_settled, &mut group_settled);
+                progress = true;
+            }
+
+            let done = node_coordinates.iter().all(|ready| *ready)
+                && group_coordinates.iter().all(|ready| *ready)
+                && node_settled.iter().all(|ready| *ready)
+                && group_settled.iter().all(|ready| *ready);
+            if done {
+                return Vec::new();
+            }
+            if !progress {
+                return (0..self.diagram.nodes.len())
+                    .filter(|i| !node_coordinates[*i] || !node_settled[*i])
+                    .map(Entity::Node)
+                    .chain(
+                        (0..self.diagram.groups.len())
+                            .filter(|g| !group_coordinates[*g] || !group_settled[*g])
+                            .map(Entity::Group),
+                    )
+                    .collect();
+            }
+        }
+    }
+
+    fn settle_subtree(&self, group: usize, node_settled: &mut [bool], group_settled: &mut [bool]) {
+        for member in &self.diagram.groups[group].members {
+            match self.index.get(member.as_str()) {
+                Some(Entity::Node(i)) => node_settled[*i] = true,
+                Some(Entity::Group(g)) => {
+                    group_settled[*g] = true;
+                    self.settle_subtree(*g, node_settled, group_settled);
+                }
+                None => {}
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -143,5 +270,13 @@ mod tests {
 
         assert_eq!(plan.placed_unit(Entity::Node(0)), Some(1));
         assert_eq!(plan.placed_unit(Entity::Group(0)), Some(1));
+    }
+
+    #[test]
+    fn a_group_waiting_for_its_own_member_is_unresolved() {
+        let diagram = crate::parser::parse_diagram("group g right-of a {\n node a\n}").unwrap();
+        let plan = PlacementPlan::new(&diagram);
+
+        assert_eq!(plan.unresolved(), [Entity::Node(0), Entity::Group(0)]);
     }
 }
