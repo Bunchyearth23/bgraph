@@ -2,6 +2,8 @@
 
 use kasuari::WeightedRelation::*;
 use kasuari::{Solver, Strength, Variable};
+use std::collections::BTreeSet;
+use std::process::Command;
 
 fn required_chain() -> [f64; 4] {
     let left = Variable::new();
@@ -30,8 +32,7 @@ fn a_fully_declared_layout_is_stable_through_kasuari() {
     }
 }
 
-#[test]
-fn the_spike_records_kasuaris_underconstrained_boundary() {
+fn underconstrained_values() -> [f64; 5] {
     let window = Variable::new();
     let left_1 = Variable::new();
     let right_1 = Variable::new();
@@ -54,11 +55,53 @@ fn the_spike_records_kasuaris_underconstrained_boundary() {
     solver.add_edit_variable(window, Strength::STRONG).unwrap();
     solver.suggest_value(window, 75.0).unwrap();
 
-    let values =
-        [window, left_1, right_1, left_2, right_2].map(|variable| solver.get_value(variable));
+    [window, left_1, right_1, left_2, right_2].map(|variable| solver.get_value(variable))
+}
+
+#[test]
+fn the_spike_records_kasuaris_underconstrained_boundary() {
+    let values = underconstrained_values();
     let allowed = [[75.0, 0.0, 0.0, 0.0, 75.0], [75.0, 0.0, 50.0, 50.0, 75.0]];
     assert!(
         allowed.contains(&values),
         "Kasuari produced an undocumented third solution: {values:?}"
+    );
+}
+
+#[test]
+fn deterministic_fork_is_stable_across_processes() {
+    const CHILD: &str = "BGRAPH_KASUARI_DETERMINISM_CHILD";
+    const MARKER: &str = "BGRAPH_KASUARI_VALUES=";
+
+    if std::env::var_os(CHILD).is_some() {
+        println!("{MARKER}{:?}", underconstrained_values());
+        return;
+    }
+
+    let executable = std::env::current_exe().expect("the integration-test executable");
+    let mut seen = BTreeSet::new();
+    for _ in 0..32 {
+        let output = Command::new(&executable)
+            .args([
+                "--exact",
+                "deterministic_fork_is_stable_across_processes",
+                "--nocapture",
+            ])
+            .env(CHILD, "1")
+            .output()
+            .expect("the child determinism probe runs");
+        assert!(output.status.success(), "child probe failed: {output:?}");
+        let stdout = String::from_utf8(output.stdout).expect("test output is UTF-8");
+        let value = stdout
+            .lines()
+            .find_map(|line| line.split_once(MARKER).map(|(_, value)| value))
+            .unwrap_or_else(|| panic!("child probe emitted no value: {stdout}"));
+        seen.insert(value.to_string());
+    }
+
+    assert_eq!(
+        seen.len(),
+        1,
+        "the same system produced different solutions across processes: {seen:?}"
     );
 }

@@ -20,9 +20,11 @@ LSP, commandes `explain` / `layout`, wasm, preview et stratégie de refactor.
 > est refusée. Les collisions sont diagnostiquées sans déplacement; un éventuel
 > `arrange` reste une transformation DSL séparée du render. Toutes les cibles sont
 > un gate du premier prototype. Kasuari 0.4.12 est le candidat retenu pour ce spike,
-> pas encore une dépendance validée : il compile sur les cibles isolées testées,
-> mais son départage sous-contraint est non déterministe et doit être adapté ou
-> remplacé avant migration. Les passages comparant
+> avec une adaptation locale minimale : les collections parcourues du tableau
+> sont ordonnées, tandis que la table de lookup des contraintes reste hachée car
+> elle n'est jamais itérée. Le même cas sous-contraint est désormais stable entre
+> processus natifs et instances wasm; l'adoption finale attend encore le double
+> run sur le véritable IR bgraph. Les passages comparant
 > un palier initial limité aux égalités exactes restent la trace de l'analyse,
 > mais ne décrivent plus la direction retenue.
 
@@ -1140,13 +1142,16 @@ L'audit isolé a passé les builds natif, `--no-default-features`,
 `wasm32-unknown-unknown` et `wasm32-wasip1`, avec et sans features par défaut.
 Cela ne prouve encore ni le protocole Typst ni l'intégration dans bgraph.
 
-Le blocage est `D-045`. La documentation de Kasuari prévient qu'un système
+Le blocage initial était `D-045`. La documentation de Kasuari prévient qu'un système
 sous-contraint peut choisir non déterministement entre plusieurs solutions. Le
 probe a reproduit exactement ce cas : 200 processus identiques ont produit les
 deux solutions possibles, 101 fois l'une et 99 fois l'autre. Les tables de hachage
 du solveur participent à l'ordre de sélection des symboles et pivots. Kasuari doit
-donc être adapté ou forké avec ordres canoniques et tests cross-target avant toute
-migration; s'il ne passe pas ce gate, le repli est un cœur interne.
+donc être adapté avec ordres canoniques et tests cross-target avant toute
+migration. Le spike a depuis introduit un fork local minimal utilisant des
+collections ordonnées partout où l'itération peut choisir un pivot. Le probe
+donne maintenant la même solution sur 32 processus natifs et 100 instances
+wasm; la preuve doit encore être répétée sur le véritable IR avant la bascule.
 
 Sources : [dépôt Kasuari](https://github.com/ratatui/kasuari),
 [documentation 0.4.12](https://docs.rs/kasuari/latest/kasuari/),

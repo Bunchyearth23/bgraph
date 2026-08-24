@@ -102,6 +102,7 @@ disagree.
 | `src/diff.rs` | Two versions as one drawing, matched by identifier |
 | `src/explain.rs` | Why a box is where it is — needs nothing from the solver |
 | `src/relayout.rs` | `bgraph layout`: inserts into lines, never rewrites them |
+| `src/placement.rs` | Placement IR boundary: entity index, scoped implicit flow and readiness shared by check/solve/explain/layout |
 | `src/report.rs` | The two forms of a diagnostic. The flat one is an interchange format and does not move |
 | `src/init.rs` | `bgraph init <genre>`, generated from the same tables |
 | `src/examples.rs` | **The worked file for every archetype, in the source.** Not a directory: `include_str!` made the crate unbuildable without one, and `init` makes one redundant. `docs/goldens.txt` pins what each renders to |
@@ -123,6 +124,7 @@ disagree.
 | `editors/vscode/` | VS Code extension: TextMate grammar, LSP client, Markdown preview |
 | `playground/` | The wasm module and a single-page playground |
 | `typst/` | bgraph as a Typst plugin, plus the no-plugin form |
+| `vendor/kasuari/` | Kasuari 0.4.12 with ordered tableau iteration for `D-045`; upstream source and licences retained |
 
 ## Conventions
 - Property **values stay raw in the AST** (`ast::Value`) and are interpreted in
