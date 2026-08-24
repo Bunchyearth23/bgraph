@@ -22,6 +22,7 @@ use anyhow::{Result, bail};
 
 use crate::ast::{Align, Diagram, Placement, RelDir};
 use crate::layout::Layout;
+use crate::placement::{EffectivePlacement, PlacementPlan};
 use crate::style::{GraphOpts, Registry, Style};
 
 /// Everything known about one box, as lines ready to print.
@@ -59,15 +60,16 @@ pub fn explain(diagram: &Diagram, layout: &Layout, id: &str) -> Result<String> {
     }
 
     out.push_str("\nplacement\n");
-    match &node.placement {
-        Some(Placement::At { x, y }) => {
+    let placement = PlacementPlan::new(diagram);
+    match placement.node(index, opts.flow) {
+        EffectivePlacement::Declared(Placement::At { x, y }) => {
             out.push_str(&format!(
                 "  at ({}, {})  — declared\n",
                 round(*x),
                 round(*y)
             ));
         }
-        Some(Placement::Cell { col, row }) => {
+        EffectivePlacement::Declared(Placement::Cell { col, row }) => {
             out.push_str(&format!(
                 "  at (col {}, row {})  — declared\n",
                 round(*col),
@@ -84,7 +86,7 @@ pub fn explain(diagram: &Diagram, layout: &Layout, id: &str) -> Result<String> {
                 None => out.push_str("  grid — NOT DECLARED, so a cell is one point\n"),
             }
         }
-        Some(Placement::Rel {
+        EffectivePlacement::Declared(Placement::Rel {
             dir,
             anchor,
             gap,
@@ -112,22 +114,22 @@ pub fn explain(diagram: &Diagram, layout: &Layout, id: &str) -> Result<String> {
                 None => out.push_str("  align center  — default\n"),
             }
         }
-        None => {
+        EffectivePlacement::Flow { dir, anchor } => {
             // The rule an author most often forgets, and the one that most
             // often explains a surprise.
-            match index {
-                0 => out.push_str("  none — the first box, so it sits at the origin\n"),
-                _ => out.push_str(&format!(
-                    "  none — flows {} from `{}`, the statement before it\n",
-                    match opts.flow {
-                        RelDir::RightOf => "right",
-                        RelDir::LeftOf => "left",
-                        RelDir::Below => "down",
-                        RelDir::Above => "up",
-                    },
-                    diagram.nodes[index - 1].id.as_str()
-                )),
-            }
+            out.push_str(&format!(
+                "  none — flows {} from sibling `{}`\n",
+                match dir {
+                    RelDir::RightOf => "right",
+                    RelDir::LeftOf => "left",
+                    RelDir::Below => "down",
+                    RelDir::Above => "up",
+                },
+                anchor.as_str()
+            ));
+        }
+        EffectivePlacement::Origin => {
+            out.push_str("  none — the first box in its container, so it sits at its origin\n");
         }
     }
 

@@ -29,6 +29,7 @@ use anyhow::Result;
 /// The same source with a placement written onto every box that had none.
 pub fn fill_in(source: &str, diagram: &Diagram) -> Result<String> {
     let opts = GraphOpts::from_props(&diagram.graph)?;
+    let placement = crate::placement::PlacementPlan::new(diagram);
     let word = match opts.flow {
         RelDir::RightOf => "right-of",
         RelDir::LeftOf => "left-of",
@@ -41,12 +42,15 @@ pub fn fill_in(source: &str, diagram: &Diagram) -> Result<String> {
     let mut edits: Vec<(usize, String)> = Vec::new();
 
     for (i, node) in diagram.nodes.iter().enumerate() {
-        // The first box has nothing to be placed against, and a box that
-        // already says where it goes is not this command's business.
-        if i == 0 || node.placement.is_some() {
+        // A flow root has nothing to be placed against, and a box that already
+        // says where it goes is not this command's business.
+        if node.placement.is_some() {
             continue;
         }
-        let anchor = diagram.nodes[i - 1].id.as_str();
+        let Some(anchor) = placement.implicit_anchor(i) else {
+            continue;
+        };
+        let anchor = diagram.nodes[anchor].id.as_str();
         let at = insertion_point(source, node.span.start, node.span.end);
         edits.push((at, format!(" {word} {anchor}")));
     }
@@ -104,11 +108,12 @@ pub fn would_change(source: &str, diagram: &Diagram) -> Result<bool> {
 
 /// Every box that has no placement of its own, for a report.
 pub fn unplaced(diagram: &Diagram) -> Vec<&str> {
+    let placement = crate::placement::PlacementPlan::new(diagram);
     diagram
         .nodes
         .iter()
         .enumerate()
-        .filter(|(i, n)| *i > 0 && n.placement.is_none())
+        .filter(|(i, n)| n.placement.is_none() && placement.implicit_anchor(*i).is_some())
         .map(|(_, n)| n.id.as_str())
         .collect()
 }

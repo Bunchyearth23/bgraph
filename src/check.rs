@@ -902,6 +902,7 @@ fn check_graph(diagram: &Diagram, out: &mut Vec<Diag>) {
 /// Detects anchor loops the same way the solver does: repeatedly place what
 /// can be placed; whatever never becomes placeable forms a cycle.
 fn check_cycles(diagram: &Diagram, nodes: &HashMap<&str, usize>, out: &mut Vec<Diag>) {
+    let placement = crate::placement::PlacementPlan::new(diagram);
     let mut resolved = vec![false; diagram.nodes.len()];
     let mut pending: Vec<usize> = (0..diagram.nodes.len()).collect();
 
@@ -913,9 +914,11 @@ fn check_cycles(diagram: &Diagram, nodes: &HashMap<&str, usize>, out: &mut Vec<D
             let anchor = match &diagram.nodes[i].placement {
                 Some(Placement::Rel { anchor, .. }) => Some(anchor.as_str()),
                 Some(Placement::At { .. } | Placement::Cell { .. }) => None,
-                // An unplaced node flows from the previous one in source order.
-                None if i > 0 => Some(diagram.nodes[i - 1].id.as_str()),
-                None => None,
+                // The solver's rule: the previous sibling in the same
+                // container, not the previous node in the flat AST.
+                None => placement
+                    .implicit_anchor(i)
+                    .map(|anchor| diagram.nodes[anchor].id.as_str()),
             };
 
             match anchor.and_then(|a| nodes.get(a)) {

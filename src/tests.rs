@@ -4530,6 +4530,22 @@ fn an_unplaced_node_flows_from_its_sibling_not_the_previous_line() {
 }
 
 #[test]
+fn cycle_check_uses_the_same_scoped_flow_as_the_solver() {
+    let l = build(
+        r#"
+        node outside right-of first { size: 20 20 }
+        group g {
+          padding: 0
+          node first { size: 20 20 }
+        }
+    "#,
+    );
+
+    assert_eq!(l.nodes[1].rect.x, 0.0);
+    assert!(l.nodes[0].rect.x > l.nodes[1].rect.right());
+}
+
+#[test]
 fn groups_share_the_item_namespace() {
     assert!(err("group g {\n node g\n}").contains("declared twice"));
     assert!(err("group node {\n node a\n}").contains("reserved word"));
@@ -9512,6 +9528,16 @@ fn explain_names_the_rule_an_author_forgets() {
 }
 
 #[test]
+fn explain_names_the_scoped_flow_root() {
+    let out = explained(
+        "node outside at (100, 0)\ngroup g {\n node first\n node second\n}",
+        "first",
+    );
+    assert!(out.contains("first box in its container"), "{out}");
+    assert!(!out.contains("`outside`"), "{out}");
+}
+
+#[test]
 fn explain_says_when_a_cell_has_no_grid_to_sit_on() {
     // A cell with no declared grid puts everything on the origin — a
     // question nobody thinks to ask, which is exactly when to volunteer it.
@@ -9578,6 +9604,7 @@ fn freezing_a_layout_does_not_change_the_picture() {
         "graph { flow: down, gap: 30 }\nnode a \"A\"\nnode b \"B\"",
         "node a \"A\"\nnode b \"B\" { fill: #eef3ff }\nnode c \"C\"",
         "node a \"A\" at (0, 0)\nnode b \"B\" right-of a\nnode c \"C\"",
+        "node outside at (100, 0)\ngroup g {\n node first\n node second\n}",
     ] {
         let (before, after) = frozen(source);
         let one = crate::render_source(&before).expect("the original draws");
@@ -9587,6 +9614,13 @@ fn freezing_a_layout_does_not_change_the_picture() {
             "the picture moved:\n--- before\n{before}\n--- after\n{after}"
         );
     }
+}
+
+#[test]
+fn freezing_uses_the_previous_sibling_inside_a_group() {
+    let (_, after) = frozen("node outside at (100, 0)\ngroup g {\n node first\n node second\n}");
+    assert!(!after.contains("first right-of outside"), "{after}");
+    assert!(after.contains("second right-of first"), "{after}");
 }
 
 #[test]
