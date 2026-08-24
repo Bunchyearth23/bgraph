@@ -103,6 +103,7 @@ disagree.
 | `src/explain.rs` | Why a box is where it is — needs nothing from the solver |
 | `src/relayout.rs` | `bgraph layout`: inserts into lines, never rewrites them |
 | `src/placement.rs` | Placement IR boundary: entity index, scoped implicit flow and readiness shared by check/solve/explain/layout |
+| `src/constraint_layout.rs` | `W-153` shadow lowering: compares migrated node relations with the deterministic Kasuari fork without owning rendered geometry yet |
 | `src/report.rs` | The two forms of a diagnostic. The flat one is an interchange format and does not move |
 | `src/init.rs` | `bgraph init <genre>`, generated from the same tables |
 | `src/examples.rs` | **The worked file for every archetype, in the source.** Not a directory: `include_str!` made the crate unbuildable without one, and `init` makes one redundant. `docs/goldens.txt` pins what each renders to |
@@ -110,7 +111,7 @@ disagree.
 | `src/docgen.rs` | `docs/reference.md`, generated from the `props.rs` tables |
 | `src/check.rs` | **The validator** — spanned diagnostics, one source of truth |
 | `src/style.rs` | Style cascade, `extends` flattening, `GraphOpts` |
-| `src/layout.rs` | Anchor solver → absolute `Rect`s |
+| `src/layout.rs` | Current anchor solver → absolute `Rect`s; debug spike builds compare migrated relations with Kasuari before render |
 | `src/bpmn.rs` | `type bpmn` — the marks inside a shape (event glyph, gateway mark, task marker) and the boundary events that sit on a task's edge. Line segments, never a Unicode glyph: a `✉` is whatever the reader's font says it is |
 | `src/ortho.rs` | `router: ortho` — A\* over a channel grid, so an elbow goes round a box. Integer costs, no hash container: the golden test is byte for byte |
 | `src/render_svg.rs` | Shapes, edge routing, markers, text |

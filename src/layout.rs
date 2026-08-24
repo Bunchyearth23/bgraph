@@ -870,6 +870,31 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     // Alignment runs after, because it is the one constraint that genuinely
     // needs positions to exist.
     constrain_alignment(diagram, index, &mut solved);
+
+    // The experimental Cassowary path is a shadow, never the source of the
+    // picture. It certifies each migrated relation against the current engine
+    // before `W-153` is allowed to switch the renderer over.
+    #[cfg(all(feature = "kasuari-spike", debug_assertions))]
+    if let Some(shadow) = crate::constraint_layout::solve_nodes(diagram, &placement, &sizes, &opts)?
+    {
+        for (i, candidate) in shadow.iter().enumerate() {
+            let Some(current) = solved.nodes[i] else {
+                continue;
+            };
+            let differs = (candidate.x - current.x).abs() > 1e-8
+                || (candidate.y - current.y).abs() > 1e-8
+                || (candidate.w - current.w).abs() > 1e-8
+                || (candidate.h - current.h).abs() > 1e-8;
+            if differs {
+                bail!(
+                    "Kasuari shadow diverged for `{}`: current {:?}, candidate {:?}",
+                    diagram.nodes[i].id.as_str(),
+                    current,
+                    candidate
+                );
+            }
+        }
+    }
     let placed = solved.nodes;
 
     let mut nodes: Vec<PlacedNode> = diagram

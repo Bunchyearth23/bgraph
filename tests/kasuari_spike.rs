@@ -105,3 +105,16 @@ fn deterministic_fork_is_stable_across_processes() {
         "the same system produced different solutions across processes: {seen:?}"
     );
 }
+
+#[test]
+fn v1_relations_match_the_cassowary_shadow() {
+    for source in [
+        "node a at (10, 20) { size: 80 40 }\nnode b right-of a gap 30 align top { size: 60 20 }",
+        "node a right-of b gap 12 { size: 30 30 }\nnode b at (5, 7) { size: 40 50 }",
+        "graph { flow: down, gap: 18 }\nnode a { size: 80 40 }\nnode b { size: 30 20 }",
+        "graph { grid: 100 60 }\nnode a at (col 2, row 3)\nnode b above a align right",
+    ] {
+        bgraph::render_source(source)
+            .unwrap_or_else(|error| panic!("shadow rejected:\n{source}\n{error:#}"));
+    }
+}

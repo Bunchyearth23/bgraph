@@ -23,8 +23,13 @@ LSP, commandes `explain` / `layout`, wasm, preview et stratégie de refactor.
 > avec une adaptation locale minimale : les collections parcourues du tableau
 > sont ordonnées, tandis que la table de lookup des contraintes reste hachée car
 > elle n'est jamais itérée. Le même cas sous-contraint est désormais stable entre
-> processus natifs et instances wasm; l'adoption finale attend encore le double
-> run sur le véritable IR bgraph. Les passages comparant
+> processus natifs et instances wasm. Un premier double-run porte maintenant sur
+> les relations v1 de nœuds sans groupes : positions absolues et grille, quatre
+> directions, gaps, alignements relatifs et flow implicite. En build de debug, le
+> solveur courant produit toujours le dessin et le lowering Kasuari doit produire
+> les mêmes rectangles; au-delà de 512 nœuds, ce shadow s'efface jusqu'au benchmark
+> dédié. L'adoption finale attend encore groupes, contraintes simultanées,
+> provenance et diagnostics. Les passages comparant
 > un palier initial limité aux égalités exactes restent la trace de l'analyse,
 > mais ne décrivent plus la direction retenue.
 
@@ -1138,9 +1143,10 @@ Ratatui. Sa surface est volontairement bas niveau, incrémentale, compatible
 `no_std` et sans abstraction de rectangle imposée : c'est une bonne forme pour
 abaisser l'IR géométrique de bgraph sans lui déléguer le modèle produit.
 
-L'audit isolé a passé les builds natif, `--no-default-features`,
-`wasm32-unknown-unknown` et `wasm32-wasip1`, avec et sans features par défaut.
-Cela ne prouve encore ni le protocole Typst ni l'intégration dans bgraph.
+L'audit a passé les builds natif, `--no-default-features`,
+`wasm32-unknown-unknown`, `wasm32-wasip1` et la combinaison exacte du protocole
+Typst. Le premier lowering est maintenant intégré au pipeline bgraph en shadow
+debug; l'exécution dans l'hôte Typst lui-même reste à prouver.
 
 Le blocage initial était `D-045`. La documentation de Kasuari prévient qu'un système
 sous-contraint peut choisir non déterministement entre plusieurs solutions. Le
@@ -1151,7 +1157,9 @@ donc être adapté avec ordres canoniques et tests cross-target avant toute
 migration. Le spike a depuis introduit un fork local minimal utilisant des
 collections ordonnées partout où l'itération peut choisir un pivot. Le probe
 donne maintenant la même solution sur 32 processus natifs et 100 instances
-wasm; la preuve doit encore être répétée sur le véritable IR avant la bascule.
+wasm. Le premier lowering bgraph compare désormais les relations v1 simples au
+solveur courant en debug; la preuve doit encore couvrir l'IR avec provenance,
+les groupes, les contraintes simultanées et les permutations avant la bascule.
 
 Sources : [dépôt Kasuari](https://github.com/ratatui/kasuari),
 [documentation 0.4.12](https://docs.rs/kasuari/latest/kasuari/),
