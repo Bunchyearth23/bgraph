@@ -9921,6 +9921,16 @@ fn explain_says_when_a_cell_has_no_grid_to_sit_on() {
 }
 
 #[test]
+fn explain_reports_bounded_grid_units() {
+    let out = explained(
+        "graph { grid: 4 3 20 30 }\nnode a \"A\"\nlayout { place a at (col 2, row 1) }",
+        "a",
+    );
+    assert!(out.contains("grid 4 × 3"), "{out}");
+    assert!(out.contains("gaps 20 × 30"), "{out}");
+}
+
+#[test]
 fn explain_attributes_each_colour_to_the_layer_that_set_it() {
     let out = explained(
         r#"style card { fill: #1e293b stroke: #38bdf8 }

@@ -75,15 +75,25 @@ pub fn explain(diagram: &Diagram, layout: &Layout, id: &str) -> Result<String> {
                 round(*col),
                 round(*row)
             ));
-            match opts.grid {
-                Some((x, y)) => out.push_str(&format!(
-                    "  grid {} × {}  — from `graph {{ grid }}`\n",
-                    round(x),
-                    round(y)
-                )),
-                // Worth saying loudly: a cell with no grid puts everything on
-                // the origin, and that is a question nobody thinks to ask.
-                None => out.push_str("  grid — NOT DECLARED, so a cell is one point\n"),
+            if let Some(spec) = opts.grid_spec {
+                out.push_str(&format!(
+                    "  grid {} × {}, gaps {} × {} — from `graph {{ grid }}`\n",
+                    spec.columns,
+                    spec.rows,
+                    round(spec.gap_col),
+                    round(spec.gap_row)
+                ));
+            } else {
+                match opts.grid {
+                    Some((x, y)) => out.push_str(&format!(
+                        "  grid {} × {}  — from `graph {{ grid }}`\n",
+                        round(x),
+                        round(y)
+                    )),
+                    // Worth saying loudly: a cell with no grid puts everything on
+                    // the origin, and that is a question nobody thinks to ask.
+                    None => out.push_str("  grid — NOT DECLARED, so a cell is one point\n"),
+                }
             }
         }
         EffectivePlacement::Declared(Placement::Rel {
