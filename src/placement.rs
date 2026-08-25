@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use crate::ast::{Diagram, Placement, RelDir, Spanned};
+use crate::ast::{ConstraintDecl, Diagram, Placement, RelDir, Spanned};
 
 /// A named entity that can participate in placement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -76,6 +76,24 @@ impl<'a> PlacementPlan<'a> {
         &self.index
     }
 
+    /// Constraints resolve their member names through the same namespace as
+    /// every other placement relation. Validation reports non-node members;
+    /// consumers can therefore skip them without inventing a second error.
+    pub fn constraint_members(&self, constraint: &ConstraintDecl) -> Vec<usize> {
+        constraint
+            .members
+            .iter()
+            .filter_map(|member| match self.index.get(member.as_str()).copied() {
+                Some(Entity::Node(node)) => Some(node),
+                Some(Entity::Group(_)) | None => None,
+            })
+            .collect()
+    }
+
+    pub fn constraints(&self) -> &'a [ConstraintDecl] {
+        &self.diagram.constraints
+    }
+
     pub fn owner(&self) -> &HashMap<Entity, usize> {
         &self.owner
     }
@@ -84,8 +102,12 @@ impl<'a> PlacementPlan<'a> {
         self.previous_sibling[node]
     }
 
+    pub fn declared_placement(&self, node: usize) -> Option<&'a Placement> {
+        self.diagram.nodes[node].placement.as_ref()
+    }
+
     pub fn node(&self, node: usize, flow: RelDir) -> EffectivePlacement<'a> {
-        if let Some(placement) = self.diagram.nodes[node].placement.as_ref() {
+        if let Some(placement) = self.declared_placement(node) {
             EffectivePlacement::Declared(placement)
         } else if let Some(anchor) = self.implicit_anchor(node) {
             EffectivePlacement::Flow {
@@ -278,5 +300,15 @@ mod tests {
         let plan = PlacementPlan::new(&diagram);
 
         assert_eq!(plan.unresolved(), [Entity::Node(0), Entity::Group(0)]);
+    }
+
+    #[test]
+    fn constraints_share_the_placement_namespace() {
+        let diagram =
+            crate::parser::parse_diagram("group g { node a }\nnode b\nsame-width a g missing b")
+                .unwrap();
+        let plan = PlacementPlan::new(&diagram);
+
+        assert_eq!(plan.constraint_members(&diagram.constraints[0]), [0, 1]);
     }
 }

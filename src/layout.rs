@@ -845,7 +845,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     // the fact does not push its neighbours along — it lands on top of them.
     // Placement already knows how to lay out boxes of a given size, so the
     // honest order is: decide the sizes, then place.
-    constrain_sizes(diagram, index, &mut sizes);
+    constrain_sizes(&placement, &mut sizes);
 
     // What each node's drawing reaches past its own box. Only a caption does
     // that, and only two genres draw one — everywhere else this is zeros and
@@ -869,7 +869,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     let mut solved = place_all(diagram, &placement, &sizes, &overhang, &opts)?;
     // Alignment runs after, because it is the one constraint that genuinely
     // needs positions to exist.
-    constrain_alignment(diagram, index, &mut solved);
+    constrain_alignment(&placement, &mut solved);
 
     // The experimental Cassowary path is a shadow, never the source of the
     // picture. It certifies each migrated relation against the current engine
@@ -1673,32 +1673,12 @@ pub struct Solved {
 /// because `D-001` makes the order the author's to state. Nothing here can
 /// move a box past another one.
 ///
-/// A name the constraint cannot resolve is simply skipped: `check` has
-/// already reported it, and reporting it twice would say there are two
-/// mistakes.
-fn members_of(
-    constraint: &crate::ast::ConstraintDecl,
-    index: &HashMap<&str, Entity>,
-) -> Vec<usize> {
-    constraint
-        .members
-        .iter()
-        .filter_map(|m| match index.get(m.as_str()).copied() {
-            Some(Entity::Node(i)) => Some(i),
-            // A group or an unknown name is skipped rather than reported:
-            // `check` has already spoken, and saying it twice would claim
-            // there are two mistakes.
-            _ => None,
-        })
-        .collect()
-}
-
 /// `same-width` and `same-height`, applied to the intrinsic sizes.
-fn constrain_sizes(diagram: &Diagram, index: &HashMap<&str, Entity>, sizes: &mut [(f64, f64)]) {
+fn constrain_sizes(plan: &PlacementPlan<'_>, sizes: &mut [(f64, f64)]) {
     use crate::ast::ConstraintKind;
 
-    for constraint in &diagram.constraints {
-        let members = members_of(constraint, index);
+    for constraint in plan.constraints() {
+        let members = plan.constraint_members(constraint);
         if members.len() < 2 {
             continue;
         }
@@ -1724,14 +1704,15 @@ fn constrain_sizes(diagram: &Diagram, index: &HashMap<&str, Entity>, sizes: &mut
 }
 
 /// `align-group`, applied to the solved rectangles.
-fn constrain_alignment(diagram: &Diagram, index: &HashMap<&str, Entity>, solved: &mut Solved) {
+fn constrain_alignment(plan: &PlacementPlan<'_>, solved: &mut Solved) {
     use crate::ast::{ConstraintAxis, ConstraintKind};
 
-    for constraint in &diagram.constraints {
+    for constraint in plan.constraints() {
         if constraint.kind != ConstraintKind::AlignGroup {
             continue;
         }
-        let rects: Vec<usize> = members_of(constraint, index)
+        let rects: Vec<usize> = plan
+            .constraint_members(constraint)
             .into_iter()
             .filter(|i| solved.nodes[*i].is_some())
             .collect();
@@ -1771,7 +1752,7 @@ fn constrain_alignment(diagram: &Diagram, index: &HashMap<&str, Entity>, solved:
                     // silently overwrote it, despite the language contract
                     // saying an explicit position wins over a constraint.
                     if matches!(
-                        diagram.nodes[*i].placement.as_ref(),
+                        plan.declared_placement(*i),
                         Some(Placement::At { .. } | Placement::Cell { .. })
                     ) {
                         continue;
