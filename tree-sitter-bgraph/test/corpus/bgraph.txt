@@ -94,9 +94,14 @@ style leaf extends base {
 Absolute and relative placement
 ================================================================================
 
-node a "A" at (0, 0)
-node b "B" .service right-of a gap 90 align top
-node c above b
+node a "A"
+node b "B" .service
+node c
+layout {
+  place a at (0, 0)
+  place b right-of a gap 90 align top
+  place c above b
+}
 
 --------------------------------------------------------------------------------
 
@@ -105,32 +110,40 @@ node c above b
     keyword: (item_keyword
       (identifier))
     name: (identifier)
-    label: (string)
-    placement: (absolute_position
-      point: (point
-        x: (number)
-        y: (number))))
+    label: (string))
   (item_declaration
     keyword: (item_keyword
       (identifier))
     name: (identifier)
     label: (string)
     class: (class_reference
-      (identifier))
-    placement: (relative_position
-      direction: (direction)
-      anchor: (identifier)
-      (gap_clause
-        amount: (number))
-      (align_clause
-        alignment: (alignment))))
+      (identifier)))
   (item_declaration
     keyword: (item_keyword
       (identifier))
-    name: (identifier)
-    placement: (relative_position
-      direction: (direction)
-      anchor: (identifier))))
+    name: (identifier))
+  (layout_declaration
+    body: (layout_block
+      (layout_statement
+        target: (identifier)
+        placement: (absolute_position
+          point: (point
+            x: (number)
+            y: (number))))
+      (layout_statement
+        target: (identifier)
+        placement: (relative_position
+          direction: (direction)
+          anchor: (identifier)
+          (gap_clause
+            amount: (number))
+          (align_clause
+            alignment: (alignment))))
+      (layout_statement
+        target: (identifier)
+        placement: (relative_position
+          direction: (direction)
+          anchor: (identifier))))))
 
 ================================================================================
 Every arrow form
@@ -314,7 +327,7 @@ node b { fill: #ff0000 stroke: #ff0000aa }
 Groups nest and carry properties
 ================================================================================
 
-group outer "Outer" .frame at (0, 0) {
+group outer "Outer" .frame {
   padding: 22
   node a "A"
   group inner "Inner" {
@@ -331,10 +344,6 @@ group outer "Outer" .frame at (0, 0) {
     label: (string)
     class: (class_reference
       (identifier))
-    placement: (absolute_position
-      point: (point
-        x: (number)
-        y: (number)))
     body: (group_block
       (property
         name: (property_name)
@@ -391,7 +400,8 @@ Dates and durations are single values
 
 task a "A" 2026-08-01 12d
 task b "B" 2026-08-01 2026-08-13
-node c at (-40, -20)
+node c
+layout { place c at (-40, -20) }
 
 --------------------------------------------------------------------------------
 
@@ -413,11 +423,15 @@ node c at (-40, -20)
   (item_declaration
     keyword: (item_keyword
       (identifier))
-    name: (identifier)
-    placement: (absolute_position
-      point: (point
-        x: (number)
-        y: (number)))))
+    name: (identifier))
+  (layout_declaration
+    body: (layout_block
+      (layout_statement
+        target: (identifier)
+        placement: (absolute_position
+          point: (point
+            x: (number)
+            y: (number)))))))
 
 ================================================================================
 Scoped layout block

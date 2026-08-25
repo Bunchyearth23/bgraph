@@ -39,8 +39,8 @@ layout {
   align top ui api
 }
 
-note "Figures are March." .hot below api gap 20
-legend right-of api gap 60
+note "Figures are March." .hot
+legend
 
 ui -> core.api "HTTPS"
 web.app -> jobs.app "enqueues"

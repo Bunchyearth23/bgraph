@@ -93,7 +93,9 @@ fn reflow(source: &str) -> String {
 /// is a named colour: `white` has no fourth channel, and turning it into a hex
 /// literal is the author's decision to make, not this function's.
 pub fn migrate(source: &str) -> anyhow::Result<String> {
-    let diagram = crate::parser::parse_legacy_diagram(source)?;
+    // `fmt --migrate` only handles independent property migrations. V1
+    // placement syntax is deliberately outside the language now.
+    let diagram = crate::parser::parse_diagram(source)?;
 
     let decls = declarations(source);
     let mut edits: Vec<(usize, usize, String)> = Vec::new();

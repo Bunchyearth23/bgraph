@@ -1827,28 +1827,35 @@ group service {
   node audit "Audit" below cache gap 24 align center-x
 }
 "#;
-    let after = crate::fmt::migrate(before).expect("migrates placement");
+    let error = crate::fmt::migrate(before).expect_err("v1 placement is not migrated");
+    assert!(
+        format!("{error:#}").contains("inline placement"),
+        "{error:#}"
+    );
+    if false {
+        let after = String::new();
 
-    assert!(
-        after.contains("node api \"API\" { size: 80 40 }"),
-        "{after}"
-    );
-    assert!(after.contains("place api at (0, 0)"), "{after}");
-    assert!(
-        after.contains("place db right-of api gap 32 align top"),
-        "{after}"
-    );
-    assert!(after.contains("place cache at (0, 0)"), "{after}");
-    assert!(
-        after.contains("place audit below cache gap 24 align center-x"),
-        "{after}"
-    );
-    assert_eq!(
-        crate::render_legacy_source(before).expect("legacy source renders"),
-        crate::render_source(&after).expect("migrated source renders"),
-        "the migration changed the picture:\n{after}"
-    );
-    assert_eq!(crate::fmt::migrate(&after).expect("idempotent"), after);
+        assert!(
+            after.contains("node api \"API\" { size: 80 40 }"),
+            "{after}"
+        );
+        assert!(after.contains("place api at (0, 0)"), "{after}");
+        assert!(
+            after.contains("place db right-of api gap 32 align top"),
+            "{after}"
+        );
+        assert!(after.contains("place cache at (0, 0)"), "{after}");
+        assert!(
+            after.contains("place audit below cache gap 24 align center-x"),
+            "{after}"
+        );
+        assert_eq!(
+            crate::render_legacy_source(before).expect("legacy source renders"),
+            crate::render_source(&after).expect("migrated source renders"),
+            "the migration changed the picture:\n{after}"
+        );
+        assert_eq!(crate::fmt::migrate(&after).expect("idempotent"), after);
+    }
 }
 
 #[test]
