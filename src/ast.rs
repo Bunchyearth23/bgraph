@@ -163,6 +163,9 @@ pub struct UseDecl {
     /// the instance in, so an instance is placed and anchored exactly as any
     /// other group is — rather than needing a placement vocabulary of its own.
     pub placement: Option<Placement>,
+    /// Source range of the legacy inline placement, when one was written.
+    /// Kept only so `fmt --migrate` can remove exactly that clause.
+    pub placement_span: Option<Span>,
     pub bindings: Vec<Prop>,
     pub span: Span,
 }
@@ -190,6 +193,8 @@ pub struct GroupDecl {
     /// Where the group goes. Its *size* always comes from its members; a
     /// placement translates the whole subtree once they are solved.
     pub placement: Option<Placement>,
+    /// Source range of the legacy inline placement, when one was written.
+    pub placement_span: Option<Span>,
     pub props: Vec<Prop>,
     /// Items and groups declared directly inside, in source order.
     pub members: Vec<Spanned<String>>,
@@ -220,6 +225,8 @@ pub struct NodeDecl {
     pub positional_span: Span,
     pub classes: Vec<Spanned<String>>,
     pub placement: Option<Placement>,
+    /// Source range of the legacy inline placement, when one was written.
+    pub placement_span: Option<Span>,
     pub props: Vec<Prop>,
     /// Bare strings written in the block: a class's fields, a table's columns.
     /// Distinct from `GroupDecl::members`, which names other declarations.

@@ -1767,6 +1767,39 @@ fn the_migration_is_idempotent_and_leaves_a_clean_file_alone() {
 }
 
 #[test]
+fn the_migration_moves_inline_positions_into_their_layout_scopes() {
+    let before = r#"node api "API" at (0, 0) { size: 80 40 }
+node db "Database" right-of api gap 32 align top { size: 120 60 }
+group service {
+  node cache "Cache" at (0, 0)
+  node audit "Audit" below cache gap 24 align center-x
+}
+"#;
+    let after = crate::fmt::migrate(before).expect("migrates placement");
+
+    assert!(
+        after.contains("node api \"API\" { size: 80 40 }"),
+        "{after}"
+    );
+    assert!(after.contains("place api at (0, 0)"), "{after}");
+    assert!(
+        after.contains("place db right-of api gap 32 align top"),
+        "{after}"
+    );
+    assert!(after.contains("place cache at (0, 0)"), "{after}");
+    assert!(
+        after.contains("place audit below cache gap 24 align center-x"),
+        "{after}"
+    );
+    assert_eq!(
+        crate::render_source(before).expect("legacy source renders"),
+        crate::render_source(&after).expect("migrated source renders"),
+        "the migration changed the picture:\n{after}"
+    );
+    assert_eq!(crate::fmt::migrate(&after).expect("idempotent"), after);
+}
+
+#[test]
 fn the_migration_declines_rather_than_inventing_a_colour() {
     // Both refusals are the same principle: this command may move a value, it
     // may not decide one. A `#ffffff` conjured to carry an alpha would have

@@ -391,6 +391,7 @@ fn read_data(diagram: &mut Diagram, from: &Path) -> Result<()> {
             positional_span: prop.span,
             classes: Vec::new(),
             placement: None,
+            placement_span: None,
             props: Vec::new(),
             members: Vec::new(),
             span: prop.span,
@@ -522,6 +523,7 @@ fn expand(diagram: &mut Diagram, from: &Path) -> Result<()> {
             label: None,
             classes: Vec::new(),
             placement: placing.placement.clone(),
+            placement_span: placing.placement_span,
             props: Vec::new(),
             members,
             edge_members: Vec::new(),
@@ -569,6 +571,9 @@ fn pin(d: &mut Diagram, at: Span) {
         }
         props(&mut node.props);
         pin_placement(&mut node.placement, at);
+        if node.placement_span.is_some() {
+            node.placement_span = Some(at);
+        }
         s(&mut node.span);
     }
     for edge in &mut d.edges {
@@ -591,6 +596,9 @@ fn pin(d: &mut Diagram, at: Span) {
         }
         props(&mut group.props);
         pin_placement(&mut group.placement, at);
+        if group.placement_span.is_some() {
+            group.placement_span = Some(at);
+        }
         s(&mut group.span);
     }
     for layout in &mut d.layouts {
@@ -729,6 +737,9 @@ fn shift(d: &mut Diagram, delta: usize) {
         }
         props(&mut node.props);
         shift_placement(&mut node.placement, delta);
+        if let Some(span) = &mut node.placement_span {
+            s(span);
+        }
         s(&mut node.span);
     }
     for edge in &mut d.edges {
@@ -751,6 +762,9 @@ fn shift(d: &mut Diagram, delta: usize) {
         }
         props(&mut group.props);
         shift_placement(&mut group.placement, delta);
+        if let Some(span) = &mut group.placement_span {
+            s(span);
+        }
         s(&mut group.span);
     }
     for layout in &mut d.layouts {
