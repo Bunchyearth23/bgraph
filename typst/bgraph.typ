@@ -37,7 +37,7 @@
 /// answer: it matches what `check` does on the command line, and a document
 /// that ships with a hole where a diagram should be is worse than one that
 /// refused to build.
-#let diagram(source, width: auto, alt: none) = image(
+#let bg-diagram(source, width: auto, alt: none) = image(
   _plugin.bgraph_typst_render(bytes(source)),
   format: "svg",
   width: width,
@@ -45,7 +45,7 @@
 )
 
 /// The same, reading the source from a file beside the document.
-#let diagram-file(path, width: auto, alt: none) = diagram(
+#let bg-diagram-file(path, width: auto, alt: none) = diagram(
   read(path),
   width: width,
   alt: alt,

@@ -112,6 +112,7 @@ pub const CARDINALITIES: &[&str] = &[
 /// every box without being referenced — but it lived in `resolve`'s argument
 /// list and in nobody's documentation, so `style grid` looked exactly like a
 /// typo and a typo looked exactly like a theme (`W-134`).
+#[derive(Debug, Clone, Copy)]
 pub struct ThemeStyle {
     pub name: &'static str,
     /// The half of the vocabulary it reads, when it reads only one half.
@@ -193,6 +194,41 @@ pub const THEME_STYLES: &[ThemeStyle] = &[
 
 pub fn theme_style(name: &str) -> Option<&'static ThemeStyle> {
     THEME_STYLES.iter().find(|t| t.name == name)
+}
+
+/// The style target selected by a name in the current archetype.
+///
+/// Global targets are fixed (`node`, `edge`, ...); item targets are supplied by
+/// the archetype, including alternate declaration words such as BPMN's
+/// `event` and `gateway`. Keeping this classification here prevents the
+/// renderer, validator and editor from maintaining subtly different lists.
+#[derive(Debug, Clone, Copy)]
+pub enum ThemeTarget {
+    Global(&'static ThemeStyle),
+    Item(&'static str),
+}
+
+impl ThemeTarget {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Global(style) => style.name,
+            Self::Item(name) => name,
+        }
+    }
+
+    pub fn ctx(self) -> Option<Ctx> {
+        match self {
+            Self::Global(style) => style.ctx,
+            Self::Item(_) => Some(Ctx::Node),
+        }
+    }
+
+    pub fn only(self) -> &'static [&'static str] {
+        match self {
+            Self::Global(style) => style.only,
+            Self::Item(_) => &[],
+        }
+    }
 }
 
 pub const PROPS: &[PropDef] = &[
@@ -1540,6 +1576,28 @@ impl ArchetypeDef {
     pub fn items(&self) -> impl Iterator<Item = &'static str> {
         std::iter::once(self.item).chain(self.alt_items.iter().map(|a| a.item))
     }
+
+    /// The style target for a declaration word. `node` is the universal
+    /// synonym and therefore selects the primary item theme.
+    pub fn style_word<'a>(&self, written: &'a str) -> &'a str {
+        if written == "node" {
+            self.item
+        } else if self.items().any(|item| item == written) {
+            written
+        } else {
+            self.item
+        }
+    }
+}
+
+/// Classify a style name for one archetype.
+pub fn theme_target(def: &ArchetypeDef, name: &str) -> Option<ThemeTarget> {
+    if let Some(global) = theme_style(name) {
+        return Some(ThemeTarget::Global(global));
+    }
+    def.items()
+        .find(|item| *item == name)
+        .map(ThemeTarget::Item)
 }
 
 pub struct Slot {

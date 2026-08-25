@@ -322,6 +322,19 @@ fn a_themed_style_is_offered_only_its_own_side() {
     assert!(labels.contains(&"shape") && labels.contains(&"router"));
 }
 
+#[test]
+fn an_alternate_archetype_theme_is_offered_only_node_properties() {
+    let server = Server {
+        docs: HashMap::new(),
+    };
+    let text = "type bpmn\nstyle event {\n  ";
+    let items = server.items_for(text, "  ", text.len());
+    let labels: Vec<&str> = items.iter().filter_map(|i| i["label"].as_str()).collect();
+    assert!(labels.contains(&"shape"));
+    assert!(labels.contains(&"stage"));
+    assert!(!labels.contains(&"router"));
+}
+
 /// A theme reads a named part of the vocabulary, so offering the rest is
 /// offering the warning `check_styles` is about to write.
 #[test]

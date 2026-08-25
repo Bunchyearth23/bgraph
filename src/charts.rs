@@ -317,7 +317,7 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
     for node in &diagram.nodes {
         let style = registry.resolve(
             chart_defaults(),
-            def.item,
+            def.style_word(node.keyword.as_str()),
             &node.classes,
             &node.props_for(def),
         )?;
@@ -571,7 +571,7 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
     for (i, node) in diagram.nodes.iter().enumerate() {
         let style = registry.resolve(
             chart_defaults(),
-            def.item,
+            def.style_word(node.keyword.as_str()),
             &node.classes,
             &node.props_for(def),
         )?;
@@ -828,7 +828,7 @@ pub fn tree(
     for node in &diagram.nodes {
         let style = registry.resolve(
             Style::node_defaults(),
-            def.item,
+            def.style_word(node.keyword.as_str()),
             &node.classes,
             &node.props_for(def),
         )?;
@@ -1161,7 +1161,7 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
     for (i, node) in diagram.nodes.iter().enumerate() {
         let style = registry.resolve(
             chart_defaults(),
-            def.item,
+            def.style_word(node.keyword.as_str()),
             &node.classes,
             &node.props_for(def),
         )?;
@@ -1620,7 +1620,7 @@ pub fn rack(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
             let node = &diagram.nodes[i];
             let style = registry.resolve(
                 Style::node_defaults(),
-                def.item,
+                def.style_word(node.keyword.as_str()),
                 &node.classes,
                 &node.props_for(def),
             )?;
@@ -1701,7 +1701,7 @@ pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
     for (i, node) in diagram.nodes.iter().enumerate() {
         let style = registry.resolve(
             chart_defaults(),
-            def.item,
+            def.style_word(node.keyword.as_str()),
             &node.classes,
             &node.props_for(def),
         )?;
@@ -1959,7 +1959,7 @@ pub fn journey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resul
     for node in &diagram.nodes {
         let style = registry.resolve(
             chart_defaults(),
-            def.item,
+            def.style_word(node.keyword.as_str()),
             &node.classes,
             &node.props_for(def),
         )?;
@@ -2284,7 +2284,7 @@ pub fn kanban(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
             };
             let style = registry.resolve(
                 chart_defaults(),
-                def.item,
+                def.style_word(node.keyword.as_str()),
                 &node.classes,
                 &node.props_for(def),
             )?;
@@ -2429,7 +2429,7 @@ fn packet_like(
     for node in &diagram.nodes {
         let style = registry.resolve(
             Style::node_defaults(),
-            def.item,
+            def.style_word(node.keyword.as_str()),
             &node.classes,
             &node.props_for(def),
         )?;
@@ -2719,7 +2719,7 @@ fn build_tiles(
             let node = &diagram.nodes[i];
             let style = registry.resolve(
                 chart_defaults(),
-                def.item,
+                def.style_word(node.keyword.as_str()),
                 &node.classes,
                 &node.props_for(def),
             )?;
@@ -3166,7 +3166,7 @@ pub fn quadrant(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
     for (slot, node) in diagram.nodes.iter().enumerate() {
         let style = registry.resolve(
             chart_defaults(),
-            def.item,
+            def.style_word(node.keyword.as_str()),
             &node.classes,
             &node.props_for(def),
         )?;
@@ -3297,7 +3297,7 @@ pub fn wave(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
     for node in &diagram.nodes {
         let style = registry.resolve(
             chart_defaults(),
-            def.item,
+            def.style_word(node.keyword.as_str()),
             &node.classes,
             &node.props_for(def),
         )?;
@@ -3789,7 +3789,7 @@ pub fn sankey(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result
 
         let style = registry.resolve(
             chart_defaults(),
-            def.item,
+            def.style_word(node.keyword.as_str()),
             &node.classes,
             &node.props_for(def),
         )?;
@@ -4137,7 +4137,7 @@ pub fn bar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
     for (i, node) in diagram.nodes.iter().enumerate() {
         let style = registry.resolve(
             chart_defaults(),
-            def.item,
+            def.style_word(node.keyword.as_str()),
             &node.classes,
             &node.props_for(def),
         )?;
@@ -4384,7 +4384,7 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
     for (i, node) in diagram.nodes.iter().enumerate() {
         let style = registry.resolve(
             chart_defaults(),
-            def.item,
+            def.style_word(node.keyword.as_str()),
             &node.classes,
             &node.props_for(def),
         )?;
@@ -4700,7 +4700,7 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
     for (i, node) in diagram.nodes.iter().enumerate() {
         let style = registry.resolve(
             Style::node_defaults(),
-            def.item,
+            def.style_word(node.keyword.as_str()),
             &node.classes,
             &node.props_for(def),
         )?;
@@ -4981,7 +4981,7 @@ pub fn gantt(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
     for (i, node) in diagram.nodes.iter().enumerate() {
         let style = registry.resolve(
             chart_defaults(),
-            def.item,
+            def.style_word(node.keyword.as_str()),
             &node.classes,
             &node.props_for(def),
         )?;
@@ -5274,7 +5274,7 @@ pub fn timeline(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
     for node in &diagram.nodes {
         let style = registry.resolve(
             chart_defaults(),
-            def.item,
+            def.style_word(node.keyword.as_str()),
             &node.classes,
             &node.props_for(def),
         )?;

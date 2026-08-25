@@ -36,7 +36,7 @@ and a diagram that stops parsing stops the build.
 ```typst
 #import "bgraph.typ": diagram, diagram-file
 
-#diagram("
+#bg-diagram("
   node ui \"Browser\"
   node api \"API\"
   layout {
@@ -46,7 +46,7 @@ and a diagram that stops parsing stops the build.
   ui -> api
 ")
 
-#diagram-file("arch.bd", width: 80%)
+#bg-diagram-file("arch.bd", width: 80%)
 ```
 
 **A diagram that does not parse fails the build**, with the compiler's own

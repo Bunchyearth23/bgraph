@@ -228,14 +228,17 @@ fn paint(diagram: &Diagram, node: &crate::ast::NodeDecl, id: &str) -> Result<Str
         }
     };
 
-    let layers: Vec<(String, Option<&Style>)> =
-        std::iter::once((format!("`style {}`", def.item), registry.get(def.item)))
-            .chain(
-                node.classes
-                    .iter()
-                    .map(|c| (format!("`.{}`", c.as_str()), registry.get(c.as_str()))),
-            )
-            .collect();
+    let item_word = def.style_word(node.keyword.as_str());
+    let mut layers: Vec<(String, Option<&Style>)> = Vec::new();
+    if item_word != "node" {
+        layers.push(("`style node`".to_string(), registry.get("node")));
+    }
+    layers.push((format!("`style {item_word}`"), registry.get(item_word)));
+    layers.extend(
+        node.classes
+            .iter()
+            .map(|c| (format!("`.{}`", c.as_str()), registry.get(c.as_str()))),
+    );
 
     for (from, layer) in layers {
         let Some(layer) = layer else { continue };
@@ -245,7 +248,7 @@ fn paint(diagram: &Diagram, node: &crate::ast::NodeDecl, id: &str) -> Result<Str
     }
 
     let before = current.clone();
-    current.overlay(&crate::style::layer_from_props(&node.props)?);
+    current.overlay(&crate::style::layer_from_props(&node.props_for(def))?);
     note(
         &current,
         &before,

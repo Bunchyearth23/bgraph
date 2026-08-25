@@ -211,9 +211,9 @@ composited away first.
 built-in defaults  →  style node / style edge  →  .classes (in order)  →  inline { }
 ```
 
-The implicit theme is the archetype's own word — `style slice { … }` in a
-pie — with `style node` and `style edge` remaining universal aliases, applied
-first so the specific name wins where both are declared. `extends` flattens a chain
+The implicit theme is the word written for the item — `style slice { … }` in a
+pie, or `style event { … }` for BPMN events — with `style node` and `style edge`
+remaining universal aliases, applied first so the specific name wins where both are declared. `extends` flattens a chain
 child-first. An unknown property or an unknown `.class` is an error.
 
 ### Themes, and everything else
@@ -277,7 +277,7 @@ Aliases are marked. They behave identically to the property they alias; the edit
 
 A **theme** is a style the renderer looks up on its own: it paints without being referenced. Everything else is a **class**, and a class paints where `.name` is written and nowhere else. The list is fixed, which is what lets a style whose name is on neither list be reported rather than silently drawn nowhere.
 
-Each genre adds one more theme: its own item word, so `style slice` themes a pie and `style device` a rack.
+Each genre's item words are theme targets. A single-word genre uses that word (`style slice` themes a pie); a multi-form genre gives each form its own target (`style task`, `style event`, `style gateway` and `style data` in BPMN). `style node` remains the common layer.
 
 | Theme | Reads | What it paints |
 |---|---|---|

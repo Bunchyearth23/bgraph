@@ -56,12 +56,11 @@ impl Context {
                 Some("graph") => Block::Graph,
                 Some("layout") => Block::Layout,
                 Some("group") | Some("activate") | Some("component") => Block::Container,
-                Some("style") => Block::Style(
-                    head.split_whitespace()
-                        .nth(1)
-                        .and_then(props::theme_style)
-                        .map(|t| t.name),
-                ),
+                Some("style") => Block::Style(head.split_whitespace().nth(1).and_then(|name| {
+                    props::archetype(declared_archetype(text))
+                        .and_then(|def| props::theme_target(def, name))
+                        .map(|target| target.name())
+                })),
                 _ if declares_an_edge(head) => Block::Edge,
                 _ => Block::Node,
             }

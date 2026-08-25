@@ -125,14 +125,20 @@ impl Server {
                 // A theme reads a named part of the vocabulary and
                 // `check_styles` warns when a style reaches outside it;
                 // offering what it does not read is offering that warning.
-                Block::Style(name) => name.and_then(props::theme_style).and_then(|t| t.ctx),
+                Block::Style(name) => name
+                    .and_then(|name| {
+                        props::archetype(archetype).and_then(|def| props::theme_target(def, name))
+                    })
+                    .and_then(|t| t.ctx()),
                 _ => None,
             };
 
             let only: &[&str] = match block {
                 Block::Style(name) => name
-                    .and_then(props::theme_style)
-                    .map_or(&[][..], |t| t.only),
+                    .and_then(|name| {
+                        props::archetype(archetype).and_then(|def| props::theme_target(def, name))
+                    })
+                    .map_or(&[][..], |t| t.only()),
                 _ => &[],
             };
 

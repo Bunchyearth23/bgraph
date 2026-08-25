@@ -632,7 +632,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         let mut style = registry
             .resolve(
                 node_base.clone(),
-                item.item,
+                item.style_word(node.keyword.as_str()),
                 &node.classes,
                 // `props_for`, not `effective_props(item.slots)`: the
                 // positional shape follows the **word the author wrote**

@@ -3354,6 +3354,57 @@ fn a_chart_s_own_furniture_is_styled_by_the_diagram_not_by_its_items() {
 }
 
 #[test]
+fn every_bpmn_form_is_an_implicit_style_target() {
+    let layout = build(
+        "type bpmn\n\
+         style node { fill: #ffffff }\n\
+         style event { fill: #ff0000 }\n\
+         style gateway { fill: #00ff00 }\n\
+         style data { fill: #0000ff }\n\
+         task t \"Task\" plain\n\
+         event e \"Event\" start plain\n\
+         gateway g \"Gateway\" exclusive\n\
+         data d \"Data\" object\n\
+         layout {\n\
+           place t at (0, 0)\n\
+           place e right-of t\n\
+           place g right-of e\n\
+           place d right-of g\n\
+         }\n",
+    );
+
+    let fill = |id: &str| {
+        layout
+            .nodes
+            .iter()
+            .find(|node| node.id == id)
+            .and_then(|node| node.style.fill.as_deref())
+            .unwrap_or_default()
+    };
+    assert_eq!(fill("t"), "#ffffff");
+    assert_eq!(fill("e"), "#ff0000");
+    assert_eq!(fill("g"), "#00ff00");
+    assert_eq!(fill("d"), "#0000ff");
+}
+
+#[test]
+fn an_item_theme_is_checked_as_a_node_theme() {
+    let diagnostics = diags(
+        "type bpmn\n\
+         style event { head: none }\n\
+         event e \"Event\" start plain\n",
+    );
+    assert!(
+        diagnostics.iter().any(|diagnostic| {
+            diagnostic
+                .message
+                .contains("`head` has no effect on a node")
+        }),
+        "{diagnostics:?}"
+    );
+}
+
+#[test]
 fn style_grid_paints_the_rules_and_the_numbers_along_them() {
     // There was no way to recolour a rack's unit rules at all: they were the
     // theme's, and the theme is decided by the background.

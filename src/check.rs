@@ -487,10 +487,10 @@ fn check_styles(diagram: &Diagram, def: &'static props::ArchetypeDef, out: &mut 
         // The themes the renderer looks up on its own each read a named part
         // of the vocabulary; a style under any other name is generic and takes
         // the union of both halves, because a class can be applied to either.
-        let theme = props::theme_style(style.name.as_str());
+        let theme = props::theme_target(def, style.name.as_str());
         check_props_refined(
             &style.props,
-            theme.and_then(|t| t.ctx),
+            theme.and_then(|t| t.ctx()),
             def.item_props,
             props::PROPS,
             "property",
@@ -499,17 +499,17 @@ fn check_styles(diagram: &Diagram, def: &'static props::ArchetypeDef, out: &mut 
 
         // A theme that reads only a few properties says so, rather than
         // accepting `fill` on a gridline and drawing nothing with it.
-        if let Some(theme) = theme.filter(|t| !t.only.is_empty()) {
+        if let Some(theme) = theme.filter(|t| !t.only().is_empty()) {
             for prop in &style.props {
-                if !theme.only.contains(&prop.name.as_str()) {
+                if !theme.only().contains(&prop.name.as_str()) {
                     out.push(Diag::warn(
                         prop.name_span,
                         format!(
                             "`{}` has no effect on `style {}` — it reads {}",
                             prop.name,
-                            theme.name,
+                            theme.name(),
                             theme
-                                .only
+                                .only()
                                 .iter()
                                 .filter(|n| {
                                     props::lookup(n, props::PROPS).is_some_and(|d| !d.alias)
@@ -562,10 +562,7 @@ fn check_dead_styles(diagram: &Diagram, def: &'static props::ArchetypeDef, out: 
 
     for style in &diagram.styles {
         let name = style.name.as_str();
-        if used.contains(name)
-            || props::theme_style(name).is_some()
-            || def.items().any(|w| w == name)
-        {
+        if used.contains(name) || props::theme_target(def, name).is_some() {
             continue;
         }
 
@@ -1375,7 +1372,12 @@ fn resolved_nodes(diagram: &Diagram, base: crate::style::Style) -> Vec<crate::st
         .iter()
         .map(|node| {
             registry
-                .resolve(base.clone(), def.item, &node.classes, &node.props_for(def))
+                .resolve(
+                    base.clone(),
+                    def.style_word(node.keyword.as_str()),
+                    &node.classes,
+                    &node.props_for(def),
+                )
                 .unwrap_or_default()
         })
         .collect()
