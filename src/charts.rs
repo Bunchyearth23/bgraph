@@ -4393,8 +4393,9 @@ pub fn xy(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Lay
                 scattered = true;
                 // `chunks_exact` drops a trailing x rather than inventing a y
                 // for it; `check` is what tells the author the count is odd.
+                let (coordinates, _) = flat.as_chunks::<2>();
                 let mut pairs: Vec<(f64, f64)> =
-                    flat.chunks_exact(2).map(|c| (c[0], c[1])).collect();
+                    coordinates.iter().map(|[x, y]| (*x, *y)).collect();
                 // A line through points in *declaration* order zigzags. Sorting
                 // by x costs a scatter nothing and is the only reading of
                 // `mark: line` that means anything.
