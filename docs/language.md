@@ -549,6 +549,29 @@ system, not a solver. Nothing is snapped to it: a box placed in pixels is
 unaffected, and a grid that quietly moved a declared position would be exactly
 the auto-placement this language refuses.
 
+The same cells can be used as waypoints when a link needs a stable detour:
+
+```bgraph
+graph { grid: 160 90 }
+
+node api "API"
+node db  "Database"
+
+layout {
+  place api at (col 0, row 0)
+  place db  at (col 2, row 1)
+}
+
+api -> db { router: ortho } via (col 1, row 0)
+```
+
+Changing `160 90` changes the scale of every cell, without rewriting the
+placements. A single value (`grid: 120`) is shorthand for a square grid. This
+`graph { grid: ... }` is only a placement coordinate system: it does **not**
+draw visible lines and it does not automatically arrange boxes. Do not confuse
+it with `style grid`, which is chart furniture (axis/grid lines) for archetypes
+that support it.
+
 ### Freezing a loose file
 
 Write a diagram without placements, then run `bgraph layout` once and every
