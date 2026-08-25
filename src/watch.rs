@@ -130,14 +130,20 @@ fn version(input: &Path) -> String {
 }
 
 fn page(input: &Path, data: Option<&Path>) -> String {
-    let (status, content) = match render_source(input, data) {
-        Ok(svg) => ("", svg),
+    let (status, content, diagnostics) = match render_source(input, data) {
+        Ok(svg) => {
+            let diagnostics = preview_diagnostics(input, data)
+                .map(|items| diagnostics_html(&items))
+                .unwrap_or_default();
+            ("", svg, diagnostics)
+        }
         Err(err) => (
             "error",
             format!(
                 "<pre class=\"err\">{}</pre>",
                 html_escape(&format!("{err:#}"))
             ),
+            String::new(),
         ),
     };
 
@@ -186,10 +192,22 @@ fn page(input: &Path, data: Option<&Path>) -> String {
   #zoom {{ font-variant-numeric: tabular-nums; }}
   #keys {{ opacity: .65; }}
   #name {{ margin-left: auto; }}
+  #diagnostics {{ position: fixed; top: 12px; right: 12px; z-index: 2;
+                  max-width: min(520px, calc(100vw - 24px)); max-height: 40vh;
+                  overflow: auto; padding: 10px 12px; border: 1px solid #f59e0b;
+                  border-radius: 8px; background: color-mix(in srgb, Canvas 92%, #f59e0b);
+                  color: CanvasText; box-shadow: 0 2px 10px #0002; }}
+  #diagnostics strong {{ display: block; margin-bottom: 4px; }}
+  #diagnostics ul {{ margin: 0; padding-left: 18px; }}
+  #diagnostics li {{ margin: 3px 0; }}
+  #diagnostics li span {{ font: 10px ui-monospace, monospace; text-transform: uppercase; }}
+  #diagnostics .error {{ color: #dc2626; }}
+  #diagnostics .warning {{ color: #a16207; }}
 </style>
 </head>
 <body>
 <div id="viewport"><div id="canvas">{content}</div></div>
+{diagnostics}
 <div id="bar">
   <span id="zoom">100%</span>
   <span id="keys">scroll to zoom · drag to pan · <b>0</b> reset · <b>f</b> fit</span>
@@ -303,7 +321,63 @@ tick();
 </html>"#,
         name = html_escape(&input.display().to_string()),
         status_label = if status.is_empty() { "" } else { " · error" },
+        diagnostics = diagnostics,
     )
+}
+
+/// Run the same post-layout analysis exposed by `check`, LSP and wasm.
+///
+/// The preview still renders the picture when warnings exist, but it must not
+/// hide them: a diagram that looks plausible while violating containment or
+/// overlapping boxes is exactly the case this surface is meant to help with.
+fn preview_diagnostics(input: &Path, data: Option<&Path>) -> Result<Vec<crate::check::Diag>> {
+    if is_svg(input) {
+        return Ok(Vec::new());
+    }
+    let source =
+        fs::read_to_string(input).with_context(|| format!("cannot read {}", input.display()))?;
+    #[cfg(feature = "json")]
+    let source = if let Some(path) = data {
+        let raw =
+            fs::read_to_string(path).with_context(|| format!("cannot read {}", path.display()))?;
+        let values = crate::template::Bindings::from_json(&raw)
+            .with_context(|| format!("in {}", path.display()))?;
+        crate::template::Template::parse(&source)?.fill(&values)?
+    } else {
+        source
+    };
+    #[cfg(not(feature = "json"))]
+    let _ = data;
+    let diagram = crate::parser::parse_diagram(&source)?;
+    let mut diagnostics = crate::check::check(&diagram);
+    if !diagnostics
+        .iter()
+        .any(|diag| diag.severity == crate::check::Severity::Error)
+        && let Ok(layout) = crate::layout::solve(&diagram)
+    {
+        diagnostics.extend(crate::check::after_layout(&diagram, &layout));
+    }
+    Ok(diagnostics)
+}
+
+fn diagnostics_html(items: &[crate::check::Diag]) -> String {
+    if items.is_empty() {
+        return String::new();
+    }
+    let rows = items
+        .iter()
+        .map(|diag| {
+            let class = match diag.severity {
+                crate::check::Severity::Error => "error",
+                crate::check::Severity::Warning => "warning",
+            };
+            format!(
+                "<li class=\"{class}\"><span>{class}</span> {}</li>",
+                html_escape(&diag.message)
+            )
+        })
+        .collect::<String>();
+    format!("<aside id=\"diagnostics\"><strong>Diagnostics</strong><ul>{rows}</ul></aside>")
 }
 
 /// The page is a `format!` template, so every CSS and JS brace is doubled in
