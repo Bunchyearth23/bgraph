@@ -821,6 +821,8 @@ pub struct GraphOpts {
     pub description: Option<String>,
     /// Column and row step for `at (col 3, row 2)`, when one is declared.
     pub grid: Option<(f64, f64)>,
+    /// A bounded grid: columns, rows, and the gaps between tracks.
+    pub grid_spec: Option<GridSpec>,
     /// A font to carry inside the SVG: the family it should be called, and
     /// its bytes. Set from the command line rather than from the file,
     /// because it is a choice about the *output* — the same diagram is
@@ -830,6 +832,24 @@ pub struct GraphOpts {
     /// where a crisp one says "this is decided", which is information rather
     /// than ornament.
     pub sketch: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GridSpec {
+    pub columns: usize,
+    pub rows: usize,
+    pub gap_col: f64,
+    pub gap_row: f64,
+}
+
+impl GridSpec {
+    /// Fixed track pitch derived from the largest item in each axis. This is
+    /// deterministic and keeps every declared cell large enough for a node.
+    pub fn pitch(self, sizes: &[(f64, f64)]) -> (f64, f64) {
+        let width = sizes.iter().map(|(w, _)| *w).fold(0.0, f64::max);
+        let height = sizes.iter().map(|(_, h)| *h).fold(0.0, f64::max);
+        (width + self.gap_col, height + self.gap_row)
+    }
 }
 
 impl Default for GraphOpts {
@@ -845,6 +865,7 @@ impl Default for GraphOpts {
             title_align: None,
             description: None,
             grid: None,
+            grid_spec: None,
             embed_font: None,
             sketch: false,
         }
@@ -878,13 +899,35 @@ impl GraphOpts {
                 }
                 "grid" => {
                     let numbers: Vec<f64> = prop.values.iter().filter_map(|v| v.as_num()).collect();
-                    opts.grid = match numbers.as_slice() {
-                        // One number is a square cell, which is the common
-                        // case and reads better than writing it twice.
-                        [step] => Some((*step, *step)),
-                        [x, y, ..] => Some((*x, *y)),
-                        [] => bail!("`grid` needs a step: `grid: 160 90`, or one number for both"),
-                    };
+                    if let [columns, rows, gap_col, gap_row] = numbers.as_slice() {
+                        if *columns < 1.0
+                            || *rows < 1.0
+                            || columns.fract() != 0.0
+                            || rows.fract() != 0.0
+                            || *gap_col < 0.0
+                            || *gap_row < 0.0
+                        {
+                            bail!("`grid` needs positive integer dimensions and non-negative gaps");
+                        }
+                        opts.grid_spec = Some(GridSpec {
+                            columns: *columns as usize,
+                            rows: *rows as usize,
+                            gap_col: *gap_col,
+                            gap_row: *gap_row,
+                        });
+                        opts.grid = None;
+                    } else {
+                        opts.grid = match numbers.as_slice() {
+                            // One number is a square cell, which is the common
+                            // case and reads better than writing it twice.
+                            [step] => Some((*step, *step)),
+                            [x, y, ..] => Some((*x, *y)),
+                            [] => {
+                                bail!("`grid` needs a step: `grid: 160 90`, or one number for both")
+                            }
+                        };
+                        opts.grid_spec = None;
+                    }
                 }
                 "padding" => opts.padding = first.and_then(|x| x.as_num()).unwrap_or(opts.padding),
                 "gap" => opts.gap = first.and_then(|x| x.as_num()).unwrap_or(opts.gap),

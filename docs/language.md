@@ -528,10 +528,11 @@ outline is not one to wobble.
 
 ### A grid
 
-Declare a step once and place in cells:
+Declare the grid dimensions and the gaps between its tracks, then place in
+cells:
 
 ```bgraph
-graph { grid: 170 110 }
+graph { grid: 4 3 32 48 }
 
 node a "Ingest"
 node b "Queue"
@@ -544,15 +545,16 @@ layout {
 }
 ```
 
-`at (col 3, row 2)` is still `at`, in units the file declared — a coordinate
-system, not a solver. Nothing is snapped to it: a box placed in pixels is
-unaffected, and a grid that quietly moved a declared position would be exactly
-the auto-placement this language refuses.
+`at (col 3, row 2)` is still `at`, in cells declared by the grid. The four
+values are the number of columns, the number of rows, the column gap and the
+row gap. Tracks are sized from the largest node on each axis, so labels remain
+inside their cells. `right-of`, `below` and their siblings use the target node's
+nearest legal cell, while an explicit position is never silently moved.
 
 The same cells can be used as waypoints when a link needs a stable detour:
 
 ```bgraph
-graph { grid: 160 90 }
+graph { grid: 4 3 24 32 }
 
 node api "API"
 node db  "Database"
@@ -565,12 +567,11 @@ layout {
 api -> db { router: ortho } via (col 1, row 0)
 ```
 
-Changing `160 90` changes the scale of every cell, without rewriting the
-placements. A single value (`grid: 120`) is shorthand for a square grid. This
-`graph { grid: ... }` is only a placement coordinate system: it does **not**
-draw visible lines and it does not automatically arrange boxes. Do not confuse
-it with `style grid`, which is chart furniture (axis/grid lines) for archetypes
-that support it.
+Changing the gaps changes the scale of the grid without rewriting the
+placements. This `graph { grid: ... }` is a placement coordinate system: it does
+**not** draw visible lines and it does not automatically arrange boxes. Do not
+confuse it with `style grid`, which is chart furniture (axis/grid lines) for
+archetypes that support it.
 
 ### Freezing a loose file
 

@@ -300,7 +300,7 @@ Declared once, in `graph { … }`. These are diagram-wide and are not part of th
 | `title` | `title: <text>` | Heading drawn above the diagram. Every genre accepts it here — the chart archetypes also take a `title` in their own settings, and that one wins where both are given. |
 | `padding` | `padding: <number>` | Margin between the drawing and the canvas edge. |
 | `sketch` | `sketch: <on\|off>` | Draw as if by hand. A sketched architecture says "this is a proposal" where a crisp one says "this is decided" — information rather than ornament. Deterministic: the wobble is a hash of each shape's own geometry, so the same file always produces the same file. |
-| `grid` | `grid: <number> <number>` | Column and row step for `at (col 3, row 2)`. One number sets both. A coordinate system, not a solver: nothing is snapped to it, and a box placed in pixels is unaffected. |
+| `grid` | `grid: <columns> <rows> <gap-col> <gap-row>` | Declares a bounded placement grid. Columns and rows are positive integers; the last two values are non-negative gaps between tracks. Positions, gaps and waypoints use cells in this mode; without a four-value grid, the legacy free coordinate units remain available. |
 | `gap` | `gap: <number>` | Default distance used by anchors that omit `gap`. |
 | `background` | `background: <color>` | Canvas fill. Also backs edge labels so they stay readable. |
 | `bg` *(alias)* | `bg: <color>` | Alias of `background`. |

@@ -1039,10 +1039,19 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             .via
             .iter()
             .filter_map(|stop| match stop {
-                Placement::At { x, y } => Some((*x, *y)),
-                Placement::Cell { col, row } => {
-                    let (gx, gy) = opts.grid.unwrap_or((1.0, 1.0));
-                    Some((col * gx, row * gy))
+                Placement::At { .. } => {
+                    let p = resolve_grid_placement(stop, &opts, &sizes);
+                    match p {
+                        Placement::At { x, y } => Some((x, y)),
+                        _ => None,
+                    }
+                }
+                Placement::Cell { .. } => {
+                    let p = resolve_grid_placement(stop, &opts, &sizes);
+                    match p {
+                        Placement::At { x, y } => Some((x, y)),
+                        _ => None,
+                    }
                 }
                 Placement::Rel {
                     dir,
@@ -1054,7 +1063,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                         Entity::Node(i) => placed[*i]?,
                         Entity::Group(g) => solved.groups[*g]?,
                     };
-                    let step = gap.unwrap_or(opts.gap);
+                    let step = grid_distance(&opts, gap.unwrap_or(opts.gap), *dir, &sizes);
                     Some(match dir {
                         RelDir::RightOf => (r.right() + step, r.cy()),
                         RelDir::LeftOf => (r.x - step, r.cy()),
@@ -1399,7 +1408,11 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         let w = text_width(&lines, size);
         let h = lines.len() as f64 * size * LINE_HEIGHT;
 
-        let rect = match note.placement.as_ref().map(|p| p.resolved(opts.grid)) {
+        let rect = match note
+            .placement
+            .as_ref()
+            .map(|p| resolve_grid_placement(p, &opts, &sizes))
+        {
             Some(Placement::At { x, y }) => Rect { x, y, w, h },
             Some(Placement::Rel {
                 dir,
@@ -1415,7 +1428,15 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                 // `check`; drawing the note at the origin would add a second
                 // wrong thing to look at, so it is left out.
                 let Some(anchor_rect) = found else { continue };
-                offset_from(&anchor_rect, dir, gap.unwrap_or(opts.gap), align, w, h)
+                let candidate = offset_from(
+                    &anchor_rect,
+                    dir,
+                    grid_distance(&opts, gap.unwrap_or(opts.gap), dir, &sizes),
+                    align,
+                    w,
+                    h,
+                );
+                snap_to_grid(candidate, &opts, &sizes)
             }
             // Unreachable — `resolved` leaves no cells — and answered rather
             // than panicked, as everywhere else.
@@ -1488,7 +1509,11 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         let w = swatch + gap_to_text + widest;
         let h = entries.len() as f64 * step;
 
-        let rect = match legend.placement.as_ref().map(|p| p.resolved(opts.grid)) {
+        let rect = match legend
+            .placement
+            .as_ref()
+            .map(|p| resolve_grid_placement(p, &opts, &sizes))
+        {
             Some(Placement::At { x, y }) => Rect { x, y, w, h },
             Some(Placement::Rel {
                 dir,
@@ -1501,7 +1526,14 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                     Entity::Group(g) => groups.get(*g).map(|f| f.rect),
                 });
                 let Some(anchor_rect) = found else { continue };
-                offset_from(&anchor_rect, dir, gap.unwrap_or(opts.gap), align, w, h)
+                offset_from(
+                    &anchor_rect,
+                    dir,
+                    grid_distance(&opts, gap.unwrap_or(opts.gap), dir, &sizes),
+                    align,
+                    w,
+                    h,
+                )
             }
             Some(Placement::Cell { col, row }) => Rect {
                 x: col,
@@ -1826,6 +1858,48 @@ fn constrain_alignment(plan: &PlacementPlan<'_>, solved: &mut Solved) {
     }
 }
 
+fn resolve_grid_placement(
+    placement: &Placement,
+    opts: &GraphOpts,
+    sizes: &[(f64, f64)],
+) -> Placement {
+    if let Some(spec) = opts.grid_spec {
+        let (sx, sy) = spec.pitch(sizes);
+        return match placement {
+            Placement::At { x, y } | Placement::Cell { col: x, row: y } => Placement::At {
+                x: x * sx,
+                y: y * sy,
+            },
+            other => other.clone(),
+        };
+    }
+    placement.resolved(opts.grid)
+}
+
+fn grid_distance(opts: &GraphOpts, distance: f64, dir: RelDir, sizes: &[(f64, f64)]) -> f64 {
+    let Some(spec) = opts.grid_spec else {
+        return distance;
+    };
+    let (sx, sy) = spec.pitch(sizes);
+    if matches!(dir, RelDir::RightOf | RelDir::LeftOf) {
+        distance * sx
+    } else {
+        distance * sy
+    }
+}
+
+fn snap_to_grid(rect: Rect, opts: &GraphOpts, sizes: &[(f64, f64)]) -> Rect {
+    let Some(spec) = opts.grid_spec else {
+        return rect;
+    };
+    let (sx, sy) = spec.pitch(sizes);
+    Rect {
+        x: (rect.x / sx).round() * sx,
+        y: (rect.y / sy).round() * sy,
+        ..rect
+    }
+}
+
 fn place_all(
     diagram: &Diagram,
     plan: &PlacementPlan<'_>,
@@ -1874,7 +1948,9 @@ fn place_all(
             // declaration inside the same container, not merely the previous
             // line in the file.
             let placement = match plan.node(i, opts.flow) {
-                EffectivePlacement::Declared(placement) => Some(placement.resolved(opts.grid)),
+                EffectivePlacement::Declared(placement) => {
+                    Some(resolve_grid_placement(placement, opts, sizes))
+                }
                 EffectivePlacement::Flow { dir, anchor } => Some(Placement::Rel {
                     dir,
                     anchor: anchor.clone(),
@@ -1926,7 +2002,14 @@ fn place_all(
                     }
                     let anchor_rect = rect_of(target, &node_rect, &group_rect)
                         .expect("readiness implies a rectangle");
-                    offset_from(&anchor_rect, dir, gap.unwrap_or(opts.gap), align, w, h)
+                    offset_from(
+                        &anchor_rect,
+                        dir,
+                        grid_distance(opts, gap.unwrap_or(opts.gap), dir, sizes),
+                        align,
+                        w,
+                        h,
+                    )
                 }
             };
 
@@ -1972,7 +2055,7 @@ fn place_all(
 
             let placed_at = plan
                 .declared_group_placement(g)
-                .map(|p| p.resolved(opts.grid));
+                .map(|p| resolve_grid_placement(p, opts, sizes));
             let (frame, delta) = match &placed_at {
                 None => (frame, (0.0, 0.0)),
                 Some(Placement::At { x, y }) | Some(Placement::Cell { col: x, row: y }) => (

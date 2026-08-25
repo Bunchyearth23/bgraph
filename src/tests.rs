@@ -9062,6 +9062,28 @@ fn one_grid_number_is_a_square_cell() {
 }
 
 #[test]
+fn bounded_grid_uses_track_gaps_as_placement_units() {
+    let l = build(
+        r#"graph { grid: 4 3 20 30 }
+           node a "A" at (0, 0) { size: 100 80 }
+           node b "B" at (2, 1) { size: 60 40 }"#,
+    );
+    // The largest node defines the deterministic track size: 100+20 by
+    // 80+30. `at` values are cells in bounded-grid mode.
+    assert_eq!((l.nodes[1].rect.x, l.nodes[1].rect.y), (240.0, 110.0));
+}
+
+#[test]
+fn relative_placement_uses_the_nearest_grid_cell() {
+    let l = build(
+        r#"graph { grid: 4 3 20 30 }
+           node a "A" at (1, 1) { size: 100 80 }
+           node b "B" right-of a gap 1 { size: 60 40 }"#,
+    );
+    assert_eq!((l.nodes[1].rect.x, l.nodes[1].rect.y), (340.0, 130.0));
+}
+
+#[test]
 fn a_box_in_pixels_is_untouched_by_the_grid() {
     // Nothing is snapped to it. A grid that quietly moved a declared
     // position would be exactly the solver `D-001` refuses.

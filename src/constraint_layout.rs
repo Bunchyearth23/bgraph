@@ -103,7 +103,12 @@ pub fn solve_nodes(
     sizes: &[(f64, f64)],
     opts: &GraphOpts,
 ) -> Result<Option<Vec<Rect>>> {
-    if diagram.nodes.len() > MAX_SHADOW_NODES || !diagram.groups.is_empty() {
+    // Bounded grids need measured track pitches before constraints are lowered;
+    // keep them on the canonical placement path until that lowering is shared.
+    if opts.grid_spec.is_some()
+        || diagram.nodes.len() > MAX_SHADOW_NODES
+        || !diagram.groups.is_empty()
+    {
         return Ok(None);
     }
 

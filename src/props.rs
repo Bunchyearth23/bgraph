@@ -577,10 +577,12 @@ pub const GRAPH_PROPS: &[PropDef] = &[
         alias: false,
         ctx: Ctx::Both,
         words: &[],
-        syntax: "grid: <number> <number>",
-        doc: "Column and row step for `at (col 3, row 2)`. One number sets \
-              both. A coordinate system, not a solver: nothing is snapped to \
-              it, and a box placed in pixels is unaffected.",
+        syntax: "grid: <columns> <rows> <gap-col> <gap-row>",
+        doc: "Declares a bounded placement grid. Columns and rows are positive \
+              integers; the last two values are non-negative gaps between \
+              tracks. Positions, gaps and waypoints use cells in this mode; \
+              without a four-value grid, the legacy free coordinate units remain \
+              available.",
     },
     PropDef {
         name: "gap",
