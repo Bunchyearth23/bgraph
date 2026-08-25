@@ -123,7 +123,6 @@ module.exports = grammar({
         field('component', $.identifier),
         'as',
         field('prefix', $.identifier),
-        optional(field('placement', $._placement)),
         optional(field('bindings', $.block)),
       ),
 
@@ -144,7 +143,6 @@ module.exports = grammar({
         optional(field('label', $.string)),
         // No positional data: a group has no slots, it is a frame.
         repeat(field('class', $.class_reference)),
-        optional(field('placement', $._placement)),
         field('body', $.group_block),
       ),
 
@@ -196,10 +194,7 @@ module.exports = grammar({
         // placement keyword.
         optional(
           choice(
-            choice(
-              seq(field('placement', $._placement), optional(field('body', $.block))),
-              seq(field('body', $.block), optional(field('placement', $._placement))),
-            ),
+            field('body', $.block),
           ),
         ),
       ),

@@ -154,9 +154,6 @@ pub struct UseDecl {
     /// because two instances of one component would otherwise declare the
     /// same identifiers twice.
     pub prefix: Spanned<String>,
-    /// Placement retained only for the internal legacy reader.
-    pub placement: Option<Placement>,
-    pub placement_span: Option<Span>,
     pub bindings: Vec<Prop>,
     pub span: Span,
 }
@@ -181,9 +178,6 @@ pub struct GroupDecl {
     pub id: Spanned<String>,
     pub label: Option<String>,
     pub classes: Vec<Spanned<String>>,
-    /// Placement retained only for the internal legacy reader.
-    pub placement: Option<Placement>,
-    pub placement_span: Option<Span>,
     pub props: Vec<Prop>,
     /// Items and groups declared directly inside, in source order.
     pub members: Vec<Spanned<String>>,
@@ -213,9 +207,6 @@ pub struct NodeDecl {
     pub positional: Vec<Value>,
     pub positional_span: Span,
     pub classes: Vec<Spanned<String>>,
-    /// Placement retained only for the internal legacy reader.
-    pub placement: Option<Placement>,
-    pub placement_span: Option<Span>,
     pub props: Vec<Prop>,
     /// Bare strings written in the block: a class's fields, a table's columns.
     /// Distinct from `GroupDecl::members`, which names other declarations.

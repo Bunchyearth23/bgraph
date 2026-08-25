@@ -63,7 +63,7 @@ legend_decl = { "legend" ~ !":" ~ class_ref* ~ placement? ~ block? }
 
 // v2 placement lives apart from declarations. `place` is deliberately a
 // statement rather than a property: geometry names its target and can carry
-// the same ordinary anchor relation the v1 inline form accepted.
+// the same ordinary anchor relations used by the placement engine.
 layout_decl  = { "layout" ~ layout_block }
 layout_block = { "{" ~ sep ~ (layout_stmt ~ inner_term)* ~ "}" }
 layout_stmt  = _{ layout_place | layout_align | layout_equal_width | layout_equal_height | layout_row | layout_column }
@@ -78,7 +78,7 @@ layout_row = { "row" ~ layout_series_member+ ~ gap? }
 layout_column = { "column" ~ layout_series_member+ ~ gap? }
 
 component_decl = { "component" ~ ident ~ group_block }
-use_decl       = { "use" ~ ident ~ "as" ~ ident ~ placement? ~ block? }
+use_decl       = { "use" ~ ident ~ "as" ~ ident ~ block? }
 
 type_decl  = { "type" ~ ident ~ block? }
 
@@ -89,7 +89,7 @@ type_decl  = { "type" ~ ident ~ block? }
 // an *existing* item rather than declaring a new one, because a bar belongs to
 // a participant that is already on the diagram (`D-024`).
 group_kw    = { "group" | "activate" }
-group_decl  = { group_kw ~ name ~ string? ~ class_ref* ~ placement? ~ group_block }
+group_decl  = { group_kw ~ name ~ string? ~ class_ref* ~ group_block }
 // Entries are separated, for the same reason statements are: without it
 // `padding: 22 node a` cannot be told from a property with three values.
 group_block = { "{" ~ sep ~ ((prop | stmt) ~ inner_term)* ~ "}" }
@@ -110,7 +110,7 @@ style_decl = { "style" ~ ident ~ ("extends" ~ ident)? ~ block }
 // so it has to be known before anything else can be checked.
 name       = _{ ident | placeholder }
 item_decl  = { ident ~ name ~ string? ~ (pos_value | class_ref)* ~ tail? }
-tail       = _{ placement ~ block? | block ~ placement? }
+tail       = _{ block }
 
 // A placement keyword would otherwise be eaten as a bare-word value. So would
 // `via`, which opens a waypoint list on an edge.

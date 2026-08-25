@@ -405,20 +405,6 @@
             "named": true
           }
         ]
-      },
-      "placement": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "absolute_position",
-            "named": true
-          },
-          {
-            "type": "relative_position",
-            "named": true
-          }
-        ]
       }
     }
   },
@@ -536,20 +522,6 @@
           },
           {
             "type": "placeholder",
-            "named": true
-          }
-        ]
-      },
-      "placement": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "absolute_position",
-            "named": true
-          },
-          {
-            "type": "relative_position",
             "named": true
           }
         ]
@@ -1042,20 +1014,6 @@
         "types": [
           {
             "type": "identifier",
-            "named": true
-          }
-        ]
-      },
-      "placement": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "absolute_position",
-            "named": true
-          },
-          {
-            "type": "relative_position",
             "named": true
           }
         ]

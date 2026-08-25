@@ -195,7 +195,7 @@ impl<'a> PlacementPlan<'a> {
     }
 
     pub fn declared_placement(&self, node: usize) -> Option<&'a Placement> {
-        self.layout_placement[node].or(self.diagram.nodes[node].placement.as_ref())
+        self.layout_placement[node]
     }
 
     /// Whether source already gives this node a position. A `row` or
@@ -206,7 +206,7 @@ impl<'a> PlacementPlan<'a> {
     }
 
     pub fn declared_group_placement(&self, group: usize) -> Option<&'a Placement> {
-        self.layout_group_placement[group].or(self.diagram.groups[group].placement.as_ref())
+        self.layout_group_placement[group]
     }
 
     pub fn node(&self, node: usize, flow: RelDir) -> EffectivePlacement<'a> {

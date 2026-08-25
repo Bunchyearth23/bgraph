@@ -63,24 +63,8 @@ pub fn parse_diagram(input: &str) -> Result<Diagram> {
 /// and two orders above anything a person draws.
 pub const MAX_NESTING: usize = 64;
 
-#[cfg(test)]
-pub(crate) fn parse_legacy_diagram(input: &str) -> Result<Diagram> {
-    parse_legacy(input).map_err(anyhow::Error::from)
-}
-
 /// Parses source text, keeping the span an error points at.
 pub fn parse(input: &str) -> std::result::Result<Diagram, ParseError> {
-    let diagram = parse_legacy(input)?;
-    if let Some(span) = legacy_layout_span(&diagram) {
-        return Err(ParseError {
-            message: "inline placement is no longer supported; use a `layout { … }` block".into(),
-            span,
-        });
-    }
-    Ok(diagram)
-}
-
-fn parse_legacy(input: &str) -> std::result::Result<Diagram, ParseError> {
     check_nesting(input)?;
 
     let parsed = DiagramParser::parse(Rule::file, input).map_err(|err| ParseError {
@@ -97,26 +81,6 @@ fn parse_legacy(input: &str) -> std::result::Result<Diagram, ParseError> {
         message: format!("{err:#}"),
         span: Span { start: 0, end: 0 },
     })
-}
-
-fn legacy_layout_span(diagram: &Diagram) -> Option<Span> {
-    diagram
-        .nodes
-        .iter()
-        .filter_map(|node| node.placement_span)
-        .chain(
-            diagram
-                .groups
-                .iter()
-                .filter_map(|group| group.placement_span),
-        )
-        .chain(
-            diagram
-                .uses
-                .iter()
-                .filter_map(|use_decl| use_decl.placement_span),
-        )
-        .min_by_key(|span| span.start)
 }
 
 /// Counts brace depth without parsing, skipping the three places a brace is
@@ -451,23 +415,16 @@ fn parse_use(pair: Pair<Rule>) -> Result<crate::ast::UseDecl> {
         .next()
         .map(|p| spanned(&p))
         .context("`use` needs `as <name>`")?;
-    let mut placement = None;
-    let mut placement_span = None;
     let mut bindings = Vec::new();
     for rest in inner {
         match rest.as_rule() {
             Rule::block => bindings = parse_block(rest)?,
-            _other => {
-                placement_span = Some(span_of(&rest));
-                placement = Some(parse_placement(rest)?);
-            }
+            other => bail!("unexpected rule {other:?} in use declaration"),
         }
     }
     Ok(crate::ast::UseDecl {
         component,
         prefix,
-        placement,
-        placement_span,
         bindings,
         span,
     })
@@ -521,8 +478,6 @@ fn parse_group(pair: Pair<Rule>, diagram: &mut Diagram) -> Result<()> {
     let mut id = None;
     let mut label = None;
     let mut classes = Vec::new();
-    let mut placement = None;
-    let mut placement_span = None;
     let mut props = Vec::new();
     let mut members = Vec::new();
     let mut edge_members = Vec::new();
@@ -535,10 +490,6 @@ fn parse_group(pair: Pair<Rule>, diagram: &mut Diagram) -> Result<()> {
             r if is_name(r) && id.is_none() => id = Some(spanned(&part)),
             Rule::string if label.is_none() => label = Some(unescape(part)),
             Rule::class_ref => classes.push(class_name(part)),
-            Rule::abs_pos | Rule::rel_pos => {
-                placement_span = Some(span_of(&part));
-                placement = Some(parse_placement(part)?);
-            }
             Rule::group_block => {
                 for inner in part.into_inner() {
                     match inner.as_rule() {
@@ -582,8 +533,6 @@ fn parse_group(pair: Pair<Rule>, diagram: &mut Diagram) -> Result<()> {
         id,
         label,
         classes,
-        placement,
-        placement_span,
         props,
         members,
         edge_members,
@@ -615,8 +564,6 @@ fn parse_item(pair: Pair<Rule>) -> Result<NodeDecl> {
     let mut positional = Vec::new();
     let mut positional_span: Option<Span> = None;
     let mut classes = Vec::new();
-    let mut placement = None;
-    let mut placement_span = None;
     let mut props = Vec::new();
     let mut members = Vec::new();
 
@@ -630,10 +577,6 @@ fn parse_item(pair: Pair<Rule>) -> Result<NodeDecl> {
             // Likewise the first string is the label, by construction.
             Rule::string if label.is_none() => label = Some(unescape(part)),
             Rule::class_ref => classes.push(class_name(part)),
-            Rule::abs_pos | Rule::rel_pos => {
-                placement_span = Some(span_of(&part));
-                placement = Some(parse_placement(part)?);
-            }
             Rule::block => (props, members) = parse_body(part)?,
             Rule::ident
             | Rule::string
@@ -660,8 +603,6 @@ fn parse_item(pair: Pair<Rule>) -> Result<NodeDecl> {
         positional,
         positional_span: positional_span.unwrap_or(span),
         classes,
-        placement,
-        placement_span,
         props,
         members,
         span,
