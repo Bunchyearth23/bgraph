@@ -37,7 +37,7 @@ pub(crate) fn diagnostics_for(text: &str, path: Option<&std::path::Path>) -> Vec
     let index = LineIndex::new(text);
     let mut diags = check::check(&composed.diagram);
     if let Ok(layout) = crate::layout::solve(&composed.diagram) {
-        diags.extend(check::after_layout(&layout));
+        diags.extend(check::after_layout(&composed.diagram, &layout));
     }
 
     let mut out = Vec::new();
@@ -96,7 +96,7 @@ pub(crate) fn diagnostics(text: &str) -> Vec<Value> {
     if let Some(diagram) = &diagram {
         diags.extend(check::check(diagram));
         if let Ok(layout) = crate::layout::solve(diagram) {
-            diags.extend(check::after_layout(&layout));
+            diags.extend(check::after_layout(diagram, &layout));
         }
     }
 

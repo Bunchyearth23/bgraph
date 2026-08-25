@@ -999,14 +999,14 @@ fn a_boundary_event_sits_on_the_task_it_names() {
     // for where on it is fixed rather than solved. Two on one task spread
     // along the edge in the order they are written, so the picture follows
     // the file.
-    let l = build(
-        "type bpmn\n\
+    let source = "type bpmn\n\
          task pay \"Pay\" service at (0, 0) { size: 200 80 }\n\
          event late \"14 days\" boundary timer { attach: pay }\n\
          event err \"Declined\" boundary error { attach: pay }\n\
          task chase \"Chase\" at (0, 300)\n\
-         late -> chase\n",
-    );
+         late -> chase\n";
+    let d = parse_diagram(source).expect("parses");
+    let l = layout::solve(&d).expect("solves");
     let by = |id: &str| l.nodes.iter().find(|n| n.id == id).expect("placed");
     let host = by("pay").rect;
 
@@ -1034,7 +1034,7 @@ fn a_boundary_event_sits_on_the_task_it_names() {
     // reporting the crossing would be the validator complaining about the
     // notation working.
     assert_eq!(
-        crate::check::after_layout(&l)
+        crate::check::after_layout(&d, &l)
             .into_iter()
             .map(|d| d.message)
             .collect::<Vec<_>>(),
@@ -1151,10 +1151,28 @@ fn a_process_that_runs_backwards_is_a_warning_and_not_an_error() {
 fn after(source: &str) -> Vec<String> {
     let diagram = parse_diagram(source).expect("parses");
     let solved = layout::solve(&diagram).expect("solves");
-    crate::check::after_layout(&solved)
+    crate::check::after_layout(&diagram, &solved)
         .into_iter()
         .map(|d| d.message)
         .collect()
+}
+
+#[test]
+fn overlapping_declared_boxes_are_reported_but_never_repaired() {
+    let diagnostics = after(
+        "node api \"API\" { size: 100 60 }\n\
+         node db \"Database\" { size: 100 60 }\n\
+         layout {\n\
+           place api at (0, 0)\n\
+           place db at (40, 20)\n\
+         }\n",
+    );
+    assert!(
+        diagnostics
+            .iter()
+            .any(|message| message.contains("`db` overlaps `api`")),
+        "{diagnostics:?}"
+    );
 }
 
 #[test]

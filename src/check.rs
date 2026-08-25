@@ -217,7 +217,7 @@ fn check_archetype(diagram: &Diagram, out: &mut Vec<Diag>) -> &'static props::Ar
 /// A few problems are only visible afterwards, and they still belong here —
 /// `layout.rs` solves, `check.rs` judges, and moving one of these into the
 /// solver would be the beginning of a second validator.
-pub fn after_layout(layout: &crate::layout::Layout) -> Vec<Diag> {
+pub fn after_layout(diagram: &Diagram, layout: &crate::layout::Layout) -> Vec<Diag> {
     let mut out = Vec::new();
     let routed = crate::render_svg::route_all(layout);
 
@@ -309,6 +309,50 @@ pub fn after_layout(layout: &crate::layout::Layout) -> Vec<Diag> {
                         .to_string(),
                 ));
                 break;
+            }
+        }
+    }
+
+    // A declared layout may deliberately put an edge through a box, but two
+    // opaque boxes covering one another is nearly always a relation the author
+    // forgot to write. This is a warning, never a repair: choosing a side on
+    // which to separate them would recreate auto-layout (`D-049`). Chart and
+    // BPMN geometry is semantic, including legitimate boundary overlaps, so
+    // only ordinary declared-layout genres opt in here.
+    let def = archetype_of(diagram);
+    if def.layout_capability() == props::LayoutCapability::Declared
+        && def.name != "bpmn"
+        && !diagram.layouts.is_empty()
+    {
+        for (left_index, left) in layout.nodes.iter().enumerate() {
+            for (right_index, right) in layout.nodes.iter().enumerate().skip(left_index + 1) {
+                let overlaps = left.rect.x < right.rect.right()
+                    && left.rect.right() > right.rect.x
+                    && left.rect.y < right.rect.bottom()
+                    && left.rect.bottom() > right.rect.y;
+                if !overlaps {
+                    continue;
+                }
+                let span = diagram
+                    .nodes
+                    .get(right_index)
+                    .filter(|node| node.id.as_str() == right.id)
+                    .map(|node| node.id.span)
+                    .or_else(|| {
+                        diagram
+                            .nodes
+                            .get(left_index)
+                            .filter(|node| node.id.as_str() == left.id)
+                            .map(|node| node.id.span)
+                    })
+                    .unwrap_or_default();
+                out.push(Diag::warn(
+                    span,
+                    format!(
+                        "`{}` overlaps `{}` — declare a separating placement, gap or axis; bgraph will not move either box for you",
+                        right.id, left.id
+                    ),
+                ));
             }
         }
     }

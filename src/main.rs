@@ -681,7 +681,7 @@ fn report_composed(
 
     let mut diagnostics = bgraph::check::check(&composed.diagram);
     if let Ok(solved) = layout::solve(&composed.diagram) {
-        diagnostics.extend(bgraph::check::after_layout(&solved));
+        diagnostics.extend(bgraph::check::after_layout(&composed.diagram, &solved));
     }
     diagnostics.sort_by_key(|d| (d.span.start, d.span.end));
 
@@ -779,7 +779,7 @@ fn check_file(input: &PathBuf, ci: bool, json_output: bool) -> Result<i32> {
         // The ones that need the boxes placed. `check` is still the only
         // validator; this is its second pass, not a second validator.
         if let Ok(solved) = layout::solve(diagram) {
-            diagnostics.extend(bgraph::check::after_layout(&solved));
+            diagnostics.extend(bgraph::check::after_layout(diagram, &solved));
         }
     }
     diagnostics.sort_by_key(|d| (d.span.start, d.span.end));

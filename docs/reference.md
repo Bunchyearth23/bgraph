@@ -2124,6 +2124,8 @@ path.
 
 - a property with no effect where it is written (`shape` on an edge,
   `value` outside `type pie`, a setting on an archetype that takes none)
+- two boxes in a declared-layout diagram that overlap; bgraph names them but
+  never chooses a direction in which to move either one
 - a style declared more than once
 - text whose contrast against what sits behind it is below 3:1
 - `type pie` — a slice with value 0; fewer than three slices, which a bar or
