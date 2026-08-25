@@ -132,6 +132,13 @@ pub enum LayoutStmt {
     },
     /// `align top api database`, `equal-width api database`.
     Constraint { constraint: ConstraintDecl },
+    /// `row api database cache gap 32`, or its vertical `column` form.
+    Series {
+        dir: RelDir,
+        members: Vec<Spanned<String>>,
+        gap: Option<f64>,
+        span: Span,
+    },
 }
 
 /// `component service { … }` — the body kept as source text, because that is

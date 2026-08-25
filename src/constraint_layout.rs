@@ -179,6 +179,27 @@ pub fn solve_nodes(
                     },
                 )?;
             }
+            EffectivePlacement::Series { dir, anchor, gap } => {
+                lower_relative(
+                    dir,
+                    anchor.as_str(),
+                    gap,
+                    RelativeAlignment {
+                        declared: None,
+                        overridden_axis: plan.v2_alignment_axis(i),
+                    },
+                    *vars,
+                    provenance(ConstraintOrigin::RelativePlacement, Axis::X, i, node_span)
+                        .with_anchor(anchor.span),
+                    &mut Lowering {
+                        plan,
+                        variables: &variables,
+                        default_gap: opts.gap,
+                        grid: opts.grid,
+                        out: &mut constraints,
+                    },
+                )?;
+            }
         }
     }
 

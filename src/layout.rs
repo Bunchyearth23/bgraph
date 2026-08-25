@@ -1838,6 +1838,12 @@ fn place_all(
                     gap: None,
                     align: None,
                 }),
+                EffectivePlacement::Series { dir, anchor, gap } => Some(Placement::Rel {
+                    dir,
+                    anchor: anchor.clone(),
+                    gap,
+                    align: None,
+                }),
                 EffectivePlacement::Origin => None,
             };
             let rect = match placement {

@@ -711,6 +711,16 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": false,
+      "required": false,
+      "types": [
+        {
+          "type": "gap_clause",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -1220,6 +1230,10 @@
   {
     "type": "color",
     "named": true
+  },
+  {
+    "type": "column",
+    "named": false
   },
   {
     "type": "comment",

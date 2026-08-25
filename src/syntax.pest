@@ -69,12 +69,16 @@ constraint_decl = { constraint_kw ~ align_kw? ~ ident+ }
 // the same ordinary anchor relation the v1 inline form accepted.
 layout_decl  = { "layout" ~ layout_block }
 layout_block = { "{" ~ sep ~ (layout_stmt ~ inner_term)* ~ "}" }
-layout_stmt  = _{ layout_place | layout_align | layout_equal_width | layout_equal_height }
+layout_stmt  = _{ layout_place | layout_align | layout_equal_width | layout_equal_height | layout_row | layout_column }
 layout_place = { "place" ~ name ~ placement }
 layout_align = { "align" ~ layout_align_kw ~ name+ }
 layout_align_kw = @{ "left" | "right" | "top" | "bottom" | "center-x" | "center-y" }
 layout_equal_width = { "equal-width" ~ name+ }
 layout_equal_height = { "equal-height" ~ name+ }
+layout_series_member = { !layout_gap_kw ~ name }
+layout_gap_kw = @{ "gap" ~ !(ASCII_ALPHANUMERIC | "_" | "-") }
+layout_row = { "row" ~ layout_series_member+ ~ gap? }
+layout_column = { "column" ~ layout_series_member+ ~ gap? }
 
 component_decl = { "component" ~ ident ~ group_block }
 use_decl       = { "use" ~ ident ~ "as" ~ ident ~ placement? ~ block? }

@@ -605,7 +605,7 @@ fn pin(d: &mut Diagram, at: Span) {
                     span,
                 } => {
                     sp(target);
-                    pin_placement(&mut Some(placement.clone()), at);
+                    pin_placement_value(placement, at);
                     *span = at;
                 }
                 crate::ast::LayoutStmt::Constraint { constraint } => {
@@ -614,6 +614,12 @@ fn pin(d: &mut Diagram, at: Span) {
                     }
                     s(&mut constraint.span);
                 }
+                crate::ast::LayoutStmt::Series { members, span, .. } => {
+                    for member in members {
+                        sp(member);
+                    }
+                    s(span);
+                }
             }
         }
         s(&mut layout.span);
@@ -621,8 +627,13 @@ fn pin(d: &mut Diagram, at: Span) {
 }
 
 fn pin_placement(placement: &mut Option<crate::ast::Placement>, at: Span) {
-    use crate::ast::Placement;
-    if let Some(Placement::Rel { anchor, .. }) = placement {
+    if let Some(placement) = placement {
+        pin_placement_value(placement, at);
+    }
+}
+
+fn pin_placement_value(placement: &mut crate::ast::Placement, at: Span) {
+    if let crate::ast::Placement::Rel { anchor, .. } = placement {
         anchor.span = at;
     }
 }
@@ -764,6 +775,12 @@ fn shift(d: &mut Diagram, delta: usize) {
                     }
                     s(&mut constraint.span);
                 }
+                crate::ast::LayoutStmt::Series { members, span, .. } => {
+                    for member in members {
+                        sp(member);
+                    }
+                    s(span);
+                }
             }
         }
         s(&mut layout.span);
@@ -842,6 +859,13 @@ fn qualify(d: &mut Diagram, prefix: &str) {
                 }
                 crate::ast::LayoutStmt::Constraint { constraint } => {
                     for member in &mut constraint.members {
+                        if own.contains(&member.value) {
+                            rename(member);
+                        }
+                    }
+                }
+                crate::ast::LayoutStmt::Series { members, .. } => {
+                    for member in members {
                         if own.contains(&member.value) {
                             rename(member);
                         }

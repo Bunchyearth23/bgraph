@@ -458,6 +458,30 @@ without inventing a second placement language.
 `top` / `bottom` / `center` (or `middle`) for horizontal ones. It defaults
 to `center`.
 
+### Rows and columns
+
+For a simple ordered run, name the sequence once instead of repeating each
+anchor. `row` places every following node to the right of the preceding one;
+`column` does the same downward. The first name remains an ordinary anchor, so
+it may be positioned with `place`; every later name gets its position from the
+series and cannot also be placed elsewhere.
+
+```bgraph
+node api   "API"
+node cache "Cache"
+node db    "Database"
+node audit "Audit log"
+
+layout {
+  place api at (0, 0)
+  row api cache db gap 32
+  column db audit gap 24
+}
+```
+
+Both forms accept direct nodes only. In a group's local `layout` block, every
+member of the series must belong directly to that group.
+
 ### Sketch mode
 
 ```bgraph

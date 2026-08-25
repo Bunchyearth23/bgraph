@@ -11,6 +11,8 @@ use crate::ast::{
     ConstraintAxis, ConstraintDecl, ConstraintKind, Diagram, LayoutStmt, Placement, RelDir, Spanned,
 };
 
+type SeriesPlacement<'a> = (RelDir, &'a Spanned<String>, Option<f64>);
+
 /// A named entity that can participate in placement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Entity {
@@ -44,6 +46,12 @@ pub enum EffectivePlacement<'a> {
         dir: RelDir,
         anchor: &'a Spanned<String>,
     },
+    /// An explicit `row` or `column` chain inside a layout block.
+    Series {
+        dir: RelDir,
+        anchor: &'a Spanned<String>,
+        gap: Option<f64>,
+    },
     /// The first node in a container starts at that container's origin.
     Origin,
 }
@@ -56,6 +64,7 @@ pub struct PlacementPlan<'a> {
     previous_sibling: Vec<Option<usize>>,
     layout_placement: Vec<Option<&'a Placement>>,
     layout_group_placement: Vec<Option<&'a Placement>>,
+    series_placement: Vec<Option<SeriesPlacement<'a>>>,
 }
 
 impl<'a> PlacementPlan<'a> {
@@ -87,6 +96,7 @@ impl<'a> PlacementPlan<'a> {
 
         let mut layout_placement = vec![None; diagram.nodes.len()];
         let mut layout_group_placement = vec![None; diagram.groups.len()];
+        let mut series_placement = vec![None; diagram.nodes.len()];
         for layout in &diagram.layouts {
             for statement in &layout.statements {
                 if let LayoutStmt::Place {
@@ -101,6 +111,16 @@ impl<'a> PlacementPlan<'a> {
                         None => {}
                     }
                 }
+                if let LayoutStmt::Series {
+                    dir, members, gap, ..
+                } = statement
+                {
+                    for pair in members.windows(2) {
+                        if let Some(Entity::Node(node)) = index.get(pair[1].as_str()).copied() {
+                            series_placement[node] = Some((*dir, &pair[0], *gap));
+                        }
+                    }
+                }
             }
         }
 
@@ -111,6 +131,7 @@ impl<'a> PlacementPlan<'a> {
             previous_sibling,
             layout_placement,
             layout_group_placement,
+            series_placement,
         }
     }
 
@@ -150,7 +171,7 @@ impl<'a> PlacementPlan<'a> {
                             declaration: constraint,
                             v2: true,
                         }),
-                        LayoutStmt::Place { .. } => None,
+                        LayoutStmt::Place { .. } | LayoutStmt::Series { .. } => None,
                     })
             }))
     }
@@ -198,6 +219,8 @@ impl<'a> PlacementPlan<'a> {
     pub fn node(&self, node: usize, flow: RelDir) -> EffectivePlacement<'a> {
         if let Some(placement) = self.declared_placement(node) {
             EffectivePlacement::Declared(placement)
+        } else if let Some((dir, anchor, gap)) = self.series_placement[node] {
+            EffectivePlacement::Series { dir, anchor, gap }
         } else if let Some(anchor) = self.implicit_anchor(node) {
             EffectivePlacement::Flow {
                 dir: flow,
@@ -258,7 +281,8 @@ impl<'a> PlacementPlan<'a> {
                     EffectivePlacement::Declared(Placement::Rel { anchor, .. }) => {
                         self.index.get(anchor.as_str()).copied()
                     }
-                    EffectivePlacement::Flow { anchor, .. } => {
+                    EffectivePlacement::Flow { anchor, .. }
+                    | EffectivePlacement::Series { anchor, .. } => {
                         self.index.get(anchor.as_str()).copied()
                     }
                     EffectivePlacement::Declared(Placement::At { .. } | Placement::Cell { .. })

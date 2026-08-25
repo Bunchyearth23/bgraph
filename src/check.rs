@@ -772,7 +772,10 @@ fn check_layouts(diagram: &Diagram, out: &mut Vec<Diag>) {
         .iter()
         .map(|group| (group.id.as_str(), group))
         .collect();
-    let mut placed = HashSet::new();
+    // A series gives each member after its first one a placement. Keeping it
+    // in the same set as `place` makes a competing source position a hard
+    // error rather than an order-dependent no-op.
+    let mut positioned = HashSet::new();
 
     for layout in &diagram.layouts {
         let scope = layout
@@ -780,6 +783,70 @@ fn check_layouts(diagram: &Diagram, out: &mut Vec<Diag>) {
             .as_ref()
             .and_then(|scope| groups.get(scope.as_str()).copied());
         for statement in &layout.statements {
+            if let LayoutStmt::Series { members, .. } = statement {
+                let mut in_series = HashSet::new();
+                for (position, member) in members.iter().enumerate() {
+                    if !in_series.insert(member.as_str()) {
+                        out.push(Diag::error(
+                            member.span,
+                            format!(
+                                "`{}` appears more than once in this row or column",
+                                member.as_str()
+                            ),
+                        ));
+                    }
+                    if !nodes.contains(member.as_str()) {
+                        let message = if groups.contains_key(member.as_str()) {
+                            format!(
+                                "`row` and `column` accept nodes, not group `{}`",
+                                member.as_str()
+                            )
+                        } else {
+                            format!("`row` or `column` names unknown node `{}`", member.as_str())
+                        };
+                        out.push(Diag::error(member.span, message));
+                        continue;
+                    }
+                    if let Some(group) = scope
+                        && !group
+                            .members
+                            .iter()
+                            .any(|candidate| candidate.as_str() == member.as_str())
+                    {
+                        out.push(Diag::error(
+                            member.span,
+                            format!(
+                                "`{}` is outside the local `layout` block of group `{}`",
+                                member.as_str(),
+                                group.id.as_str()
+                            ),
+                        ));
+                    }
+                    // The first member is the anchor for its successor and
+                    // may itself be explicitly placed. Every later member is
+                    // positioned by this series.
+                    if position > 0 {
+                        if !positioned.insert(member.as_str()) {
+                            out.push(Diag::error(
+                                member.span,
+                                format!("`{}` is positioned more than once", member.as_str()),
+                            ));
+                        }
+                        if diagram.nodes.iter().any(|node| {
+                            node.id.as_str() == member.as_str() && node.placement.is_some()
+                        }) {
+                            out.push(Diag::error(
+                                member.span,
+                                format!(
+                                    "`{}` has both an inline placement and a `row` or `column` placement",
+                                    member.as_str()
+                                ),
+                            ));
+                        }
+                    }
+                }
+                continue;
+            }
             let LayoutStmt::Place {
                 target,
                 placement: _,
@@ -804,7 +871,7 @@ fn check_layouts(diagram: &Diagram, out: &mut Vec<Diag>) {
                 out.push(Diag::error(target.span, message));
                 continue;
             }
-            if !placed.insert(target.as_str()) {
+            if !positioned.insert(target.as_str()) {
                 out.push(Diag::error(
                     target.span,
                     format!("`{}` is placed more than once", target.as_str()),
@@ -873,7 +940,7 @@ fn placements(diagram: &Diagram) -> impl Iterator<Item = (&Spanned<String>, &Pla
                     LayoutStmt::Place {
                         target, placement, ..
                     } => Some((target, placement)),
-                    LayoutStmt::Constraint { .. } => None,
+                    LayoutStmt::Constraint { .. } | LayoutStmt::Series { .. } => None,
                 })
         }))
 }

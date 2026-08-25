@@ -354,6 +354,32 @@ fn parse_layout(pair: Pair<Rule>, scope: Option<Spanned<String>>) -> Result<Layo
                     constraint: parse_layout_constraint(statement, ConstraintKind::SameHeight)?,
                 });
             }
+            Rule::layout_row | Rule::layout_column => {
+                let span = span_of(&statement);
+                let dir = if statement.as_rule() == Rule::layout_row {
+                    RelDir::RightOf
+                } else {
+                    RelDir::Below
+                };
+                let mut members = Vec::new();
+                let mut gap = None;
+                for part in statement.into_inner() {
+                    if part.as_rule() == Rule::gap {
+                        gap = Some(number(part.into_inner().next().expect("gap value"))?);
+                    } else {
+                        members.push(spanned(&part));
+                    }
+                }
+                if members.len() < 2 {
+                    bail!("a row or column needs at least two names");
+                }
+                statements.push(LayoutStmt::Series {
+                    dir,
+                    members,
+                    gap,
+                    span,
+                });
+            }
             other => bail!("unexpected layout statement `{other:?}`"),
         }
     }

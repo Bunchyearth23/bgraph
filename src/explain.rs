@@ -131,6 +131,30 @@ pub fn explain(diagram: &Diagram, layout: &Layout, id: &str) -> Result<String> {
                 anchor.as_str()
             ));
         }
+        EffectivePlacement::Series { dir, anchor, gap } => {
+            out.push_str(&format!(
+                "  {} {}  — from declared {}\n",
+                match dir {
+                    RelDir::RightOf => "right-of",
+                    RelDir::LeftOf => "left-of",
+                    RelDir::Below => "below",
+                    RelDir::Above => "above",
+                },
+                anchor.as_str(),
+                if dir == RelDir::RightOf {
+                    "row"
+                } else {
+                    "column"
+                },
+            ));
+            match gap {
+                Some(g) => out.push_str(&format!("  gap {}  — declared\n", round(g))),
+                None => out.push_str(&format!(
+                    "  gap {}  — default, from `graph {{ gap }}`\n",
+                    round(opts.gap)
+                )),
+            }
+        }
         EffectivePlacement::Origin => {
             out.push_str("  none — the first box in its container, so it sits at its origin\n");
         }

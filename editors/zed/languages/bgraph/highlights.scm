@@ -23,6 +23,8 @@
   "legend"
   "layout"
   "place"
+  "row"
+  "column"
   ; Adjustments to what is already placed. They never reorder anything.
   "align-group"
   "same-width"

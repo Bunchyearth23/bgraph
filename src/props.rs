@@ -2860,6 +2860,14 @@ pub const KEYWORDS: &[(&str, &str)] = &[
         "Place a declared node inside `layout { … }`: `place api right-of gateway gap 24`.",
     ),
     (
+        "row",
+        "Place each following node to the right of the preceding one: `layout { row api db cache gap 24 }`. The first node is the anchor; later nodes cannot carry another placement.",
+    ),
+    (
+        "column",
+        "Place each following node below the preceding one: `layout { column api db cache gap 24 }`. The first node is the anchor; later nodes cannot carry another placement.",
+    ),
+    (
         "equal-width",
         "Canonical layout relation: `layout { equal-width api db }` makes every named box as wide as the widest.",
     ),

@@ -106,6 +106,8 @@ module.exports = grammar({
         seq('align', field('alignment', $.layout_alignment), repeat1(field('member', $._name))),
         seq('equal-width', repeat1(field('member', $._name))),
         seq('equal-height', repeat1(field('member', $._name))),
+        seq('row', repeat1(field('member', $._name)), optional($.gap_clause)),
+        seq('column', repeat1(field('member', $._name)), optional($.gap_clause)),
       ),
 
     layout_alignment: (_) =>

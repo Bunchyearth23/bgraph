@@ -127,6 +127,52 @@ fn a_layout_block_aligns_and_equalizes_nodes() {
 }
 
 #[test]
+fn rows_and_columns_chain_the_order_the_author_wrote() {
+    let l = build(
+        r#"node a "A" { size: 40 30 }
+           node b "B" { size: 40 30 }
+           node c "C" { size: 40 30 }
+           node d "D" { size: 40 30 }
+           layout {
+             place a at (0, 0)
+             row a b c gap 24
+             column c d gap 18
+           }"#,
+    );
+    assert_eq!(l.nodes[1].rect.x, 64.0);
+    assert_eq!(l.nodes[2].rect.x, 128.0);
+    assert_eq!(l.nodes[3].rect.y, 48.0);
+}
+
+#[test]
+fn layout_series_reject_unknown_non_local_and_competing_positions() {
+    assert!(err("node a\nlayout { row a ghost }").contains("unknown node `ghost`"));
+    assert!(err("node a\nnode b\nlayout { row a b b }").contains("more than once"));
+    assert!(
+        err(r#"node outside
+               group service {
+                 node api
+                 node db
+                 layout { row api outside db }
+               }"#)
+        .contains("outside the local `layout` block")
+    );
+    assert!(
+        err(r#"node api at (0, 0)
+               node db at (10, 10)
+               layout { row api db }"#)
+        .contains("both an inline placement and a `row` or `column` placement")
+    );
+    assert!(
+        err(r#"node api
+               node db
+               layout { row api db
+                        place db at (0, 0) }"#)
+        .contains("placed more than once")
+    );
+}
+
+#[test]
 fn a_local_layout_only_constrains_its_groups_members() {
     assert!(
         err(r#"node outside

@@ -486,3 +486,29 @@ layout {
       (layout_statement
         member: (identifier)
         member: (identifier)))))
+
+================================================================================
+Scoped layout series
+================================================================================
+
+layout {
+  row api db cache gap 24
+  column cache audit gap 18
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (layout_declaration
+    body: (layout_block
+      (layout_statement
+        member: (identifier)
+        member: (identifier)
+        member: (identifier)
+        (gap_clause
+          amount: (number)))
+      (layout_statement
+        member: (identifier)
+        member: (identifier)
+        (gap_clause
+          amount: (number))))))
