@@ -110,6 +110,36 @@ fn a_layout_place_cannot_compete_with_v1_inline_placement() {
 }
 
 #[test]
+fn a_layout_block_aligns_and_equalizes_nodes() {
+    let l = build(
+        r#"node api "API" { size: 80 40 }
+           node db "Database" { size: 120 60 }
+           layout {
+             place api at (0, 0)
+             place db right-of api gap 24 align bottom
+             align top api db
+             equal-width api db
+           }"#,
+    );
+    assert_eq!(l.nodes[0].rect.w, 120.0);
+    assert_eq!(l.nodes[1].rect.w, 120.0);
+    assert_eq!(l.nodes[1].rect.y, 0.0, "v2 align top did not control y");
+}
+
+#[test]
+fn a_local_layout_only_constrains_its_groups_members() {
+    assert!(
+        err(r#"node outside
+           group service {
+             node api
+             node db
+             layout { align top api outside }
+           }"#,)
+        .contains("outside the local `layout` block")
+    );
+}
+
+#[test]
 fn relative_placement_offsets_by_the_gap() {
     let l = build(
         r#"
@@ -139,6 +169,15 @@ fn alignment_selects_the_cross_axis_edge() {
     assert_eq!(l.nodes[1].rect.y, 0.0);
     assert_eq!(l.nodes[2].rect.y, 80.0);
     assert_eq!(l.nodes[3].rect.y, 40.0);
+}
+
+#[test]
+fn an_explicit_cross_axis_center_is_accepted() {
+    let l = build(
+        r#"node a "A" at (0, 0) { size: 80 40 }
+           node b "B" below a align center-x { size: 40 30 }"#,
+    );
+    assert_eq!(l.nodes[1].rect.x, 20.0);
 }
 
 #[test]
@@ -8828,6 +8867,23 @@ fn an_align_group_does_not_override_an_explicit_at() {
 }
 
 #[test]
+fn an_align_group_does_not_override_a_v2_explicit_at() {
+    let source = r#"node a "A" { size: 80 40 }
+                   node b "B" { size: 80 60 }
+                   layout {
+                     place a at (0, 0)
+                     place b at (120, 33)
+                   }
+                   align-group top a b"#;
+    let l = build(source);
+    assert_eq!(l.nodes[1].rect.y, 33.0, "a v2 explicit `at` moved");
+    assert!(diags(source).iter().any(|diagnostic| {
+        diagnostic.severity == crate::check::Severity::Warning
+            && diagnostic.message.contains("explicit `at`")
+    }));
+}
+
+#[test]
 fn a_constraint_names_only_distinct_nodes() {
     assert!(err("node a\nsame-width a typo").contains("unknown node `typo`"));
     assert!(err("node a\nsame-width a a").contains("more than once"));
@@ -9663,6 +9719,23 @@ fn explain_names_the_axis_of_an_align_group() {
         "a",
     );
     assert!(out.contains("align-group top — aligns y"), "{out}");
+}
+
+#[test]
+fn explain_names_v2_layout_relations() {
+    let out = explained(
+        r#"node a "A"
+           node b "B"
+           layout {
+             place a at (0, 0)
+             place b right-of a
+             align top a b
+             equal-width a b
+           }"#,
+        "a",
+    );
+    assert!(out.contains("align top — aligns y"), "{out}");
+    assert!(out.contains("equal-width"), "{out}");
 }
 
 #[test]

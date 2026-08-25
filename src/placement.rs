@@ -7,13 +7,32 @@
 
 use std::collections::HashMap;
 
-use crate::ast::{ConstraintDecl, Diagram, LayoutStmt, Placement, RelDir, Spanned};
+use crate::ast::{
+    ConstraintAxis, ConstraintDecl, ConstraintKind, Diagram, LayoutStmt, Placement, RelDir, Spanned,
+};
 
 /// A named entity that can participate in placement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Entity {
     Node(usize),
     Group(usize),
+}
+
+/// A legacy or scoped-v2 relation, lowered through one consumer interface.
+#[derive(Clone, Copy)]
+pub struct ConstraintRef<'a> {
+    declaration: &'a ConstraintDecl,
+    v2: bool,
+}
+
+impl<'a> ConstraintRef<'a> {
+    pub fn declaration(self) -> &'a ConstraintDecl {
+        self.declaration
+    }
+
+    pub fn is_v2(self) -> bool {
+        self.v2
+    }
 }
 
 /// The effective placement of a node, including the implicit flow rule.
@@ -68,10 +87,11 @@ impl<'a> PlacementPlan<'a> {
         let mut layout_placement = vec![None; diagram.nodes.len()];
         for layout in &diagram.layouts {
             for statement in &layout.statements {
-                let LayoutStmt::Place {
+                if let LayoutStmt::Place {
                     target, placement, ..
-                } = statement;
-                if let Some(Entity::Node(node)) = index.get(target.as_str()).copied() {
+                } = statement
+                    && let Some(Entity::Node(node)) = index.get(target.as_str()).copied()
+                {
                     layout_placement[node] = Some(placement);
                 }
             }
@@ -93,8 +113,9 @@ impl<'a> PlacementPlan<'a> {
     /// Constraints resolve their member names through the same namespace as
     /// every other placement relation. Validation reports non-node members;
     /// consumers can therefore skip them without inventing a second error.
-    pub fn constraint_members(&self, constraint: &ConstraintDecl) -> Vec<usize> {
+    pub fn constraint_members(&self, constraint: ConstraintRef<'a>) -> Vec<usize> {
         constraint
+            .declaration()
             .members
             .iter()
             .filter_map(|member| match self.index.get(member.as_str()).copied() {
@@ -104,8 +125,50 @@ impl<'a> PlacementPlan<'a> {
             .collect()
     }
 
-    pub fn constraints(&self) -> &'a [ConstraintDecl] {
-        &self.diagram.constraints
+    pub fn constraints(&self) -> impl Iterator<Item = ConstraintRef<'a>> + '_ {
+        self.diagram
+            .constraints
+            .iter()
+            .map(|declaration| ConstraintRef {
+                declaration,
+                v2: false,
+            })
+            .chain(self.diagram.layouts.iter().flat_map(|layout| {
+                layout
+                    .statements
+                    .iter()
+                    .filter_map(|statement| match statement {
+                        LayoutStmt::Constraint { constraint } => Some(ConstraintRef {
+                            declaration: constraint,
+                            v2: true,
+                        }),
+                        LayoutStmt::Place { .. } => None,
+                    })
+            }))
+    }
+
+    /// A v2 alignment is applied after ordinary placement, so it owns that
+    /// cross-axis coordinate. The Cassowary shadow uses this to avoid keeping
+    /// the temporary placement alignment as a competing required equation.
+    pub fn v2_alignment_axis(&self, node: usize) -> Option<ConstraintAxis> {
+        self.constraints()
+            .filter(|constraint| {
+                constraint.is_v2()
+                    && constraint.declaration().kind == ConstraintKind::AlignGroup
+                    && constraint
+                        .declaration()
+                        .members
+                        .iter()
+                        .skip(1)
+                        .any(|member| {
+                            matches!(
+                                self.index.get(member.as_str()),
+                                Some(Entity::Node(index)) if *index == node
+                            )
+                        })
+            })
+            .map(|constraint| constraint.declaration().axis)
+            .last()
     }
 
     pub fn owner(&self) -> &HashMap<Entity, usize> {
@@ -323,6 +386,9 @@ mod tests {
                 .unwrap();
         let plan = PlacementPlan::new(&diagram);
 
-        assert_eq!(plan.constraint_members(&diagram.constraints[0]), [0, 1]);
+        assert_eq!(
+            plan.constraint_members(plan.constraints().next().unwrap()),
+            [0, 1]
+        );
     }
 }

@@ -4,7 +4,7 @@ use anyhow::{Result, anyhow};
 use kasuari::WeightedRelation::*;
 use kasuari::{Constraint, Solver, Strength, Variable};
 
-use crate::ast::{Align, ConstraintKind, Diagram, Placement, RelDir, Span};
+use crate::ast::{Align, ConstraintAxis, ConstraintKind, Diagram, Placement, RelDir, Span};
 use crate::layout::Rect;
 use crate::placement::{EffectivePlacement, Entity, PlacementPlan};
 use crate::style::GraphOpts;
@@ -32,6 +32,7 @@ pub enum ConstraintOrigin {
     RelativePlacement,
     ImplicitFlow,
     ContainerOrigin,
+    AlignmentConstraint,
 }
 
 /// Source data retained with every constraint until the solver reports it.
@@ -83,7 +84,15 @@ struct Lowering<'plan, 'diagram, 'out> {
     out: &'out mut Vec<SourcedConstraint>,
 }
 
-/// Solve the v1 node relations that already have an exact Cassowary lowering.
+/// The ordinary cross-axis alignment, and whether a later v2 relation owns
+/// that coordinate instead.
+#[derive(Clone, Copy)]
+struct RelativeAlignment {
+    declared: Option<Align>,
+    overridden_axis: Option<ConstraintAxis>,
+}
+
+/// Solve every currently-lowered node relation in a shadow Cassowary system.
 ///
 /// `None` means the diagram still uses a construct the shadow path has not
 /// migrated. It is intentionally not approximated: a partial comparison that
@@ -139,6 +148,7 @@ pub fn solve_nodes(
                     i,
                     node_span,
                     *vars,
+                    plan.v2_alignment_axis(i),
                     &mut Lowering {
                         plan,
                         variables: &variables,
@@ -153,7 +163,10 @@ pub fn solve_nodes(
                     dir,
                     anchor.as_str(),
                     None,
-                    None,
+                    RelativeAlignment {
+                        declared: None,
+                        overridden_axis: plan.v2_alignment_axis(i),
+                    },
                     *vars,
                     provenance(ConstraintOrigin::ImplicitFlow, Axis::X, i, node_span)
                         .with_anchor(anchor.span),
@@ -165,6 +178,66 @@ pub fn solve_nodes(
                         out: &mut constraints,
                     },
                 )?;
+            }
+        }
+    }
+
+    // The v2 block spells the alignment axis, unlike the legacy global form.
+    // That makes this relation an exact lowering rather than a geometry-based
+    // approximation, so it is ready for the shadow comparison now.
+    for constraint_ref in plan.constraints() {
+        if !constraint_ref.is_v2() {
+            continue;
+        }
+        let constraint = constraint_ref.declaration();
+        if constraint.kind != ConstraintKind::AlignGroup {
+            continue;
+        }
+        let members = plan.constraint_members(constraint_ref);
+        let Some((&lead, rest)) = members.split_first() else {
+            continue;
+        };
+        let target = variables[lead];
+        let Some(lead_member) = constraint.members.first() else {
+            continue;
+        };
+        for node in rest {
+            // An absolute declaration is required geometry. This mirrors the
+            // current renderer's deliberate refusal to move it late.
+            if matches!(
+                plan.declared_placement(*node),
+                Some(Placement::At { .. } | Placement::Cell { .. })
+            ) {
+                continue;
+            }
+            let source = provenance(
+                ConstraintOrigin::AlignmentConstraint,
+                match constraint.axis {
+                    ConstraintAxis::Horizontal => Axis::X,
+                    ConstraintAxis::Vertical => Axis::Y,
+                    ConstraintAxis::Inferred => return Ok(None),
+                },
+                *node,
+                constraint.span,
+            )
+            .with_anchor(lead_member.span)
+            .with_anchor_index(lead);
+            match constraint.axis {
+                ConstraintAxis::Horizontal => lower_horizontal_alignment(
+                    variables[*node],
+                    target,
+                    constraint.align,
+                    source,
+                    &mut constraints,
+                ),
+                ConstraintAxis::Vertical => lower_vertical_alignment(
+                    variables[*node],
+                    target,
+                    constraint.align,
+                    source,
+                    &mut constraints,
+                ),
+                ConstraintAxis::Inferred => unreachable!(),
             }
         }
     }
@@ -201,6 +274,7 @@ fn lower_placement(
     node: usize,
     node_span: Span,
     vars: Variables,
+    overridden_axis: Option<ConstraintAxis>,
     lowering: &mut Lowering<'_, '_, '_>,
 ) -> Result<()> {
     let origin = match placement {
@@ -230,7 +304,10 @@ fn lower_placement(
             dir,
             anchor.as_str(),
             gap,
-            align,
+            RelativeAlignment {
+                declared: align,
+                overridden_axis,
+            },
             vars,
             provenance(origin, Axis::X, node, node_span).with_anchor(anchor.span),
             lowering,
@@ -247,7 +324,7 @@ fn lower_relative(
     dir: RelDir,
     anchor: &str,
     gap: Option<f64>,
-    align: Option<Align>,
+    alignment: RelativeAlignment,
     vars: Variables,
     source: ConstraintProvenance,
     lowering: &mut Lowering<'_, '_, '_>,
@@ -259,7 +336,7 @@ fn lower_relative(
     };
     let target = lowering.variables[anchor];
     let gap = gap.unwrap_or(lowering.default_gap);
-    let align = align.unwrap_or(Align::Center);
+    let align = alignment.declared.unwrap_or(Align::Center);
 
     match dir {
         RelDir::RightOf => {
@@ -268,13 +345,15 @@ fn lower_relative(
                 vars.x | EQ(Strength::REQUIRED) | (target.x + target.w + gap),
                 source.with_axis(Axis::X).with_anchor_index(anchor),
             );
-            lower_vertical_alignment(
-                vars,
-                target,
-                align,
-                source.with_anchor_index(anchor),
-                lowering.out,
-            );
+            if alignment.overridden_axis != Some(ConstraintAxis::Vertical) {
+                lower_vertical_alignment(
+                    vars,
+                    target,
+                    align,
+                    source.with_anchor_index(anchor),
+                    lowering.out,
+                );
+            }
         }
         RelDir::LeftOf => {
             push(
@@ -282,13 +361,15 @@ fn lower_relative(
                 (vars.x + vars.w + gap) | EQ(Strength::REQUIRED) | target.x,
                 source.with_axis(Axis::X).with_anchor_index(anchor),
             );
-            lower_vertical_alignment(
-                vars,
-                target,
-                align,
-                source.with_anchor_index(anchor),
-                lowering.out,
-            );
+            if alignment.overridden_axis != Some(ConstraintAxis::Vertical) {
+                lower_vertical_alignment(
+                    vars,
+                    target,
+                    align,
+                    source.with_anchor_index(anchor),
+                    lowering.out,
+                );
+            }
         }
         RelDir::Below => {
             push(
@@ -296,13 +377,15 @@ fn lower_relative(
                 vars.y | EQ(Strength::REQUIRED) | (target.y + target.h + gap),
                 source.with_axis(Axis::Y).with_anchor_index(anchor),
             );
-            lower_horizontal_alignment(
-                vars,
-                target,
-                align,
-                source.with_anchor_index(anchor),
-                lowering.out,
-            );
+            if alignment.overridden_axis != Some(ConstraintAxis::Horizontal) {
+                lower_horizontal_alignment(
+                    vars,
+                    target,
+                    align,
+                    source.with_anchor_index(anchor),
+                    lowering.out,
+                );
+            }
         }
         RelDir::Above => {
             push(
@@ -310,13 +393,15 @@ fn lower_relative(
                 (vars.y + vars.h + gap) | EQ(Strength::REQUIRED) | target.y,
                 source.with_axis(Axis::Y).with_anchor_index(anchor),
             );
-            lower_horizontal_alignment(
-                vars,
-                target,
-                align,
-                source.with_anchor_index(anchor),
-                lowering.out,
-            );
+            if alignment.overridden_axis != Some(ConstraintAxis::Horizontal) {
+                lower_horizontal_alignment(
+                    vars,
+                    target,
+                    align,
+                    source.with_anchor_index(anchor),
+                    lowering.out,
+                );
+            }
         }
     }
     Ok(())

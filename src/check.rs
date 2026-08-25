@@ -632,10 +632,17 @@ fn anchor_names(diagram: &Diagram) -> HashSet<&str> {
 /// the diagram was sound while the renderer silently ignored the relation.
 fn check_constraints(diagram: &Diagram, out: &mut Vec<Diag>) {
     let nodes: HashSet<&str> = diagram.nodes.iter().map(|node| node.id.as_str()).collect();
-    let groups: HashSet<&str> = diagram
+    let node_index: HashMap<&str, usize> = diagram
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(index, node)| (node.id.as_str(), index))
+        .collect();
+    let placement = crate::placement::PlacementPlan::new(diagram);
+    let groups: HashMap<&str, &GroupDecl> = diagram
         .groups
         .iter()
-        .map(|group| group.id.as_str())
+        .map(|group| (group.id.as_str(), group))
         .collect();
 
     for constraint in &diagram.constraints {
@@ -644,52 +651,114 @@ fn check_constraints(diagram: &Diagram, out: &mut Vec<Diag>) {
             ConstraintKind::SameWidth => "same-width",
             ConstraintKind::SameHeight => "same-height",
         };
-        let mut seen = HashSet::new();
-        for member in &constraint.members {
-            if !seen.insert(member.as_str()) {
-                out.push(Diag::error(
-                    member.span,
-                    format!("`{name}` names `{}` more than once", member.as_str()),
-                ));
-            } else if groups.contains(member.as_str()) {
-                out.push(Diag::error(
-                    member.span,
-                    format!(
-                        "`{name}` accepts nodes, but `{}` is a group",
-                        member.as_str()
-                    ),
-                ));
-            } else if !nodes.contains(member.as_str()) {
-                out.push(Diag::error(
-                    member.span,
-                    format!("`{name}` names unknown node `{}`", member.as_str()),
-                ));
-            }
-        }
-
-        if constraint.kind != ConstraintKind::AlignGroup {
-            continue;
-        }
-        for member in constraint.members.iter().skip(1) {
-            let Some(node) = diagram
-                .nodes
-                .iter()
-                .find(|node| node.id.as_str() == member.as_str())
-            else {
+        check_constraint(
+            diagram,
+            constraint,
+            name,
+            None,
+            &nodes,
+            &groups,
+            &node_index,
+            &placement,
+            out,
+        );
+    }
+    for layout in &diagram.layouts {
+        let scope = layout
+            .scope
+            .as_ref()
+            .and_then(|scope| groups.get(scope.as_str()).copied());
+        for statement in &layout.statements {
+            let LayoutStmt::Constraint { constraint } = statement else {
                 continue;
             };
-            if matches!(
-                node.placement.as_ref(),
-                Some(Placement::At { .. } | Placement::Cell { .. })
-            ) {
-                out.push(Diag::warn(
-                    node.span,
-                    format!(
-                        "`align-group` leaves `{}` at its explicit `at` position",
-                        node.id.as_str()
-                    ),
-                ));
-            }
+            let name = match constraint.kind {
+                ConstraintKind::AlignGroup => "align",
+                ConstraintKind::SameWidth => "equal-width",
+                ConstraintKind::SameHeight => "equal-height",
+            };
+            check_constraint(
+                diagram,
+                constraint,
+                name,
+                scope,
+                &nodes,
+                &groups,
+                &node_index,
+                &placement,
+                out,
+            );
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn check_constraint(
+    diagram: &Diagram,
+    constraint: &ConstraintDecl,
+    name: &str,
+    scope: Option<&GroupDecl>,
+    nodes: &HashSet<&str>,
+    groups: &HashMap<&str, &GroupDecl>,
+    node_index: &HashMap<&str, usize>,
+    placement: &crate::placement::PlacementPlan<'_>,
+    out: &mut Vec<Diag>,
+) {
+    let mut seen = HashSet::new();
+    for member in &constraint.members {
+        if !seen.insert(member.as_str()) {
+            out.push(Diag::error(
+                member.span,
+                format!("`{name}` names `{}` more than once", member.as_str()),
+            ));
+        } else if groups.contains_key(member.as_str()) {
+            out.push(Diag::error(
+                member.span,
+                format!(
+                    "`{name}` accepts nodes, but `{}` is a group",
+                    member.as_str()
+                ),
+            ));
+        } else if !nodes.contains(member.as_str()) {
+            out.push(Diag::error(
+                member.span,
+                format!("`{name}` names unknown node `{}`", member.as_str()),
+            ));
+        } else if let Some(group) = scope
+            && !group
+                .members
+                .iter()
+                .any(|candidate| candidate.as_str() == member.as_str())
+        {
+            out.push(Diag::error(
+                member.span,
+                format!(
+                    "`{}` is outside the local `layout` block of group `{}`",
+                    member.as_str(),
+                    group.id.as_str()
+                ),
+            ));
+        }
+    }
+
+    if constraint.kind != ConstraintKind::AlignGroup {
+        return;
+    }
+    for member in constraint.members.iter().skip(1) {
+        let Some(&index) = node_index.get(member.as_str()) else {
+            continue;
+        };
+        if matches!(
+            placement.declared_placement(index),
+            Some(Placement::At { .. } | Placement::Cell { .. })
+        ) {
+            out.push(Diag::warn(
+                diagram.nodes[index].span,
+                format!(
+                    "`{name}` leaves `{}` at its explicit `at` position",
+                    diagram.nodes[index].id.as_str()
+                ),
+            ));
         }
     }
 }
@@ -715,7 +784,10 @@ fn check_layouts(diagram: &Diagram, out: &mut Vec<Diag>) {
                 target,
                 placement: _,
                 span: _,
-            } = statement;
+            } = statement
+            else {
+                continue;
+            };
             if !nodes.contains(target.as_str()) {
                 let message = if groups.contains_key(target.as_str()) {
                     format!(
@@ -779,11 +851,15 @@ fn placements(diagram: &Diagram) -> impl Iterator<Item = (&Spanned<String>, &Pla
                 .filter_map(|g| g.placement.as_ref().map(|p| (&g.id, p))),
         )
         .chain(diagram.layouts.iter().flat_map(|layout| {
-            layout.statements.iter().map(|statement| match statement {
-                LayoutStmt::Place {
-                    target, placement, ..
-                } => (target, placement),
-            })
+            layout
+                .statements
+                .iter()
+                .filter_map(|statement| match statement {
+                    LayoutStmt::Place {
+                        target, placement, ..
+                    } => Some((target, placement)),
+                    LayoutStmt::Constraint { .. } => None,
+                })
         }))
 }
 

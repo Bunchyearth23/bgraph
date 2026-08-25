@@ -423,9 +423,26 @@ Every archetype ships a complete, working file: they are in
 
 ## Layout
 
-Placement is explicit, but expressed **relative to other nodes** — so
-inserting a node shifts everything anchored to it instead of forcing you to
-renumber coordinates.
+Placement is explicit, but lives in one separate `layout` block. Declarations
+say what exists; the block says **where** it goes. Relations are still relative
+to other nodes, so inserting a node shifts what is anchored to it instead of
+forcing you to renumber coordinates.
+
+```bgraph
+node ui  "Browser"
+node api "API"
+node db  "Database"
+
+layout {
+  place ui at (0, 0)
+  place api right-of ui gap 48 align top
+  place db below api gap 32 align center-x
+}
+```
+
+A `group` may contain its own `layout` block; there it can address only that
+group's direct members. This keeps local geometry next to the local structure
+without inventing a second placement language.
 
 | Form | Meaning |
 |---|---|
@@ -468,9 +485,15 @@ Declare a step once and place in cells:
 ```bgraph
 graph { grid: 170 110 }
 
-node a "Ingest" at (col 0, row 0)
-node b "Queue"  at (col 1, row 0)
-node c "Store"  at (col 1, row 1)
+node a "Ingest"
+node b "Queue"
+node c "Store"
+
+layout {
+  place a at (col 0, row 0)
+  place b at (col 1, row 0)
+  place c at (col 1, row 1)
+}
 ```
 
 `at (col 3, row 2)` is still `at`, in units the file declared — a coordinate
@@ -506,33 +529,47 @@ alone, and running it twice changes nothing the second time.
 
 ### Constraints
 
-Three statements adjust what is already placed, and none of them reorders
+Three relations adjust what is already placed, and none of them reorders
 anything:
 
 ```bgraph
 node a "A"
-node b "A much longer label" right-of a gap 40
-node c "C" right-of b gap 40
+node b "A much longer label"
+node c "C"
 
-same-width a b c
-same-height a b c
-align-group top a b c
+layout {
+  place a at (0, 0)
+  place b right-of a gap 40
+  place c right-of b gap 40
+  equal-width a b c
+  equal-height a b c
+  align top a b c
+}
 ```
 
-`same-width` and `same-height` give a set one size — the **largest** wins,
+`equal-width` and `equal-height` give a set one size — the **largest** wins,
 because shrinking to match a narrower neighbour clips the label. They are
 applied *before* placement, so widening a box pushes its neighbours along
 instead of landing on top of them.
 
-`align-group` gives a set one cross-axis coordinate. The **first** name
+`align` gives a set one cross-axis coordinate. The **first** name
 decides, not an average: an average moves every box, including the one the
-others were being lined up against. The axis is read off the geometry — a row
-lines up on `y`, a column on `x`.
+others were being lined up against. Its spelling makes the axis explicit:
+`top`, `bottom` and `center-y` control `y`; `left`, `right` and `center-x`
+control `x`.
 
 ```bgraph
-node a "A" at (0, 0)
-node b "B" right-of a gap 80 align top      // tops line up
-node c "C" below a gap 40 align left        // left edges line up
+node a "A"
+node b "B"
+node c "C"
+
+layout {
+  place a at (0, 0)
+  place b right-of a gap 80
+  place c below a gap 40
+  align top a b
+  align left a c
+}
 ```
 
 **Anchors may point forward.** The solver runs repeated passes, so

@@ -21,10 +21,14 @@
   "use"
   "note"
   "legend"
+  "layout"
+  "place"
   ; Adjustments to what is already placed. They never reorder anything.
   "align-group"
   "same-width"
   "same-height"
+  "equal-width"
+  "equal-height"
   ; Grid units: `at (col 3, row 2)` is still `at`.
   "col"
   "row"
@@ -36,6 +40,7 @@
 
 (direction) @keyword
 (alignment) @constant
+(layout_alignment) @constant
 
 ; ---------------------------------------------------------------- names
 

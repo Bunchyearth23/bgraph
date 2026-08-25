@@ -130,6 +130,8 @@ pub enum LayoutStmt {
         placement: Placement,
         span: Span,
     },
+    /// `align top api database`, `equal-width api database`.
+    Constraint { constraint: ConstraintDecl },
 }
 
 /// `component service { … }` — the body kept as source text, because that is

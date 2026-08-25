@@ -620,6 +620,11 @@
     }
   },
   {
+    "type": "layout_alignment",
+    "named": true,
+    "fields": {}
+  },
+  {
     "type": "layout_block",
     "named": true,
     "fields": {},
@@ -654,9 +659,33 @@
     "type": "layout_statement",
     "named": true,
     "fields": {
+      "alignment": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "layout_alignment",
+            "named": true
+          }
+        ]
+      },
+      "member": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "placeholder",
+            "named": true
+          }
+        ]
+      },
       "placement": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "absolute_position",
@@ -670,7 +699,7 @@
       },
       "target": {
         "multiple": false,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "identifier",
@@ -1177,6 +1206,14 @@
     "named": false
   },
   {
+    "type": "center-x",
+    "named": false
+  },
+  {
+    "type": "center-y",
+    "named": false
+  },
+  {
     "type": "col",
     "named": false
   },
@@ -1200,6 +1237,14 @@
   {
     "type": "duration",
     "named": true
+  },
+  {
+    "type": "equal-height",
+    "named": false
+  },
+  {
+    "type": "equal-width",
+    "named": false
   },
   {
     "type": "extends",

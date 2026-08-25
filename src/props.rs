@@ -2856,6 +2856,18 @@ pub const KEYWORDS: &[(&str, &str)] = &[
          members. Inline placement is being removed during the v2 migration.",
     ),
     (
+        "place",
+        "Place a declared node inside `layout { … }`: `place api right-of gateway gap 24`.",
+    ),
+    (
+        "equal-width",
+        "Canonical layout relation: `layout { equal-width api db }` makes every named box as wide as the widest.",
+    ),
+    (
+        "equal-height",
+        "Canonical layout relation: `layout { equal-height api db }` makes every named box as tall as the tallest.",
+    ),
+    (
         "same-width",
         "Give a set of boxes one width: `same-width a b c`. The widest wins, \
          because shrinking to match a narrower neighbour clips the label. \
@@ -2904,7 +2916,10 @@ pub const PLACEMENTS: &[(&str, &str)] = &[
     ("above", "Place above another node."),
     ("below", "Place below another node."),
     ("gap", "Distance to the anchor, overriding the graph `gap`."),
-    ("align", "Cross-axis alignment against the anchor."),
+    (
+        "align",
+        "Cross-axis alignment against an anchor, or a canonical relation such as `layout { align top api db }`.",
+    ),
     ("extends", "Inherit every property of another style."),
 ];
 

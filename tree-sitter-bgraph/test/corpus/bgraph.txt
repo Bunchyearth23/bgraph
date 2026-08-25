@@ -460,3 +460,29 @@ layout {
             amount: (number))
           (align_clause
             alignment: (alignment)))))))
+
+================================================================================
+Scoped layout relations
+================================================================================
+
+layout {
+  align top api db
+  equal-width api db
+  equal-height api db
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (layout_declaration
+    body: (layout_block
+      (layout_statement
+        alignment: (layout_alignment)
+        member: (identifier)
+        member: (identifier))
+      (layout_statement
+        member: (identifier)
+        member: (identifier))
+      (layout_statement
+        member: (identifier)
+        member: (identifier)))))

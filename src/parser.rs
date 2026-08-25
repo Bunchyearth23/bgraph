@@ -327,19 +327,76 @@ fn parse_layout(pair: Pair<Rule>, scope: Option<Spanned<String>>) -> Result<Layo
     let block = pair.into_inner().next().expect("a layout has a block");
     let mut statements = Vec::new();
     for statement in block.into_inner() {
-        let span = span_of(&statement);
-        let mut parts = statement.into_inner();
-        let target = parts.next().expect("a place statement names its target");
-        let placement = parts.next().expect("a place statement has a placement");
-        statements.push(LayoutStmt::Place {
-            target: spanned(&target),
-            placement: parse_placement(placement)?,
-            span,
-        });
+        match statement.as_rule() {
+            Rule::layout_place => {
+                let span = span_of(&statement);
+                let mut parts = statement.into_inner();
+                let target = parts.next().expect("a place statement names its target");
+                let placement = parts.next().expect("a place statement has a placement");
+                statements.push(LayoutStmt::Place {
+                    target: spanned(&target),
+                    placement: parse_placement(placement)?,
+                    span,
+                });
+            }
+            Rule::layout_align => {
+                statements.push(LayoutStmt::Constraint {
+                    constraint: parse_layout_constraint(statement, ConstraintKind::AlignGroup)?,
+                });
+            }
+            Rule::layout_equal_width => {
+                statements.push(LayoutStmt::Constraint {
+                    constraint: parse_layout_constraint(statement, ConstraintKind::SameWidth)?,
+                });
+            }
+            Rule::layout_equal_height => {
+                statements.push(LayoutStmt::Constraint {
+                    constraint: parse_layout_constraint(statement, ConstraintKind::SameHeight)?,
+                });
+            }
+            other => bail!("unexpected layout statement `{other:?}`"),
+        }
     }
     Ok(LayoutDecl {
         scope,
         statements,
+        span,
+    })
+}
+
+fn parse_layout_constraint(pair: Pair<Rule>, kind: ConstraintKind) -> Result<ConstraintDecl> {
+    let span = span_of(&pair);
+    let mut align = Align::Center;
+    let mut axis = ConstraintAxis::Inferred;
+    let mut members = Vec::new();
+
+    for part in pair.into_inner() {
+        match part.as_rule() {
+            Rule::layout_align_kw => {
+                (align, axis) = match part.as_str() {
+                    "left" => (Align::Start, ConstraintAxis::Horizontal),
+                    "right" => (Align::End, ConstraintAxis::Horizontal),
+                    "top" => (Align::Start, ConstraintAxis::Vertical),
+                    "bottom" => (Align::End, ConstraintAxis::Vertical),
+                    "center-x" => (Align::Center, ConstraintAxis::Horizontal),
+                    "center-y" => (Align::Center, ConstraintAxis::Vertical),
+                    other => bail!("unknown layout alignment `{other}`"),
+                };
+            }
+            _ => members.push(spanned(&part)),
+        }
+    }
+
+    if members.len() < 2 {
+        bail!(
+            "a layout relation needs at least two names — one box is already aligned with itself"
+        );
+    }
+    Ok(ConstraintDecl {
+        kind,
+        align,
+        axis,
+        members,
         span,
     })
 }

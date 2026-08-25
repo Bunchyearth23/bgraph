@@ -101,7 +101,15 @@ module.exports = grammar({
       ),
 
     layout_statement: ($) =>
-      seq('place', field('target', $._name), field('placement', $._placement)),
+      choice(
+        seq('place', field('target', $._name), field('placement', $._placement)),
+        seq('align', field('alignment', $.layout_alignment), repeat1(field('member', $._name))),
+        seq('equal-width', repeat1(field('member', $._name))),
+        seq('equal-height', repeat1(field('member', $._name))),
+      ),
+
+    layout_alignment: (_) =>
+      choice('left', 'right', 'top', 'bottom', 'center-x', 'center-y'),
 
     // A constraint adjusts one axis of already-placed boxes and never their
     // order, which is what keeps the layout declared (`D-031`).
@@ -266,7 +274,7 @@ module.exports = grammar({
 
     align_clause: ($) => seq('align', field('alignment', $.alignment)),
 
-    alignment: (_) => choice('left', 'right', 'center', 'middle', 'top', 'bottom'),
+    alignment: (_) => choice('left', 'right', 'center-x', 'center-y', 'center', 'middle', 'top', 'bottom'),
 
     point: ($) => seq('(', field('x', $.number), ',', field('y', $.number), ')'),
 

@@ -1677,8 +1677,9 @@ pub struct Solved {
 fn constrain_sizes(plan: &PlacementPlan<'_>, sizes: &mut [(f64, f64)]) {
     use crate::ast::ConstraintKind;
 
-    for constraint in plan.constraints() {
-        let members = plan.constraint_members(constraint);
+    for constraint_ref in plan.constraints() {
+        let constraint = constraint_ref.declaration();
+        let members = plan.constraint_members(constraint_ref);
         if members.len() < 2 {
             continue;
         }
@@ -1707,12 +1708,13 @@ fn constrain_sizes(plan: &PlacementPlan<'_>, sizes: &mut [(f64, f64)]) {
 fn constrain_alignment(plan: &PlacementPlan<'_>, solved: &mut Solved) {
     use crate::ast::{ConstraintAxis, ConstraintKind};
 
-    for constraint in plan.constraints() {
+    for constraint_ref in plan.constraints() {
+        let constraint = constraint_ref.declaration();
         if constraint.kind != ConstraintKind::AlignGroup {
             continue;
         }
         let rects: Vec<usize> = plan
-            .constraint_members(constraint)
+            .constraint_members(constraint_ref)
             .into_iter()
             .filter(|i| solved.nodes[*i].is_some())
             .collect();
