@@ -69,6 +69,30 @@ pub(super) fn symbols(text: &str) -> Value {
             "selectionRange": index.range(node.id.span),
         }));
     }
+    for group in &diagram.groups {
+        out.push(json!({
+            "name": group.id.as_str(),
+            "detail": group.label.clone(),
+            "kind": 3,
+            "range": index.range(group.span),
+            "selectionRange": index.range(group.id.span),
+        }));
+    }
+    for layout in &diagram.layouts {
+        let relations = layout.statements.len();
+        let scope = layout
+            .scope
+            .as_ref()
+            .map(|scope| format!("in group {}", scope.as_str()))
+            .unwrap_or_else(|| "file scope".to_string());
+        out.push(json!({
+            "name": "layout",
+            "detail": format!("{scope} · {relations} relation{}", if relations == 1 { "" } else { "s" }),
+            "kind": 3,
+            "range": index.range(layout.span),
+            "selectionRange": index.range(layout.span),
+        }));
+    }
     // LSP clients expect a document outline in source order.  Building the
     // three categories separately is convenient, but leaking that order
     // makes the outline jump around as templates or styles are added.

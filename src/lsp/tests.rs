@@ -383,6 +383,35 @@ fn hover_on_a_node_reports_its_resolved_geometry() {
 }
 
 #[test]
+fn hover_on_a_node_names_its_scoped_layout_relation() {
+    let text = "node a \"A\" { size: 100 50 }\nnode b \"B\"\nlayout {\n  place a at (10, 20)\n  place b right-of a gap 30\n}\n";
+
+    let hover = hover::describe_node(text, "b").expect("b is declared");
+    assert!(hover.contains("**placement**"), "{hover}");
+    assert!(hover.contains("right-of a  — declared"), "{hover}");
+    assert!(hover.contains("gap 30  — declared"), "{hover}");
+}
+
+#[test]
+fn outline_includes_groups_and_scoped_layouts() {
+    let source = "group services \"Services\" {\n  node api \"API\"\n  node db \"DB\"\n  layout {\n    place api at (0, 0)\n    place db right-of api\n  }\n}\n";
+    let symbols = server(source).symbols(&json!({
+        "textDocument": { "uri": "file:///t.bd" }
+    }));
+    let entries = symbols.as_array().expect("a document outline");
+    let group = entries
+        .iter()
+        .find(|symbol| symbol["name"] == "services")
+        .expect("the group is visible");
+    assert_eq!(group["detail"], "Services");
+    let layout = entries
+        .iter()
+        .find(|symbol| symbol["name"] == "layout")
+        .expect("the scoped block is visible");
+    assert_eq!(layout["detail"], "in group services · 2 relations");
+}
+
+#[test]
 fn hover_on_a_style_lists_its_properties() {
     let text = "style base { radius: 4 }\nstyle leaf extends base {\n  shape: cylinder\n}\n";
 

@@ -140,6 +140,21 @@ pub(super) fn describe_node(text: &str, id: &str) -> Option<String> {
             facts.push(format!("shape   {shape:?}").to_lowercase());
         }
         out.push_str(&format!("\n\n```\n{}\n```", facts.join("\n")));
+
+        // A rectangle answers where the box ended up, but it cannot tell an
+        // author which scoped declaration caused it.  Reuse the command-line
+        // explanation rather than making the editor guess from source text.
+        // The paint section is already represented above, so keep the
+        // placement-only portion here.
+        if let Ok(explanation) = crate::explain::explain(&diagram, &layout, id)
+            && let Some((_, placement_and_paint)) = explanation.split_once("\n\nplacement\n")
+            && let Some((placement, _)) = placement_and_paint.split_once("\npaint\n")
+        {
+            out.push_str(&format!(
+                "\n\n**placement**\n\n```\n{}\n```",
+                placement.trim()
+            ));
+        }
     }
     Some(out)
 }
