@@ -290,6 +290,7 @@ pub fn validate_frames(
     plan: &PlacementPlan<'_>,
     nodes: &[Option<Rect>],
     groups: &[Option<Rect>],
+    opts: &GraphOpts,
 ) -> Result<()> {
     if diagram.groups.is_empty() {
         return Ok(());
@@ -357,6 +358,100 @@ pub fn validate_frames(
     }
     for (group_index, group) in diagram.groups.iter().enumerate() {
         let frame = entity_vars(Entity::Group(group_index));
+        if let Some(placement) = plan.declared_group_placement(group_index) {
+            let source = provenance(
+                ConstraintOrigin::RelativePlacement,
+                Axis::X,
+                diagram.nodes.len() + group_index,
+                group.span,
+            );
+            match placement.resolved(opts.grid) {
+                Placement::At { x, y } => {
+                    push(
+                        &mut constraints,
+                        frame.x | EQ(Strength::REQUIRED) | x,
+                        source.with_axis(Axis::X),
+                    );
+                    push(
+                        &mut constraints,
+                        frame.y | EQ(Strength::REQUIRED) | y,
+                        source.with_axis(Axis::Y),
+                    );
+                }
+                Placement::Cell { .. } => unreachable!("resolved cells are absolute"),
+                Placement::Rel {
+                    dir,
+                    anchor,
+                    gap,
+                    align,
+                } => {
+                    let Some(target) = plan.index().get(anchor.as_str()).copied() else {
+                        continue;
+                    };
+                    let target = entity_vars(target);
+                    let gap = gap.unwrap_or(opts.gap);
+                    let align = align.unwrap_or(Align::Center);
+                    match dir {
+                        RelDir::RightOf => {
+                            push(
+                                &mut constraints,
+                                frame.x | EQ(Strength::REQUIRED) | (target.x + target.w + gap),
+                                source.with_axis(Axis::X),
+                            );
+                            lower_vertical_alignment(
+                                frame,
+                                target,
+                                align,
+                                source,
+                                &mut constraints,
+                            );
+                        }
+                        RelDir::LeftOf => {
+                            push(
+                                &mut constraints,
+                                (frame.x + frame.w + gap) | EQ(Strength::REQUIRED) | target.x,
+                                source.with_axis(Axis::X),
+                            );
+                            lower_vertical_alignment(
+                                frame,
+                                target,
+                                align,
+                                source,
+                                &mut constraints,
+                            );
+                        }
+                        RelDir::Below => {
+                            push(
+                                &mut constraints,
+                                frame.y | EQ(Strength::REQUIRED) | (target.y + target.h + gap),
+                                source.with_axis(Axis::Y),
+                            );
+                            lower_horizontal_alignment(
+                                frame,
+                                target,
+                                align,
+                                source,
+                                &mut constraints,
+                            );
+                        }
+                        RelDir::Above => {
+                            push(
+                                &mut constraints,
+                                (frame.y + frame.h + gap) | EQ(Strength::REQUIRED) | target.y,
+                                source.with_axis(Axis::Y),
+                            );
+                            lower_horizontal_alignment(
+                                frame,
+                                target,
+                                align,
+                                source,
+                                &mut constraints,
+                            );
+                        }
+                    }
+                }
+            }
+        }
         for member in &group.members {
             let Some(entity) = plan.index().get(member.as_str()).copied() else {
                 continue;

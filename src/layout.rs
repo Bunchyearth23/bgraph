@@ -887,6 +887,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             &placement,
             &solved.nodes,
             &solved.groups,
+            &opts,
         )?;
         solved
     };
