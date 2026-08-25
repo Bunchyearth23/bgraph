@@ -64,6 +64,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
     let nodes = check_nodes(diagram, def, &mut out);
     check_groups(diagram, def, &nodes, &mut out);
     check_layouts(diagram, &mut out);
+    check_layout_capability(diagram, def, &mut out);
     check_constraints(diagram, &mut out);
     check_edges(diagram, def, &nodes, &mut out);
     check_graph(diagram, &mut out);
@@ -141,6 +142,25 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
 
     out.sort_by_key(|d| (d.span.start, d.span.end));
     out
+}
+
+fn check_layout_capability(
+    diagram: &Diagram,
+    def: &'static props::ArchetypeDef,
+    out: &mut Vec<Diag>,
+) {
+    if def.layout_capability() == props::LayoutCapability::Declared {
+        return;
+    }
+    for layout in &diagram.layouts {
+        out.push(Diag::error(
+            layout.span,
+            format!(
+                "`type {}` manages its own geometry, so it cannot use a `layout` block",
+                def.name
+            ),
+        ));
+    }
 }
 
 /// The declared archetype, or `free`. Reports an unknown name and any

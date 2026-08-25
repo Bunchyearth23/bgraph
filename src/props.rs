@@ -1472,6 +1472,31 @@ pub struct ArchetypeDef {
     pub edge_slots: &'static [Slot],
 }
 
+/// Whether the common `layout` language controls this archetype's geometry.
+///
+/// The list is deliberate product vocabulary, not a renderer-side guess: a
+/// relation that a genre cannot honour is rejected before it can look like a
+/// successful but ignored placement (`D-048`). `Hybrid` is reserved for a
+/// genre that later exposes named guides; no current genre has that contract.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LayoutCapability {
+    Declared,
+    ArchetypeManaged,
+    Hybrid,
+}
+
+const DECLARED_LAYOUT_ARCHETYPES: &[&str] = &[
+    "free",
+    "class",
+    "block",
+    "er",
+    "state",
+    "harness",
+    "bpmn",
+    "network",
+    "requirements",
+];
+
 /// A second word for the same archetype, with a positional shape of its own.
 pub struct AltItem {
     pub item: &'static str,
@@ -1480,6 +1505,15 @@ pub struct AltItem {
 }
 
 impl ArchetypeDef {
+    /// The placement contract of this diagram genre.
+    pub fn layout_capability(&self) -> LayoutCapability {
+        if DECLARED_LAYOUT_ARCHETYPES.contains(&self.name) {
+            LayoutCapability::Declared
+        } else {
+            LayoutCapability::ArchetypeManaged
+        }
+    }
+
     /// Whether this archetype answers to the word the author wrote. `node` is
     /// the universal synonym everywhere.
     pub fn accepts(&self, written: &str) -> bool {

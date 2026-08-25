@@ -444,6 +444,11 @@ A `group` may contain its own `layout` block; there it can address only that
 group's direct members. This keeps local geometry next to the local structure
 without inventing a second placement language.
 
+Only genres with declared geometry accept this block (`free`, `class`, `block`,
+`er`, `state`, `harness`, `bpmn`, `network`, `requirements`). A chart such as
+`pie`, `gantt` or `packet` owns its geometry from its data and rejects `layout`
+instead of silently ignoring it.
+
 | Form | Meaning |
 |---|---|
 | `at (x, y)` | absolute top-left corner |

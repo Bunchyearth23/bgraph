@@ -717,6 +717,14 @@ fn pie_and_packet_ignore_edges_and_placement_out_loud() {
 }
 
 #[test]
+fn a_layout_block_is_refused_when_an_archetype_owns_its_geometry() {
+    let message = err(r#"type pie
+           slice organic "Organic" 10
+           layout { place organic at (0, 0) }"#);
+    assert!(message.contains("manages its own geometry"), "{message}");
+}
+
+#[test]
 fn packet_places_fields_by_bit_range() {
     let l = build(
         r#"
