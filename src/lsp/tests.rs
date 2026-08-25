@@ -157,8 +157,9 @@ fn declaration_span_points_at_the_identifier() {
 
 #[test]
 fn word_at_grabs_hyphenated_identifiers() {
-    let text = "node a right-of b";
-    let (word, _) = word_at(text, 10).expect("cursor is inside a word");
+    let text = "node a\nlayout { place a right-of b }";
+    let at = text.find("right-of").expect("relation is present") + 2;
+    let (word, _) = word_at(text, at).expect("cursor is inside a word");
     assert_eq!(word, "right-of");
 }
 
@@ -760,7 +761,10 @@ fn chart_data_is_offered_only_where_it_is_read() {
 
 #[test]
 fn placements_are_not_offered_where_placement_is_ignored() {
-    assert!(labels_at("node a ", "node a ").contains(&"right-of".to_string()));
+    assert!(!labels_at("node a ", "node a ").contains(&"right-of".to_string()));
+    assert!(
+        labels_at("node a\nlayout {\n  place a ", "  place a ").contains(&"right-of".to_string())
+    );
     assert!(!labels_at("type pie\nnode a ", "node a ").contains(&"right-of".to_string()));
 }
 
@@ -866,7 +870,10 @@ fn go_to_definition_finds_a_box_declared_under_its_genres_own_word() {
 
 #[test]
 fn placements_follow_the_archetypes_keyword() {
-    assert!(labels_at("node a ", "node a ").contains(&"right-of".to_string()));
+    assert!(!labels_at("node a ", "node a ").contains(&"right-of".to_string()));
+    assert!(
+        labels_at("node a\nlayout {\n  place a ", "  place a ").contains(&"right-of".to_string())
+    );
     // A pie ignores placement, so it is not offered — with either word.
     assert!(!labels_at("type pie\nslice a ", "slice a ").contains(&"right-of".to_string()));
 }

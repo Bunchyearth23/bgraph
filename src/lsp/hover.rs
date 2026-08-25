@@ -62,7 +62,9 @@ pub(super) fn hover(text: &str, index: &LineIndex, offset: usize) -> Value {
         && word != "node"
     {
         props::archetype(archetype).map(|def| item_form(def, &word))
-    } else if let Some((_, doc)) = props::PLACEMENTS.iter().find(|(name, _)| *name == word) {
+    } else if ctx.block == Some(Block::Layout)
+        && let Some((_, doc)) = props::PLACEMENTS.iter().find(|(name, _)| *name == word)
+    {
         Some((*doc).to_string())
     } else if let Some((_, doc)) = props::KEYWORDS.iter().find(|(name, _)| *name == word) {
         Some((*doc).to_string())

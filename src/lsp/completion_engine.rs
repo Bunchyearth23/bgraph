@@ -255,18 +255,6 @@ impl Server {
             )];
         }
 
-        // Placements only make sense where placement is honoured, and only
-        // once the item already has an identifier.
-        if words.first().is_some_and(|w| *w == item || *w == "node")
-            && words.len() >= 2
-            && archetype == "free"
-        {
-            return props::PLACEMENTS
-                .iter()
-                .map(|(name, doc)| completion(name, 14, "placement", doc))
-                .collect();
-        }
-
         // The first word of a statement: a keyword, or a node id starting an
         // edge. A line holding nothing but indentation is that position too —
         // asking on a blank line used to answer nothing, which is the one
