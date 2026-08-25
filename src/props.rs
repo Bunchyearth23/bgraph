@@ -2842,9 +2842,11 @@ pub const KEYWORDS: &[(&str, &str)] = &[
     ),
     (
         "align-group",
-        "Give a set of boxes one cross-axis coordinate: `align-group top a b c`. \
-         A pass over the solved layout, never a reordering — the first name \
-         decides, and an explicit `at` wins.",
+        "Give a set of boxes one coordinate: `align-group top a b c` aligns \
+         their top edges on y; `left`/`right` align x. A pass over the solved \
+         layout, never a reordering — the first name decides, and an explicit \
+         `at` wins. Legacy `center`/`middle` still infer their axis; the v2 \
+         `layout` block will require it explicitly.",
     ),
     (
         "same-width",
