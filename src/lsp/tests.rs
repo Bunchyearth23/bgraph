@@ -420,7 +420,7 @@ fn completion_offers_keywords_at_statement_level() {
 
 #[test]
 fn hover_on_a_node_reports_its_resolved_geometry() {
-    let text = "node a \"A\" at (10, 20) { size: 100 50 }\nnode b right-of a gap 30\n";
+    let text = "node a \"A\" { size: 100 50 }\nnode b\nlayout {\n  place a at (10, 20)\n  place b right-of a gap 30\n}\n";
 
     let hover = hover::describe_node(text, "b").expect("b is declared");
     assert!(hover.contains("**node** `b`"), "{hover}");
