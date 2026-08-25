@@ -159,6 +159,23 @@ message — which matches what `check` does and beats shipping a document with a
 hole where a diagram should be. See [`typst/README.md`](typst/README.md),
 including the two-command form that needs no plugin at all.
 
+## Export local sans les sources
+
+Pour préparer un dossier installable sur une autre machine sans distribuer le
+dépôt, lancez :
+
+```sh
+./export.sh
+```
+
+Le dossier `export/` contient les binaires Linux, Windows x86_64 et Windows ARM64, le paquet VS Code,
+l'extension Zed et le module Typst. La compilation Windows doit être faite sur
+une machine disposant du linker Windows. Sous Linux, `export.sh` installe et
+utilise automatiquement `cargo-xwin` ; pour fournir vos propres exécutables,
+passez `--windows-bin-dir /chemin/vers/binaires-windows`.
+Sous Windows, l'installation de l'extension Zed se fait avec
+`export/zed/install.ps1`.
+
 ## Other archetypes
 
 `type`, declared once at the top of a file, picks the genre. `free` — nodes

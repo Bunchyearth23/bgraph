@@ -198,6 +198,7 @@ not copies.
 | `W-161` | 2026-08-25 | Lisibilité des liens concurrents et des croisements | `7ce4536` |
 | `W-162` | 2026-08-25 | Grille de placement déclarative pour nœuds et liens | `059da29` |
 | `W-163` | 2026-08-25 | Galerie vérifiée des exemples BD/SVG par archétype | `90270ae` |
+| `W-164` | 2026-08-25 | Script `./export.sh` pour produire une distribution locale sans sources : binaires Linux, Windows x86_64/ARM64 (avec `cargo-xwin`), VS Code, Zed et Typst | ce commit |
 | `W-150` | 2026-08-21 | Schéma généré du vocabulaire | non committé |
 | `W-149` | 2026-08-21 | Snapshots visuels représentatifs | non committé |
 | `W-148` | 2026-08-21 | Cohérence des chiffres et du vocabulaire documentaire | non committé |
