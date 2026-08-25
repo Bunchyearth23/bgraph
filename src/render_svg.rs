@@ -239,7 +239,7 @@ fn crossing_marks(layout: &Layout, routed: &[Routed]) -> String {
         for (j, second) in routed.iter().enumerate().skip(i + 1) {
             for &(a, b) in &segments(&first.points) {
                 for &(c, d) in &segments(&second.points) {
-                    let Some((x, y, horizontal)) = crossing(a, b, c, d) else {
+                    let Some((x, y, dx, dy)) = crossing(a, b, c, d) else {
                         continue;
                     };
                     if seen
@@ -259,17 +259,20 @@ fn crossing_marks(layout: &Layout, routed: &[Routed]) -> String {
                             paint("fill", background)
                         );
                     }
-                    let (d, q) = if horizontal {
-                        (
-                            format!("M{} {}", n(x - 6.0), n(y)),
-                            format!("{} {} {} {}", n(x), n(y - 6.0), n(x + 6.0), n(y)),
-                        )
-                    } else {
-                        (
-                            format!("M{} {}", n(x), n(y - 6.0)),
-                            format!("{} {} {} {}", n(x + 6.0), n(y), n(x), n(y + 6.0)),
-                        )
-                    };
+                    let length = (dx * dx + dy * dy).sqrt();
+                    let (ux, uy) = (dx / length, dy / length);
+                    let (px, py) = (-uy, ux);
+                    let start = (x - ux * 6.0, y - uy * 6.0);
+                    let end = (x + ux * 6.0, y + uy * 6.0);
+                    let control = (x + px * 6.0, y + py * 6.0);
+                    let d = format!("M{} {}", n(start.0), n(start.1));
+                    let q = format!(
+                        "{} {} {} {}",
+                        n(control.0),
+                        n(control.1),
+                        n(end.0),
+                        n(end.1)
+                    );
                     let _ = write!(
                         out,
                         r#"<path d="{} Q {}" fill="none"{} stroke-width="{}" stroke-linecap="round"/>"#,
@@ -289,26 +292,29 @@ fn segments(points: &[(f64, f64)]) -> Vec<((f64, f64), (f64, f64))> {
     points.windows(2).map(|pair| (pair[0], pair[1])).collect()
 }
 
-/// Return an interior orthogonal crossing and whether the later segment is
-/// horizontal. Endpoints and collinear overlap are intentionally excluded.
+/// Return an interior crossing and the direction of the later segment.
+/// Endpoints and collinear overlap are intentionally excluded. This covers
+/// straight, curved and orthogonal routes alike; a crossing marker is a visual
+/// property of two links, not of one router.
 fn crossing(
     a: (f64, f64),
     b: (f64, f64),
     c: (f64, f64),
     d: (f64, f64),
-) -> Option<(f64, f64, bool)> {
-    let ah = (a.1 - b.1).abs() < 1e-6;
-    let av = (a.0 - b.0).abs() < 1e-6;
-    let ch = (c.1 - d.1).abs() < 1e-6;
-    let cv = (c.0 - d.0).abs() < 1e-6;
-    let inside = |v: f64, p: f64, q: f64| v > p.min(q) + 1e-6 && v < p.max(q) - 1e-6;
-    if ah && cv && inside(c.0, a.0, b.0) && inside(a.1, c.1, d.1) {
-        return Some((c.0, a.1, false));
+) -> Option<(f64, f64, f64, f64)> {
+    let (rx, ry) = (b.0 - a.0, b.1 - a.1);
+    let (sx, sy) = (d.0 - c.0, d.1 - c.1);
+    let denominator = rx * sy - ry * sx;
+    if denominator.abs() < 1e-6 {
+        return None;
     }
-    if av && ch && inside(a.0, c.0, d.0) && inside(c.1, a.1, b.1) {
-        return Some((a.0, c.1, true));
+    let (qx, qy) = (c.0 - a.0, c.1 - a.1);
+    let t = (qx * sy - qy * sx) / denominator;
+    let u = (qx * ry - qy * rx) / denominator;
+    if t <= 1e-6 || t >= 1.0 - 1e-6 || u <= 1e-6 || u >= 1.0 - 1e-6 {
+        return None;
     }
-    None
+    Some((a.0 + t * rx, a.1 + t * ry, sx, sy))
 }
 
 /// Which edges run between the same pair of boxes, and where each sits among
