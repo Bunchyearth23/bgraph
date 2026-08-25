@@ -1,5 +1,14 @@
-node a at (0, 0)
-node b right-of a gap 40 align top
-node c below a align left
-node d left-of a
-node e above a
+node a
+node b
+node c
+node d
+node e
+
+
+layout {
+  place a at (0, 0)
+  place b right-of a gap 40 align top
+  place c below a align left
+  place d left-of a
+  place e above a
+}

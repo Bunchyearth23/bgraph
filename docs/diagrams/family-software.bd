@@ -6,21 +6,28 @@ graph { background: #ffffff padding: 16 gap: 46 }
 style entity { fill: #eef3ff stroke: #2563eb 1.3 font: 12 "Archivo" #1a1a1a radius: 5 padding: 11 }
 style edge   { stroke: #8a8a8a 1.2 font: 10 "Archivo" #8a8a8a head: none }
 
-entity customer "Customer" at (0, 0) {
+entity customer "Customer" {
   - id: uuid PK
   - email: text
 }
 
-entity order "Order" right-of customer gap 110 {
+entity order "Order" {
   - id: uuid PK
   - customer_id: uuid FK
   - total_cents: bigint
 }
 
-entity line "OrderLine" below order gap 40 {
+entity line "OrderLine" {
   - order_id: uuid FK
   - sku: text
 }
 
 customer -> order "places"   one many
 order    -> line  "contains" one one-many
+
+
+layout {
+  place customer at (0, 0)
+  place order right-of customer gap 110
+  place line below order gap 40
+}

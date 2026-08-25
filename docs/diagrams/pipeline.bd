@@ -7,13 +7,13 @@ style edge  { stroke: #8a8a8a 1.2 font: 10 "Archivo" #8a8a8a }
 style out   { fill: #ecf8ef stroke: #1b8a3a 1.3 }
 style front { fill: #f0f0f0 stroke: #8a8a8a 1.2 }
 
-node src   "source (.bd)" .front at (0, 0)
-node parse "parser"       right-of src
-node ast   "AST"          right-of parse
-node check "check"        right-of ast
-node lay   "layout"       right-of check
-node svg   "SVG"          .out right-of lay gap 34 align top
-node pdf   "PDF"          .out below svg gap 14
+node src   "source (.bd)" .front
+node parse "parser"
+node ast   "AST"
+node check "check"
+node lay   "layout"
+node svg   "SVG"          .out
+node pdf   "PDF"          .out
 
 src -> parse
 parse -> ast
@@ -21,3 +21,14 @@ ast -> check
 check -> lay
 lay -> svg
 lay -> pdf
+
+
+layout {
+  place src at (0, 0)
+  place parse right-of src
+  place ast right-of parse
+  place check right-of ast
+  place lay right-of check
+  place svg right-of lay gap 34 align top
+  place pdf below svg gap 14
+}

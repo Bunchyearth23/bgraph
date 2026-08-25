@@ -7,11 +7,19 @@ style node { fill: #eef3ff stroke: #2563eb 1.3 font: 12 "Archivo" #1a1a1a radius
 style edge { stroke: #8a8a8a 1.2 font: 10 "Archivo" #8a8a8a }
 style weak { fill: #f0f0f0 stroke: #8a8a8a 1.2 }
 
-node d "built-in defaults"   .weak at (0, 0)
-node t "style node / edge"   right-of d
-node c ".classes, in order"  right-of t
-node i "inline { … }"        right-of c
+node d "built-in defaults"   .weak
+node t "style node / edge"
+node c ".classes, in order"
+node i "inline { … }"
 
 d -> t "overwritten by"
 t -> c "overwritten by"
 c -> i "overwritten by"
+
+
+layout {
+  place d at (0, 0)
+  place t right-of d
+  place c right-of t
+  place i right-of c
+}

@@ -16,19 +16,28 @@ style hot { fill: #fee2e2 stroke: #dc2626 legend: "Degraded" }
 
 component service {
   node app "{{label}}"
-  node db  "Database" below app gap 34
+  node db  "Database"
+  layout {
+    place app at (0, 0)
+    place db below app gap 34
+  }
   app -> db "reads"
 }
 
 use service as web
-use service as jobs right-of web gap 90 { label: "Jobs" }
+use service as jobs { label: "Jobs" }
 
-node ui  "Browser" .hot at (col 0, row 0)
-node api "API"     .hot at (col 2, row 1) { description: "Takes the card." }
+node ui  "Browser" .hot
+node api "API"     .hot { description: "Takes the card." }
 
-same-width  ui api
-same-height ui api
-align-group top ui api
+layout {
+  place jobs right-of web gap 90
+  place ui at (col 0, row 0)
+  place api at (col 2, row 1)
+  equal-width ui api
+  equal-height ui api
+  align top ui api
+}
 
 note "Figures are March." .hot below api gap 20
 legend right-of api gap 60

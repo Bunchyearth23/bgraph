@@ -2,21 +2,37 @@ graph { background: #0f172a padding: 30 gap: 40 }
 style node { fill: #1e293b stroke: #334155 1.5 font: 13 #e2e8f0 }
 style group { stroke: #38bdf8 1.5 font: 12 #38bdf8 fill: #38bdf810 }
 
-node client "Client" at (0, 0)
+node client "Client"
 
 group edge_svc "Edge" {
   padding: 22
-  node gw   "Gateway"  right-of client gap 70
-  node auth "Auth"     below gw gap 30
+  node gw   "Gateway"
+  node auth "Auth"
+
+  layout {
+    place gw right-of client gap 70
+    place auth below gw gap 30
+  }
 }
 
-group core "Core services" right-of edge_svc gap 60 {
+group core "Core services" {
   node orders  "Orders"
-  node billing "Billing" below orders gap 30
+  node billing "Billing"
+
+  layout {
+    place billing below orders gap 30
+  }
 }
 
-node db "Postgres" right-of core gap 60 { shape: cylinder }
+node db "Postgres" { shape: cylinder }
 
 client -> gw
 gw -> orders
 orders -> db
+
+
+layout {
+  place client at (0, 0)
+  place db right-of core gap 60
+  place core right-of edge_svc gap 60
+}

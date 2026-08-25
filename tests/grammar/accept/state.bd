@@ -1,6 +1,12 @@
 type state
 state begin { kind: initial }
-state s "S" right-of begin
-state stop { kind: final } right-of s
+state s "S"
+state stop { kind: final }
 begin -> s
 s -> stop "go" { guard: "ready" }
+
+
+layout {
+  place s right-of begin
+  place stop right-of s
+}

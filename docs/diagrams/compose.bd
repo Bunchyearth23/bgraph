@@ -7,11 +7,19 @@ style file  { fill: #f0f0f0 stroke: #8a8a8a 1.2 font: 12 "Archivo" #1a1a1a radiu
 style out   { fill: #ecf8ef stroke: #1b8a3a 1.3 }
 style edge  { stroke: #8a8a8a 1.2 font: 10 "Archivo" #8a8a8a }
 
-node house "house.bds\nstyles only" .file at (0, 0)
-node core  "core.bd\napi, db"      .file below house gap 20
-node main  "main.bd\nui"           .node right-of house gap 60 align top
-node one   "one diagram\nui · core.api · core.db" .out right-of main gap 46
+node house "house.bds\nstyles only" .file
+node core  "core.bd\napi, db"      .file
+node main  "main.bd\nui"           .node
+node one   "one diagram\nui · core.api · core.db" .out
 
 house -> main "include"
 core  -> main "include … as core"
 main  -> one
+
+
+layout {
+  place house at (0, 0)
+  place core below house gap 20
+  place main right-of house gap 60 align top
+  place one right-of main gap 46
+}
