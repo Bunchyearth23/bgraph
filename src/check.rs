@@ -64,6 +64,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
     let nodes = check_nodes(diagram, def, &mut out);
     check_groups(diagram, def, &nodes, &mut out);
     check_layouts(diagram, &mut out);
+    check_grid_bounds(diagram, &mut out);
     check_layout_capability(diagram, def, &mut out);
     check_constraints(diagram, &mut out);
     check_edges(diagram, def, &nodes, &mut out);
@@ -987,6 +988,40 @@ fn placements(diagram: &Diagram) -> impl Iterator<Item = (&Spanned<String>, &Pla
                 LayoutStmt::Constraint { .. } | LayoutStmt::Series { .. } => None,
             })
     })
+}
+
+fn check_grid_bounds(diagram: &Diagram, out: &mut Vec<Diag>) {
+    let Some(grid) = diagram.graph.iter().find(|prop| prop.name == "grid") else {
+        return;
+    };
+    let nums: Vec<f64> = grid
+        .values
+        .iter()
+        .filter_map(|value| value.as_num())
+        .collect();
+    let [columns, rows, _, _] = nums.as_slice() else {
+        return;
+    };
+    if *columns < 1.0 || *rows < 1.0 || columns.fract() != 0.0 || rows.fract() != 0.0 {
+        return;
+    }
+    for (target, placement) in placements(diagram) {
+        let (x, y) = match placement {
+            Placement::At { x, y } | Placement::Cell { col: x, row: y } => (*x, *y),
+            Placement::Rel { .. } => continue,
+        };
+        if x < 0.0 || x >= *columns || y < 0.0 || y >= *rows {
+            out.push(Diag::error(
+                target.span,
+                format!(
+                    "placement of `{}` is outside the declared grid ({} columns × {} rows)",
+                    target.as_str(),
+                    *columns as usize,
+                    *rows as usize
+                ),
+            ));
+        }
+    }
 }
 
 fn check_groups(

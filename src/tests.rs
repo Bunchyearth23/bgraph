@@ -9084,6 +9084,18 @@ fn relative_placement_uses_the_nearest_grid_cell() {
 }
 
 #[test]
+fn bounded_grid_rejects_out_of_range_cells() {
+    let diagnostics =
+        diags("graph { grid: 4 3 20 30 }\nnode a\nlayout { place a at (col 4, row 1) }\n");
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diag| diag.message.contains("outside the declared grid")),
+        "{diagnostics:?}"
+    );
+}
+
+#[test]
 fn a_box_in_pixels_is_untouched_by_the_grid() {
     // Nothing is snapped to it. A grid that quietly moved a declared
     // position would be exactly the solver `D-001` refuses.
