@@ -55,6 +55,9 @@ pub struct Diagram {
     pub uses: Vec<UseDecl>,
     /// Adjustments applied to the solved layout, in declaration order.
     pub constraints: Vec<ConstraintDecl>,
+    /// Scoped v2 placement declarations. They are kept separate from the
+    /// entities they position so the source has one canonical geometry block.
+    pub layouts: Vec<LayoutDecl>,
     /// Free text placed by the ordinary anchors, belonging to no box.
     pub notes: Vec<NoteDecl>,
     /// A key to the style classes in use. At most one is meaningful; a second
@@ -107,6 +110,26 @@ pub enum ConstraintAxis {
     Vertical,
     /// Legacy `center` / `middle`, whose axis was not represented in v1.
     Inferred,
+}
+
+/// A `layout { … }` block, at the file root or owned by one group.
+#[derive(Debug)]
+pub struct LayoutDecl {
+    /// `None` is the file-level block; a group block is local to that group.
+    pub scope: Option<Spanned<String>>,
+    pub statements: Vec<LayoutStmt>,
+    pub span: Span,
+}
+
+/// A geometric relation in the canonical v2 layout grammar.
+#[derive(Debug)]
+pub enum LayoutStmt {
+    /// `place api right-of gateway gap 24 align top`.
+    Place {
+        target: Spanned<String>,
+        placement: Placement,
+        span: Span,
+    },
 }
 
 /// `component service { … }` — the body kept as source text, because that is

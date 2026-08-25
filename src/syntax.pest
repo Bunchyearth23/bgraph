@@ -36,7 +36,7 @@ term = _{ (nl | ";" | ",")+ | &EOI }
 // an edge; PEG backtracking still lets a node actually named `type` have edges.
 // `edge_decl` precedes `item_decl` only for speed: `item_decl` would fail on
 // the arrow anyway and backtrack.
-stmt = _{ include_decl | component_decl | use_decl | constraint_decl | note_decl | legend_decl | type_decl | graph_decl | style_decl | group_decl | edge_decl | item_decl }
+stmt = _{ include_decl | component_decl | use_decl | layout_decl | constraint_decl | note_decl | legend_decl | type_decl | graph_decl | style_decl | group_decl | edge_decl | item_decl }
 
 // `include "shared.bds"` merges another file whole; with `as` its names come
 // in under a prefix. Resolved before parsing reaches `check`, so by the time
@@ -63,6 +63,13 @@ legend_decl = { "legend" ~ !":" ~ class_ref* ~ placement? ~ block? }
 
 constraint_kw   = { "align-group" | "same-width" | "same-height" }
 constraint_decl = { constraint_kw ~ align_kw? ~ ident+ }
+
+// v2 placement lives apart from declarations. `place` is deliberately a
+// statement rather than a property: geometry names its target and can carry
+// the same ordinary anchor relation the v1 inline form accepted.
+layout_decl  = { "layout" ~ layout_block }
+layout_block = { "{" ~ sep ~ (layout_stmt ~ inner_term)* ~ "}" }
+layout_stmt  = { "place" ~ name ~ placement }
 
 component_decl = { "component" ~ ident ~ group_block }
 use_decl       = { "use" ~ ident ~ "as" ~ ident ~ placement? ~ block? }
@@ -114,7 +121,7 @@ edge_tail  = _{ via_list ~ block? | block ~ via_list? }
 // Atomic: a non-atomic rule would let implicit whitespace slip between the
 // word and the boundary test, so `style -> a` would read the `-` as part
 // of an identifier and the guard would never fire.
-keyword    = @{ ("type" | "graph" | "style" | "node" | "group" | "activate") ~ !(ASCII_ALPHANUMERIC | "_" | "-") }
+keyword    = @{ ("type" | "graph" | "style" | "node" | "group" | "activate" | "layout") ~ !(ASCII_ALPHANUMERIC | "_" | "-") }
 
 class_ref = { "." ~ ident }
 arrow     = @{ "<->" | "<-" | "-->" | "..>" | "--" | "->" | ".." }

@@ -180,7 +180,7 @@ graph { background: #0b1120 padding: 30 }
 group rust "Rust" {
   box lsp    "lsp.rs"        1180
   box charts "charts.rs"      760
-  box layout "layout.rs"      620
+  box solver "layout.rs"      620
   box render "render_svg.rs"  560
   box check  "check.rs"       540
   box props  "props.rs"       520
@@ -837,7 +837,7 @@ entry src     "src/"
 entry lib     "lib.rs"
 entry parser  "parser.rs"
 entry check   "check.rs"
-entry layout  "layout.rs"
+entry solver  "layout.rs"
 entry charts  "charts.rs"
 entry render  "render_svg.rs"
 entry lsp     "lsp.rs"
@@ -845,9 +845,9 @@ entry lsp     "lsp.rs"
 src -> lib
 src -> parser
 src -> check
-src -> layout
-layout -> charts
-layout -> render
+src -> solver
+solver -> charts
+solver -> render
 src -> lsp
 "##;
 

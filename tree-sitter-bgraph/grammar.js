@@ -39,6 +39,7 @@ module.exports = grammar({
         $.include_declaration,
         $.note_declaration,
         $.legend_declaration,
+        $.layout_declaration,
         $.constraint_declaration,
         $.component_declaration,
         $.use_declaration,
@@ -80,6 +81,27 @@ module.exports = grammar({
         optional(field('placement', $._placement)),
         optional(field('body', $.block)),
       ),
+
+    // v2 placement is held apart from declarations. A `place` line names its
+    // target and then uses the ordinary anchor vocabulary.
+    layout_declaration: ($) => seq('layout', field('body', $.layout_block)),
+
+    layout_block: ($) =>
+      seq(
+        '{',
+        repeat($._newline),
+        optional(
+          seq(
+            $.layout_statement,
+            repeat(seq(repeat1($._newline), $.layout_statement)),
+            repeat($._newline),
+          ),
+        ),
+        '}',
+      ),
+
+    layout_statement: ($) =>
+      seq('place', field('target', $._name), field('placement', $._placement)),
 
     // A constraint adjusts one axis of already-placed boxes and never their
     // order, which is what keeps the layout declared (`D-031`).

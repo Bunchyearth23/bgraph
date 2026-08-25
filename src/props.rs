@@ -2849,6 +2849,13 @@ pub const KEYWORDS: &[(&str, &str)] = &[
          `layout` block will require it explicitly.",
     ),
     (
+        "layout",
+        "Canonical placement block (v2): `layout { place api at (0, 0) }`. \
+         Declarations say what exists; this block says where it goes. It may \
+         also live inside a `group`, where it can place that group's direct \
+         members. Inline placement is being removed during the v2 migration.",
+    ),
+    (
         "same-width",
         "Give a set of boxes one width: `same-width a b c`. The widest wins, \
          because shrinking to match a narrower neighbour clips the label. \

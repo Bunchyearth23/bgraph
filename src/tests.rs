@@ -73,6 +73,43 @@ fn absolute_placement_is_honoured() {
 }
 
 #[test]
+fn a_layout_block_places_declared_nodes() {
+    let l = build(
+        r#"node api "API" { size: 80 40 }
+           node db "DB" { size: 80 40 }
+           layout {
+             place api at (100, 50)
+             place db right-of api gap 20 align top
+           }"#,
+    );
+    assert_eq!(l.nodes[0].rect.x, 100.0);
+    assert_eq!(l.nodes[0].rect.y, 50.0);
+    assert_eq!(l.nodes[1].rect.x, 200.0);
+    assert_eq!(l.nodes[1].rect.y, 50.0);
+}
+
+#[test]
+fn a_local_layout_only_places_its_groups_members() {
+    assert!(
+        err(r#"node outside
+           group service {
+             node api
+             layout { place outside at (0, 0) }
+           }"#,)
+        .contains("outside the local `layout` block")
+    );
+}
+
+#[test]
+fn a_layout_place_cannot_compete_with_v1_inline_placement() {
+    assert!(
+        err(r#"node api at (0, 0)
+           layout { place api at (10, 10) }"#,)
+        .contains("both an inline placement")
+    );
+}
+
+#[test]
 fn relative_placement_offsets_by_the_gap() {
     let l = build(
         r#"

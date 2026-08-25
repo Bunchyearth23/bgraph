@@ -212,6 +212,7 @@ fn build(file: Pair<Rule>, input: &str) -> Result<Diagram> {
             }
             Rule::include_decl => diagram.includes.push(parse_include(pair)?),
             Rule::constraint_decl => diagram.constraints.push(parse_constraint(pair)?),
+            Rule::layout_decl => diagram.layouts.push(parse_layout(pair, None)?),
             Rule::note_decl => diagram.notes.push(parse_note(pair)?),
             Rule::legend_decl => diagram.legends.push(parse_note(pair)?),
             Rule::component_decl => diagram.components.push(parse_component(pair, input)?),
@@ -321,6 +322,28 @@ fn parse_constraint(pair: Pair<Rule>) -> Result<crate::ast::ConstraintDecl> {
     })
 }
 
+fn parse_layout(pair: Pair<Rule>, scope: Option<Spanned<String>>) -> Result<LayoutDecl> {
+    let span = span_of(&pair);
+    let block = pair.into_inner().next().expect("a layout has a block");
+    let mut statements = Vec::new();
+    for statement in block.into_inner() {
+        let span = span_of(&statement);
+        let mut parts = statement.into_inner();
+        let target = parts.next().expect("a place statement names its target");
+        let placement = parts.next().expect("a place statement has a placement");
+        statements.push(LayoutStmt::Place {
+            target: spanned(&target),
+            placement: parse_placement(placement)?,
+            span,
+        });
+    }
+    Ok(LayoutDecl {
+        scope,
+        statements,
+        span,
+    })
+}
+
 fn parse_component(pair: Pair<Rule>, source: &str) -> Result<crate::ast::ComponentDecl> {
     let span = span_of(&pair);
     let mut inner = pair.into_inner();
@@ -422,6 +445,7 @@ fn parse_group(pair: Pair<Rule>, diagram: &mut Diagram) -> Result<()> {
     let mut props = Vec::new();
     let mut members = Vec::new();
     let mut edge_members = Vec::new();
+    let mut layouts = Vec::new();
     let mut activates = false;
 
     for part in pair.into_inner() {
@@ -454,6 +478,7 @@ fn parse_group(pair: Pair<Rule>, diagram: &mut Diagram) -> Result<()> {
                             diagram.edges.push(parse_edge(inner)?);
                         }
                         Rule::style_decl => diagram.styles.push(parse_style(inner)?),
+                        Rule::layout_decl => layouts.push(inner),
                         other => bail!("`{other:?}` cannot be nested in a group"),
                     }
                 }
@@ -462,9 +487,15 @@ fn parse_group(pair: Pair<Rule>, diagram: &mut Diagram) -> Result<()> {
         }
     }
 
+    let id = id.expect("a group declaration always names the group");
+    for layout in layouts {
+        diagram
+            .layouts
+            .push(parse_layout(layout, Some(id.clone()))?);
+    }
     diagram.groups.push(GroupDecl {
         activates,
-        id: id.expect("a group declaration always names the group"),
+        id,
         label,
         classes,
         placement,

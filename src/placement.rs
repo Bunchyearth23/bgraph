@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use crate::ast::{ConstraintDecl, Diagram, Placement, RelDir, Spanned};
+use crate::ast::{ConstraintDecl, Diagram, LayoutStmt, Placement, RelDir, Spanned};
 
 /// A named entity that can participate in placement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -35,6 +35,7 @@ pub struct PlacementPlan<'a> {
     index: HashMap<&'a str, Entity>,
     owner: HashMap<Entity, usize>,
     previous_sibling: Vec<Option<usize>>,
+    layout_placement: Vec<Option<&'a Placement>>,
 }
 
 impl<'a> PlacementPlan<'a> {
@@ -64,11 +65,24 @@ impl<'a> PlacementPlan<'a> {
             previous.insert(container, i);
         }
 
+        let mut layout_placement = vec![None; diagram.nodes.len()];
+        for layout in &diagram.layouts {
+            for statement in &layout.statements {
+                let LayoutStmt::Place {
+                    target, placement, ..
+                } = statement;
+                if let Some(Entity::Node(node)) = index.get(target.as_str()).copied() {
+                    layout_placement[node] = Some(placement);
+                }
+            }
+        }
+
         Self {
             diagram,
             index,
             owner,
             previous_sibling,
+            layout_placement,
         }
     }
 
@@ -103,7 +117,7 @@ impl<'a> PlacementPlan<'a> {
     }
 
     pub fn declared_placement(&self, node: usize) -> Option<&'a Placement> {
-        self.diagram.nodes[node].placement.as_ref()
+        self.layout_placement[node].or(self.diagram.nodes[node].placement.as_ref())
     }
 
     pub fn node(&self, node: usize, flow: RelDir) -> EffectivePlacement<'a> {

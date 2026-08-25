@@ -63,6 +63,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
     check_styles(diagram, def, &mut out);
     let nodes = check_nodes(diagram, def, &mut out);
     check_groups(diagram, def, &nodes, &mut out);
+    check_layouts(diagram, &mut out);
     check_constraints(diagram, &mut out);
     check_edges(diagram, def, &nodes, &mut out);
     check_graph(diagram, &mut out);
@@ -693,6 +694,79 @@ fn check_constraints(diagram: &Diagram, out: &mut Vec<Diag>) {
     }
 }
 
+/// The v2 layout block names existing declarations; it never creates a second
+/// namespace or a second way to attach geometry to a node.
+fn check_layouts(diagram: &Diagram, out: &mut Vec<Diag>) {
+    let nodes: HashSet<&str> = diagram.nodes.iter().map(|node| node.id.as_str()).collect();
+    let groups: HashMap<&str, &GroupDecl> = diagram
+        .groups
+        .iter()
+        .map(|group| (group.id.as_str(), group))
+        .collect();
+    let mut placed = HashSet::new();
+
+    for layout in &diagram.layouts {
+        let scope = layout
+            .scope
+            .as_ref()
+            .and_then(|scope| groups.get(scope.as_str()).copied());
+        for statement in &layout.statements {
+            let LayoutStmt::Place {
+                target,
+                placement: _,
+                span: _,
+            } = statement;
+            if !nodes.contains(target.as_str()) {
+                let message = if groups.contains_key(target.as_str()) {
+                    format!(
+                        "`place` accepts nodes, but `{}` is a group",
+                        target.as_str()
+                    )
+                } else {
+                    format!("`place` names unknown node `{}`", target.as_str())
+                };
+                out.push(Diag::error(target.span, message));
+                continue;
+            }
+            if !placed.insert(target.as_str()) {
+                out.push(Diag::error(
+                    target.span,
+                    format!("`{}` is placed more than once", target.as_str()),
+                ));
+            }
+            if let Some(node) = diagram
+                .nodes
+                .iter()
+                .find(|node| node.id.as_str() == target.as_str())
+                && node.placement.is_some()
+            {
+                out.push(Diag::error(
+                    target.span,
+                    format!(
+                        "`{}` has both an inline placement and `layout {{ place … }}`",
+                        target.as_str()
+                    ),
+                ));
+            }
+            if let Some(group) = scope
+                && !group
+                    .members
+                    .iter()
+                    .any(|member| member.as_str() == target.as_str())
+            {
+                out.push(Diag::error(
+                    target.span,
+                    format!(
+                        "`{}` is outside the local `layout` block of group `{}`",
+                        target.as_str(),
+                        group.id.as_str()
+                    ),
+                ));
+            }
+        }
+    }
+}
+
 fn placements(diagram: &Diagram) -> impl Iterator<Item = (&Spanned<String>, &Placement)> {
     diagram
         .nodes
@@ -704,6 +778,13 @@ fn placements(diagram: &Diagram) -> impl Iterator<Item = (&Spanned<String>, &Pla
                 .iter()
                 .filter_map(|g| g.placement.as_ref().map(|p| (&g.id, p))),
         )
+        .chain(diagram.layouts.iter().flat_map(|layout| {
+            layout.statements.iter().map(|statement| match statement {
+                LayoutStmt::Place {
+                    target, placement, ..
+                } => (target, placement),
+            })
+        }))
 }
 
 fn check_groups(

@@ -418,3 +418,45 @@ node c at (-40, -20)
       point: (point
         x: (number)
         y: (number)))))
+
+================================================================================
+Scoped layout block
+================================================================================
+
+node api "API"
+node db "DB"
+layout {
+  place api at (0, 0)
+  place db right-of api gap 24 align top
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (item_declaration
+    keyword: (item_keyword
+      (identifier))
+    name: (identifier)
+    label: (string))
+  (item_declaration
+    keyword: (item_keyword
+      (identifier))
+    name: (identifier)
+    label: (string))
+  (layout_declaration
+    body: (layout_block
+      (layout_statement
+        target: (identifier)
+        placement: (absolute_position
+          point: (point
+            x: (number)
+            y: (number))))
+      (layout_statement
+        target: (identifier)
+        placement: (relative_position
+          direction: (direction)
+          anchor: (identifier)
+          (gap_clause
+            amount: (number))
+          (align_clause
+            alignment: (alignment)))))))

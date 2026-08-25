@@ -362,6 +362,10 @@
           "named": true
         },
         {
+          "type": "layout_declaration",
+          "named": true
+        },
+        {
           "type": "legend_declaration",
           "named": true
         },
@@ -613,6 +617,71 @@
           "named": true
         }
       ]
+    }
+  },
+  {
+    "type": "layout_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "layout_statement",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "layout_declaration",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "layout_block",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "layout_statement",
+    "named": true,
+    "fields": {
+      "placement": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "absolute_position",
+            "named": true
+          },
+          {
+            "type": "relative_position",
+            "named": true
+          }
+        ]
+      },
+      "target": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          },
+          {
+            "type": "placeholder",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -875,6 +944,10 @@
         },
         {
           "type": "item_declaration",
+          "named": true
+        },
+        {
+          "type": "layout_declaration",
           "named": true
         },
         {
@@ -1153,6 +1226,10 @@
     "named": false
   },
   {
+    "type": "layout",
+    "named": false
+  },
+  {
     "type": "left",
     "named": false
   },
@@ -1179,6 +1256,10 @@
   {
     "type": "number",
     "named": true
+  },
+  {
+    "type": "place",
+    "named": false
   },
   {
     "type": "placeholder",
