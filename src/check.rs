@@ -323,6 +323,16 @@ pub fn after_layout(diagram: &Diagram, layout: &crate::layout::Layout) -> Vec<Di
     if def.layout_capability() == props::LayoutCapability::Declared
         && def.name != "bpmn"
         && !diagram.layouts.is_empty()
+        // A few archetypes use the declared placement vocabulary but lower
+        // their records into anonymous drawing segments. An empty synthetic
+        // id is not a box the author can separate, so only compare the
+        // one-to-one ordinary layout surface.
+        && layout.nodes.len() == diagram.nodes.len()
+        && layout
+            .nodes
+            .iter()
+            .zip(&diagram.nodes)
+            .all(|(placed, declared)| placed.id == declared.id.as_str())
     {
         for (left_index, left) in layout.nodes.iter().enumerate() {
             for (right_index, right) in layout.nodes.iter().enumerate().skip(left_index + 1) {

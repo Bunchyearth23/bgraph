@@ -62,21 +62,36 @@ style group { stroke: #38bdf8 1.2 font: 12 #38bdf8 fill: #38bdf80c radius: 12 }
 style edge  { stroke: #64748b 1.5 font: 11 #94a3b8 }
 style store extends node { shape: cylinder stroke: #10b981 1.5 }
 
-node client "Client" at (0, 0)
+node client "Client"
 
-group edge "Edge" right-of client gap 60 {
+group edge "Edge" {
   padding: 20
   node gw   "Gateway"
-  node auth "Auth" below gw gap 26
+  node auth "Auth"
+  layout {
+    place gw at (0, 0)
+    place auth below gw gap 26
+  }
 }
 
-group core "Core services" right-of edge gap 60 {
+group core "Core services" {
   padding: 20
   node orders  "Orders"
-  node billing "Billing" below orders gap 26
+  node billing "Billing"
+  layout {
+    place orders at (0, 0)
+    place billing below orders gap 26
+  }
 }
 
-node db "Postgres" .store right-of core gap 60
+node db "Postgres" .store
+
+layout {
+  place client at (0, 0)
+  place edge right-of client gap 60
+  place core right-of edge gap 60
+  place db right-of core gap 60
+}
 
 client -> gw    "https"
 gw     -> auth  "verify"
@@ -375,27 +390,39 @@ block customer "Personal Banking Customer" person {
   description: "A customer of the bank, with personal accounts."
 }
 
-group system "Internet Banking System" below customer gap 52 {
-  block web "Web Application" container at (0, 0) {
+group system "Internet Banking System" {
+  block web "Web Application" container {
     tech: "Java, Spring MVC"
     description: "Delivers the static content and the SPA."
   }
-  block spa "Single-Page App" container right-of web gap 150 {
+  block spa "Single-Page App" container {
     tech: "TypeScript, Angular"
     description: "Provides all the banking functionality in the browser."
   }
-  block api "API Application" container below spa gap 64 {
+  block api "API Application" container {
     tech: "Java, Spring MVC"
     description: "Provides banking functionality via a JSON/HTTPS API."
   }
-  block db "Database" database left-of api gap 150 {
+  block db "Database" database {
     tech: "Oracle 19c"
     description: "Stores user registration, hashed credentials and logs."
   }
+  layout {
+    place web at (0, 0)
+    place spa right-of web gap 150
+    place api below spa gap 64
+    place db left-of api gap 150
+  }
 }
 
-block mainframe "Mainframe Banking System" external below db gap 56 {
+block mainframe "Mainframe Banking System" external {
   description: "Stores the core banking information."
+}
+
+layout {
+  place customer at (0, 0)
+  place system below customer gap 52
+  place mainframe below db gap 56
 }
 
 customer -> web "Visits bigbank.com" { tech: "HTTPS" }
@@ -411,29 +438,36 @@ graph { background: #0b1120 padding: 32 gap: 56 }
 style entity { fill: #1e293b stroke: #38bdf8 1.4 font: 13 #e2e8f0 radius: 6 padding: 14 }
 style edge   { stroke: #64748b 1.4 font: 11 #94a3b8 head: none }
 
-entity customer "Customer" at (0, 0) {
+entity customer "Customer" {
   - id: uuid PK
   - email: text
   - created_at: timestamptz
 }
 
-entity order "Order" right-of customer gap 120 {
+entity order "Order" {
   - id: uuid PK
   - customer_id: uuid FK
   - placed_at: timestamptz
   - total_cents: bigint
 }
 
-entity line "OrderLine" below order gap 56 {
+entity line "OrderLine" {
   - order_id: uuid FK
   - sku: text
   - qty: integer
 }
 
-entity address "Address" below customer gap 56 {
+entity address "Address" {
   - customer_id: uuid FK
   - line1: text
   - city: text
+}
+
+layout {
+  place customer at (0, 0)
+  place order right-of customer gap 120
+  place line below order gap 56
+  place address below customer gap 56
 }
 
 customer -> order   "places"    one many
@@ -449,32 +483,39 @@ graph { background: #0b1120 padding: 32 gap: 64 }
 style requirement { fill: #1e293b stroke: #38bdf8 1.4 font: 13 #e2e8f0 radius: 6 padding: 14 }
 style edge        { stroke: #64748b 1.4 font: 11 #94a3b8 head: open dash: dashed }
 
-requirement stop "Stopping distance" at (0, 0) {
+requirement stop "Stopping distance" {
   - REQ-001
   - The vehicle shall stop within 40 m from 100 km/h on dry asphalt.
   risk: high
   verify: test
 }
 
-requirement fade "Fade resistance" below stop gap 56 {
+requirement fade "Fade resistance" {
   - REQ-002
   - Braking performance shall not drop by more than 10% over ten consecutive stops.
   risk: medium
   verify: test
 }
 
-requirement pedal "Pedal force" right-of stop gap 150 {
+requirement pedal "Pedal force" {
   - REQ-003
   - Full braking shall require no more than 500 N of pedal force.
   risk: low
   verify: demonstration
 }
 
-requirement adas "Emergency assist" below pedal gap 56 {
+requirement adas "Emergency assist" {
   - REQ-004
   - The assist shall command full braking within 150 ms of a detected obstacle.
   risk: high
   verify: analysis
+}
+
+layout {
+  place stop at (0, 0)
+  place fade below stop gap 56
+  place pedal right-of stop gap 150
+  place adas below pedal gap 56
 }
 
 // `<from> -> <to> ["label"] <link>` — read tail to head.
@@ -490,28 +531,35 @@ graph { background: #0b1120 padding: 32 gap: 56 }
 style class { fill: #1e293b stroke: #38bdf8 1.4 font: 13 #e2e8f0 radius: 6 padding: 14 }
 style edge  { stroke: #64748b 1.4 font: 11 #94a3b8 }
 
-class user "User" at (0, 0) {
+class user "User" {
   - id: Uuid
   - email: String
   - name: String
 }
 
-class order "Order" right-of user gap 90 {
+class order "Order" {
   - id: Uuid
   - user_id: Uuid
   - total: Money
   - placed_at: DateTime
 }
 
-class line "OrderLine" below order gap 44 {
+class line "OrderLine" {
   - order_id: Uuid
   - sku: String
   - qty: u32
 }
 
-class money "Money" right-of order gap 90 {
+class money "Money" {
   - amount: i64
   - currency: Iso4217
+}
+
+layout {
+  place user at (0, 0)
+  place order right-of user gap 90
+  place line below order gap 44
+  place money right-of order gap 90
 }
 
 user  -> order "places"
@@ -661,14 +709,23 @@ style host  { fill: #1e293b stroke: #334155 1.2 font: 12 #e2e8f0 radius: 5 }
 style edge  { stroke: #64748b 1.3 font: 10 #94a3b8 head: none }
 style group { stroke: #334155 1 fill: #0f172a80 radius: 8 dash: dashed font: 11 #94a3b8 }
 
-host net "Internet" cloud at (0, 0)
-host fw  "Edge firewall" firewall below net gap 60 { addr: "203.0.113.1" }
-host tor "Top-of-rack" switch below fw gap 60 { addr: "10.0.0.1" }
+host net "Internet" cloud
+host fw  "Edge firewall" firewall { addr: "203.0.113.1" }
+host tor "Top-of-rack" switch { addr: "10.0.0.1" }
 
 group core "Core segment — 10.0.0.0/24" {
-  host proc01 "rk1-app01" server right-of tor gap 190 { addr: "10.0.0.11" }
-  host proc02 "rk1-app02" server below proc01 gap 40 { addr: "10.0.0.12" }
-  host shelf  "Storage shelf"   storage below proc02 gap 40 { addr: "10.0.0.20" }
+  host proc01 "rk1-app01" server { addr: "10.0.0.11" }
+  host proc02 "rk1-app02" server { addr: "10.0.0.12" }
+  host shelf  "Storage shelf"   storage { addr: "10.0.0.20" }
+}
+
+layout {
+  place net at (0, 0)
+  place fw below net gap 60
+  place tor below fw gap 60
+  place proc01 right-of tor gap 190
+  place proc02 below proc01 gap 40
+  place shelf below proc02 gap 40
 }
 
 net -> fw  "uplink" "1 GbE"
@@ -718,20 +775,25 @@ style edge      { stroke: #64748b 1.3 font: 10 #94a3b8 head: none }
 style power     { stroke: #f43f5e 1.6 font: 10 #fda4af head: none }
 style ground    { stroke: #64748b 1.6 font: 10 #94a3b8 head: none dash: dashed }
 
-connector j1 "J1 — MOLEX 4-way" at (0, 0) {
+connector j1 "J1 — MOLEX 4-way" {
   - 1: +12V
   - 2: GND
   - 3: SIG_A
   - 4: SIG_B
 }
 
-connector j2 "J2 — JST 6-way" right-of j1 {
+connector j2 "J2 — JST 6-way" {
   - 1: VCC
   - 2: RETURN
   - 3: IN_A
   - 4: IN_B
   - 5: SHIELD
   - 6: n/c
+}
+
+layout {
+  place j1 at (0, 0)
+  place j2 right-of j1
 }
 
 // `<from> -> <to> ["label"] <from-pin> <to-pin>`
@@ -863,18 +925,29 @@ style edge  { stroke: #64748b 1.5 font: 11 #94a3b8 }
 style group { stroke: #f59e0b 1.2 font: 11 #f59e0b fill: #f59e0b0c }
 
 state begin      { kind: initial }
-state draft "Draft"        right-of begin gap 46
-state placed "Placed"      right-of draft
+state draft "Draft"
+state placed "Placed"
 
 group fulfil "fulfilment" {
   padding: 22
-  state picking "Picking"  right-of placed gap 150
-  state shipped "Shipped"  right-of picking gap 80
+  state picking "Picking"
+  state shipped "Shipped"
 }
 
-state done "Delivered"     right-of fulfil gap 56
-state stop { kind: final }  right-of done gap 46
-state cancelled "Cancelled" below placed gap 62
+state done "Delivered"
+state stop { kind: final }
+state cancelled "Cancelled"
+
+layout {
+  place begin at (0, 0)
+  place draft right-of begin gap 46
+  place placed right-of draft
+  place picking right-of placed gap 150
+  place shipped right-of picking gap 80
+  place done right-of fulfil gap 56
+  place stop right-of done gap 46
+  place cancelled below placed gap 62
+}
 
 begin   -> draft
 draft   -> placed  "submit"
@@ -905,17 +978,28 @@ group filed "Employee" {
   padding: 22
 
   event submit "Claim submitted" start message
-  task  fill   "Fill the form"   user right-of submit gap 44
+  task  fill   "Fill the form"   user
+  layout {
+    place submit at (0, 0)
+    place fill right-of submit gap 44
+  }
 }
 
-group review "Finance" below filed gap 112 {
+group review "Finance" {
   padding: 22
 
-  task    check "Validate receipts" rule at (0, 0)
-  gateway ok    "Within policy?"    exclusive right-of check gap 52
-  task    pay   "Pay the claim"     service right-of ok gap 52
-  task    query "Ask for detail"    send below pay gap 74
-  event   done  "Reimbursed"        end right-of pay gap 52
+  task    check "Validate receipts" rule
+  gateway ok    "Within policy?"    exclusive
+  task    pay   "Pay the claim"     service
+  task    query "Ask for detail"    send
+  event   done  "Reimbursed"        end
+  layout {
+    place check at (0, 0)
+    place ok right-of check gap 52
+    place pay right-of ok gap 52
+    place query below pay gap 74
+    place done right-of pay gap 52
+  }
 }
 
 // A boundary event sits *on* a task, and says so by naming it. Placement, and
@@ -926,8 +1010,14 @@ event late "14 days" boundary timer { attach: pay }
 // right of the employee's pool — which is where it went first — its message
 // flow had to cross the whole picture to reach `check` on the far left, which
 // is a worse crossing than the one that move was meant to remove.
-data claim  "Claim form" object below filed gap 22 align left
-data ledger "Ledger"     store below done gap 40
+data claim  "Claim form" object
+data ledger "Ledger"     store
+
+layout {
+  place review below filed gap 112
+  place claim below filed gap 22 align left
+  place ledger below done gap 40
+}
 
 submit -> fill
 fill   -> check

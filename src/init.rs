@@ -42,7 +42,7 @@ pub fn skeleton(genre: &str) -> Result<String> {
         // `free` is the language itself and every other archetype has an
         // example, asserted by a test — so this is unreachable rather than a
         // case to handle. It still says something useful if it ever is.
-        .unwrap_or("node a \"A\"\nnode b \"B\" right-of a\na -> b\n");
+        .unwrap_or("node a \"A\"\nnode b \"B\"\nlayout {\n  place a at (0, 0)\n  place b right-of a\n}\na -> b\n");
 
     let mut out = String::new();
     out.push_str(&header(def));
