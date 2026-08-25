@@ -107,7 +107,7 @@ control a single line. `D-033` records the decision they carry out.
 | `W-159` | planned | Classification de capacité des archetypes | Éteint `X-026`. Ajouter `Declared`, `ArchetypeManaged` et `Hybrid` à `ArchetypeDef`, puis dériver validation, complétion, documentation et solveur d'une matrice exhaustive testée. |
 | `W-160` | planned | Gate runtime wasm, Typst et surfaces sans dépendances | Éteint `X-028`. Exécuter les mêmes fixtures de placement, groupes et diagnostics en natif, no-default, wasm navigateur/WASI, Typst, LSP et extensions avant toute bascule du solveur. |
 | `W-161` | planned | Lisibilité des liens concurrents et des croisements | Éteint `X-029`. Donner une voie séparée aux segments concurrents quand elle existe, puis marquer chaque croisement résiduel de tout routeur par un pont visuel déterministe; ajouter diagnostics et goldens. |
-| `W-162` | planned | Grille de placement déclarative pour nœuds et liens | Remplacer l’actuel simple pas de coordonnées par une grille V2 déclarant colonnes, lignes et gaps; faire partager cette géométrie aux placements de nœuds, aux waypoints de liens, au solveur, au check, au LSP et à la documentation. |
+| `W-162` | planned | Grille de placement déclarative pour nœuds et liens | Remplacer l’actuel simple pas de coordonnées par une grille V2 déclarant colonnes, lignes et gaps; faire partager cette géométrie aux placements de nœuds, aux waypoints de liens, au solveur, au check, au LSP et à la documentation. `right-of`, `left-of`, `above` et `below` restent relatifs à leur node cible, puis choisissent la cellule légale la plus proche dans la direction demandée; aucune coordonnée explicite ne doit être déplacée silencieusement. |
 
 ### Risks
 
