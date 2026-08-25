@@ -25,7 +25,7 @@ impl Server {
         }
 
         if ctx.block == Some(Block::Layout) {
-            return layout_items(text, line, declared_archetype(text));
+            return layout_items(text, line, offset, declared_archetype(text));
         }
 
         let trimmed = line.trim_start();
@@ -344,7 +344,7 @@ impl Server {
 /// Completion inside the canonical geometry block.  It deliberately does not
 /// offer declarations or style properties: a `layout` says how already named
 /// entities relate, never what new entities exist.
-fn layout_items(text: &str, line: &str, archetype: &str) -> Vec<Value> {
+fn layout_items(text: &str, line: &str, offset: usize, archetype: &str) -> Vec<Value> {
     if !matches!(
         props::archetype(archetype).map(|def| def.layout_capability()),
         Some(props::LayoutCapability::Declared | props::LayoutCapability::Hybrid)
@@ -361,9 +361,46 @@ fn layout_items(text: &str, line: &str, archetype: &str) -> Vec<Value> {
     } else {
         ""
     };
-    let entities = || {
+    let parsed = crate::parser::parse(text).ok();
+    let local_members = parsed.as_ref().and_then(|diagram| {
+        let layout = diagram
+            .layouts
+            .iter()
+            .find(|layout| layout.span.contains(offset))?;
+        let scope = layout.scope.as_ref()?;
+        let group = diagram
+            .groups
+            .iter()
+            .find(|group| group.id.as_str() == scope.as_str())?;
+        Some(
+            group
+                .members
+                .iter()
+                .map(|member| member.as_str().to_string())
+                .collect::<Vec<_>>(),
+        )
+    });
+    let node_names = parsed.as_ref().map(|diagram| {
+        diagram
+            .nodes
+            .iter()
+            .map(|node| node.id.as_str().to_string())
+            .collect::<Vec<_>>()
+    });
+    let entities = |nodes_only: bool| {
         declared_items(text, archetype)
             .into_iter()
+            .filter(|(name, _)| {
+                local_members
+                    .as_ref()
+                    .is_none_or(|members| members.iter().any(|member| member == name))
+            })
+            .filter(|(name, _)| {
+                !nodes_only
+                    || node_names
+                        .as_ref()
+                        .is_none_or(|nodes| nodes.iter().any(|node| node == name))
+            })
             .map(|(name, label)| completion(&name, 6, "entity", &label))
             .collect()
     };
@@ -416,12 +453,12 @@ fn layout_items(text: &str, line: &str, archetype: &str) -> Vec<Value> {
     }
 
     match words[0] {
-        "place" if words.len() == 1 || preceding == "place" => entities(),
+        "place" if words.len() == 1 || preceding == "place" => entities(false),
         "place" if words.len() == 2 && ends_with_space => props::PLACEMENTS
             .iter()
             .map(|(name, doc)| completion(name, 14, "position", doc))
             .collect(),
-        "place" if is_rel_dir(preceding) => entities(),
+        "place" if is_rel_dir(preceding) => entities(false),
         "place" if preceding == "align" => props::ALIGNMENTS
             .iter()
             .map(|axis| {
@@ -446,7 +483,7 @@ fn layout_items(text: &str, line: &str, archetype: &str) -> Vec<Value> {
                 })
                 .collect()
         }
-        "align" | "equal-width" | "equal-height" | "row" | "column" => entities(),
+        "align" | "equal-width" | "equal-height" | "row" | "column" => entities(true),
         _ => Vec::new(),
     }
 }

@@ -110,6 +110,23 @@ fn completion_inside_layout_offers_only_canonical_relations() {
 }
 
 #[test]
+fn completion_inside_a_local_layout_stays_with_its_direct_members() {
+    let server = Server {
+        docs: HashMap::new(),
+    };
+    let text = "node outside\ngroup service {\n  node api\n  node db\n  layout {\n    place api at (0, 0)\n  }\n}\n";
+    let offset = text.find("place api").unwrap() + "place ".len();
+    let targets: Vec<String> = server
+        .items_for(text, "    place ", offset)
+        .iter()
+        .filter_map(|item| item["label"].as_str().map(str::to_string))
+        .collect();
+    assert!(targets.contains(&"api".to_string()), "{targets:?}");
+    assert!(targets.contains(&"db".to_string()), "{targets:?}");
+    assert!(!targets.contains(&"outside".to_string()), "{targets:?}");
+}
+
+#[test]
 fn braces_inside_strings_and_comments_are_ignored() {
     let text = "node a \"{\"\nnode b";
     assert_eq!(Context::at(text, text.len()).block, None);
