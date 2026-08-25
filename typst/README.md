@@ -34,7 +34,7 @@ its `.bd` sources, so the document is illustrated by the compiler it documents
 and a diagram that stops parsing stops the build.
 
 ```typst
-#import "bgraph.typ": diagram, diagram-file
+#import "bgraph.typ": bg-diagram, bg-diagram-file
 
 #bg-diagram("
   node ui \"Browser\"

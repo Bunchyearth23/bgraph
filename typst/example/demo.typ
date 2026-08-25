@@ -1,8 +1,8 @@
-#import "../bgraph.typ": diagram
+#import "../bgraph.typ": bg-diagram
 
 = A diagram from source in the document
 
-#diagram("
+#bg-diagram("
   graph { title: \"From Typst\" }
   node ui \"Browser\"
   node api \"API\"
@@ -16,4 +16,4 @@
 A diagram that does not parse fails the build rather than leaving a hole —
 uncomment the line below to see the compiler's own message in place.
 
-// #diagram("node ??? broken")
+// #bg-diagram("node ??? broken")

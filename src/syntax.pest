@@ -102,8 +102,8 @@ style_decl = { "style" ~ ident ~ ("extends" ~ ident)? ~ block }
 // archetype declares.
 // Data and `.class` may interleave: the leading `.` keeps them apart, so
 // there is no reason to make the author remember an order.
-// The placement and the block may come in either order — both read
-// naturally, and `{` cannot be mistaken for a placement keyword.
+// Placement is declared in a scoped `layout` block; the optional tail here is
+// only the inline property/member block.
 // A hole may stand where a *name* goes, so a template can supply the id of the
 // statement it fills — which is the whole point of repeating a line per row.
 // Not where the archetype goes: the archetype decides which properties exist,
@@ -121,8 +121,7 @@ place_kw   = @{ ("at" | "right-of" | "left-of" | "below" | "above" | "via") ~ !(
 // parses here (pest backtracks out of `style_decl`) but not in tree-sitter,
 // whose lexer commits to the keyword. `check` reserves these names outright.
 edge_decl  = { !(keyword) ~ name ~ arrow ~ name ~ string? ~ (pos_value | class_ref)* ~ edge_tail? }
-// Either order, the way an item's placement and block already are: both read
-// naturally and `{` cannot be mistaken for `via`.
+// `via` and the property block may come in either order.
 edge_tail  = _{ via_list ~ block? | block ~ via_list? }
 // Atomic: a non-atomic rule would let implicit whitespace slip between the
 // word and the boundary test, so `style -> a` would read the `-` as part

@@ -190,8 +190,8 @@ module.exports = grammar({
           // Data and `.class` may interleave: the leading `.` keeps them apart.
           repeat(choice(field('data', $._bare_value), field('class', $.class_reference))),
         ),
-        // Either order reads naturally, and `{` cannot be mistaken for a
-        // placement keyword.
+        // Placement is declared in a scoped `layout` block; this optional
+        // branch is only the inline property/member block.
         optional(
           choice(
             field('body', $.block),
@@ -219,8 +219,7 @@ module.exports = grammar({
           ),
           repeat(choice(field('data', $._bare_value), field('class', $.class_reference))),
         ),
-        // `via` and the block come in either order, the way an item's
-        // placement and block already do.
+        // `via` and the property block come in either order.
         optional(
           choice(
             seq(field('via', $.via_list), optional(field('body', $.block))),

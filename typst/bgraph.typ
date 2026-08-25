@@ -13,8 +13,8 @@
 //
 // then, from a document:
 //
-//   #import "bgraph.typ": diagram
-//   #diagram(read("arch.bd"))
+//   #import "bgraph.typ": bg-diagram
+//   #bg-diagram(read("arch.bd"))
 //
 // The two-command form works today with no plugin at all and is the right
 // answer when the diagram is already a file beside the document:
@@ -45,7 +45,7 @@
 )
 
 /// The same, reading the source from a file beside the document.
-#let bg-diagram-file(path, width: auto, alt: none) = diagram(
+#let bg-diagram-file(path, width: auto, alt: none) = bg-diagram(
   read(path),
   width: width,
   alt: alt,

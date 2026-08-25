@@ -122,7 +122,7 @@ order: source, placement, style, data, then composition.
 
 ## In a browser
 
-The core is four dependencies of pure Rust and the SVG writer is hand-written,
+The core is five dependencies of pure Rust and the SVG writer is hand-written,
 so the renderer compiles to wasm nearly as it stands:
 
 ```sh
@@ -150,8 +150,8 @@ For a Rust integration, see the supported embedding boundary in
 ```
 
 ```typst
-#import "typst/bgraph.typ": diagram
-#diagram(read("arch.bd"), width: 70%)
+#import "typst/bgraph.typ": bg-diagram
+#bg-diagram(read("arch.bd"), width: 70%)
 ```
 
 A diagram that does not parse **fails the build**, with the compiler's own

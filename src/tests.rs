@@ -10279,7 +10279,7 @@ fn the_library_needs_no_argument_parser() {
     // What makes a wasm build sane: a page has no argv, and a library
     // consumer should not compile a parser it will never call. The binaries
     // declare `cli` in `required-features`, so `cargo build` still builds
-    // them and `--no-default-features` resolves to four dependencies.
+    // them and `--no-default-features` resolves to five dependencies.
     let manifest = include_str!("../Cargo.toml");
 
     let clap = manifest

@@ -18,7 +18,7 @@
 // It needs the module: `./typst/build.sh`, which `compile.sh` runs when it is
 // missing. Imported under a second name because the theme already has a
 // `diagram` — that one is the figure, this one is the picture inside it.
-#import "../typst/bgraph.typ": diagram as render
+#import "../typst/bgraph.typ": bg-diagram as render
 
 #show: bunchy-theme.with()
 

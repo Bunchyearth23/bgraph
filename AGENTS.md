@@ -21,7 +21,8 @@ each has its own *word* and its own positional data:
 
     slice organic "Organic search" 4820      // type pie
     field sport   "Source port"    0 15      // type packet
-    node  a       "A"              at (0, 0) // type free
+    node  a       "A"              // type free
+    layout { place a at (0, 0) }
 
 Adding an archetype means adding `item` and `slots` to its `ArchetypeDef` —
 neither grammar changes. `node` stays a universal synonym and positional data
@@ -68,7 +69,7 @@ disagree.
 - `cargo run --bin bgraph -- check /tmp/a.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
 - `cargo test` (555 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
-- `cargo build --no-default-features` — the four-dependency library. **A CI
+- `cargo build --no-default-features` — the five-dependency library. **A CI
   step, and it has been red before**: a `#[cfg]` on a type without one on its
   users compiles under `default` and not here
 - `./playground/build.sh` — the wasm module, into `playground/public/`

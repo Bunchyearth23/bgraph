@@ -3,7 +3,7 @@
 //! Hand-rolled for the same reason the SVG writer, the PDF writer and the HTTP
 //! preview are: `wasm-bindgen` is a dependency *and* a build step, for four
 //! functions whose entire job is to move bytes across a boundary. The crate
-//! that keeps four dependencies does not take a fifth to pass a string.
+//! that keeps five dependencies does not take a sixth to pass a string.
 //!
 //! # The protocol
 //!

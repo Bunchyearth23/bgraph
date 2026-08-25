@@ -426,7 +426,7 @@ field seq   "Sequence number"  32 63
 `check` reports overlapping ranges as errors and unassigned bits between two
 fields as warnings, so a header that does not add up says so.
 
-Edges and placement are ignored by both chart archetypes — and reported, not
+Edges and placement are ignored by chart archetypes — and reported, not
 silently dropped.
 
 **`node` still works everywhere** as a universal synonym for the archetype's
