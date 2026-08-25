@@ -1,5 +1,5 @@
-use alloc::collections::BTreeMap;
 use alloc::collections::btree_map::Entry;
+use alloc::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
 pub struct Row {
