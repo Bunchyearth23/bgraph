@@ -110,7 +110,10 @@ pub fn explain(diagram: &Diagram, layout: &Layout, id: &str) -> Result<String> {
                 )),
             }
             match align {
-                Some(a) => out.push_str(&format!("  align {}  — declared\n", align_name(*a))),
+                Some(a) => out.push_str(&format!(
+                    "  align {}  — declared\n",
+                    cross_axis_align_name(*a, *dir)
+                )),
                 None => out.push_str("  align center  — default\n"),
             }
         }
@@ -137,13 +140,18 @@ pub fn explain(diagram: &Diagram, layout: &Layout, id: &str) -> Result<String> {
     // forget three screens away from the statement they act on.
     for constraint in &diagram.constraints {
         if constraint.members.iter().any(|m| m.as_str() == id) {
+            let relation = match constraint.kind {
+                crate::ast::ConstraintKind::AlignGroup => format!(
+                    "align-group {} — aligns {}",
+                    constraint_align_name(constraint),
+                    constraint_axis_name(constraint.axis),
+                ),
+                crate::ast::ConstraintKind::SameWidth => "same-width".to_string(),
+                crate::ast::ConstraintKind::SameHeight => "same-height".to_string(),
+            };
             out.push_str(&format!(
                 "  {}  — with {}\n",
-                match constraint.kind {
-                    crate::ast::ConstraintKind::AlignGroup => "align-group",
-                    crate::ast::ConstraintKind::SameWidth => "same-width",
-                    crate::ast::ConstraintKind::SameHeight => "same-height",
-                },
+                relation,
                 constraint
                     .members
                     .iter()
@@ -219,11 +227,50 @@ fn paint(diagram: &Diagram, node: &crate::ast::NodeDecl, id: &str) -> Result<Str
         .collect())
 }
 
-fn align_name(align: Align) -> &'static str {
-    match align {
-        Align::Start => "left / top",
-        Align::Center => "center",
-        Align::End => "right / bottom",
+fn cross_axis_align_name(align: Align, dir: RelDir) -> &'static str {
+    match dir {
+        RelDir::RightOf | RelDir::LeftOf => match align {
+            Align::Start => "top",
+            Align::Center => "center",
+            Align::End => "bottom",
+        },
+        RelDir::Below | RelDir::Above => match align {
+            Align::Start => "left",
+            Align::Center => "center",
+            Align::End => "right",
+        },
+    }
+}
+
+fn constraint_align_name(constraint: &crate::ast::ConstraintDecl) -> &'static str {
+    use crate::ast::ConstraintAxis;
+
+    match constraint.axis {
+        ConstraintAxis::Horizontal => match constraint.align {
+            Align::Start => "left",
+            Align::Center => "center",
+            Align::End => "right",
+        },
+        ConstraintAxis::Vertical => match constraint.align {
+            Align::Start => "top",
+            Align::Center => "center",
+            Align::End => "bottom",
+        },
+        // The parser constructs only `center` on this path. Keep the
+        // explanation total if an AST is assembled by a library caller.
+        ConstraintAxis::Inferred => match constraint.align {
+            Align::Start => "start",
+            Align::Center => "center",
+            Align::End => "end",
+        },
+    }
+}
+
+fn constraint_axis_name(axis: crate::ast::ConstraintAxis) -> &'static str {
+    match axis {
+        crate::ast::ConstraintAxis::Horizontal => "x",
+        crate::ast::ConstraintAxis::Vertical => "y",
+        crate::ast::ConstraintAxis::Inferred => "an axis inferred by legacy v1",
     }
 }
 

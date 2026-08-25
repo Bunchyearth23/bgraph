@@ -9618,6 +9618,17 @@ fn explain_mentions_a_constraint_acting_on_the_box() {
 }
 
 #[test]
+fn explain_names_the_axis_of_an_align_group() {
+    let out = explained(
+        r#"node a "A"
+           node b "B" right-of a
+           align-group top a b"#,
+        "a",
+    );
+    assert!(out.contains("align-group top — aligns y"), "{out}");
+}
+
+#[test]
 fn explaining_an_unknown_box_lists_the_ones_there_are() {
     let diagram = parse_diagram("node a \"A\"\nnode b \"B\"").unwrap();
     let solved = layout::solve(&diagram).unwrap();
