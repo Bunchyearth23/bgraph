@@ -115,7 +115,6 @@
 
 pub mod check;
 pub mod compose;
-#[cfg(feature = "kasuari-spike")]
 #[allow(missing_docs)]
 pub mod constraint_layout;
 #[allow(missing_docs)]

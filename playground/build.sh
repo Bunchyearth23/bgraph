@@ -19,7 +19,7 @@ cd "$here/.."
 target=wasm32-unknown-unknown
 # No `cli`, no `csv`, no `pdf`: a page has no argument parser, no disk to read
 # a table from and nowhere to put a PDF. `wasm` is the entry points.
-features=all-archetypes,json,wasm,kasuari-spike
+features=all-archetypes,json,wasm
 
 rustup target list --installed | grep -qx "$target" \
   || { echo "build.sh: rustup target add $target" >&2; exit 1; }

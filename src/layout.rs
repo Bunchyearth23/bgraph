@@ -866,35 +866,24 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         })
         .collect();
 
-    let mut solved = place_all(diagram, &placement, &sizes, &overhang, &opts)?;
-    // Alignment runs after, because it is the one constraint that genuinely
-    // needs positions to exist.
-    constrain_alignment(&placement, &mut solved);
-
-    // The experimental Cassowary path is a shadow, never the source of the
-    // picture. It certifies each migrated relation against the current engine
-    // before `W-153` is allowed to switch the renderer over.
-    #[cfg(all(feature = "kasuari-spike", debug_assertions))]
-    if let Some(shadow) = crate::constraint_layout::solve_nodes(diagram, &placement, &sizes, &opts)?
+    // Cassowary is now the source of geometry whenever every relation can be
+    // lowered without approximation.  Frames still need their content bounds
+    // before their own translation can be expressed, so those diagrams retain
+    // the established fixpoint until group lowering lands.  This is a
+    // semantic fallback, not a build-flag-dependent second engine.
+    let solved = if let Some(nodes) =
+        crate::constraint_layout::solve_nodes(diagram, &placement, &sizes, &opts)?
     {
-        for (i, candidate) in shadow.iter().enumerate() {
-            let Some(current) = solved.nodes[i] else {
-                continue;
-            };
-            let differs = (candidate.x - current.x).abs() > 1e-8
-                || (candidate.y - current.y).abs() > 1e-8
-                || (candidate.w - current.w).abs() > 1e-8
-                || (candidate.h - current.h).abs() > 1e-8;
-            if differs {
-                bail!(
-                    "Kasuari shadow diverged for `{}`: current {:?}, candidate {:?}",
-                    diagram.nodes[i].id.as_str(),
-                    current,
-                    candidate
-                );
-            }
+        Solved {
+            nodes: nodes.into_iter().map(Some).collect(),
+            groups: vec![None; diagram.groups.len()],
         }
-    }
+    } else {
+        let mut solved = place_all(diagram, &placement, &sizes, &overhang, &opts)?;
+        // Legacy alignment and group frames still need the historical pass.
+        constrain_alignment(&placement, &mut solved);
+        solved
+    };
     let placed = solved.nodes;
 
     let mut nodes: Vec<PlacedNode> = diagram

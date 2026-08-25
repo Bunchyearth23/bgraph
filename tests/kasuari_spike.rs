@@ -1,5 +1,3 @@
-#![cfg(feature = "kasuari-spike")]
-
 use kasuari::WeightedRelation::*;
 use kasuari::{Solver, Strength, Variable};
 use std::collections::BTreeSet;
