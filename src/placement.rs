@@ -212,6 +212,13 @@ impl<'a> PlacementPlan<'a> {
         self.layout_placement[node].or(self.diagram.nodes[node].placement.as_ref())
     }
 
+    /// Whether source already gives this node a position. A `row` or
+    /// `column` positions every member after its first anchor just as surely
+    /// as `place` does, even though the relation is stored separately.
+    pub fn has_source_position(&self, node: usize) -> bool {
+        self.declared_placement(node).is_some() || self.series_placement[node].is_some()
+    }
+
     pub fn declared_group_placement(&self, group: usize) -> Option<&'a Placement> {
         self.layout_group_placement[group].or(self.diagram.groups[group].placement.as_ref())
     }

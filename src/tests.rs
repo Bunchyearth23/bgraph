@@ -9934,8 +9934,12 @@ fn freezing_a_layout_does_not_change_the_picture() {
 #[test]
 fn freezing_uses_the_previous_sibling_inside_a_group() {
     let (_, after) = frozen("node outside at (100, 0)\ngroup g {\n node first\n node second\n}");
-    assert!(!after.contains("first right-of outside"), "{after}");
-    assert!(after.contains("second right-of first"), "{after}");
+    assert!(
+        after.contains("  layout {\n    place first at (0, 0)"),
+        "{after}"
+    );
+    assert!(!after.contains("place first right-of outside"), "{after}");
+    assert!(after.contains("place second right-of first"), "{after}");
 }
 
 #[test]
@@ -9957,22 +9961,22 @@ fn a_comment_and_the_author_s_spacing_survive() {
     let (_, after) = frozen(source);
     assert!(after.contains("// the reader"), "{after}");
     assert!(after.contains("node ui   \"Browser\""), "{after}");
-    assert!(after.contains("node api  \"API\" right-of ui"), "{after}");
+    assert!(after.contains("place api right-of ui"), "{after}");
 }
 
 #[test]
-fn a_placement_lands_before_a_block_and_not_against_it() {
-    // Both orders parse, but `right-of api{ … }` is not something a person
-    // would have typed — and that was the first output.
+fn a_frozen_placement_is_kept_outside_the_declaration_block() {
     let (_, after) = frozen("node a \"A\"\nnode b \"B\" { fill: #eef3ff }\n");
-    assert!(after.contains("right-of a { fill:"), "{after}");
+    assert!(after.contains("node b \"B\" { fill: #eef3ff }"), "{after}");
+    assert!(after.contains("place b right-of a"), "{after}");
 }
 
 #[test]
-fn a_box_that_already_says_where_it_goes_is_left_alone() {
+fn an_existing_legacy_placement_is_left_untouched_while_the_origin_is_migrated() {
     let source = "node a \"A\"\nnode b \"B\" below a gap 90\n";
     let (_, after) = frozen(source);
-    assert_eq!(after, source, "a declared placement was rewritten");
+    assert!(after.contains("node b \"B\" below a gap 90"), "{after}");
+    assert!(after.contains("place a at (0, 0)"), "{after}");
 }
 
 #[test]
@@ -9985,7 +9989,7 @@ fn freezing_twice_changes_nothing_the_second_time() {
 #[test]
 fn a_brace_inside_a_label_is_not_a_block() {
     let (_, after) = frozen("node a \"A\"\nnode b \"a { brace\"\n");
-    assert!(after.contains("\"a { brace\" right-of a"), "{after}");
+    assert!(after.contains("place b right-of a"), "{after}");
 }
 
 // ------------------------------------------------- embedded font (I-058)

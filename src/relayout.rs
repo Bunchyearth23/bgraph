@@ -8,11 +8,11 @@
 //!
 //! # It edits the author's file
 //!
-//! So it **inserts into lines** rather than rewriting them. `fmt` is lexical
-//! and rewrites whole lines while deliberately leaving interior alignment
-//! alone; this has to go further, because a comment, a column of aligned
-//! values and a trailing note are all things the author put there on purpose
-//! and none of them are this command's business.
+//! So it **adds scoped layout blocks** rather than rewriting declarations.
+//! `fmt` is lexical and rewrites whole lines while deliberately leaving
+//! interior alignment alone; this has to go further, because a comment, a
+//! column of aligned values and a trailing note are all things the author put
+//! there on purpose and none of them are this command's business.
 //!
 //! # The guard that makes it trustworthy
 //!
@@ -22,11 +22,13 @@
 //! flows from the statement before it — so anything else would be a bug, and
 //! the test is what says so.
 
-use crate::ast::{Diagram, Placement, RelDir};
+use crate::ast::{Diagram, RelDir};
+use crate::placement::Entity;
 use crate::style::GraphOpts;
 use anyhow::Result;
 
-/// The same source with a placement written onto every box that had none.
+/// The same source with canonical scoped `layout` blocks that position every
+/// box which did not already have a source relation.
 pub fn fill_in(source: &str, diagram: &Diagram) -> Result<String> {
     let opts = GraphOpts::from_props(&diagram.graph)?;
     let placement = crate::placement::PlacementPlan::new(diagram);
@@ -37,22 +39,43 @@ pub fn fill_in(source: &str, diagram: &Diagram) -> Result<String> {
         RelDir::Above => "above",
     };
 
+    // One pending relation per root or group scope. Origins are deliberately
+    // written too: after this command, no rendered position relies on the
+    // implicit-flow rule hidden in declaration order.
+    let mut root = Vec::new();
+    let mut local = vec![Vec::new(); diagram.groups.len()];
+
+    for (i, node) in diagram.nodes.iter().enumerate() {
+        if placement.has_source_position(i) {
+            continue;
+        }
+        let relation = match placement.implicit_anchor(i) {
+            Some(anchor) => format!("{word} {}", diagram.nodes[anchor].id.as_str()),
+            None => "at (0, 0)".to_string(),
+        };
+        let statement = format!("place {} {relation}", node.id.as_str());
+        match placement.owner().get(&Entity::Node(i)).copied() {
+            Some(group) => local[group].push(statement),
+            None => root.push(statement),
+        }
+    }
+
     // Collected first and applied last-to-first, so an earlier insertion
     // cannot move a later one's offset out from under it.
     let mut edits: Vec<(usize, String)> = Vec::new();
-
-    for (i, node) in diagram.nodes.iter().enumerate() {
-        // A flow root has nothing to be placed against, and a box that already
-        // says where it goes is not this command's business.
-        if node.placement.is_some() {
+    for (group, statements) in local.into_iter().enumerate() {
+        if statements.is_empty() {
             continue;
         }
-        let Some(anchor) = placement.implicit_anchor(i) else {
-            continue;
-        };
-        let anchor = diagram.nodes[anchor].id.as_str();
-        let at = insertion_point(source, node.span.start, node.span.end);
-        edits.push((at, format!(" {word} {anchor}")));
+        let span = diagram.groups[group].span;
+        let at = span.end.saturating_sub(1);
+        edits.push((at, scoped_block(source, span.start, at, &statements, false)));
+    }
+    if !root.is_empty() {
+        edits.push((
+            source.len(),
+            scoped_block(source, source.len(), source.len(), &root, true),
+        ));
     }
 
     let mut out = source.to_string();
@@ -65,39 +88,42 @@ pub fn fill_in(source: &str, diagram: &Diagram) -> Result<String> {
     Ok(out)
 }
 
-/// Where a placement belongs in a statement: after everything the author
-/// wrote on the line, and **before the block** if there is one.
-///
-/// Both orders parse — the grammar takes a placement either side of a block —
-/// but a placement written after a block reads as an afterthought, and this is
-/// meant to look like something a person would have typed.
-fn insertion_point(source: &str, start: usize, end: usize) -> usize {
-    let statement = &source[start..end.min(source.len())];
-
-    // A brace inside a string is not a block, and a label may well contain
-    // one — the same rule the nesting scanner follows.
-    let mut in_string = false;
-    let mut chars = statement.char_indices();
-    while let Some((i, c)) = chars.next() {
-        match c {
-            '\\' if in_string => {
-                chars.next();
-            }
-            '"' => in_string = !in_string,
-            // Before the space that already sits in front of the block, not
-            // after it: inserting at the brace produced `right-of api{ … }`,
-            // and the whitespace the author left is theirs to keep.
-            '{' if !in_string => {
-                let head = &statement[..i];
-                return start + head.trim_end().len();
-            }
-            _ => {}
-        }
+/// A root or local `layout` block, matching the indentation of its owner.
+fn scoped_block(
+    source: &str,
+    owner_start: usize,
+    insertion: usize,
+    statements: &[String],
+    root: bool,
+) -> String {
+    let line_start = source[..owner_start.min(source.len())]
+        .rfind('\n')
+        .map_or(0, |newline| newline + 1);
+    let base = source[line_start..owner_start.min(source.len())]
+        .chars()
+        .take_while(|ch| matches!(ch, ' ' | '\t'))
+        .collect::<String>();
+    let indent = if root {
+        base.clone()
+    } else {
+        format!("{base}  ")
+    };
+    let prefix = if source[..insertion.min(source.len())].ends_with('\n') {
+        ""
+    } else {
+        "\n"
+    };
+    let mut out = format!("{prefix}{indent}layout {{\n");
+    for statement in statements {
+        out.push_str(&format!("{indent}  {statement}\n"));
     }
-
-    // No block: at the end of the statement, minus any trailing space the
-    // author left, so the line does not gain two spaces in a row.
-    start + statement.trim_end().len()
+    out.push_str(&format!("{indent}}}"));
+    if !root {
+        out.push_str(&format!("\n{base}"));
+    } else {
+        out.push('\n');
+    }
+    out
 }
 
 /// Whether anything would change — for a `--check` that reports rather than
@@ -113,27 +139,7 @@ pub fn unplaced(diagram: &Diagram) -> Vec<&str> {
         .nodes
         .iter()
         .enumerate()
-        .filter(|(i, n)| n.placement.is_none() && placement.implicit_anchor(*i).is_some())
+        .filter(|(i, _)| !placement.has_source_position(*i))
         .map(|(_, n)| n.id.as_str())
         .collect()
-}
-
-/// A placement written out the way the grammar reads it.
-///
-/// Public so a test can assert the shape without reaching into the file.
-pub fn written(placement: &Placement) -> String {
-    match placement {
-        Placement::At { x, y } => format!("at ({x}, {y})"),
-        Placement::Cell { col, row } => format!("at (col {col}, row {row})"),
-        Placement::Rel { dir, anchor, .. } => format!(
-            "{} {}",
-            match dir {
-                RelDir::RightOf => "right-of",
-                RelDir::LeftOf => "left-of",
-                RelDir::Below => "below",
-                RelDir::Above => "above",
-            },
-            anchor.as_str()
-        ),
-    }
 }
