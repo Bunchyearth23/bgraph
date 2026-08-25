@@ -221,6 +221,43 @@ pub fn after_layout(diagram: &Diagram, layout: &crate::layout::Layout) -> Vec<Di
     let mut out = Vec::new();
     let routed = crate::render_svg::route_all(layout);
 
+    // A frame is a containment contract: every direct member must remain
+    // inside the frame after translations and size constraints have settled.
+    // This belongs in the post-layout pass because only absolute rectangles
+    // can prove the violation.
+    for group in &diagram.groups {
+        let Some(frame) = layout
+            .groups
+            .iter()
+            .find(|placed| placed.id == group.id.as_str())
+        else {
+            continue;
+        };
+        for member in &group.members {
+            let Some(node) = layout
+                .nodes
+                .iter()
+                .find(|placed| placed.id == member.as_str())
+            else {
+                continue;
+            };
+            let inside = node.rect.x >= frame.rect.x
+                && node.rect.y >= frame.rect.y
+                && node.rect.right() <= frame.rect.right()
+                && node.rect.bottom() <= frame.rect.bottom();
+            if !inside {
+                out.push(Diag::error(
+                    group.span,
+                    format!(
+                        "`{}` lies outside its containing group `{}`",
+                        member.as_str(),
+                        group.id.as_str()
+                    ),
+                ));
+            }
+        }
+    }
+
     // An edge label drawn over a box. Nodes are painted after labels, so the
     // box wins and the text is simply gone — which is what `[funds cleared]`
     // looked like in the `state` example: not truncated, overpainted.
@@ -701,9 +738,8 @@ fn anchor_names(diagram: &Diagram) -> HashSet<&str> {
         .collect()
 }
 
-/// Constraints are declarations, not best-effort layout hints. A misspelled
-/// member used to disappear inside `layout::members_of`, making `check` claim
-/// the diagram was sound while the renderer silently ignored the relation.
+/// Layout relations are declarations, not best-effort hints. A misspelled
+/// member must be reported before the solver sees the document.
 fn check_constraints(diagram: &Diagram, out: &mut Vec<Diag>) {
     let nodes: HashSet<&str> = diagram.nodes.iter().map(|node| node.id.as_str()).collect();
     let node_index: HashMap<&str, usize> = diagram
@@ -719,24 +755,6 @@ fn check_constraints(diagram: &Diagram, out: &mut Vec<Diag>) {
         .map(|group| (group.id.as_str(), group))
         .collect();
 
-    for constraint in &diagram.constraints {
-        let name = match constraint.kind {
-            ConstraintKind::AlignGroup => "align-group",
-            ConstraintKind::SameWidth => "same-width",
-            ConstraintKind::SameHeight => "same-height",
-        };
-        check_constraint(
-            diagram,
-            constraint,
-            name,
-            None,
-            &nodes,
-            &groups,
-            &node_index,
-            &placement,
-            out,
-        );
-    }
     for layout in &diagram.layouts {
         let scope = layout
             .scope
@@ -899,24 +917,11 @@ fn check_layouts(diagram: &Diagram, out: &mut Vec<Diag>) {
                     // The first member is the anchor for its successor and
                     // may itself be explicitly placed. Every later member is
                     // positioned by this series.
-                    if position > 0 {
-                        if !positioned.insert(member.as_str()) {
-                            out.push(Diag::error(
-                                member.span,
-                                format!("`{}` is positioned more than once", member.as_str()),
-                            ));
-                        }
-                        if diagram.nodes.iter().any(|node| {
-                            node.id.as_str() == member.as_str() && node.placement.is_some()
-                        }) {
-                            out.push(Diag::error(
-                                member.span,
-                                format!(
-                                    "`{}` has both an inline placement and a `row` or `column` placement",
-                                    member.as_str()
-                                ),
-                            ));
-                        }
+                    if position > 0 && !positioned.insert(member.as_str()) {
+                        out.push(Diag::error(
+                            member.span,
+                            format!("`{}` is positioned more than once", member.as_str()),
+                        ));
                     }
                 }
                 continue;
@@ -951,31 +956,6 @@ fn check_layouts(diagram: &Diagram, out: &mut Vec<Diag>) {
                     format!("`{}` is placed more than once", target.as_str()),
                 ));
             }
-            if let Some(node) = diagram
-                .nodes
-                .iter()
-                .find(|node| node.id.as_str() == target.as_str())
-                && node.placement.is_some()
-            {
-                out.push(Diag::error(
-                    target.span,
-                    format!(
-                        "`{}` has both an inline placement and `layout {{ place … }}`",
-                        target.as_str()
-                    ),
-                ));
-            }
-            if let Some(group) = group_target
-                && group.placement.is_some()
-            {
-                out.push(Diag::error(
-                    target.span,
-                    format!(
-                        "`{}` has both an inline placement and `layout {{ place … }}`",
-                        target.as_str()
-                    ),
-                ));
-            }
             if let Some(group) = scope
                 && !group
                     .members
@@ -996,27 +976,17 @@ fn check_layouts(diagram: &Diagram, out: &mut Vec<Diag>) {
 }
 
 fn placements(diagram: &Diagram) -> impl Iterator<Item = (&Spanned<String>, &Placement)> {
-    diagram
-        .nodes
-        .iter()
-        .filter_map(|n| n.placement.as_ref().map(|p| (&n.id, p)))
-        .chain(
-            diagram
-                .groups
-                .iter()
-                .filter_map(|g| g.placement.as_ref().map(|p| (&g.id, p))),
-        )
-        .chain(diagram.layouts.iter().flat_map(|layout| {
-            layout
-                .statements
-                .iter()
-                .filter_map(|statement| match statement {
-                    LayoutStmt::Place {
-                        target, placement, ..
-                    } => Some((target, placement)),
-                    LayoutStmt::Constraint { .. } | LayoutStmt::Series { .. } => None,
-                })
-        }))
+    diagram.layouts.iter().flat_map(|layout| {
+        layout
+            .statements
+            .iter()
+            .filter_map(|statement| match statement {
+                LayoutStmt::Place {
+                    target, placement, ..
+                } => Some((target, placement)),
+                LayoutStmt::Constraint { .. } | LayoutStmt::Series { .. } => None,
+            })
+    })
 }
 
 fn check_groups(
@@ -1394,21 +1364,6 @@ fn warn_ignored(diagram: &Diagram, archetype: &str, out: &mut Vec<Diag>) {
             format!("`type {archetype}` draws no edges; this line is ignored"),
         ));
     }
-    warn_ignored_placement(diagram, archetype, out);
-}
-
-/// The half of [`warn_ignored`] that applies to an archetype which *does* read
-/// edges — `venn` carries its overlap counts on them — but still places its
-/// own items.
-fn warn_ignored_placement(diagram: &Diagram, archetype: &str, out: &mut Vec<Diag>) {
-    for node in &diagram.nodes {
-        if node.placement.is_some() {
-            out.push(Diag::warn(
-                node.span,
-                format!("`type {archetype}` places its own nodes; the placement is ignored"),
-            ));
-        }
-    }
 }
 
 fn check_pie(diagram: &Diagram, out: &mut Vec<Diag>) {
@@ -1681,12 +1636,6 @@ fn check_bar(diagram: &Diagram, out: &mut Vec<Diag>) {
 
 fn check_sankey(diagram: &Diagram, out: &mut Vec<Diag>) {
     for node in &diagram.nodes {
-        if node.placement.is_some() {
-            out.push(Diag::warn(
-                node.span,
-                "`type sankey` places its own nodes; the placement is ignored".to_string(),
-            ));
-        }
         if let Some(prop) = node.props.iter().find(|p| p.name == "value") {
             out.push(Diag::error(
                 prop.name_span,
@@ -1902,7 +1851,6 @@ fn check_block(diagram: &Diagram, out: &mut Vec<Diag>) {
 /// the author's business (`W-049`).
 #[cfg(feature = "gitgraph")]
 fn check_gitgraph(diagram: &Diagram, out: &mut Vec<Diag>) {
-    warn_ignored_placement(diagram, "gitgraph", out);
     check_cycles_free(diagram, out);
 
     let order: HashMap<&str, usize> = diagram
@@ -1958,16 +1906,6 @@ fn check_gitgraph(diagram: &Diagram, out: &mut Vec<Diag>) {
 /// (`W-041`): a second parent, a cycle, or nothing to start from.
 #[cfg(any(feature = "orgchart", feature = "mindmap", feature = "treeview"))]
 fn check_tree(diagram: &Diagram, out: &mut Vec<Diag>) {
-    let archetype = archetype_of(diagram).name;
-    for node in &diagram.nodes {
-        if node.placement.is_some() {
-            out.push(Diag::warn(
-                node.span,
-                format!("`type {archetype}` places its own items; the placement is ignored"),
-            ));
-        }
-    }
-
     let mut parent: HashMap<&str, &str> = HashMap::new();
     let known: HashSet<&str> = diagram.nodes.iter().map(|n| n.id.as_str()).collect();
 
@@ -2107,8 +2045,6 @@ fn check_harness(diagram: &Diagram, out: &mut Vec<Diag>) {
 /// warned about and four is refused rather than drawn wrongly.
 #[cfg(feature = "venn")]
 fn check_venn(diagram: &Diagram, out: &mut Vec<Diag>) {
-    warn_ignored_placement(diagram, "venn", out);
-
     let where_ = diagram
         .archetype
         .as_ref()
@@ -2925,17 +2861,6 @@ fn check_state(diagram: &Diagram, out: &mut Vec<Diag>) {
 }
 
 fn check_sequence(diagram: &Diagram, out: &mut Vec<Diag>) {
-    for node in &diagram.nodes {
-        if node.placement.is_some() {
-            out.push(Diag::warn(
-                node.span,
-                "`type sequence` ranks its participants in declaration order; \
-                 the placement is ignored"
-                    .to_string(),
-            ));
-        }
-    }
-
     if diagram.edges.is_empty() {
         out.push(Diag::warn(
             diagram

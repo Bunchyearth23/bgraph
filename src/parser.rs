@@ -50,17 +50,6 @@ pub fn parse_diagram(input: &str) -> Result<Diagram> {
     parse(input).map_err(anyhow::Error::from)
 }
 
-/// Reads the pre-v2 syntax for the one-way source migrator.
-///
-/// This boundary is deliberately crate-private: `fmt --migrate` is allowed to
-/// understand a file written before the layout DSL was unified, while every
-/// public entry point will eventually accept v2 only. Keeping the reader here
-/// lets that removal happen without giving the old syntax a second public API.
-#[cfg(test)]
-pub(crate) fn parse_legacy_diagram(input: &str) -> Result<Diagram> {
-    parse_legacy(input).map_err(anyhow::Error::from)
-}
-
 /// How deeply groups may nest.
 ///
 /// This is not a taste judgement about diagrams — it is a guard on the host
@@ -74,6 +63,11 @@ pub(crate) fn parse_legacy_diagram(input: &str) -> Result<Diagram> {
 /// and two orders above anything a person draws.
 pub const MAX_NESTING: usize = 64;
 
+#[cfg(test)]
+pub(crate) fn parse_legacy_diagram(input: &str) -> Result<Diagram> {
+    parse_legacy(input).map_err(anyhow::Error::from)
+}
+
 /// Parses source text, keeping the span an error points at.
 pub fn parse(input: &str) -> std::result::Result<Diagram, ParseError> {
     let diagram = parse_legacy(input)?;
@@ -86,11 +80,6 @@ pub fn parse(input: &str) -> std::result::Result<Diagram, ParseError> {
     Ok(diagram)
 }
 
-/// Parses both the canonical grammar and the pre-v2 placement clauses.
-///
-/// This is deliberately private. The migration command needs the old AST to
-/// preserve a diagram byte-for-byte, but no caller outside this crate gets an
-/// API that accepts a second placement language.
 fn parse_legacy(input: &str) -> std::result::Result<Diagram, ParseError> {
     check_nesting(input)?;
 
@@ -110,9 +99,6 @@ fn parse_legacy(input: &str) -> std::result::Result<Diagram, ParseError> {
     })
 }
 
-/// The declarations that used to carry a placement inline. Notes and legends
-/// are annotations rather than named layout entities, so their placement is a
-/// separate annotation feature and is intentionally not part of this v1 gate.
 fn legacy_layout_span(diagram: &Diagram) -> Option<Span> {
     diagram
         .nodes
@@ -130,7 +116,6 @@ fn legacy_layout_span(diagram: &Diagram) -> Option<Span> {
                 .iter()
                 .filter_map(|use_decl| use_decl.placement_span),
         )
-        .chain(diagram.constraints.iter().map(|constraint| constraint.span))
         .min_by_key(|span| span.start)
 }
 
@@ -262,7 +247,6 @@ fn build(file: Pair<Rule>, input: &str) -> Result<Diagram> {
                 diagram.graph.extend(parse_block(block)?);
             }
             Rule::include_decl => diagram.includes.push(parse_include(pair)?),
-            Rule::constraint_decl => diagram.constraints.push(parse_constraint(pair)?),
             Rule::layout_decl => diagram.layouts.push(parse_layout(pair, None)?),
             Rule::note_decl => diagram.notes.push(parse_note(pair)?),
             Rule::legend_decl => diagram.legends.push(parse_note(pair)?),
@@ -326,49 +310,6 @@ fn parse_note(pair: Pair<Rule>) -> Result<crate::ast::NoteDecl> {
         classes,
         placement,
         props,
-        span,
-    })
-}
-
-fn parse_constraint(pair: Pair<Rule>) -> Result<crate::ast::ConstraintDecl> {
-    use crate::ast::{Align, ConstraintAxis, ConstraintKind};
-    let span = span_of(&pair);
-    let mut kind = ConstraintKind::AlignGroup;
-    let mut align = Align::Center;
-    let mut axis = ConstraintAxis::Inferred;
-    let mut members = Vec::new();
-
-    for part in pair.into_inner() {
-        match part.as_rule() {
-            Rule::constraint_kw => {
-                kind = match part.as_str() {
-                    "align-group" => ConstraintKind::AlignGroup,
-                    "same-width" => ConstraintKind::SameWidth,
-                    "same-height" => ConstraintKind::SameHeight,
-                    other => bail!("unknown constraint `{other}`"),
-                }
-            }
-            Rule::align_kw => {
-                (align, axis) = match part.as_str() {
-                    "left" => (Align::Start, ConstraintAxis::Horizontal),
-                    "right" => (Align::End, ConstraintAxis::Horizontal),
-                    "top" => (Align::Start, ConstraintAxis::Vertical),
-                    "bottom" => (Align::End, ConstraintAxis::Vertical),
-                    _ => (Align::Center, ConstraintAxis::Inferred),
-                }
-            }
-            _ => members.push(spanned(&part)),
-        }
-    }
-
-    if members.len() < 2 {
-        bail!("a constraint needs at least two names — one box is already aligned with itself");
-    }
-    Ok(crate::ast::ConstraintDecl {
-        kind,
-        align,
-        axis,
-        members,
         span,
     })
 }
@@ -516,7 +457,7 @@ fn parse_use(pair: Pair<Rule>) -> Result<crate::ast::UseDecl> {
     for rest in inner {
         match rest.as_rule() {
             Rule::block => bindings = parse_block(rest)?,
-            _ => {
+            _other => {
                 placement_span = Some(span_of(&rest));
                 placement = Some(parse_placement(rest)?);
             }

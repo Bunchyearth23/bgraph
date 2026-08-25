@@ -20,20 +20,15 @@ pub enum Entity {
     Group(usize),
 }
 
-/// A legacy or scoped-v2 relation, lowered through one consumer interface.
+/// A scoped relation, lowered through one consumer interface.
 #[derive(Clone, Copy)]
 pub struct ConstraintRef<'a> {
     declaration: &'a ConstraintDecl,
-    v2: bool,
 }
 
 impl<'a> ConstraintRef<'a> {
     pub fn declaration(self) -> &'a ConstraintDecl {
         self.declaration
-    }
-
-    pub fn is_v2(self) -> bool {
-        self.v2
     }
 }
 
@@ -155,25 +150,17 @@ impl<'a> PlacementPlan<'a> {
     }
 
     pub fn constraints(&self) -> impl Iterator<Item = ConstraintRef<'a>> + '_ {
-        self.diagram
-            .constraints
-            .iter()
-            .map(|declaration| ConstraintRef {
-                declaration,
-                v2: false,
-            })
-            .chain(self.diagram.layouts.iter().flat_map(|layout| {
-                layout
-                    .statements
-                    .iter()
-                    .filter_map(|statement| match statement {
-                        LayoutStmt::Constraint { constraint } => Some(ConstraintRef {
-                            declaration: constraint,
-                            v2: true,
-                        }),
-                        LayoutStmt::Place { .. } | LayoutStmt::Series { .. } => None,
-                    })
-            }))
+        self.diagram.layouts.iter().flat_map(|layout| {
+            layout
+                .statements
+                .iter()
+                .filter_map(|statement| match statement {
+                    LayoutStmt::Constraint { constraint } => Some(ConstraintRef {
+                        declaration: constraint,
+                    }),
+                    LayoutStmt::Place { .. } | LayoutStmt::Series { .. } => None,
+                })
+        })
     }
 
     /// A v2 alignment is applied after ordinary placement, so it owns that
@@ -182,8 +169,7 @@ impl<'a> PlacementPlan<'a> {
     pub fn v2_alignment_axis(&self, node: usize) -> Option<ConstraintAxis> {
         self.constraints()
             .filter(|constraint| {
-                constraint.is_v2()
-                    && constraint.declaration().kind == ConstraintKind::AlignGroup
+                constraint.declaration().kind == ConstraintKind::AlignGroup
                     && constraint
                         .declaration()
                         .members
@@ -390,7 +376,7 @@ mod tests {
 
     #[test]
     fn implicit_flow_is_scoped_to_the_container() {
-        let diagram = crate::parser::parse_legacy_diagram(
+        let diagram = crate::parser::parse_diagram(
             "node outside\ngroup g {\n node first\n node second\n}\nnode after",
         )
         .unwrap();
@@ -404,8 +390,8 @@ mod tests {
 
     #[test]
     fn the_innermost_placed_ancestor_is_the_translation_unit() {
-        let diagram = crate::parser::parse_legacy_diagram(
-            "group outer at (10, 10) {\n group inner {\n node a\n }\n}",
+        let diagram = crate::parser::parse_diagram(
+            "group outer {\n group inner {\n node a\n }\n}\nlayout { place outer at (10, 10) }",
         )
         .unwrap();
         let plan = PlacementPlan::new(&diagram);
@@ -415,18 +401,9 @@ mod tests {
     }
 
     #[test]
-    fn a_group_waiting_for_its_own_member_is_unresolved() {
-        let diagram =
-            crate::parser::parse_legacy_diagram("group g right-of a {\n node a\n}").unwrap();
-        let plan = PlacementPlan::new(&diagram);
-
-        assert_eq!(plan.unresolved(), [Entity::Node(0), Entity::Group(0)]);
-    }
-
-    #[test]
     fn constraints_share_the_placement_namespace() {
-        let diagram = crate::parser::parse_legacy_diagram(
-            "group g { node a }\nnode b\nsame-width a g missing b",
+        let diagram = crate::parser::parse_diagram(
+            "group g { node a }\nnode b\nlayout { equal-width a g missing b }",
         )
         .unwrap();
         let plan = PlacementPlan::new(&diagram);

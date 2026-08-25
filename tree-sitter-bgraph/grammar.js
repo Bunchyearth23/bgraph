@@ -40,7 +40,6 @@ module.exports = grammar({
         $.note_declaration,
         $.legend_declaration,
         $.layout_declaration,
-        $.constraint_declaration,
         $.component_declaration,
         $.use_declaration,
         $.type_declaration,
@@ -112,15 +111,6 @@ module.exports = grammar({
 
     layout_alignment: (_) =>
       choice('left', 'right', 'top', 'bottom', 'center-x', 'center-y'),
-
-    // A constraint adjusts one axis of already-placed boxes and never their
-    // order, which is what keeps the layout declared (`D-031`).
-    constraint_declaration: ($) =>
-      seq(
-        field('keyword', choice('align-group', 'same-width', 'same-height')),
-        optional(field('alignment', $.alignment)),
-        repeat1(field('member', $.identifier)),
-      ),
 
     // A component is a file you did not have to make a file of: declared
     // once, placed under a name, prefixed exactly as an included file is.
@@ -206,8 +196,10 @@ module.exports = grammar({
         // placement keyword.
         optional(
           choice(
-            seq(field('placement', $._placement), optional(field('body', $.block))),
-            seq(field('body', $.block), optional(field('placement', $._placement))),
+            choice(
+              seq(field('placement', $._placement), optional(field('body', $.block))),
+              seq(field('body', $.block), optional(field('placement', $._placement))),
+            ),
           ),
         ),
       ),

@@ -167,29 +167,12 @@ pub fn explain(diagram: &Diagram, layout: &Layout, id: &str) -> Result<String> {
         if constraint.members.iter().any(|m| m.as_str() == id) {
             let relation = match constraint.kind {
                 crate::ast::ConstraintKind::AlignGroup => format!(
-                    "{} {} — aligns {}",
-                    if constraint_ref.is_v2() {
-                        "align"
-                    } else {
-                        "align-group"
-                    },
+                    "align {} — aligns {}",
                     constraint_align_name(constraint),
                     constraint_axis_name(constraint.axis),
                 ),
-                crate::ast::ConstraintKind::SameWidth => {
-                    if constraint_ref.is_v2() {
-                        "equal-width".to_string()
-                    } else {
-                        "same-width".to_string()
-                    }
-                }
-                crate::ast::ConstraintKind::SameHeight => {
-                    if constraint_ref.is_v2() {
-                        "equal-height".to_string()
-                    } else {
-                        "same-height".to_string()
-                    }
-                }
+                crate::ast::ConstraintKind::SameWidth => "equal-width".to_string(),
+                crate::ast::ConstraintKind::SameHeight => "equal-height".to_string(),
             };
             out.push_str(&format!(
                 "  {}  — with {}\n",

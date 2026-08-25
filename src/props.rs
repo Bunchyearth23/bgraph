@@ -2875,14 +2875,6 @@ pub const KEYWORDS: &[(&str, &str)] = &[
          note and a box with no border.",
     ),
     (
-        "align-group",
-        "Give a set of boxes one coordinate: `align-group top a b c` aligns \
-         their top edges on y; `left`/`right` align x. A pass over the solved \
-         layout, never a reordering — the first name decides, and an explicit \
-         `at` wins. Legacy `center`/`middle` still infer their axis; the v2 \
-         `layout` block will require it explicitly.",
-    ),
-    (
         "layout",
         "Canonical placement block (v2): `layout { place api at (0, 0) }`. \
          Declarations say what exists; this block says where it goes. It may \
@@ -2909,13 +2901,6 @@ pub const KEYWORDS: &[(&str, &str)] = &[
         "equal-height",
         "Canonical layout relation: `layout { equal-height api db }` makes every named box as tall as the tallest.",
     ),
-    (
-        "same-width",
-        "Give a set of boxes one width: `same-width a b c`. The widest wins, \
-         because shrinking to match a narrower neighbour clips the label. \
-         Applied before placement, so nothing is pushed on top of anything.",
-    ),
-    ("same-height", "The same, for height."),
     (
         "component",
         "A fragment declared once and placed many times — `component service \

@@ -127,50 +127,6 @@
     }
   },
   {
-    "type": "constraint_declaration",
-    "named": true,
-    "fields": {
-      "alignment": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "alignment",
-            "named": true
-          }
-        ]
-      },
-      "keyword": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "align-group",
-            "named": false
-          },
-          {
-            "type": "same-height",
-            "named": false
-          },
-          {
-            "type": "same-width",
-            "named": false
-          }
-        ]
-      },
-      "member": {
-        "multiple": true,
-        "required": true,
-        "types": [
-          {
-            "type": "identifier",
-            "named": true
-          }
-        ]
-      }
-    }
-  },
-  {
     "type": "direction",
     "named": true,
     "fields": {}
@@ -335,10 +291,6 @@
       "types": [
         {
           "type": "component_declaration",
-          "named": true
-        },
-        {
-          "type": "constraint_declaration",
           "named": true
         },
         {
@@ -962,10 +914,6 @@
           "named": true
         },
         {
-          "type": "constraint_declaration",
-          "named": true
-        },
-        {
           "type": "edge_declaration",
           "named": true
         },
@@ -1188,10 +1136,6 @@
     "named": false
   },
   {
-    "type": "align-group",
-    "named": false
-  },
-  {
     "type": "arrow",
     "named": true
   },
@@ -1338,14 +1282,6 @@
   },
   {
     "type": "row",
-    "named": false
-  },
-  {
-    "type": "same-height",
-    "named": false
-  },
-  {
-    "type": "same-width",
     "named": false
   },
   {

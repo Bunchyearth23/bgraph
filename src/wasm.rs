@@ -110,7 +110,15 @@ pub unsafe extern "C" fn bgraph_check(pointer: *const u8, len: usize) -> *const 
     match crate::parser::parse_diagram(&source) {
         Ok(diagram) => {
             let index = crate::lsp::LineIndex::new(&source);
-            for (i, diag) in crate::check::check(&diagram).iter().enumerate() {
+            let mut diagnostics = crate::check::check(&diagram);
+            if !diagnostics
+                .iter()
+                .any(|diag| diag.severity == crate::check::Severity::Error)
+                && let Ok(layout) = crate::layout::solve(&diagram)
+            {
+                diagnostics.extend(crate::check::after_layout(&diagram, &layout));
+            }
+            for (i, diag) in diagnostics.iter().enumerate() {
                 let (line, col) = index.line_col(diag.span.start);
                 if i > 0 {
                     out.push(',');

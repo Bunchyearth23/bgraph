@@ -25,10 +25,6 @@
   "place"
   "row"
   "column"
-  ; Adjustments to what is already placed. They never reorder anything.
-  "align-group"
-  "same-width"
-  "same-height"
   "equal-width"
   "equal-height"
   ; Grid units: `at (col 3, row 2)` is still `at`.
@@ -53,11 +49,6 @@
 (edge_declaration from: (identifier) @variable)
 (edge_declaration to: (identifier) @variable)
 (relative_position anchor: (identifier) @variable)
-
-; A constraint names boxes that already exist, so its members read as
-; references and not as declarations.
-(constraint_declaration member: (identifier) @variable)
-(constraint_declaration alignment: (alignment) @constant)
 
 ; A component is declared once and placed under a name. The placing declares
 ; the name; the component it names is a reference to the declaration above.

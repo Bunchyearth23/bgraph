@@ -53,8 +53,6 @@ pub struct Diagram {
     /// *is* an include of a file you did not have to make (`D-030`).
     pub components: Vec<ComponentDecl>,
     pub uses: Vec<UseDecl>,
-    /// Adjustments applied to the solved layout, in declaration order.
-    pub constraints: Vec<ConstraintDecl>,
     /// Scoped v2 placement declarations. They are kept separate from the
     /// entities they position so the source has one canonical geometry block.
     pub layouts: Vec<LayoutDecl>,
@@ -79,17 +77,14 @@ pub struct NoteDecl {
     pub span: Span,
 }
 
-/// `align-group left a b c`, `same-width a b c`.
+/// A relation in a scoped `layout { … }` block.
 #[derive(Debug)]
 pub struct ConstraintDecl {
     pub kind: ConstraintKind,
-    /// Which edge to line up on, for `align-group`. Defaults to `center`,
+    /// Which edge to line up on, for `align`. Defaults to `center`,
     /// matching what `align` on a placement defaults to.
     pub align: Align,
-    /// Axis selected by the spelling in a legacy `align-group` declaration.
-    /// `center`/`middle` did not say which one, so only that legacy spelling
-    /// retains the geometry-based fallback until the scoped `layout` DSL
-    /// replaces it.
+    /// Axis selected by the alignment keyword.
     pub axis: ConstraintAxis,
     pub members: Vec<Spanned<String>>,
     pub span: Span,
@@ -103,12 +98,12 @@ pub enum ConstraintKind {
     SameHeight,
 }
 
-/// The coordinate an `align-group` relation controls.
+/// The coordinate an `align` relation controls.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConstraintAxis {
     Horizontal,
     Vertical,
-    /// Legacy `center` / `middle`, whose axis was not represented in v1.
+    /// An axis-neutral center relation in the internal IR.
     Inferred,
 }
 
@@ -159,12 +154,8 @@ pub struct UseDecl {
     /// because two instances of one component would otherwise declare the
     /// same identifiers twice.
     pub prefix: Spanned<String>,
-    /// Where the instance goes. It lands on the frame the expansion wraps
-    /// the instance in, so an instance is placed and anchored exactly as any
-    /// other group is — rather than needing a placement vocabulary of its own.
+    /// Placement retained only for the internal legacy reader.
     pub placement: Option<Placement>,
-    /// Source range of the legacy inline placement, when one was written.
-    /// Kept only so `fmt --migrate` can remove exactly that clause.
     pub placement_span: Option<Span>,
     pub bindings: Vec<Prop>,
     pub span: Span,
@@ -190,10 +181,8 @@ pub struct GroupDecl {
     pub id: Spanned<String>,
     pub label: Option<String>,
     pub classes: Vec<Spanned<String>>,
-    /// Where the group goes. Its *size* always comes from its members; a
-    /// placement translates the whole subtree once they are solved.
+    /// Placement retained only for the internal legacy reader.
     pub placement: Option<Placement>,
-    /// Source range of the legacy inline placement, when one was written.
     pub placement_span: Option<Span>,
     pub props: Vec<Prop>,
     /// Items and groups declared directly inside, in source order.
@@ -224,8 +213,8 @@ pub struct NodeDecl {
     pub positional: Vec<Value>,
     pub positional_span: Span,
     pub classes: Vec<Spanned<String>>,
+    /// Placement retained only for the internal legacy reader.
     pub placement: Option<Placement>,
-    /// Source range of the legacy inline placement, when one was written.
     pub placement_span: Option<Span>,
     pub props: Vec<Prop>,
     /// Bare strings written in the block: a class's fields, a table's columns.

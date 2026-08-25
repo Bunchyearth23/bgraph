@@ -1662,7 +1662,7 @@ pub struct Solved {
 /// because `D-001` makes the order the author's to state. Nothing here can
 /// move a box past another one.
 ///
-/// `same-width` and `same-height`, applied to the intrinsic sizes.
+/// `equal-width` and `equal-height`, applied to the intrinsic sizes.
 fn constrain_sizes(plan: &PlacementPlan<'_>, sizes: &mut [(f64, f64)]) {
     use crate::ast::ConstraintKind;
 
@@ -1740,7 +1740,7 @@ impl DisjointSets {
     }
 }
 
-/// `align-group`, applied to the solved rectangles.
+/// `align`, applied to the solved rectangles.
 fn constrain_alignment(plan: &PlacementPlan<'_>, solved: &mut Solved) {
     use crate::ast::{ConstraintAxis, ConstraintKind};
 

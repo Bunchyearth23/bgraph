@@ -103,13 +103,7 @@ pub fn solve_nodes(
     sizes: &[(f64, f64)],
     opts: &GraphOpts,
 ) -> Result<Option<Vec<Rect>>> {
-    if diagram.nodes.len() > MAX_SHADOW_NODES
-        || !diagram.groups.is_empty()
-        || diagram
-            .constraints
-            .iter()
-            .any(|constraint| constraint.kind == ConstraintKind::AlignGroup)
-    {
+    if diagram.nodes.len() > MAX_SHADOW_NODES || !diagram.groups.is_empty() {
         return Ok(None);
     }
 
@@ -203,13 +197,7 @@ pub fn solve_nodes(
         }
     }
 
-    // The v2 block spells the alignment axis, unlike the legacy global form.
-    // That makes this relation an exact lowering rather than a geometry-based
-    // approximation, so it is ready for the shadow comparison now.
     for constraint_ref in plan.constraints() {
-        if !constraint_ref.is_v2() {
-            continue;
-        }
         let constraint = constraint_ref.declaration();
         if constraint.kind != ConstraintKind::AlignGroup {
             continue;

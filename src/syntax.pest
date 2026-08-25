@@ -36,7 +36,7 @@ term = _{ (nl | ";" | ",")+ | &EOI }
 // an edge; PEG backtracking still lets a node actually named `type` have edges.
 // `edge_decl` precedes `item_decl` only for speed: `item_decl` would fail on
 // the arrow anyway and backtrack.
-stmt = _{ include_decl | component_decl | use_decl | layout_decl | constraint_decl | note_decl | legend_decl | type_decl | graph_decl | style_decl | group_decl | edge_decl | item_decl }
+stmt = _{ include_decl | component_decl | use_decl | layout_decl | note_decl | legend_decl | type_decl | graph_decl | style_decl | group_decl | edge_decl | item_decl }
 
 // `include "shared.bds"` merges another file whole; with `as` its names come
 // in under a prefix. Resolved before parsing reaches `check`, so by the time
@@ -60,9 +60,6 @@ note_decl = { "note" ~ string ~ class_ref* ~ placement? ~ block? }
 // derived from what the file says rather than guessed at, so a legend cannot
 // describe a colour nobody used.
 legend_decl = { "legend" ~ !":" ~ class_ref* ~ placement? ~ block? }
-
-constraint_kw   = { "align-group" | "same-width" | "same-height" }
-constraint_decl = { constraint_kw ~ align_kw? ~ ident+ }
 
 // v2 placement lives apart from declarations. `place` is deliberately a
 // statement rather than a property: geometry names its target and can carry

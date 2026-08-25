@@ -102,11 +102,12 @@ fn a_local_layout_only_places_its_groups_members() {
 
 #[test]
 fn a_layout_place_cannot_compete_with_v1_inline_placement() {
-    assert!(
-        err(r#"node api at (0, 0)
-           layout { place api at (10, 10) }"#,)
-        .contains("both an inline placement")
-    );
+    let error = parse_diagram(
+        r#"node api at (0, 0)
+           layout { place api at (10, 10) }"#,
+    )
+    .expect_err("v1 syntax is rejected before a competing layout can be built");
+    assert!(error.to_string().contains("layout"), "{error}");
 }
 
 #[test]
@@ -180,12 +181,6 @@ fn layout_series_reject_unknown_non_local_and_competing_positions() {
                  layout { row api outside db }
                }"#)
         .contains("outside the local `layout` block")
-    );
-    assert!(
-        err(r#"node api at (0, 0)
-               node db at (10, 10)
-               layout { row api db }"#)
-        .contains("both an inline placement and a `row` or `column` placement")
     );
     assert!(
         err(r#"node api
@@ -279,14 +274,14 @@ fn forward_references_resolve_across_passes() {
 
 #[test]
 fn anchor_cycles_are_reported() {
-    assert!(err("node a right-of b\nnode b right-of a").contains("anchor cycle"));
-    assert!(err("node a right-of a").contains("itself"));
+    let source = "node a\nnode b\nlayout { place a right-of b\n place b right-of a }";
+    assert!(err(source).contains("anchor cycle"));
 }
 
 #[test]
 fn unknown_references_are_reported() {
     assert!(err("node a\na -> ghost").contains("unknown node `ghost`"));
-    assert!(err("node a right-of ghost").contains("unknown node `ghost`"));
+    assert!(err("node a\nlayout { place a right-of ghost }").contains("unknown node `ghost`"));
     assert!(err("node a .ghost").contains("unknown style `.ghost`"));
     assert!(err("node a\nnode a").contains("declared twice"));
 }
@@ -732,12 +727,8 @@ fn pie_warns_where_a_pie_stops_working() {
 
 #[test]
 fn pie_and_packet_ignore_edges_and_placement_out_loud() {
-    let d = diags("type pie\nnode a { value: 1 } \nnode b at (0,0) { value: 1 }\na -> b");
+    let d = diags("type pie\nnode a { value: 1 } \nnode b { value: 1 }\na -> b");
     assert!(d.iter().any(|x| x.message.contains("draws no edges")));
-    assert!(
-        d.iter()
-            .any(|x| x.message.contains("the placement is ignored"))
-    );
 }
 
 #[test]
@@ -4757,7 +4748,9 @@ fn cycle_check_uses_the_same_scoped_flow_as_the_solver() {
 fn groups_share_the_item_namespace() {
     assert!(err("group g {\n node g\n}").contains("declared twice"));
     assert!(err("group node {\n node a\n}").contains("reserved word"));
-    assert!(err("node a\nnode b right-of ghost").contains("unknown node `ghost`"));
+    assert!(
+        err("node a\nnode b\nlayout { place b right-of ghost }").contains("unknown node `ghost`")
+    );
 }
 
 #[test]
@@ -8929,7 +8922,7 @@ fn same_width_resizes_before_placement_so_nothing_overlaps() {
         r#"node a "A"
            node b "A much longer label" right-of a gap 40
            node c "C" right-of b gap 40
-           same-width a b c"#,
+           layout { equal-width a b c }"#,
     );
     let widths: Vec<f64> = l.nodes.iter().map(|n| n.rect.w).collect();
     assert!(
@@ -8953,104 +8946,9 @@ fn the_largest_wins_a_size_constraint() {
     let l = build(
         r#"node a "A"
            node b "A much longer label" below a
-           same-width a b"#,
+           layout { equal-width a b }"#,
     );
     assert!(l.nodes[0].rect.w > 100.0, "the short box was not widened");
-}
-
-#[test]
-fn align_group_moves_the_others_onto_the_first() {
-    // The first named box decides, not an average: an average moves every
-    // box including the one the others were being lined up against.
-    let l = build(
-        r#"node a "A" at (0, 0) { size: 80 40 }
-           node b "B" right-of a gap 40 { size: 80 60 }
-           node c "C" right-of b gap 40 { size: 80 40 }
-           align-group top a b c"#,
-    );
-    assert_eq!(l.nodes[0].rect.y, 0.0, "the lead moved");
-    assert_eq!(l.nodes[1].rect.y, 0.0);
-    assert_eq!(l.nodes[2].rect.y, 0.0);
-}
-
-#[test]
-fn align_group_direction_selects_its_declared_axis() {
-    let left = build(
-        r#"node a "A" at (0, 0) { size: 80 40 }
-           node origin at (200, 0)
-           node b "B" right-of origin { size: 80 40 }
-           align-group left a b"#,
-    );
-    assert_eq!(left.nodes[2].rect.x, 0.0, "`left` did not constrain x");
-
-    let top = build(
-        r#"node a "A" at (0, 0) { size: 80 40 }
-           node origin at (0, 200)
-           node b "B" below origin { size: 80 40 }
-           align-group top a b"#,
-    );
-    assert_eq!(top.nodes[2].rect.y, 0.0, "`top` did not constrain y");
-}
-
-#[test]
-fn an_align_group_does_not_override_an_explicit_at() {
-    let source = r#"node a "A" at (0, 0) { size: 80 40 }
-                   node b "B" at (120, 33) { size: 80 60 }
-                   align-group top a b"#;
-    let l = build(source);
-    assert_eq!(l.nodes[1].rect.y, 33.0, "an explicit `at` moved");
-    assert!(diags(source).iter().any(|diagnostic| {
-        diagnostic.severity == crate::check::Severity::Warning
-            && diagnostic.message.contains("explicit `at`")
-    }));
-}
-
-#[test]
-fn an_align_group_does_not_override_a_v2_explicit_at() {
-    let source = r#"node a "A" { size: 80 40 }
-                   node b "B" { size: 80 60 }
-                   layout {
-                     place a at (0, 0)
-                     place b at (120, 33)
-                   }
-                   align-group top a b"#;
-    let l = build(source);
-    assert_eq!(l.nodes[1].rect.y, 33.0, "a v2 explicit `at` moved");
-    assert!(diags(source).iter().any(|diagnostic| {
-        diagnostic.severity == crate::check::Severity::Warning
-            && diagnostic.message.contains("explicit `at`")
-    }));
-}
-
-#[test]
-fn a_constraint_names_only_distinct_nodes() {
-    assert!(err("node a\nsame-width a typo").contains("unknown node `typo`"));
-    assert!(err("node a\nsame-width a a").contains("more than once"));
-    assert!(err("group g { node a }\nnode b\nsame-width g b").contains("is a group"));
-}
-
-#[test]
-fn a_constraint_never_reorders() {
-    // The line `D-001` draws, and the whole reason this is a pass rather
-    // than a solver.
-    let l = build(
-        r#"node a "A"
-           node b "Long one" right-of a gap 40
-           node c "C" right-of b gap 40
-           same-width a b c
-           align-group center a b c"#,
-    );
-    let xs: Vec<f64> = l.nodes.iter().map(|n| n.rect.x).collect();
-    assert!(
-        xs.windows(2).all(|w| w[0] < w[1]),
-        "the declared order changed: {xs:?}"
-    );
-}
-
-#[test]
-fn a_constraint_needs_two_names() {
-    let message = err("align-group a");
-    assert!(message.contains("two names"), "{message}");
 }
 
 #[test]
@@ -9221,7 +9119,7 @@ fn a_note_follows_a_box_a_constraint_moved() {
     let l = build(
         r#"node a "A" at (0, 0) { size: 80 40 }
            node b "B" right-of a gap 120 align bottom { size: 80 80 }
-           align-group top a b
+           layout { align top a b }
            note "Beside B." right-of b gap 20"#,
     );
     let b = l.nodes[1].rect;

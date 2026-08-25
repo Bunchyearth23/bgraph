@@ -260,7 +260,6 @@ impl State {
             d.graph_span = other.graph_span;
         }
         d.extra_archetypes.extend(other.extra_archetypes);
-        d.constraints.extend(other.constraints);
         d.layouts.extend(other.layouts);
         d.notes.extend(other.notes);
         d.legends.extend(other.legends);
@@ -570,10 +569,6 @@ fn pin(d: &mut Diagram, at: Span) {
             sp(m);
         }
         props(&mut node.props);
-        pin_placement(&mut node.placement, at);
-        if node.placement_span.is_some() {
-            node.placement_span = Some(at);
-        }
         s(&mut node.span);
     }
     for edge in &mut d.edges {
@@ -595,10 +590,6 @@ fn pin(d: &mut Diagram, at: Span) {
             sp(m);
         }
         props(&mut group.props);
-        pin_placement(&mut group.placement, at);
-        if group.placement_span.is_some() {
-            group.placement_span = Some(at);
-        }
         s(&mut group.span);
     }
     for layout in &mut d.layouts {
@@ -631,12 +622,6 @@ fn pin(d: &mut Diagram, at: Span) {
             }
         }
         s(&mut layout.span);
-    }
-}
-
-fn pin_placement(placement: &mut Option<crate::ast::Placement>, at: Span) {
-    if let Some(placement) = placement {
-        pin_placement_value(placement, at);
     }
 }
 
@@ -736,10 +721,6 @@ fn shift(d: &mut Diagram, delta: usize) {
             sp(m);
         }
         props(&mut node.props);
-        shift_placement(&mut node.placement, delta);
-        if let Some(span) = &mut node.placement_span {
-            s(span);
-        }
         s(&mut node.span);
     }
     for edge in &mut d.edges {
@@ -761,10 +742,6 @@ fn shift(d: &mut Diagram, delta: usize) {
             sp(m);
         }
         props(&mut group.props);
-        shift_placement(&mut group.placement, delta);
-        if let Some(span) = &mut group.placement_span {
-            s(span);
-        }
         s(&mut group.span);
     }
     for layout in &mut d.layouts {
@@ -801,12 +778,6 @@ fn shift(d: &mut Diagram, delta: usize) {
     }
 }
 
-fn shift_placement(placement: &mut Option<crate::ast::Placement>, delta: usize) {
-    if let Some(placement) = placement {
-        shift_placement_value(placement, delta);
-    }
-}
-
 fn shift_placement_value(placement: &mut crate::ast::Placement, delta: usize) {
     if let crate::ast::Placement::Rel { anchor, .. } = placement {
         anchor.span.start += delta;
@@ -839,7 +810,6 @@ fn qualify(d: &mut Diagram, prefix: &str) {
                 rename(class);
             }
         }
-        rename_anchor(&mut node.placement, &own, prefix);
     }
     for group in &mut d.groups {
         rename(&mut group.id);
@@ -853,7 +823,6 @@ fn qualify(d: &mut Diagram, prefix: &str) {
                 rename(class);
             }
         }
-        rename_anchor(&mut group.placement, &own, prefix);
     }
     for layout in &mut d.layouts {
         if let Some(scope) = &mut layout.scope
@@ -907,19 +876,6 @@ fn qualify(d: &mut Diagram, prefix: &str) {
         {
             rename(parent);
         }
-    }
-}
-
-fn rename_anchor(
-    placement: &mut Option<crate::ast::Placement>,
-    own: &std::collections::HashSet<String>,
-    prefix: &str,
-) {
-    use crate::ast::Placement;
-    if let Some(Placement::Rel { anchor, .. }) = placement
-        && own.contains(&anchor.value)
-    {
-        *anchor = qualified(anchor, prefix);
     }
 }
 
