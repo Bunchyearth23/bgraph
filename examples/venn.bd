@@ -1,0 +1,36 @@
+// Overlapping sets. Two or three of them: with two, the lens is solved so
+// its **area** is the number you wrote; with three the overlaps are labelled
+// but arranged rather than solved, because three circles cannot in general
+// honour all seven regions at once. Four is refused rather than drawn
+// wrongly.
+//
+// set <id> ["label"] <count>
+// <id> -> <id> ["label"] <shared>
+//
+// Every setting this genre takes is in docs/reference.md, under its name.
+
+// Three sets. With two the lens is *solved* to the number written; with three
+// the overlaps are labelled but arranged, and `check` says so — three circles
+// cannot honour all seven regions at once (W-053).
+//
+// **On a white surface on purpose**, and one of only two examples that is
+// (`Q-006`). A Venn is read through its overlaps, which are translucent fills
+// composited on top of each other; on a dark surface each layer darkens the
+// one beneath and the three-way region goes to near black. Light is the only
+// surface on which "more layers" reads as "more".
+type venn {
+  title: "Who reads which diagram"
+  radius: 105
+}
+
+graph { background: #ffffff padding: 34 }
+style set { font: 12 "Archivo" #1a1a1a }
+
+set dev  "Developers" 420
+set ops  "Operations" 260
+set arch "Architects" 180
+
+// `<from> -> <to> <shared>` — how many things the two sets have in common.
+dev  -> ops  120
+ops  -> arch  70
+dev  -> arch 140

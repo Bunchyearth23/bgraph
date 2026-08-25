@@ -1,0 +1,56 @@
+// Architecture and C4-style component views: typed elements with a
+// technology and a description, nested with `group`, joined by relations
+// that carry a protocol. Placed by anchors exactly as in `free` — the
+// archetype supplies the vocabulary and the shapes.
+//
+// block <id> ["label"] <kind>
+//
+// Every setting this genre takes is in docs/reference.md, under its name.
+
+type block { title: "Internet banking — containers" }
+graph { background: #f8fafc padding: 36 gap: 72 }
+
+block customer "Personal Banking Customer" person {
+  description: "A customer of the bank, with personal accounts."
+}
+
+group system "Internet Banking System" {
+  block web "Web Application" container {
+    tech: "Java, Spring MVC"
+    description: "Delivers the static content and the SPA."
+  }
+  block spa "Single-Page App" container {
+    tech: "TypeScript, Angular"
+    description: "Provides all the banking functionality in the browser."
+  }
+  block api "API Application" container {
+    tech: "Java, Spring MVC"
+    description: "Provides banking functionality via a JSON/HTTPS API."
+  }
+  block db "Database" database {
+    tech: "Oracle 19c"
+    description: "Stores user registration, hashed credentials and logs."
+  }
+  layout {
+    place web at (0, 0)
+    place spa right-of web gap 150
+    place api below spa gap 64
+    place db left-of api gap 150
+  }
+}
+
+block mainframe "Mainframe Banking System" external {
+  description: "Stores the core banking information."
+}
+
+layout {
+  place customer at (0, 0)
+  place system below customer gap 52
+  place mainframe below db gap 56
+}
+
+customer -> web "Visits bigbank.com" { tech: "HTTPS" }
+web -> spa "Delivers to the browser"
+spa -> api "Makes API calls to" { tech: "JSON/HTTPS" }
+api -> db "Reads from and writes to" { tech: "SQL/TCP" }
+api -> mainframe "Makes API calls to" { tech: "XML/HTTPS" }

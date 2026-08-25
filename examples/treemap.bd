@@ -1,0 +1,35 @@
+// Nested rectangles whose area is proportional to a value. The hierarchy is
+// group nesting; a group's area is the sum of what it contains.
+//
+// box <id> ["label"] <value>
+//
+// Every setting this genre takes is in docs/reference.md, under its name.
+
+type treemap {
+  title: "Repository, by lines of code"
+  size: 660 380
+  labels: both
+}
+graph { background: #0b1120 padding: 30 }
+
+group rust "Rust" {
+  box lsp    "lsp.rs"        1180
+  box charts "charts.rs"      760
+  box solver "layout.rs"      620
+  box render "render_svg.rs"  560
+  box check  "check.rs"       540
+  box props  "props.rs"       520
+  box tests  "tests.rs"      1240
+}
+
+group grammar "Grammar" {
+  box pest "syntax.pest"  70
+  box ts   "grammar.js"  130
+  box corp "corpus"      420
+}
+
+group docs "Docs" {
+  box ref  "reference.md" 300
+  box lang "language.md"  260
+  box idx  "INDEX.md"     140
+}

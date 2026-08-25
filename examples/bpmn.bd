@@ -1,0 +1,90 @@
+// A business process. Tasks, gateways, events, data artefacts and the flows
+// between them, with pools and lanes as `group`s. Placed by anchors exactly
+// as in `free`: the archetype supplies the vocabulary, the shapes and the
+// diagnostics, and the author still says where everything goes. Four words,
+// because four things have four positional shapes (`D-023`) — a task has a
+// kind, an event has a stage and a trigger, a gateway has a gate and a datum
+// has an artefact.
+//
+// task <id> ["label"] <kind>
+// event <id> ["label"] <stage> <trigger>
+// gateway <id> ["label"] <gate>
+// data <id> ["label"] <artifact>
+// <id> -> <id> ["label"] <flow>
+//
+// Every setting this genre takes is in docs/reference.md, under its name.
+
+// A business process. Four words, because four things have four positional
+// shapes: a task has a kind, an event has a stage and a trigger, a gateway has
+// a gate, a datum has an artefact. Placement is declared as it is everywhere
+// else — the archetype supplies the notation, the author says where it goes.
+//
+// **On a white surface on purpose**, and one of only two examples that is
+// (`Q-006`). BPMN is a notation people already know from somewhere else, and
+// everywhere else draws it black on white; a process diagram in this project's
+// house dark would be the first thing a reader has to translate.
+type bpmn { title: "Expense claim" }
+graph { background: #ffffff padding: 36 gap: 40 }
+
+style node  { font: 13 #111827 stroke: #334155 1.2 fill: #ffffff }
+style edge  { stroke: #475569 1.3 font: 11 #475569 }
+style store { fill: #f1f5f9 }
+
+group filed "Employee" {
+  padding: 22
+
+  event submit "Claim submitted" start message
+  task  fill   "Fill the form"   user
+  layout {
+    place submit at (0, 0)
+    place fill right-of submit gap 44
+  }
+}
+
+group review "Finance" {
+  padding: 22
+
+  task    check "Validate receipts" rule
+  gateway ok    "Within policy?"    exclusive
+  task    pay   "Pay the claim"     service
+  task    query "Ask for detail"    send
+  event   done  "Reimbursed"        end
+  layout {
+    place check at (0, 0)
+    place ok right-of check gap 52
+    place pay right-of ok gap 52
+    place query below pay gap 74
+    place done right-of pay gap 52
+  }
+}
+
+// A boundary event sits *on* a task, and says so by naming it. Placement, and
+// declared like every other placement.
+event late "14 days" boundary timer { attach: pay }
+
+// The form sits between the two pools, over the task that reads it. Put to the
+// right of the employee's pool — which is where it went first — its message
+// flow had to cross the whole picture to reach `check` on the far left, which
+// is a worse crossing than the one that move was meant to remove.
+data claim  "Claim form" object
+data ledger "Ledger"     store
+
+layout {
+  place review below filed gap 112
+  place claim below filed gap 22 align left
+  place ledger below done gap 40
+}
+
+submit -> fill
+fill   -> check
+check  -> ok
+ok     -> pay   "within"
+ok     -> query "over"    default
+query  -> check
+pay    -> done
+late   -> query
+
+// A message crosses between participants; an association only relates.
+fill  -> claim  association
+pay   -> ledger association
+claim -> check  message

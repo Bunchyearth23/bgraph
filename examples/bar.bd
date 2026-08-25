@@ -1,0 +1,18 @@
+// Bars grouped or stacked across named categories. One series per statement,
+// its numbers in category order.
+//
+// series <id> ["label"] <points>…
+//
+// Every setting this genre takes is in docs/reference.md, under its name.
+
+type bar {
+  title: "Quarterly revenue, by region"
+  size: 520 280
+  categories: "Q1" "Q2" "Q3" "Q4"
+}
+graph { background: #0b1120 padding: 32 }
+style series { font: 12 #e2e8f0 }
+
+series emea "EMEA"   120 185 240 310
+series amer "AMER"   200 210 265 280
+series apac "APAC"    80 130 175 260

@@ -36,6 +36,7 @@ orders  -> cache   "read-through" { router: ortho }
 
 ```sh
 bgraph init pie > traffic.bd       # a working file for any of the 29 specialised genres
+bgraph examples/free.bd -o /tmp/free.svg # checked-in worked source/SVG gallery
 bgraph diagram.bd -o diagram.svg   # …or .pdf, .png, .json — the extension picks
 bgraph watch diagram.bd            # a browser preview, reloading on save
 bgraph watch docs/diagrams         # …or a whole directory, as a build loop
@@ -86,8 +87,10 @@ order: source, placement, style, data, then composition.
   patterns, labels. Where there is no way round, the edge says so instead of
   pretending.
 - **Self-sizing canvas** — the viewBox follows the content.
-- **A declared grid** — `graph { grid: 160 90 }` and `at (col 3, row 2)`.
-  Still `at`, in units you chose: a coordinate system, never a solver.
+- **A declared grid** — `graph { grid: 4 3 32 48 }` and `at (col 3, row 2)`.
+  Positions, gaps and waypoints use cells in grid mode; the checked-in
+  [`examples/`](examples/) directory contains one `.bd` and one verified SVG
+  for every archetype.
 - **Constraints that never reorder** — `align`, `equal-width`,
   `equal-height`, `row` and `column`, inside `layout`. They adjust only what
   you declared; deciding the order stays your job.

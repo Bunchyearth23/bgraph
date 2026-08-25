@@ -1,0 +1,45 @@
+// Network topology: hosts, links and the segments that hold them. Placed by
+// anchors exactly as in `free` — the archetype supplies the vocabulary, the
+// shapes and the diagnostics, and a `group` is a segment or a zone.
+//
+// host <id> ["label"] <role>
+// <id> -> <id> ["label"] <speed>
+//
+// Every setting this genre takes is in docs/reference.md, under its name.
+
+// Topology: hosts, links and the segments that hold them. The role picks the
+// shape; placement stays declared, as in `free` (W-043).
+type network { title: "One site — edge to core" }
+graph { background: #0b1120 padding: 30 gap: 70 }
+
+style host  { fill: #1e293b stroke: #334155 1.2 font: 12 #e2e8f0 radius: 5 }
+style edge  { stroke: #64748b 1.3 font: 10 #94a3b8 head: none }
+style group { stroke: #334155 1 fill: #0f172a80 radius: 8 dash: dashed font: 11 #94a3b8 }
+
+host net "Internet" cloud
+host fw  "Edge firewall" firewall { addr: "203.0.113.1" }
+host tor "Top-of-rack" switch { addr: "10.0.0.1" }
+
+group core "Core segment — 10.0.0.0/24" {
+  host proc01 "rk1-app01" server { addr: "10.0.0.11" }
+  host proc02 "rk1-app02" server { addr: "10.0.0.12" }
+  host shelf  "Storage shelf"   storage { addr: "10.0.0.20" }
+}
+
+layout {
+  place net at (0, 0)
+  place fw below net gap 60
+  place tor below fw gap 60
+  place proc01 right-of tor gap 190
+  place proc02 below proc01 gap 40
+  place shelf below proc02 gap 40
+}
+
+net -> fw  "uplink" "1 GbE"
+fw  -> tor "trunk"  "10 GbE"
+tor -> proc01 "" "10 GbE"
+tor -> proc02 "" "10 GbE"
+// Told which side to leave by (`D-033`). Three links off one switch share its
+// right-hand side; sending the longest one out of the bottom keeps its label
+// off the switch and its line out of the other two's way.
+tor -> shelf  "" "10 GbE" { from: bottom to: left }

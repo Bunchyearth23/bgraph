@@ -1,0 +1,53 @@
+// Nodes and edges placed by anchors — the default when a file declares no
+// `type`.
+//
+// node <id> ["label"]
+//
+// Every setting this genre takes is in docs/reference.md, under its name.
+
+// A group is a frame sized by what it holds. Give it a placement and the
+// whole subtree moves together.
+
+graph { background: #0f172a padding: 32 gap: 44 }
+
+style node  { fill: #1e293b stroke: #334155 1.5 font: 13 #e2e8f0 radius: 8 }
+style group { stroke: #38bdf8 1.2 font: 12 #38bdf8 fill: #38bdf80c radius: 12 }
+style edge  { stroke: #64748b 1.5 font: 11 #94a3b8 }
+style store extends node { shape: cylinder stroke: #10b981 1.5 }
+
+node client "Client"
+
+group edge "Edge" {
+  padding: 20
+  node gw   "Gateway"
+  node auth "Auth"
+  layout {
+    place gw at (0, 0)
+    place auth below gw gap 26
+  }
+}
+
+group core "Core services" {
+  padding: 20
+  node orders  "Orders"
+  node billing "Billing"
+  layout {
+    place orders at (0, 0)
+    place billing below orders gap 26
+  }
+}
+
+node db "Postgres" .store
+
+layout {
+  place client at (0, 0)
+  place edge right-of client gap 60
+  place core right-of edge gap 60
+  place db right-of core gap 60
+}
+
+client -> gw    "https"
+gw     -> auth  "verify"
+gw     -> orders
+orders -> billing
+orders -> db    "sql"

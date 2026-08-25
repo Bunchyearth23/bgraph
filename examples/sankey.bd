@@ -1,0 +1,33 @@
+// Flows between stages, sized by magnitude. The value rides on the link, not
+// on what it joins: a node's height is whatever passes through it.
+//
+// node <id> ["label"]
+// <id> -> <id> ["label"] <value>
+//
+// Every setting this genre takes is in docs/reference.md, under its name.
+
+type sankey {
+  title: "Where the traffic goes"
+  size: 620 340
+  gap: 16
+  labels: both
+}
+graph { background: #0b1120 padding: 32 }
+style node { font: 12 #e2e8f0 }
+
+node search "Organic"
+node social "Social"
+node paid   "Paid"
+node landing "Landing"
+node pricing "Pricing"
+node signup  "Sign-up"
+node bounce  "Bounce"
+
+search  -> landing 4200
+social  -> landing 1500
+paid    -> pricing  900
+search  -> pricing  620
+landing -> signup  2100
+landing -> bounce  3600
+pricing -> signup  1100
+pricing -> bounce   420

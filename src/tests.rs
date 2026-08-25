@@ -7730,6 +7730,43 @@ fn every_example_still_works() {
 }
 
 #[test]
+fn checked_in_examples_match_init_and_rendered_svg() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("examples");
+    let mut expected = std::collections::HashSet::new();
+    for (genre, _) in crate::examples::EXAMPLES {
+        let source_path = root.join(format!("{genre}.bd"));
+        let svg_path = root.join(format!("{genre}.svg"));
+        let source = std::fs::read_to_string(&source_path)
+            .unwrap_or_else(|e| panic!("missing {source_path:?}: {e}"));
+        let skeleton = crate::init::skeleton(genre).expect("known example genre");
+        assert_eq!(
+            source, skeleton,
+            "{source_path:?} drifted from `bgraph init`"
+        );
+        let rendered = crate::render_source(&source).expect("checked-in example renders");
+        let checked_in = std::fs::read_to_string(&svg_path)
+            .unwrap_or_else(|e| panic!("missing {svg_path:?}: {e}"));
+        assert_eq!(checked_in, rendered, "{svg_path:?} is stale");
+        expected.insert(format!("{genre}.bd"));
+        expected.insert(format!("{genre}.svg"));
+    }
+    let actual: std::collections::HashSet<String> = std::fs::read_dir(&root)
+        .expect("examples/")
+        .map(|entry| {
+            entry
+                .expect("example entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect();
+    assert_eq!(
+        actual, expected,
+        "examples/ must contain exactly one .bd/.svg pair per archetype"
+    );
+}
+
+#[test]
 fn every_diagram_in_the_documentation_still_works() {
     // A ```bgraph fence is a promise that the snippet is a complete, current
     // file. Prose rots quietly — `language.md` was still calling a slice a

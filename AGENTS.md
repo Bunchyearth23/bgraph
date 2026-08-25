@@ -32,7 +32,8 @@ The premise: mermaid-class tools auto-place everything and you fight the
 engine. Here **layout is declared** (relative anchors between nodes) and
 **style is a real cascade**. See `docs/language.md` for the syntax and
 `bgraph init <genre>` for a worked file per archetype — they live in
-`src/examples.rs`, not in a directory (`W-116`).
+`src/examples.rs` remains the source of truth; the checked-in `examples/` directory is a
+verified generated gallery of each `.bd` and its SVG (`W-116` plus the gallery work).
 
 **Where this is going** (`D-014`): archetypes covering four audiences —
 statistics, software, embedded and data — and, at the end of it, an
@@ -107,7 +108,7 @@ disagree.
 | `src/constraint_layout.rs` | `W-153` shadow lowering: compares migrated node relations with the deterministic Kasuari fork without owning rendered geometry yet |
 | `src/report.rs` | The two forms of a diagnostic. The flat one is an interchange format and does not move |
 | `src/init.rs` | `bgraph init <genre>`, generated from the same tables |
-| `src/examples.rs` | **The worked file for every archetype, in the source.** Not a directory: `include_str!` made the crate unbuildable without one, and `init` makes one redundant. `docs/goldens.txt` pins what each renders to |
+| `src/examples.rs` | **The worked file for every archetype, in the source.** `examples/` is a generated, checked-in gallery; `include_str!` never depends on it, and a test proves each pair matches `init` and the renderer. `docs/goldens.txt` pins what each renders to |
 | `src/wasm.rs` | The wasm boundary. **The only `unsafe` in the crate**, and `forbid` is scoped around it |
 | `src/docgen.rs` | `docs/reference.md`, generated from the `props.rs` tables |
 | `src/check.rs` | **The validator** — spanned diagnostics, one source of truth |
@@ -221,13 +222,11 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
   runs none of them. `LICENSE` still grants nothing, so the notes say the
   artefacts come with no permission to run them. Do not add a publish step to
   a second channel without a decision recorded first.
-- [2026-08-11] **A picture checked in beside its source goes stale silently.**
+- [2026-08-11] **A picture checked in beside its source goes stale silently unless it is verified.**
   `docs/diagrams/` held nine `.svg` files; the day the renderer changed, eight
-  were out of date and the manual illustrated a language it no longer
-  described. The manual renders them through `typst/bgraph.typ` now
-  (`./compile.sh` builds the module when missing) — so a diagram that stops
-  parsing stops the build. Never re-add a rendered picture beside a `.bd`; a
-  test refuses it.
+  were out of date. The checked-in `examples/` gallery is allowed because a
+  test regenerates each source through `init`, renders it, and compares the SVG
+  byte-for-byte. Never add an unverified rendered picture beside a `.bd`.
 - [2026-08-11] **A style's *name* decides whether it paints anything.** A fixed
   set — `props::THEME_STYLES` plus the genre's item word — is looked up by the
   renderer itself; everything else paints only where `.name` is written. Add a
@@ -251,8 +250,9 @@ _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update
 - [2026-08-11] **`include_str!` makes a data directory a build dependency.**
   Thirty-one of them pointed at `examples/`, so deleting a directory of *sample
   files* stopped the crate compiling. Anything the code needs at build time
-  belongs in the code; a directory is an output. The examples are
-  `src/examples.rs` now and `docs/goldens.txt` pins what each one draws.
+  belongs in the code; the directory remains an output. The examples are
+  `src/examples.rs` now, while the checked-in gallery is regenerated from
+  `bgraph init` and `docs/goldens.txt` pins what each one draws.
 - [2026-08-11] **A sweep over a directory passes when the directory is empty.**
   Half the suite's coverage was `read_dir("examples")` loops with a
   `seen >= 25` floor — which is a guard, but the floor is the only thing that

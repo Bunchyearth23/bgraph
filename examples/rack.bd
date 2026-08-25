@@ -1,0 +1,57 @@
+// A rack elevation. Units are numbered from 1 at the **bottom**, as a rack
+// is, and a device occupies an inclusive span of them. Empty units are left
+// empty: unlike a packet, a rack with gaps is a rack with room, not a rack
+// that does not add up.
+//
+// device <id> ["label"] <u> <u>
+//
+// Every setting this genre takes is in docs/reference.md, under its name.
+
+// A rack elevation. Units count from 1 at the bottom, as a rack is labelled —
+// and a device occupies an inclusive span of them (W-044). A `group` is one
+// rack, so a bank is a row of them: they stand on one floor, and a short rack
+// is short at the top (W-132).
+type rack {
+  title: "Row A — hall 1"
+  units: 24
+  cell: 230 19
+  ruler: on
+}
+
+graph { background: #0b1120 padding: 28 }
+
+style device  { fill: #1e293b stroke: #334155 1 radius: 3 font: 11 #e2e8f0 }
+style network extends device { fill: #0c2a3e stroke: #38bdf8 1 }
+style power   extends device { fill: #422006 stroke: #f59e0b 1 }
+style group   { stroke: #475569 1 }
+// The diagram's own furniture, not any device's: `grid` is the unit rules and
+// the U numbers, `title` is the heading (W-134).
+style grid    { stroke: #1e293b 0.5 font: 9 #64748b }
+style title   { font: 16 #f8fafc }
+
+// `device <id> ["label"] <lowest> <highest>`
+group a1 "A1 — general" {
+  device tor1   "Top-of-rack switch"  .network 24 24
+  device patch1 "Patch panel"         .network 23 23
+  device proc01 "rk1-app01"                    19 22
+  device proc02 "rk1-app02"                    15 18
+  device cap01  "rk1-db01"                     11 14
+  device store1 "Storage shelf"                 6  9
+  device ups1   "UPS"                 .power    1  4
+}
+
+group a2 "A2 — compute" {
+  device tor2   "Top-of-rack switch"  .network 24 24
+  device proc03 "rk2-app01"                    18 21
+  device proc04 "rk2-app02"                    14 17
+  device gpu01  "rk2-gpu01"                     8 11
+  device ups2   "UPS"                 .power    1  4
+}
+
+// A rack of its own height: the network rack is half a cabinet.
+group a3 "A3 — edge" {
+  units: 12
+  device edge1  "Border router"       .network 12 12
+  device edge2  "Aggregation switch"  .network 10 11
+  device fw     "Firewall"                      6  7
+}

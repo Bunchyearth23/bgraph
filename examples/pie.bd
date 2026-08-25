@@ -1,0 +1,22 @@
+// A pie or donut chart. Each slice needs a value; its `fill` overrides the
+// automatic palette.
+//
+// slice <id> ["label"] <value>
+//
+// Every setting this genre takes is in docs/reference.md, under its name.
+
+type pie {
+  title: "Traffic sources"
+  radius: 130
+  donut: 0.55
+  labels: percent
+}
+
+graph { background: #0b1120 padding: 32 }
+
+// `slice <id> ["label"] <value>` — the value rides in position.
+slice organic  "Organic search" 4820
+slice direct   "Direct"         2410
+slice referral "Referral"       1180
+slice social   "Social"          690
+slice paid     "Paid"            410
