@@ -93,7 +93,7 @@ fn reflow(source: &str) -> String {
 /// is a named colour: `white` has no fourth channel, and turning it into a hex
 /// literal is the author's decision to make, not this function's.
 pub fn migrate(source: &str) -> anyhow::Result<String> {
-    let diagram = crate::parser::parse_diagram(source)?;
+    let diagram = crate::parser::parse_legacy_diagram(source)?;
 
     let decls = declarations(source);
     let mut edits: Vec<(usize, usize, String)> = Vec::new();
@@ -186,7 +186,7 @@ pub fn migrate(source: &str) -> anyhow::Result<String> {
     let before_picture = if moved.is_empty() {
         None
     } else {
-        Some(crate::render_source(source).map_err(|error| {
+        Some(crate::render_legacy_source(source).map_err(|error| {
             anyhow::anyhow!(
                 "cannot verify the inline-placement migration because the source does not render: {error}"
             )

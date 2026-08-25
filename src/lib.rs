@@ -200,6 +200,18 @@ pub use template::{Bindings, Template, Value};
 /// server does.
 pub fn render_source(source: &str) -> Result<String> {
     let diagram = parser::parse_diagram(source)?;
+    render_diagram(diagram)
+}
+
+/// The private v1 reader used only to prove that `fmt --migrate` preserved a
+/// legacy drawing. It is not an alternate library API: callers get the v2
+/// language through [`render_source`].
+pub(crate) fn render_legacy_source(source: &str) -> Result<String> {
+    let diagram = parser::parse_legacy_diagram(source)?;
+    render_diagram(diagram)
+}
+
+fn render_diagram(diagram: ast::Diagram) -> Result<String> {
     // No filesystem here, and deliberately: this function is the semver
     // surface and the wasm build rests on it, so it cannot start opening
     // files because a statement asked it to (`D-029`). It says which call

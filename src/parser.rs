@@ -50,6 +50,16 @@ pub fn parse_diagram(input: &str) -> Result<Diagram> {
     parse(input).map_err(anyhow::Error::from)
 }
 
+/// Reads the pre-v2 syntax for the one-way source migrator.
+///
+/// This boundary is deliberately crate-private: `fmt --migrate` is allowed to
+/// understand a file written before the layout DSL was unified, while every
+/// public entry point will eventually accept v2 only. Keeping the reader here
+/// lets that removal happen without giving the old syntax a second public API.
+pub(crate) fn parse_legacy_diagram(input: &str) -> Result<Diagram> {
+    parse(input).map_err(anyhow::Error::from)
+}
+
 /// How deeply groups may nest.
 ///
 /// This is not a taste judgement about diagrams — it is a guard on the host

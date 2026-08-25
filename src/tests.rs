@@ -1836,7 +1836,7 @@ group service {
         "{after}"
     );
     assert_eq!(
-        crate::render_source(before).expect("legacy source renders"),
+        crate::render_legacy_source(before).expect("legacy source renders"),
         crate::render_source(&after).expect("migrated source renders"),
         "the migration changed the picture:\n{after}"
     );
