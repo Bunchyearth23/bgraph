@@ -476,10 +476,10 @@ pub const PROPS: &[PropDef] = &[
         alias: false,
         ctx: Ctx::Edge,
         words: SIDES,
-        syntax: "from: <auto|top|bottom|left|right>",
+        syntax: "from: <side> [<index> of <total>]",
         doc: "Which side of the first box the line leaves by. `auto`, the \
-              default, lets the router pick — this is for when it picks badly, \
-              or when two lines have to leave by different sides. The route \
+              default, lets the router pick. An indexed form such as `right 2 \
+              of 3` selects an evenly-spaced port on that side; the route \
               between the two attachments is still the engine's (`D-033`).",
     },
     PropDef {
@@ -487,8 +487,9 @@ pub const PROPS: &[PropDef] = &[
         alias: false,
         ctx: Ctx::Edge,
         words: SIDES,
-        syntax: "to: <auto|top|bottom|left|right>",
-        doc: "Which side of the second box the line arrives at.",
+        syntax: "to: <side> [<index> of <total>]",
+        doc: "Which side of the second box the line arrives at. An indexed form \
+              such as `left 4 of 4` selects a specific evenly-spaced port.",
     },
     PropDef {
         name: "lane",

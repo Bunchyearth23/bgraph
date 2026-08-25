@@ -3265,10 +3265,15 @@ fn check_props_refined(
         if def.words.is_empty() {
             continue;
         }
-        for value in &prop.values {
+        for (index, value) in prop.values.iter().enumerate() {
             let Some(word) = value.as_word() else {
                 continue;
             };
+            // Indexed edge attachments use the readable `side index of total`
+            // form. `of` is a structural separator, not a side value.
+            if matches!(prop.name.as_str(), "from" | "to") && index > 0 && word == "of" {
+                continue;
+            }
             // Strict by default, and the exceptions are named: a compound
             // paint property mixes colors, widths and patterns, so a bare word
             // there may legitimately be a named color. Listing the *strict*

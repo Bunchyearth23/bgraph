@@ -797,10 +797,19 @@ a -> c { from: bottom to: left }
 
 `from` and `to` take `top`, `bottom`, `left`, `right` or `auto` — `auto` is the
 default and is spelled, so a class can put a side back to the engine's choice.
-Lines arriving at one side of one box **spread along it** in declaration order
-rather than converging on its midpoint; `lane: 2` reorders them by hand. A line
-arriving and a line leaving are not in each other's way, so those are not
-spread against one another.
+For exact attachment points, add an index and a total:
+
+```bgraph
+node a "A"
+node b "B"
+a -> b { from: right 2 of 3 to: left 4 of 4 }
+```
+
+The points are spread evenly along the named side, and the index is one-based.
+Without an explicit port, lines arriving at one side of one box **spread along
+it** in declaration order; `lane: 2` reorders them by hand. A line arriving and
+a line leaving are not in each other's way, so those are not spread against one
+another.
 
 `via` takes a **list**, and each stop is parenthesised — that is what lets the
 list need no separator, since `,` already separates statements. A stop is one

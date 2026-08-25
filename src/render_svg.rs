@@ -444,14 +444,31 @@ fn attachments(layout: &Layout) -> Vec<[Option<(f64, f64)>; 2]> {
             continue;
         }
         let r = layout.nodes[node].rect;
-        let n = ends.len() as f64;
+        let n = ends
+            .iter()
+            .filter_map(|(e, at_from)| {
+                let edge = &layout.edges[*e];
+                if *at_from {
+                    edge.style.from_port.map(|(_, total)| total)
+                } else {
+                    edge.style.to_port.map(|(_, total)| total)
+                }
+            })
+            .next()
+            .unwrap_or(ends.len() as f64)
+            .max(1.0);
         for (k, (e, at_from)) in ends.iter().enumerate() {
             // `lane` counts from 1 and is clamped rather than refused: a lane
             // past the end is a diagram that still has to draw.
-            let slot = layout.edges[*e]
-                .style
-                .lane
-                .map(|l| (l - 1.0).clamp(0.0, n - 1.0))
+            let edge = &layout.edges[*e];
+            let port = if *at_from {
+                edge.style.from_port
+            } else {
+                edge.style.to_port
+            };
+            let slot = port
+                .map(|(index, _)| (index - 1.0).clamp(0.0, n - 1.0))
+                .or_else(|| edge.style.lane.map(|l| (l - 1.0).clamp(0.0, n - 1.0)))
                 .unwrap_or(k as f64);
             let along = (slot + 1.0) / (n + 1.0);
             let on_rect = match side {

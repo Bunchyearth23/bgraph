@@ -267,8 +267,8 @@ Aliases are marked. They behave identically to the property they alias; the edit
 | `from-head` | edge | `from-head: <head>` | A mark at the tail, whatever kind. UML's diamond belongs at the *whole* and the whole is nearly always the tail, so without this a composition had to be written backwards to be drawn right. |
 | `to-head` | edge | `to-head: <head>` | A mark at the head end, whatever kind. `head` sets it too; this names the end explicitly, which is what lets the two differ. |
 | `bend` | edge | `bend: <radius>` | Round an `ortho` elbow by this much. A style on the router rather than a second router, so every other property keeps meaning what it meant. Sampled into the line rather than emitted as an arc, so the PDF, the JSON export and the label solver need learn nothing. |
-| `from` | edge | `from: <auto\|top\|bottom\|left\|right>` | Which side of the first box the line leaves by. `auto`, the default, lets the router pick — this is for when it picks badly, or when two lines have to leave by different sides. The route between the two attachments is still the engine's (`D-033`). |
-| `to` | edge | `to: <auto\|top\|bottom\|left\|right>` | Which side of the second box the line arrives at. |
+| `from` | edge | `from: <side> [<index> of <total>]` | Which side of the first box the line leaves by. `auto`, the default, lets the router pick. An indexed form such as `right 2 of 3` selects an evenly-spaced port on that side; the route between the two attachments is still the engine's (`D-033`). |
+| `to` | edge | `to: <side> [<index> of <total>]` | Which side of the second box the line arrives at. An indexed form such as `left 4 of 4` selects a specific evenly-spaced port. |
 | `lane` | edge | `lane: <n>` | Where this line sits among the ones sharing its side. Lines on one side spread along it in declaration order; `lane` reorders them by hand, counting from 1 at the left or the top. |
 | `route` *(alias)* | edge | `route: <straight\|ortho>` | Alias of `router`. |
 | `shadow` | node | `shadow: <on\|off>` | Soft drop shadow under the shape. |

@@ -1653,6 +1653,21 @@ fn an_edge_attaches_where_it_is_told_to() {
 }
 
 #[test]
+fn an_edge_can_choose_indexed_ports_on_each_side() {
+    let l = build(
+        "node a \"A\" at (0, 0) { size: 100 100 }\n\
+         node b \"B\" at (300, 0) { size: 100 100 }\n\
+         a -> b { from: right 2 of 3 to: left 4 of 4 }\n",
+    );
+    let path = &render_svg::route_all(&l)[0].points;
+    let (a, b) = (l.nodes[0].rect, l.nodes[1].rect);
+    let start = path[0];
+    let end = *path.last().unwrap();
+    assert!((start.1 - (a.y + a.h * 0.5)).abs() < 0.5);
+    assert!((end.1 - (b.y + b.h * 0.8)).abs() < 0.5);
+}
+
+#[test]
 fn lines_arriving_at_one_side_share_it_instead_of_stacking() {
     // The half of `D-033` nobody has to write a word for. Two heads at one
     // point is what the author reported; two *tails* at one point is the same

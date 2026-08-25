@@ -246,6 +246,9 @@ pub struct Style {
     /// picks, which is right nearly always and is the reason this is opt-in.
     pub from_side: Option<Side>,
     pub to_side: Option<Side>,
+    /// Explicit point on the selected side: (index, total), both one-based.
+    pub from_port: Option<(f64, f64)>,
+    pub to_port: Option<(f64, f64)>,
     pub lane: Option<f64>,
     /// `type bpmn` — which element this is, and what it carries.
     ///
@@ -298,6 +301,15 @@ fn cardinality(word: &str) -> anyhow::Result<Head> {
     })
 }
 
+/// Read the optional numeric suffix on `from`/`to` (`side index of total`).
+fn indexed_port(prop: &Prop) -> Option<(f64, f64)> {
+    let nums: Vec<f64> = prop.values.iter().filter_map(|v| v.as_num()).collect();
+    match nums.as_slice() {
+        [index, total, ..] => Some((*index, *total)),
+        _ => None,
+    }
+}
+
 impl Style {
     /// Values set in `other` win; everything else is left untouched.
     pub fn overlay(&mut self, other: &Style) {
@@ -348,6 +360,8 @@ impl Style {
             shared,
             from_side,
             to_side,
+            from_port,
+            to_port,
             lane,
             task_kind,
             stage,
@@ -582,8 +596,10 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
             };
             if prop.name == "from" {
                 style.from_side = side;
+                style.from_port = indexed_port(prop);
             } else {
                 style.to_side = side;
+                style.to_port = indexed_port(prop);
             }
         }
         "lane" => style.lane = first.and_then(|x| x.as_num()),
