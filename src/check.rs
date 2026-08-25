@@ -788,14 +788,18 @@ fn check_layouts(diagram: &Diagram, out: &mut Vec<Diag>) {
             else {
                 continue;
             };
-            if !nodes.contains(target.as_str()) {
+            let group_target = groups
+                .get(target.as_str())
+                .copied()
+                .filter(|group| !group.activates);
+            if !nodes.contains(target.as_str()) && group_target.is_none() {
                 let message = if groups.contains_key(target.as_str()) {
                     format!(
-                        "`place` accepts nodes, but `{}` is a group",
+                        "`place` accepts frames, but `{}` is an activation rather than a frame",
                         target.as_str()
                     )
                 } else {
-                    format!("`place` names unknown node `{}`", target.as_str())
+                    format!("`place` names unknown node or group `{}`", target.as_str())
                 };
                 out.push(Diag::error(target.span, message));
                 continue;
@@ -811,6 +815,17 @@ fn check_layouts(diagram: &Diagram, out: &mut Vec<Diag>) {
                 .iter()
                 .find(|node| node.id.as_str() == target.as_str())
                 && node.placement.is_some()
+            {
+                out.push(Diag::error(
+                    target.span,
+                    format!(
+                        "`{}` has both an inline placement and `layout {{ place … }}`",
+                        target.as_str()
+                    ),
+                ));
+            }
+            if let Some(group) = group_target
+                && group.placement.is_some()
             {
                 out.push(Diag::error(
                     target.span,

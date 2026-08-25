@@ -261,6 +261,7 @@ impl State {
         }
         d.extra_archetypes.extend(other.extra_archetypes);
         d.constraints.extend(other.constraints);
+        d.layouts.extend(other.layouts);
         d.notes.extend(other.notes);
         d.legends.extend(other.legends);
         d.styles.extend(other.styles);
@@ -513,6 +514,7 @@ fn expand(diagram: &mut Diagram, from: &Path) -> Result<()> {
         diagram.edges.extend(instance.edges);
         diagram.nodes.extend(instance.nodes);
         diagram.styles.extend(instance.styles);
+        diagram.layouts.extend(instance.layouts);
 
         diagram.groups.push(crate::ast::GroupDecl {
             activates: false,
@@ -590,6 +592,31 @@ fn pin(d: &mut Diagram, at: Span) {
         props(&mut group.props);
         pin_placement(&mut group.placement, at);
         s(&mut group.span);
+    }
+    for layout in &mut d.layouts {
+        if let Some(scope) = &mut layout.scope {
+            sp(scope);
+        }
+        for statement in &mut layout.statements {
+            match statement {
+                crate::ast::LayoutStmt::Place {
+                    target,
+                    placement,
+                    span,
+                } => {
+                    sp(target);
+                    pin_placement(&mut Some(placement.clone()), at);
+                    *span = at;
+                }
+                crate::ast::LayoutStmt::Constraint { constraint } => {
+                    for member in &mut constraint.members {
+                        sp(member);
+                    }
+                    s(&mut constraint.span);
+                }
+            }
+        }
+        s(&mut layout.span);
     }
 }
 
@@ -715,11 +742,42 @@ fn shift(d: &mut Diagram, delta: usize) {
         shift_placement(&mut group.placement, delta);
         s(&mut group.span);
     }
+    for layout in &mut d.layouts {
+        if let Some(scope) = &mut layout.scope {
+            sp(scope);
+        }
+        for statement in &mut layout.statements {
+            match statement {
+                crate::ast::LayoutStmt::Place {
+                    target,
+                    placement,
+                    span,
+                } => {
+                    sp(target);
+                    shift_placement_value(placement, delta);
+                    span.start += delta;
+                    span.end += delta;
+                }
+                crate::ast::LayoutStmt::Constraint { constraint } => {
+                    for member in &mut constraint.members {
+                        sp(member);
+                    }
+                    s(&mut constraint.span);
+                }
+            }
+        }
+        s(&mut layout.span);
+    }
 }
 
 fn shift_placement(placement: &mut Option<crate::ast::Placement>, delta: usize) {
-    use crate::ast::Placement;
-    if let Some(Placement::Rel { anchor, .. }) = placement {
+    if let Some(placement) = placement {
+        shift_placement_value(placement, delta);
+    }
+}
+
+fn shift_placement_value(placement: &mut crate::ast::Placement, delta: usize) {
+    if let crate::ast::Placement::Rel { anchor, .. } = placement {
         anchor.span.start += delta;
         anchor.span.end += delta;
     }
@@ -766,6 +824,32 @@ fn qualify(d: &mut Diagram, prefix: &str) {
         }
         rename_anchor(&mut group.placement, &own, prefix);
     }
+    for layout in &mut d.layouts {
+        if let Some(scope) = &mut layout.scope
+            && own.contains(&scope.value)
+        {
+            rename(scope);
+        }
+        for statement in &mut layout.statements {
+            match statement {
+                crate::ast::LayoutStmt::Place {
+                    target, placement, ..
+                } => {
+                    if own.contains(&target.value) {
+                        rename(target);
+                    }
+                    rename_placement_anchor(placement, &own, prefix);
+                }
+                crate::ast::LayoutStmt::Constraint { constraint } => {
+                    for member in &mut constraint.members {
+                        if own.contains(&member.value) {
+                            rename(member);
+                        }
+                    }
+                }
+            }
+        }
+    }
     for edge in &mut d.edges {
         for end in [&mut edge.from, &mut edge.to] {
             if own.contains(&end.value) {
@@ -795,6 +879,18 @@ fn rename_anchor(
 ) {
     use crate::ast::Placement;
     if let Some(Placement::Rel { anchor, .. }) = placement
+        && own.contains(&anchor.value)
+    {
+        *anchor = qualified(anchor, prefix);
+    }
+}
+
+fn rename_placement_anchor(
+    placement: &mut crate::ast::Placement,
+    own: &std::collections::HashSet<String>,
+    prefix: &str,
+) {
+    if let crate::ast::Placement::Rel { anchor, .. } = placement
         && own.contains(&anchor.value)
     {
         *anchor = qualified(anchor, prefix);

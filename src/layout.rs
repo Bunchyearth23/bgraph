@@ -1953,7 +1953,9 @@ fn place_all(
                 h: inner.h + padding * 2.0 + title,
             };
 
-            let placed_at = group.placement.as_ref().map(|p| p.resolved(opts.grid));
+            let placed_at = plan
+                .declared_group_placement(g)
+                .map(|p| p.resolved(opts.grid));
             let (frame, delta) = match &placed_at {
                 None => (frame, (0.0, 0.0)),
                 Some(Placement::At { x, y }) | Some(Placement::Cell { col: x, row: y }) => (

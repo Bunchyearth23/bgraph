@@ -140,6 +140,22 @@ fn a_local_layout_only_constrains_its_groups_members() {
 }
 
 #[test]
+fn a_root_layout_places_a_group_and_its_subtree() {
+    let l = build(
+        r#"node client "Client" { size: 80 40 }
+           group service "Service" {
+             node api "API" { size: 80 40 }
+           }
+           layout {
+             place client at (0, 0)
+             place service right-of client gap 48
+           }"#,
+    );
+    assert_eq!(l.groups[0].rect.x, l.nodes[0].rect.right() + 48.0);
+    assert!(l.nodes[1].rect.x > l.nodes[0].rect.right());
+}
+
+#[test]
 fn relative_placement_offsets_by_the_gap() {
     let l = build(
         r#"
@@ -8929,6 +8945,17 @@ fn constraints_survive_composition() {
         l.nodes[0].rect.w > 100.0,
         "the constraint was lost on the way"
     );
+}
+
+#[test]
+fn scoped_layouts_survive_composition() {
+    let composed = compose_one(
+        "layouts-compose",
+        "node a \"A\"\nnode b \"B\"\nlayout {\n place a at (0, 0)\n place b right-of a gap 48\n}\n",
+    );
+    assert_eq!(composed.diagram.layouts.len(), 1);
+    let l = crate::layout::solve(&composed.diagram).unwrap();
+    assert_eq!(l.nodes[1].rect.x, l.nodes[0].rect.right() + 48.0);
 }
 
 // ------------------------------------------------- accessibility (I-040)

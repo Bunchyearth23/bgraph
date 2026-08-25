@@ -55,6 +55,7 @@ pub struct PlacementPlan<'a> {
     owner: HashMap<Entity, usize>,
     previous_sibling: Vec<Option<usize>>,
     layout_placement: Vec<Option<&'a Placement>>,
+    layout_group_placement: Vec<Option<&'a Placement>>,
 }
 
 impl<'a> PlacementPlan<'a> {
@@ -85,14 +86,20 @@ impl<'a> PlacementPlan<'a> {
         }
 
         let mut layout_placement = vec![None; diagram.nodes.len()];
+        let mut layout_group_placement = vec![None; diagram.groups.len()];
         for layout in &diagram.layouts {
             for statement in &layout.statements {
                 if let LayoutStmt::Place {
                     target, placement, ..
                 } = statement
-                    && let Some(Entity::Node(node)) = index.get(target.as_str()).copied()
                 {
-                    layout_placement[node] = Some(placement);
+                    match index.get(target.as_str()).copied() {
+                        Some(Entity::Node(node)) => layout_placement[node] = Some(placement),
+                        Some(Entity::Group(group)) => {
+                            layout_group_placement[group] = Some(placement)
+                        }
+                        None => {}
+                    }
                 }
             }
         }
@@ -103,6 +110,7 @@ impl<'a> PlacementPlan<'a> {
             owner,
             previous_sibling,
             layout_placement,
+            layout_group_placement,
         }
     }
 
@@ -183,6 +191,10 @@ impl<'a> PlacementPlan<'a> {
         self.layout_placement[node].or(self.diagram.nodes[node].placement.as_ref())
     }
 
+    pub fn declared_group_placement(&self, group: usize) -> Option<&'a Placement> {
+        self.layout_group_placement[group].or(self.diagram.groups[group].placement.as_ref())
+    }
+
     pub fn node(&self, node: usize, flow: RelDir) -> EffectivePlacement<'a> {
         if let Some(placement) = self.declared_placement(node) {
             EffectivePlacement::Declared(placement)
@@ -205,7 +217,7 @@ impl<'a> PlacementPlan<'a> {
                 return None;
             }
             seen.push(group);
-            if self.diagram.groups[group].placement.is_some() {
+            if self.declared_group_placement(group).is_some() {
                 return Some(group);
             }
             cursor = self.owner.get(&Entity::Group(group)).copied();
@@ -286,7 +298,7 @@ impl<'a> PlacementPlan<'a> {
                 }
 
                 let entity = Entity::Group(g);
-                let anchor_ready = match &group.placement {
+                let anchor_ready = match self.declared_group_placement(g) {
                     Some(Placement::Rel { anchor, .. }) => self
                         .index
                         .get(anchor.as_str())
