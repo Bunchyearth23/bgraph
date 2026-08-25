@@ -1567,6 +1567,18 @@ fn two_lines_between_the_same_pair_do_not_lie_on_each_other() {
 }
 
 #[test]
+fn duplicate_ortho_lines_get_distinct_interior_channels() {
+    let l = build(
+        "node a \"A\" at (0, 0) { size: 60 40 }\n\
+         node b \"B\" at (300, 160) { size: 60 40 }\n\
+         style edge { router: ortho }\n\
+         a -> b\na -> b\n",
+    );
+    let routes = render_svg::route_all(&l);
+    assert_ne!(routes[0].points, routes[1].points);
+}
+
+#[test]
 fn a_line_goes_through_every_place_it_is_told_to() {
     // `D-034`. A list, not a point — and each stop is parenthesised, which is
     // what lets the list need no separator, since `,` already separates

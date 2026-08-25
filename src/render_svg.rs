@@ -544,7 +544,10 @@ pub fn route_all(layout: &Layout) -> Vec<Routed> {
                 // when both are straight. Each takes its own bow, alternating
                 // sides so a pair separates rather than both leaning one way.
                 let line = match siblings[e] {
-                    Some((k, n)) if edge.style.router != Some(Router::Ortho) => {
+                    Some((k, n)) if edge.style.router == Some(Router::Ortho) => {
+                        offset_ortho(line, k, n)
+                    }
+                    Some((k, n)) => {
                         // The sign follows the *pair*, not the direction the
                         // edge was written in. A bow is perpendicular to the
                         // line, so `b -> a` flips the perpendicular too, and
@@ -608,6 +611,27 @@ pub fn route_all(layout: &Layout) -> Vec<Routed> {
     }
 
     routed
+}
+
+/// Separate orthogonal duplicates while preserving their declared endpoints.
+/// The interior channel is shifted, leaving short stubs at each box so the
+/// attachment remains exact.
+fn offset_ortho(mut line: Vec<(f64, f64)>, index: usize, total: usize) -> Vec<(f64, f64)> {
+    if line.len() < 3 || total < 2 {
+        return line;
+    }
+    let offset = 12.0 * (index as f64 - (total as f64 - 1.0) / 2.0);
+    let horizontal =
+        (line.last().unwrap().0 - line[0].0).abs() >= (line.last().unwrap().1 - line[0].1).abs();
+    let end = line.len() - 1;
+    for point in &mut line[1..end] {
+        if horizontal {
+            point.1 += offset;
+        } else {
+            point.0 += offset;
+        }
+    }
+    line
 }
 
 /// A label sits on the midpoint of its own edge by default, and slides along
