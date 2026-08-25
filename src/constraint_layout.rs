@@ -81,6 +81,8 @@ struct Lowering<'plan, 'diagram, 'out> {
     variables: &'plan [Variables],
     default_gap: f64,
     grid: Option<(f64, f64)>,
+    grid_spec: Option<crate::style::GridSpec>,
+    grid_pitch: (f64, f64),
     out: &'out mut Vec<SourcedConstraint>,
 }
 
@@ -103,14 +105,14 @@ pub fn solve_nodes(
     sizes: &[(f64, f64)],
     opts: &GraphOpts,
 ) -> Result<Option<Vec<Rect>>> {
-    // Bounded grids need measured track pitches before constraints are lowered;
-    // keep them on the canonical placement path until that lowering is shared.
-    if opts.grid_spec.is_some()
-        || diagram.nodes.len() > MAX_SHADOW_NODES
-        || !diagram.groups.is_empty()
-    {
+    if diagram.nodes.len() > MAX_SHADOW_NODES || !diagram.groups.is_empty() {
         return Ok(None);
     }
+
+    let grid_pitch = opts
+        .grid_spec
+        .map(|grid| grid.pitch(sizes))
+        .unwrap_or((1.0, 1.0));
 
     let variables: Vec<Variables> = (0..diagram.nodes.len()).map(|_| Variables::new()).collect();
     let mut constraints: Vec<SourcedConstraint> = Vec::with_capacity(diagram.nodes.len() * 4);
@@ -153,6 +155,8 @@ pub fn solve_nodes(
                         variables: &variables,
                         default_gap: opts.gap,
                         grid: opts.grid,
+                        grid_spec: opts.grid_spec,
+                        grid_pitch,
                         out: &mut constraints,
                     },
                 )?;
@@ -174,6 +178,8 @@ pub fn solve_nodes(
                         variables: &variables,
                         default_gap: opts.gap,
                         grid: opts.grid,
+                        grid_spec: opts.grid_spec,
+                        grid_pitch,
                         out: &mut constraints,
                     },
                 )?;
@@ -195,6 +201,8 @@ pub fn solve_nodes(
                         variables: &variables,
                         default_gap: opts.gap,
                         grid: opts.grid,
+                        grid_spec: opts.grid_spec,
+                        grid_pitch,
                         out: &mut constraints,
                     },
                 )?;
@@ -541,7 +549,18 @@ fn lower_placement(
         Placement::At { .. } => ConstraintOrigin::AbsolutePlacement,
         Placement::Rel { .. } => ConstraintOrigin::RelativePlacement,
     };
-    match placement.resolved(lowering.grid) {
+    let resolved = match (lowering.grid_spec, placement) {
+        (Some(_), Placement::At { x, y }) => Placement::At {
+            x: x * lowering.grid_pitch.0,
+            y: y * lowering.grid_pitch.1,
+        },
+        (Some(_), Placement::Cell { col, row }) => Placement::At {
+            x: col * lowering.grid_pitch.0,
+            y: row * lowering.grid_pitch.1,
+        },
+        _ => placement.resolved(lowering.grid),
+    };
+    match resolved {
         Placement::At { x, y } => {
             push(
                 lowering.out,
@@ -595,13 +614,18 @@ fn lower_relative(
     };
     let target = lowering.variables[anchor];
     let gap = gap.unwrap_or(lowering.default_gap);
+    let gap_x = if matches!(dir, RelDir::RightOf | RelDir::LeftOf) {
+        gap * lowering.grid_pitch.0
+    } else {
+        gap * lowering.grid_pitch.1
+    };
     let align = alignment.declared.unwrap_or(Align::Center);
 
     match dir {
         RelDir::RightOf => {
             push(
                 lowering.out,
-                vars.x | EQ(Strength::REQUIRED) | (target.x + target.w + gap),
+                vars.x | EQ(Strength::REQUIRED) | (target.x + target.w + gap_x),
                 source.with_axis(Axis::X).with_anchor_index(anchor),
             );
             if alignment.overridden_axis != Some(ConstraintAxis::Vertical) {
@@ -617,7 +641,7 @@ fn lower_relative(
         RelDir::LeftOf => {
             push(
                 lowering.out,
-                (vars.x + vars.w + gap) | EQ(Strength::REQUIRED) | target.x,
+                (vars.x + vars.w + gap_x) | EQ(Strength::REQUIRED) | target.x,
                 source.with_axis(Axis::X).with_anchor_index(anchor),
             );
             if alignment.overridden_axis != Some(ConstraintAxis::Vertical) {
@@ -633,7 +657,7 @@ fn lower_relative(
         RelDir::Below => {
             push(
                 lowering.out,
-                vars.y | EQ(Strength::REQUIRED) | (target.y + target.h + gap),
+                vars.y | EQ(Strength::REQUIRED) | (target.y + target.h + gap_x),
                 source.with_axis(Axis::Y).with_anchor_index(anchor),
             );
             if alignment.overridden_axis != Some(ConstraintAxis::Horizontal) {
@@ -649,7 +673,7 @@ fn lower_relative(
         RelDir::Above => {
             push(
                 lowering.out,
-                (vars.y + vars.h + gap) | EQ(Strength::REQUIRED) | target.y,
+                (vars.y + vars.h + gap_x) | EQ(Strength::REQUIRED) | target.y,
                 source.with_axis(Axis::Y).with_anchor_index(anchor),
             );
             if alignment.overridden_axis != Some(ConstraintAxis::Horizontal) {
