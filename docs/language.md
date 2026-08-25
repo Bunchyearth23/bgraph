@@ -9,8 +9,12 @@ graph { background: #0b1120 }
 
 style box { fill: #1e293b stroke: #38bdf8 1.5 }
 
-node a "Alpha" .box at (0, 0)
-node b "Beta"  .box right-of a gap 60
+node a "Alpha" .box
+node b "Beta"  .box
+layout {
+  place a at (0, 0)
+  place b right-of a gap 60
+}
 
 a -> b "carries"
 ```
@@ -63,12 +67,14 @@ collide.
 ```
 component service {
   node app "{{label}}"
-  node db  "Database" below app gap 34
+  node db  "Database"
+  layout { place db below app gap 34 }
   app -> db "reads"
 }
 
 use service as web
-use service as jobs right-of web gap 90 { label: "Jobs" }
+use service as jobs { label: "Jobs" }
+layout { place jobs right-of web gap 90 }
 
 web.app -> jobs.app "enqueues"
 ```
@@ -99,7 +105,8 @@ Text that belongs to no box — a caption, a warning, an aside:
 style caption { font: 11 #b45309 }
 
 node api "API"
-node db "Database" below api gap 60
+node db "Database"
+layout { place db below api gap 60 }
 
 note "Figures are March; April is not in yet." .caption right-of api gap 30
 note "Replica, not the primary." below db gap 14
@@ -127,7 +134,8 @@ style degraded { fill: #fef3c7 stroke: #d97706 legend: "Degraded" }
 style plain    { radius: 2 }
 
 node api "API" .healthy
-node jobs "Workers" .degraded below api
+node jobs "Workers" .degraded
+layout { place jobs below api }
 
 legend right-of api gap 70
 ```
@@ -166,8 +174,12 @@ or skipped entirely. A chart's own `title` serves as the label when no
 ```bgraph
 graph { title: "Order to cash" title-align: center }
 
-node a "A" at (0, 0)
-node b "B" at (400, 0)
+node a "A"
+node b "B"
+layout {
+  place a at (0, 0)
+  place b at (400, 0)
+}
 ```
 
 `left` (the default), `center` or `right`. **One setting for every genre**: a
@@ -275,10 +287,17 @@ and a data artefact are four different things carrying four different shapes.
 type bpmn { title: "Order to cash" }
 
 event   got   "Order received" start message
-task    check "Check credit"   service right-of got gap 44
-gateway ok    "Approved?"      exclusive right-of check gap 44
-data    form  "Claim form"     object below check gap 40
-event   done  "Approved"       end right-of ok gap 44
+task    check "Check credit"   service
+gateway ok    "Approved?"      exclusive
+data    form  "Claim form"     object
+event   done  "Approved"       end
+
+layout {
+  place check right-of got gap 44
+  place ok right-of check gap 44
+  place form below check gap 40
+  place done right-of ok gap 44
+}
 
 got   -> check
 check -> ok
@@ -739,9 +758,14 @@ a line leaves and arrives by; **`via`** names the places it goes through on the
 way. The route between any two of those is still the engine's (`D-033`).
 
 ```bgraph
-node a "A" at (0, 0)
-node b "B" at (420, 0)
-node c "C" at (200, 220)
+node a "A"
+node b "B"
+node c "C"
+layout {
+  place a at (0, 0)
+  place b at (420, 0)
+  place c at (200, 220)
+}
 
 a -> b "over the top"
 a -> b "under" { router: ortho } via (left-of c gap 30) (below c gap 40)
@@ -781,8 +805,12 @@ an end explicitly, which is what lets the two differ.
 ```bgraph
 type class
 class vehicle "Vehicle"
-class car "Car" below vehicle gap 60
-class wheel "Wheel" right-of car gap 60
+class car "Car"
+class wheel "Wheel"
+layout {
+  place car below vehicle gap 60
+  place wheel right-of car gap 60
+}
 
 car -> vehicle { head: triangle }
 car -> wheel { from-head: composition head: none }
@@ -799,9 +827,14 @@ to a shape it did not.
 ### The shape of the line itself
 
 ```bgraph
-node a "A" at (0, 0)
-node b "B" at (300, 160)
-node c "C" at (300, 0)
+node a "A"
+node b "B"
+node c "C"
+layout {
+  place a at (0, 0)
+  place b at (300, 160)
+  place c at (300, 0)
+}
 
 a -> b { router: ortho bend: 16 }
 a -> c { router: curved }
@@ -845,7 +878,8 @@ room. `label-offset` is the escape hatch:
 
 ```bgraph
 node worker "Worker"
-node db "Postgres" below worker gap 80
+node db "Postgres"
+layout { place db below worker gap 80 }
 
 worker -> db "read / write" { label-offset: -30 12 }   // left 30, down 12
 ```
@@ -865,10 +899,11 @@ group dmz "DMZ" {
   node gateway "Gateway"
 }
 
-node store "PostgreSQL" below gateway gap 80 {
+node store "PostgreSQL" {
   shape: cylinder
   label-offset: 0 8                      // clear of the cylinder's cap
 }
+layout { place store below gateway gap 80 }
 ```
 
 Nothing is clipped for it: the viewBox follows a label that has been moved

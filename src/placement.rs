@@ -390,7 +390,7 @@ mod tests {
 
     #[test]
     fn implicit_flow_is_scoped_to_the_container() {
-        let diagram = crate::parser::parse_diagram(
+        let diagram = crate::parser::parse_legacy_diagram(
             "node outside\ngroup g {\n node first\n node second\n}\nnode after",
         )
         .unwrap();
@@ -404,7 +404,7 @@ mod tests {
 
     #[test]
     fn the_innermost_placed_ancestor_is_the_translation_unit() {
-        let diagram = crate::parser::parse_diagram(
+        let diagram = crate::parser::parse_legacy_diagram(
             "group outer at (10, 10) {\n group inner {\n node a\n }\n}",
         )
         .unwrap();
@@ -416,7 +416,8 @@ mod tests {
 
     #[test]
     fn a_group_waiting_for_its_own_member_is_unresolved() {
-        let diagram = crate::parser::parse_diagram("group g right-of a {\n node a\n}").unwrap();
+        let diagram =
+            crate::parser::parse_legacy_diagram("group g right-of a {\n node a\n}").unwrap();
         let plan = PlacementPlan::new(&diagram);
 
         assert_eq!(plan.unresolved(), [Entity::Node(0), Entity::Group(0)]);
@@ -424,9 +425,10 @@ mod tests {
 
     #[test]
     fn constraints_share_the_placement_namespace() {
-        let diagram =
-            crate::parser::parse_diagram("group g { node a }\nnode b\nsame-width a g missing b")
-                .unwrap();
+        let diagram = crate::parser::parse_legacy_diagram(
+            "group g { node a }\nnode b\nsame-width a g missing b",
+        )
+        .unwrap();
         let plan = PlacementPlan::new(&diagram);
 
         assert_eq!(

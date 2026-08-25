@@ -14,11 +14,19 @@ style node    { fill: #1e293b stroke: #334155 1.5 font: 14 #e2e8f0 }
 style service { fill: #172554 stroke: #3b82f6 1.5 }
 style store extends service { shape: cylinder stroke: #10b981 1.5 }
 
-node client  "Client"         at (0, 0)
-node gateway "API\nGateway"   .service right-of client  gap 90
-node orders  "Order\nService" .service right-of gateway gap 90
-node db      "Postgres"       .store   right-of orders  gap 90
-node cache   "Redis"          .store   below db         gap 55
+node client  "Client"
+node gateway "API\nGateway"   .service
+node orders  "Order\nService" .service
+node db      "Postgres"       .store
+node cache   "Redis"          .store
+
+layout {
+  place client at (0, 0)
+  place gateway right-of client gap 90
+  place orders right-of gateway gap 90
+  place db right-of orders gap 90
+  place cache below db gap 55
+}
 
 client  -> gateway "https"
 gateway -> orders
@@ -80,9 +88,9 @@ order: source, placement, style, data, then composition.
 - **Self-sizing canvas** — the viewBox follows the content.
 - **A declared grid** — `graph { grid: 160 90 }` and `at (col 3, row 2)`.
   Still `at`, in units you chose: a coordinate system, never a solver.
-- **Constraints that never reorder** — `align-group`, `same-width`,
-  `same-height`. They adjust one axis of what is already placed; deciding an
-  order stays your job.
+- **Constraints that never reorder** — `align`, `equal-width`,
+  `equal-height`, `row` and `column`, inside `layout`. They adjust only what
+  you declared; deciding the order stays your job.
 - **Composition** — `include "house.bds"` for a shared palette,
   `include "core.bd" as core` for a diagram under a namespace, and
   `component`/`use` for a shape placed many times. No silent shadowing: a name

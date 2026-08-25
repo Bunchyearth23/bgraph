@@ -57,7 +57,7 @@ pub fn parse_diagram(input: &str) -> Result<Diagram> {
 /// public entry point will eventually accept v2 only. Keeping the reader here
 /// lets that removal happen without giving the old syntax a second public API.
 pub(crate) fn parse_legacy_diagram(input: &str) -> Result<Diagram> {
-    parse(input).map_err(anyhow::Error::from)
+    parse_legacy(input).map_err(anyhow::Error::from)
 }
 
 /// How deeply groups may nest.
@@ -75,6 +75,22 @@ pub const MAX_NESTING: usize = 64;
 
 /// Parses source text, keeping the span an error points at.
 pub fn parse(input: &str) -> std::result::Result<Diagram, ParseError> {
+    let diagram = parse_legacy(input)?;
+    if let Some(span) = legacy_layout_span(&diagram) {
+        return Err(ParseError {
+            message: "inline placement is no longer supported; run `bgraph fmt --migrate` to move it into a `layout { … }` block".into(),
+            span,
+        });
+    }
+    Ok(diagram)
+}
+
+/// Parses both the canonical grammar and the pre-v2 placement clauses.
+///
+/// This is deliberately private. The migration command needs the old AST to
+/// preserve a diagram byte-for-byte, but no caller outside this crate gets an
+/// API that accepts a second placement language.
+fn parse_legacy(input: &str) -> std::result::Result<Diagram, ParseError> {
     check_nesting(input)?;
 
     let parsed = DiagramParser::parse(Rule::file, input).map_err(|err| ParseError {
@@ -91,6 +107,30 @@ pub fn parse(input: &str) -> std::result::Result<Diagram, ParseError> {
         message: format!("{err:#}"),
         span: Span { start: 0, end: 0 },
     })
+}
+
+/// The declarations that used to carry a placement inline. Notes and legends
+/// are annotations rather than named layout entities, so their placement is a
+/// separate annotation feature and is intentionally not part of this v1 gate.
+fn legacy_layout_span(diagram: &Diagram) -> Option<Span> {
+    diagram
+        .nodes
+        .iter()
+        .filter_map(|node| node.placement_span)
+        .chain(
+            diagram
+                .groups
+                .iter()
+                .filter_map(|group| group.placement_span),
+        )
+        .chain(
+            diagram
+                .uses
+                .iter()
+                .filter_map(|use_decl| use_decl.placement_span),
+        )
+        .chain(diagram.constraints.iter().map(|constraint| constraint.span))
+        .min_by_key(|span| span.start)
 }
 
 /// Counts brace depth without parsing, skipping the three places a brace is

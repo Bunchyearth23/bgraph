@@ -105,12 +105,12 @@ fn deterministic_fork_is_stable_across_processes() {
 }
 
 #[test]
-fn v1_relations_match_the_cassowary_shadow() {
+fn canonical_relations_match_the_cassowary_shadow() {
     for source in [
-        "node a at (10, 20) { size: 80 40 }\nnode b right-of a gap 30 align top { size: 60 20 }",
-        "node a right-of b gap 12 { size: 30 30 }\nnode b at (5, 7) { size: 40 50 }",
+        "node a { size: 80 40 }\nnode b { size: 60 20 }\nlayout { place a at (10, 20)\n place b right-of a gap 30 align top }",
+        "node a { size: 30 30 }\nnode b { size: 40 50 }\nlayout { place a right-of b gap 12\n place b at (5, 7) }",
         "graph { flow: down, gap: 18 }\nnode a { size: 80 40 }\nnode b { size: 30 20 }",
-        "graph { grid: 100 60 }\nnode a at (col 2, row 3)\nnode b above a align right",
+        "graph { grid: 100 60 }\nnode a\nnode b\nlayout { place a at (col 2, row 3)\n place b above a align right }",
     ] {
         bgraph::render_source(source)
             .unwrap_or_else(|error| panic!("shadow rejected:\n{source}\n{error:#}"));

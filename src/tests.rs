@@ -1,15 +1,15 @@
 use crate::layout::{self, Layout};
-use crate::parser::{MAX_NESTING, parse_diagram};
+use crate::parser::{MAX_NESTING, parse_diagram, parse_legacy_diagram};
 use crate::render_svg;
 use crate::style::{Head, Router, Shape};
 
 fn build(source: &str) -> Layout {
-    let diagram = parse_diagram(source).expect("source should parse");
+    let diagram = parse_legacy_diagram(source).expect("source should parse");
     layout::solve(&diagram).expect("layout should solve")
 }
 
 fn err(source: &str) -> String {
-    let diagram = match parse_diagram(source) {
+    let diagram = match parse_legacy_diagram(source) {
         Ok(d) => d,
         Err(e) => return format!("{e:#}"),
     };
@@ -20,7 +20,7 @@ fn err(source: &str) -> String {
 }
 
 fn diags(source: &str) -> Vec<crate::check::Diag> {
-    let diagram = parse_diagram(source).expect("source should parse");
+    let diagram = parse_legacy_diagram(source).expect("source should parse");
     crate::check::check(&diagram)
 }
 
@@ -107,6 +107,12 @@ fn a_layout_place_cannot_compete_with_v1_inline_placement() {
            layout { place api at (10, 10) }"#,)
         .contains("both an inline placement")
     );
+}
+
+#[test]
+fn public_parser_refuses_the_retired_inline_layout_syntax() {
+    let error = parse_diagram("node api at (0, 0)").expect_err("v1 is retired");
+    assert!(error.to_string().contains("fmt --migrate"), "{error}");
 }
 
 #[test]
@@ -1000,10 +1006,12 @@ fn a_boundary_event_sits_on_the_task_it_names() {
     // along the edge in the order they are written, so the picture follows
     // the file.
     let source = "type bpmn\n\
-         task pay \"Pay\" service at (0, 0) { size: 200 80 }\n\
+         task pay \"Pay\" service { size: 200 80 }\n\
          event late \"14 days\" boundary timer { attach: pay }\n\
          event err \"Declined\" boundary error { attach: pay }\n\
-         task chase \"Chase\" at (0, 300)\n\
+         task chase \"Chase\"\n\
+         layout { place pay at (0, 0)\n\
+                  place chase at (0, 300) }\n\
          late -> chase\n";
     let d = parse_diagram(source).expect("parses");
     let l = layout::solve(&d).expect("solves");
@@ -1149,7 +1157,7 @@ fn a_process_that_runs_backwards_is_a_warning_and_not_an_error() {
 
 #[cfg(test)]
 fn after(source: &str) -> Vec<String> {
-    let diagram = parse_diagram(source).expect("parses");
+    let diagram = parse_legacy_diagram(source).expect("parses");
     let solved = layout::solve(&diagram).expect("solves");
     crate::check::after_layout(&diagram, &solved)
         .into_iter()
@@ -2110,7 +2118,7 @@ fn a_hole_stands_where_a_name_goes() {
     // like this showed as a syntax error with its highlighting collapsed.
     for source in [
         "type pie\nslice {{r.id}} \"{{r.name}}\" {{r.value}}",
-        "node {{a}} \"A\"\nnode b \"B\" right-of {{a}}",
+        "node {{a}} \"A\"\nnode b \"B\"\nlayout { place b right-of {{a}} }",
         "node {{a}}\nnode b\n{{a}} -> b \"x\"",
         "group {{g}} \"G\" {\n  node c\n}",
     ] {
@@ -2281,8 +2289,10 @@ fn a_pdf_is_a_pdf() {
     // Hand-written file structure: the header, the object table, the offsets
     // and the pointer to them all have to agree, and nothing in the rest of
     // the suite would notice if they stopped.
-    let pdf = crate::render_source_pdf("node a \"A\"\nnode b \"B\" right-of a\na -> b \"x\"")
-        .expect("renders");
+    let pdf = crate::render_source_pdf(
+        "node a \"A\"\nnode b \"B\"\nlayout { place b right-of a }\na -> b \"x\"",
+    )
+    .expect("renders");
     let text = String::from_utf8_lossy(&pdf).to_string();
 
     assert!(text.starts_with("%PDF-1.4"), "header");
@@ -2319,7 +2329,7 @@ fn a_pdf_is_a_pdf() {
 fn the_page_and_the_viewbox_are_the_same_surface() {
     // Two writers, one canvas — a second implementation of the bounds would
     // be a second place for them to drift.
-    let source = "node a \"A\"\nnode b \"B\" below a gap 40\na -> b";
+    let source = "node a \"A\"\nnode b \"B\"\nlayout { place b below a gap 40 }\na -> b";
     let svg = crate::render_source(source).expect("svg");
     let pdf = crate::render_source_pdf(source).expect("pdf");
     let pdf = String::from_utf8_lossy(&pdf).to_string();
@@ -2351,7 +2361,7 @@ fn a_pdf_draws_the_edges_the_svg_draws() {
     // The first version joined two centres with a bare line: no label, no
     // arrowhead, no routing, no clipping. It validated, it opened, and it was
     // wrong about every edge in the default archetype.
-    let source = "node a \"A\"\nnode b \"B\" right-of a gap 60\nnode c \"C\" below a\n\
+    let source = "node a \"A\"\nnode b \"B\"\nnode c \"C\"\nlayout { place b right-of a gap 60\n place c below a }\n\
                   a -> b \"carries\"\na ..> c { router: ortho }";
     let pdf =
         String::from_utf8_lossy(&crate::render_source_pdf(source).expect("renders")).to_string();
@@ -3991,7 +4001,7 @@ fn every_documented_word_is_accepted() {
         assert!(parse_diagram(&source).is_ok_and(|d| crate::check::first_error(&d).is_none()));
     }
     for align in crate::props::ALIGNMENTS {
-        let source = format!("node a\nnode b right-of a align {align}");
+        let source = format!("node a\nnode b\nlayout {{ place b right-of a align {align} }}");
         assert!(parse_diagram(&source).is_ok_and(|d| crate::check::first_error(&d).is_none()));
     }
 }
@@ -8301,7 +8311,7 @@ fn a_mistake_on_line_three_does_not_cost_line_fifty() {
     // The whole point. Before this, one bad separator threw away the
     // diagnostics and the highlighting of everything after it — at exactly
     // the moment both were wanted.
-    let source = "node a \"A\"\nnode b \"B\" right-of a\nnode ??? bad\nnode d \"D\" below b\n";
+    let source = "node a \"A\"\nnode b \"B\"\nnode ??? bad\nnode d \"D\"\n";
     let (diagram, errors) = crate::parser::parse_recovering(source);
 
     assert_eq!(errors.len(), 1, "{errors:?}");
@@ -8340,7 +8350,7 @@ fn several_mistakes_are_all_reported() {
 
 #[test]
 fn a_sound_file_pays_nothing_and_reports_nothing() {
-    let source = "node a \"A\"\nnode b \"B\" right-of a\na -> b\n";
+    let source = "node a \"A\"\nnode b \"B\"\nlayout { place b right-of a }\na -> b\n";
     let (diagram, errors) = crate::parser::parse_recovering(source);
 
     assert!(errors.is_empty(), "{errors:?}");
@@ -8516,7 +8526,7 @@ fn an_included_files_own_references_follow_it_under_the_prefix() {
             ("main.bd", "include \"core.bd\" as core\nnode ui \"UI\"\n"),
             (
                 "core.bd",
-                "node api \"API\"\nnode db \"DB\" below api\napi -> db\n",
+                "node api \"API\"\nnode db \"DB\"\nlayout { place db below api }\napi -> db\n",
             ),
         ],
     );
@@ -8598,7 +8608,10 @@ fn a_diagnostic_points_at_the_file_that_wrote_it() {
         "compose-spans",
         &[
             ("main.bd", "include \"core.bd\"\nnode ui \"UI\"\n"),
-            ("core.bd", "node api \"API\"\nnode db \"DB\" below api\n"),
+            (
+                "core.bd",
+                "node api \"API\"\nnode db \"DB\"\nlayout { place db below api }\n",
+            ),
         ],
     );
     let composed = crate::compose::load(&entry).expect("it composes");
@@ -8666,7 +8679,8 @@ fn the_composed_example_set_still_draws() {
         "// A diagram in its own right — render this file on its own and it draws.\n\
          include \"house.bds\"\n\
          node api \"API\"      .card\n\
-         node db  \"Database\" .card below api\n\
+         node db  \"Database\" .card\n\
+         layout { place db below api }\n\
          api -> db \"reads\"\n",
     )
     .unwrap();
@@ -8721,7 +8735,9 @@ fn every_theme_is_readable() {
     // Validated for contrast the way the categorical palette already is: a
     // theme that ships text nobody can read is worse than no theme.
     for theme in crate::themes::THEMES {
-        let mut diagram = parse_diagram("node a \"A\"\nnode b \"B\" right-of a\na -> b\n").unwrap();
+        let mut diagram =
+            parse_diagram("node a \"A\"\nnode b \"B\"\nlayout { place b right-of a }\na -> b\n")
+                .unwrap();
         crate::themes::apply(&mut diagram, theme.name).expect("it applies");
 
         let unreadable: Vec<String> = crate::check::check(&diagram)
@@ -8794,7 +8810,7 @@ fn compose_one(name: &str, source: &str) -> crate::compose::Composed {
 fn a_component_placed_twice_declares_two_of_everything() {
     let composed = compose_one(
         "component-twice",
-        "component service {\n  node app \"{{label}}\"\n  node db \"DB\" below app\n  app -> db\n}\n\
+        "component service {\n  node app \"{{label}}\"\n  node db \"DB\"\n  layout { place db below app }\n  app -> db\n}\n\
          use service as web { label: \"Web\" }\n\
          use service as jobs { label: \"Jobs\" }\n",
     );
@@ -8824,7 +8840,8 @@ fn an_instance_is_a_frame_so_it_can_be_placed() {
         "component-placed",
         "component service {\n  node app \"A\"\n}\n\
          use service as web\n\
-         use service as jobs right-of web gap 90\n",
+         use service as jobs\n\
+         layout { place jobs right-of web gap 90 }\n",
     );
     let frames: Vec<&str> = composed
         .diagram
@@ -9060,9 +9077,9 @@ fn constraints_survive_composition() {
     // and said nothing about it.
     let composed = compose_one(
         "constraints-compose",
-        "node a \"A\"\nnode b \"A much longer label\" below a\nsame-width a b\n",
+        "node a \"A\"\nnode b \"A much longer label\"\nlayout { place b below a\n equal-width a b }\n",
     );
-    assert_eq!(composed.diagram.constraints.len(), 1);
+    assert_eq!(composed.diagram.layouts.len(), 1);
     let l = crate::layout::solve(&composed.diagram).unwrap();
     assert!(
         l.nodes[0].rect.w > 100.0,
@@ -9409,8 +9426,12 @@ fn folding_is_the_same_every_run() {
 #[test]
 fn every_public_render_is_byte_stable() {
     let source = r#"graph { title: "Stable" }
-        node a "A" at (0, 0)
-        node b "B" right-of a gap 40
+        node a "A"
+        node b "B"
+        layout {
+          place a at (0, 0)
+          place b right-of a gap 40
+        }
         a -> b "route" { router: ortho }
     "#;
     let svg = crate::render_source(source).unwrap();
@@ -9726,7 +9747,8 @@ fn a_sketch_is_the_same_file_every_time() {
     // The whole difficulty of the feature. The golden test asserts the output
     // is byte-identical run to run — and more to the point, a diagram that
     // redrew itself differently on every save would be unreviewable.
-    let source = "graph { sketch: on }\nnode a \"A\"\nnode b \"B\" right-of a\na -> b";
+    let source =
+        "graph { sketch: on }\nnode a \"A\"\nnode b \"B\"\nlayout { place b right-of a }\na -> b";
     let first = crate::render_source(source).unwrap();
     for _ in 0..5 {
         assert_eq!(crate::render_source(source).unwrap(), first);
@@ -9737,9 +9759,10 @@ fn a_sketch_is_the_same_file_every_time() {
 fn two_boxes_in_different_places_wobble_differently() {
     // Otherwise it is a stamp rather than a drawing: every box deformed
     // identically reads as a font, not as a hand.
-    let svg =
-        crate::render_source("graph { sketch: on }\nnode a \"A\"\nnode b \"B\" right-of a gap 40")
-            .unwrap();
+    let svg = crate::render_source(
+        "graph { sketch: on }\nnode a \"A\"\nnode b \"B\"\nlayout { place b right-of a gap 40 }",
+    )
+    .unwrap();
     let paths: Vec<&str> = svg
         .match_indices("<path d=\"M")
         .map(|(i, _)| &svg[i..i + 40])
@@ -9783,7 +9806,8 @@ fn explain_says_what_the_file_declared_and_what_filled_in() {
     let out = explained(
         r#"graph { gap: 60 }
            node ui "Browser"
-           node api "API" right-of ui gap 90"#,
+           node api "API"
+           layout { place api right-of ui gap 90 }"#,
         "api",
     );
     assert!(out.contains("right-of ui"), "{out}");
@@ -9798,7 +9822,8 @@ fn explain_names_the_default_when_the_file_was_silent() {
     let out = explained(
         r#"graph { gap: 60 }
            node ui "Browser"
-           node api "API" right-of ui"#,
+           node api "API"
+           layout { place api right-of ui }"#,
         "api",
     );
     assert!(out.contains("gap 60"), "{out}");
@@ -9817,7 +9842,7 @@ fn explain_names_the_rule_an_author_forgets() {
 #[test]
 fn explain_names_the_scoped_flow_root() {
     let out = explained(
-        "node outside at (100, 0)\ngroup g {\n node first\n node second\n}",
+        "node outside\ngroup g {\n node first\n node second\n}\nlayout { place outside at (100, 0) }",
         "first",
     );
     assert!(out.contains("first box in its container"), "{out}");
@@ -9828,7 +9853,7 @@ fn explain_names_the_scoped_flow_root() {
 fn explain_says_when_a_cell_has_no_grid_to_sit_on() {
     // A cell with no declared grid puts everything on the origin — a
     // question nobody thinks to ask, which is exactly when to volunteer it.
-    let out = explained("node a \"A\" at (col 2, row 1)", "a");
+    let out = explained("node a \"A\"\nlayout { place a at (col 2, row 1) }", "a");
     assert!(out.contains("NOT DECLARED"), "{out}");
 }
 
@@ -9852,11 +9877,12 @@ fn explain_mentions_a_constraint_acting_on_the_box() {
     // Easy to forget three screens away from the statement it acts on.
     let out = explained(
         r#"node a "A"
-           node b "B" right-of a
-           same-width a b"#,
+           node b "B"
+           layout { place b right-of a
+                    equal-width a b }"#,
         "a",
     );
-    assert!(out.contains("same-width"), "{out}");
+    assert!(out.contains("equal-width"), "{out}");
     assert!(out.contains('b'), "{out}");
 }
 
@@ -9864,11 +9890,12 @@ fn explain_mentions_a_constraint_acting_on_the_box() {
 fn explain_names_the_axis_of_an_align_group() {
     let out = explained(
         r#"node a "A"
-           node b "B" right-of a
-           align-group top a b"#,
+           node b "B"
+           layout { place b right-of a
+                    align top a b }"#,
         "a",
     );
-    assert!(out.contains("align-group top — aligns y"), "{out}");
+    assert!(out.contains("align top — aligns y"), "{out}");
 }
 
 #[test]
@@ -9918,8 +9945,8 @@ fn freezing_a_layout_does_not_change_the_picture() {
         "node a \"A\"\nnode b \"B\"\nnode c \"C\"\na -> b",
         "graph { flow: down, gap: 30 }\nnode a \"A\"\nnode b \"B\"",
         "node a \"A\"\nnode b \"B\" { fill: #eef3ff }\nnode c \"C\"",
-        "node a \"A\" at (0, 0)\nnode b \"B\" right-of a\nnode c \"C\"",
-        "node outside at (100, 0)\ngroup g {\n node first\n node second\n}",
+        "node a \"A\"\nnode b \"B\"\nnode c \"C\"\nlayout { place a at (0, 0)\n place b right-of a }",
+        "node outside\ngroup g {\n node first\n node second\n}\nlayout { place outside at (100, 0) }",
     ] {
         let (before, after) = frozen(source);
         let one = crate::render_source(&before).expect("the original draws");
@@ -9933,7 +9960,9 @@ fn freezing_a_layout_does_not_change_the_picture() {
 
 #[test]
 fn freezing_uses_the_previous_sibling_inside_a_group() {
-    let (_, after) = frozen("node outside at (100, 0)\ngroup g {\n node first\n node second\n}");
+    let (_, after) = frozen(
+        "node outside\ngroup g {\n node first\n node second\n}\nlayout { place outside at (100, 0) }",
+    );
     assert!(
         after.contains("  layout {\n    place first at (0, 0)"),
         "{after}"
@@ -9972,10 +10001,10 @@ fn a_frozen_placement_is_kept_outside_the_declaration_block() {
 }
 
 #[test]
-fn an_existing_legacy_placement_is_left_untouched_while_the_origin_is_migrated() {
-    let source = "node a \"A\"\nnode b \"B\" below a gap 90\n";
+fn a_canonical_placement_is_left_untouched_while_the_origin_is_migrated() {
+    let source = "node a \"A\"\nnode b \"B\"\nlayout { place b below a gap 90 }\n";
     let (_, after) = frozen(source);
-    assert!(after.contains("node b \"B\" below a gap 90"), "{after}");
+    assert!(after.contains("place b below a gap 90"), "{after}");
     assert!(after.contains("place a at (0, 0)"), "{after}");
 }
 
