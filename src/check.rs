@@ -3254,6 +3254,30 @@ fn check_props_refined(
             continue;
         }
 
+        if matches!(prop.name.as_str(), "from" | "to") {
+            let nums: Vec<f64> = prop.values.iter().filter_map(|v| v.as_num()).collect();
+            if nums.len() >= 2 {
+                let index = nums[0];
+                let total = nums[1];
+                if !index.is_finite()
+                    || !total.is_finite()
+                    || index.fract() != 0.0
+                    || total.fract() != 0.0
+                    || index < 1.0
+                    || total < 1.0
+                    || index > total
+                {
+                    out.push(Diag::error(
+                        prop.values_span,
+                        format!(
+                            "indexed `{}` attachment needs `1 <= index <= total` (got {index} of {total})",
+                            prop.name
+                        ),
+                    ));
+                }
+            }
+        }
+
         // A hole is bound at render time; validating what is not there yet
         // would report every template as broken.
         if prop.values.iter().any(|v| v.is_hole()) {
