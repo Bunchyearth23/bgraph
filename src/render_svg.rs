@@ -127,6 +127,11 @@ pub fn render(layout: &Layout) -> String {
         );
     }
 
+    // A crossing is not an invisible topological fact: without a bridge the
+    // reader cannot tell which link continues. Draw the marker after all edge
+    // strokes so it remains visible regardless of declaration order.
+    body.push_str(&crossing_marks(layout, &routed));
+
     // Labels last among the edge layer, so no line is drawn over a plate.
     for (edge, route) in layout.edges.iter().zip(&routed) {
         if let Some((text, rect)) = &route.label {
@@ -224,6 +229,86 @@ pub fn render(layout: &Layout) -> String {
     svg.push_str(&body);
     svg.push_str("</g></svg>");
     svg
+}
+
+fn crossing_marks(layout: &Layout, routed: &[Routed]) -> String {
+    let mut out = String::new();
+    let background = layout.opts.background.as_deref().unwrap_or("#ffffff");
+    let mut seen = Vec::new();
+    for (i, first) in routed.iter().enumerate() {
+        for (j, second) in routed.iter().enumerate().skip(i + 1) {
+            for &(a, b) in &segments(&first.points) {
+                for &(c, d) in &segments(&second.points) {
+                    let Some((x, y, horizontal)) = crossing(a, b, c, d) else {
+                        continue;
+                    };
+                    if seen
+                        .iter()
+                        .any(|(px, py): &(f64, f64)| (px - x).abs() < 1e-6 && (py - y).abs() < 1e-6)
+                    {
+                        continue;
+                    }
+                    seen.push((x, y));
+                    let stroke = layout.edges[j].style.stroke.as_deref().unwrap_or("#64748b");
+                    if background != "none" && background != "transparent" {
+                        let _ = write!(
+                            out,
+                            r#"<circle cx="{}" cy="{}" r="6"{} />"#,
+                            n(x),
+                            n(y),
+                            paint("fill", background)
+                        );
+                    }
+                    let (d, q) = if horizontal {
+                        (
+                            format!("M{} {}", n(x - 6.0), n(y)),
+                            format!("{} {} {} {}", n(x), n(y - 6.0), n(x + 6.0), n(y)),
+                        )
+                    } else {
+                        (
+                            format!("M{} {}", n(x), n(y - 6.0)),
+                            format!("{} {} {} {}", n(x + 6.0), n(y), n(x), n(y + 6.0)),
+                        )
+                    };
+                    let _ = write!(
+                        out,
+                        r#"<path d="{} Q {}" fill="none"{} stroke-width="{}" stroke-linecap="round"/>"#,
+                        d,
+                        q,
+                        paint("stroke", stroke),
+                        n(layout.edges[j].style.stroke_width.unwrap_or(1.5)),
+                    );
+                }
+            }
+        }
+    }
+    out
+}
+
+fn segments(points: &[(f64, f64)]) -> Vec<((f64, f64), (f64, f64))> {
+    points.windows(2).map(|pair| (pair[0], pair[1])).collect()
+}
+
+/// Return an interior orthogonal crossing and whether the later segment is
+/// horizontal. Endpoints and collinear overlap are intentionally excluded.
+fn crossing(
+    a: (f64, f64),
+    b: (f64, f64),
+    c: (f64, f64),
+    d: (f64, f64),
+) -> Option<(f64, f64, bool)> {
+    let ah = (a.1 - b.1).abs() < 1e-6;
+    let av = (a.0 - b.0).abs() < 1e-6;
+    let ch = (c.1 - d.1).abs() < 1e-6;
+    let cv = (c.0 - d.0).abs() < 1e-6;
+    let inside = |v: f64, p: f64, q: f64| v > p.min(q) + 1e-6 && v < p.max(q) - 1e-6;
+    if ah && cv && inside(c.0, a.0, b.0) && inside(a.1, c.1, d.1) {
+        return Some((c.0, a.1, false));
+    }
+    if av && ch && inside(a.0, c.0, d.0) && inside(c.1, a.1, b.1) {
+        return Some((a.0, c.1, true));
+    }
+    None
 }
 
 /// Which edges run between the same pair of boxes, and where each sits among
