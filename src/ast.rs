@@ -83,6 +83,11 @@ pub struct ConstraintDecl {
     /// Which edge to line up on, for `align-group`. Defaults to `center`,
     /// matching what `align` on a placement defaults to.
     pub align: Align,
+    /// Axis selected by the spelling in a legacy `align-group` declaration.
+    /// `center`/`middle` did not say which one, so only that legacy spelling
+    /// retains the geometry-based fallback until the scoped `layout` DSL
+    /// replaces it.
+    pub axis: ConstraintAxis,
     pub members: Vec<Spanned<String>>,
     pub span: Span,
 }
@@ -93,6 +98,15 @@ pub enum ConstraintKind {
     AlignGroup,
     SameWidth,
     SameHeight,
+}
+
+/// The coordinate an `align-group` relation controls.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConstraintAxis {
+    Horizontal,
+    Vertical,
+    /// Legacy `center` / `middle`, whose axis was not represented in v1.
+    Inferred,
 }
 
 /// `component service { … }` — the body kept as source text, because that is

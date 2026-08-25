@@ -279,10 +279,11 @@ fn parse_note(pair: Pair<Rule>) -> Result<crate::ast::NoteDecl> {
 }
 
 fn parse_constraint(pair: Pair<Rule>) -> Result<crate::ast::ConstraintDecl> {
-    use crate::ast::{Align, ConstraintKind};
+    use crate::ast::{Align, ConstraintAxis, ConstraintKind};
     let span = span_of(&pair);
     let mut kind = ConstraintKind::AlignGroup;
     let mut align = Align::Center;
+    let mut axis = ConstraintAxis::Inferred;
     let mut members = Vec::new();
 
     for part in pair.into_inner() {
@@ -296,10 +297,12 @@ fn parse_constraint(pair: Pair<Rule>) -> Result<crate::ast::ConstraintDecl> {
                 }
             }
             Rule::align_kw => {
-                align = match part.as_str() {
-                    "left" | "top" => Align::Start,
-                    "right" | "bottom" => Align::End,
-                    _ => Align::Center,
+                (align, axis) = match part.as_str() {
+                    "left" => (Align::Start, ConstraintAxis::Horizontal),
+                    "right" => (Align::End, ConstraintAxis::Horizontal),
+                    "top" => (Align::Start, ConstraintAxis::Vertical),
+                    "bottom" => (Align::End, ConstraintAxis::Vertical),
+                    _ => (Align::Center, ConstraintAxis::Inferred),
                 }
             }
             _ => members.push(spanned(&part)),
@@ -312,6 +315,7 @@ fn parse_constraint(pair: Pair<Rule>) -> Result<crate::ast::ConstraintDecl> {
     Ok(crate::ast::ConstraintDecl {
         kind,
         align,
+        axis,
         members,
         span,
     })

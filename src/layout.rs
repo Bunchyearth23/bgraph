@@ -1725,7 +1725,7 @@ fn constrain_sizes(diagram: &Diagram, index: &HashMap<&str, Entity>, sizes: &mut
 
 /// `align-group`, applied to the solved rectangles.
 fn constrain_alignment(diagram: &Diagram, index: &HashMap<&str, Entity>, solved: &mut Solved) {
-    use crate::ast::ConstraintKind;
+    use crate::ast::{ConstraintAxis, ConstraintKind};
 
     for constraint in &diagram.constraints {
         if constraint.kind != ConstraintKind::AlignGroup {
@@ -1747,11 +1747,10 @@ fn constrain_alignment(diagram: &Diagram, index: &HashMap<&str, Entity>, solved:
                 let Some(lead) = solved.nodes[rects[0]] else {
                     continue;
                 };
-                // Which axis is decided by which one the boxes already differ
-                // on least — a row lines up on y, a column on x. Reading it
-                // off the geometry rather than asking for it keeps the
-                // statement short, and the ambiguous case cannot arise: two
-                // boxes at the same point need no aligning.
+                // v1 discarded the axis for `center` / `middle`, so only that
+                // ambiguous legacy spelling needs a geometry fallback. The
+                // directional words must mean what they say: `top` operates
+                // on y and `left` on x, regardless of the current picture.
                 let spread = |f: fn(&Rect) -> f64| {
                     let values: Vec<f64> = rects
                         .iter()
@@ -1761,7 +1760,11 @@ fn constrain_alignment(diagram: &Diagram, index: &HashMap<&str, Entity>, solved:
                     values.iter().cloned().fold(f64::MIN, f64::max)
                         - values.iter().cloned().fold(f64::MAX, f64::min)
                 };
-                let horizontal = spread(|r| r.x) >= spread(|r| r.y);
+                let horizontal = match constraint.axis {
+                    ConstraintAxis::Horizontal => false,
+                    ConstraintAxis::Vertical => true,
+                    ConstraintAxis::Inferred => spread(|r| r.x) >= spread(|r| r.y),
+                };
 
                 for i in &rects[1..] {
                     // `at` is a required coordinate. The old late pass

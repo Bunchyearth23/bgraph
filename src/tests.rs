@@ -8759,6 +8759,25 @@ fn align_group_moves_the_others_onto_the_first() {
 }
 
 #[test]
+fn align_group_direction_selects_its_declared_axis() {
+    let left = build(
+        r#"node a "A" at (0, 0) { size: 80 40 }
+           node origin at (200, 0)
+           node b "B" right-of origin { size: 80 40 }
+           align-group left a b"#,
+    );
+    assert_eq!(left.nodes[2].rect.x, 0.0, "`left` did not constrain x");
+
+    let top = build(
+        r#"node a "A" at (0, 0) { size: 80 40 }
+           node origin at (0, 200)
+           node b "B" below origin { size: 80 40 }
+           align-group top a b"#,
+    );
+    assert_eq!(top.nodes[2].rect.y, 0.0, "`top` did not constrain y");
+}
+
+#[test]
 fn an_align_group_does_not_override_an_explicit_at() {
     let source = r#"node a "A" at (0, 0) { size: 80 40 }
                    node b "B" at (120, 33) { size: 80 60 }
