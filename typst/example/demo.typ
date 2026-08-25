@@ -5,7 +5,11 @@
 #diagram("
   graph { title: \"From Typst\" }
   node ui \"Browser\"
-  node api \"API\" right-of ui gap 50
+  node api \"API\"
+  layout {
+    place ui at (0, 0)
+    place api right-of ui gap 50
+  }
   ui -> api \"HTTPS\"
 ", width: 70%)
 

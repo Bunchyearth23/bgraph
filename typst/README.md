@@ -38,7 +38,11 @@ and a diagram that stops parsing stops the build.
 
 #diagram("
   node ui \"Browser\"
-  node api \"API\" right-of ui
+  node api \"API\"
+  layout {
+    place ui at (0, 0)
+    place api right-of ui
+  }
   ui -> api
 ")
 
