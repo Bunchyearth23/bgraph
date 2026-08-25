@@ -482,21 +482,31 @@ groups nest:
 group edge "Edge" {
   padding: 22
   node gw   "Gateway"
-  node auth "Auth" below gw gap 30
+  node auth "Auth"
+  layout {
+    place gw at (0, 0)
+    place auth below gw gap 30
+  }
 }
 
-group core "Core" right-of edge gap 60 {
+group core "Core" {
   node orders "Orders"
 }
 
-node db "Postgres" right-of core gap 60
+node db "Postgres"
+
+layout {
+  place edge at (0, 0)
+  place core right-of edge gap 60
+  place db right-of core gap 60
+}
 ```
 
 **A group is sized by its members, never the other way round** — its rectangle
 is their bounding box plus its `padding`. That keeps the rule this language is
 built on: the items say where they go.
 
-A group may still carry a placement, and then it **translates its whole
+A root `layout` block may place a group, and then it **translates its whole
 subtree** once its members have landed. Members of a placed group only become
 anchorable after that translation, so nothing outside can latch onto a
 position that is about to move.

@@ -5,12 +5,14 @@ use std::time::{Duration, Instant};
 fn large_graph() -> String {
     let mut source = String::from("graph { flow: right }\nnode n0 \"0\"\n");
     for index in 1..250 {
-        source.push_str(&format!(
-            "node n{index} \"{index}\" right-of n{}\n",
-            index - 1
-        ));
+        source.push_str(&format!("node n{index} \"{index}\"\n"));
         source.push_str(&format!("n{} -> n{index} \"flow\"\n", index - 1));
     }
+    source.push_str("layout {\n  place n0 at (0, 0)\n");
+    for index in 1..250 {
+        source.push_str(&format!("  place n{index} right-of n{}\n", index - 1));
+    }
+    source.push_str("}\n");
     source
 }
 
@@ -18,13 +20,20 @@ fn ortho() -> String {
     let mut source = String::new();
     for row in 0..8 {
         for column in 0..8 {
+            source.push_str(&format!("node n{row}_{column} \"\"\n"));
+        }
+    }
+    source.push_str("layout {\n");
+    for row in 0..8 {
+        for column in 0..8 {
             source.push_str(&format!(
-                "node n{row}_{column} \"\" at ({}, {})\n",
+                "  place n{row}_{column} at ({}, {})\n",
                 column * 130,
                 row * 100
             ));
         }
     }
+    source.push_str("}\n");
     for row in 0..8 {
         for column in 0..7 {
             source.push_str(&format!(
@@ -84,7 +93,7 @@ fn measure_composition() -> Duration {
     .expect("write composition entry");
     std::fs::write(
         root.join("nodes.bd"),
-        "node api \"API\" at (0, 0)\nnode worker \"Worker\" right-of api gap 80\n",
+        "node api \"API\"\nnode worker \"Worker\"\nlayout {\n  place api at (0, 0)\n  place worker right-of api gap 80\n}\n",
     )
     .expect("write composition member");
 

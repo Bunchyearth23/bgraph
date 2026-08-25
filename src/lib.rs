@@ -11,7 +11,7 @@
 //! the editor and the CLI can never disagree about what a file means.
 //!
 //! ```
-//! let svg = bgraph::render_source("node a \"Hello\"\nnode b \"World\" right-of a\na -> b")?;
+//! let svg = bgraph::render_source("node a \"Hello\"\nnode b \"World\"\nlayout {\n  place a at (0, 0)\n  place b right-of a\n}\na -> b")?;
 //! assert!(svg.starts_with("<svg"));
 //! # Ok::<(), anyhow::Error>(())
 //! ```
