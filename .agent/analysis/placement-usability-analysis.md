@@ -28,8 +28,9 @@ LSP, commandes `explain` / `layout`, wasm, preview et stratégie de refactor.
 > directions, gaps, alignements relatifs et flow implicite. En build de debug, le
 > solveur courant produit toujours le dessin et le lowering Kasuari doit produire
 > les mêmes rectangles; au-delà de 512 nœuds, ce shadow s'efface jusqu'au benchmark
-> dédié. L'adoption finale attend encore groupes, contraintes simultanées,
-> provenance et diagnostics. Les passages comparant
+> dédié. Chaque équation conserve déjà son origine et ses spans DSL; l'adoption
+> finale attend encore groupes, contraintes simultanées et diagnostics de
+> conflits minimaux. Les passages comparant
 > un palier initial limité aux égalités exactes restent la trace de l'analyse,
 > mais ne décrivent plus la direction retenue.
 
@@ -1158,8 +1159,9 @@ migration. Le spike a depuis introduit un fork local minimal utilisant des
 collections ordonnées partout où l'itération peut choisir un pivot. Le probe
 donne maintenant la même solution sur 32 processus natifs et 100 instances
 wasm. Le premier lowering bgraph compare désormais les relations v1 simples au
-solveur courant en debug; la preuve doit encore couvrir l'IR avec provenance,
-les groupes, les contraintes simultanées et les permutations avant la bascule.
+solveur courant en debug et conserve leur provenance DSL; la preuve doit encore
+couvrir les groupes, les contraintes simultanées et les permutations avant la
+bascule.
 
 Sources : [dépôt Kasuari](https://github.com/ratatui/kasuari),
 [documentation 0.4.12](https://docs.rs/kasuari/latest/kasuari/),
