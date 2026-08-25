@@ -278,6 +278,156 @@ pub fn solve_nodes(
     ))
 }
 
+/// Verify the frame contract with the same Cassowary vocabulary used for
+/// nodes. Group bounds are still measured by the historical fixpoint (their
+/// width is the bounds of their contents), but containment and the resulting
+/// translations are now expressed as required constraints rather than being
+/// an unchecked renderer-side assumption. This is the safe first step toward
+/// lowering frames fully: once frame sizing moves into the IR, these measured
+/// equalities are the only lines that need to disappear.
+pub fn validate_frames(
+    diagram: &Diagram,
+    plan: &PlacementPlan<'_>,
+    nodes: &[Option<Rect>],
+    groups: &[Option<Rect>],
+) -> Result<()> {
+    if diagram.groups.is_empty() {
+        return Ok(());
+    }
+    let variables: Vec<Variables> = (0..diagram.nodes.len() + diagram.groups.len())
+        .map(|_| Variables::new())
+        .collect();
+    let entity_vars = |entity: Entity| match entity {
+        Entity::Node(i) => variables[i],
+        Entity::Group(i) => variables[diagram.nodes.len() + i],
+    };
+    let entity_rect = |entity: Entity| match entity {
+        Entity::Node(i) => nodes.get(i).and_then(|r| *r),
+        Entity::Group(i) => groups.get(i).and_then(|r| *r),
+    };
+    let mut constraints = Vec::new();
+    for entity in (0..diagram.nodes.len())
+        .map(Entity::Node)
+        .chain((0..diagram.groups.len()).map(Entity::Group))
+    {
+        let Some(rect) = entity_rect(entity) else {
+            return Err(anyhow!("frame lowering received an unresolved entity"));
+        };
+        let vars = entity_vars(entity);
+        push(
+            &mut constraints,
+            vars.x | EQ(Strength::REQUIRED) | rect.x,
+            provenance(
+                ConstraintOrigin::ContainerOrigin,
+                Axis::X,
+                entity_index(entity, diagram),
+                Span { start: 0, end: 0 },
+            ),
+        );
+        push(
+            &mut constraints,
+            vars.y | EQ(Strength::REQUIRED) | rect.y,
+            provenance(
+                ConstraintOrigin::ContainerOrigin,
+                Axis::Y,
+                entity_index(entity, diagram),
+                Span { start: 0, end: 0 },
+            ),
+        );
+        push(
+            &mut constraints,
+            vars.w | EQ(Strength::REQUIRED) | rect.w,
+            provenance(
+                ConstraintOrigin::MeasuredSize,
+                Axis::Width,
+                entity_index(entity, diagram),
+                Span { start: 0, end: 0 },
+            ),
+        );
+        push(
+            &mut constraints,
+            vars.h | EQ(Strength::REQUIRED) | rect.h,
+            provenance(
+                ConstraintOrigin::MeasuredSize,
+                Axis::Height,
+                entity_index(entity, diagram),
+                Span { start: 0, end: 0 },
+            ),
+        );
+    }
+    for (group_index, group) in diagram.groups.iter().enumerate() {
+        let frame = entity_vars(Entity::Group(group_index));
+        for member in &group.members {
+            let Some(entity) = plan.index().get(member.as_str()).copied() else {
+                continue;
+            };
+            let child = entity_vars(entity);
+            let span = diagram.groups[group_index].span;
+            let source = provenance(
+                ConstraintOrigin::ContainerOrigin,
+                Axis::X,
+                diagram.nodes.len() + group_index,
+                span,
+            );
+            push(
+                &mut constraints,
+                frame.x | LE(Strength::REQUIRED) | child.x,
+                source,
+            );
+            push(
+                &mut constraints,
+                frame.y | LE(Strength::REQUIRED) | child.y,
+                source.with_axis(Axis::Y),
+            );
+            push(
+                &mut constraints,
+                (frame.x + frame.w) | GE(Strength::REQUIRED) | (child.x + child.w),
+                source.with_axis(Axis::X),
+            );
+            push(
+                &mut constraints,
+                (frame.y + frame.h) | GE(Strength::REQUIRED) | (child.y + child.h),
+                source.with_axis(Axis::Y),
+            );
+        }
+    }
+    let mut solver = Solver::new();
+    for sourced in constraints {
+        solver
+            .add_constraint(sourced.constraint)
+            .map_err(|error| anyhow!("Kasuari frame containment rejected: {error}"))?;
+    }
+    for entity in (0..diagram.nodes.len())
+        .map(Entity::Node)
+        .chain((0..diagram.groups.len()).map(Entity::Group))
+    {
+        let vars = entity_vars(entity);
+        let Some(rect) = entity_rect(entity) else {
+            continue;
+        };
+        let values = [
+            (solver.get_value(vars.x), rect.x),
+            (solver.get_value(vars.y), rect.y),
+            (solver.get_value(vars.w), rect.w),
+            (solver.get_value(vars.h), rect.h),
+        ];
+        if values
+            .iter()
+            .any(|(actual, expected)| (actual - expected).abs() > 1e-7)
+        {
+            return Err(anyhow!("Kasuari frame lowering changed measured geometry"));
+        }
+    }
+    Ok(())
+}
+
+fn entity_index(entity: Entity, diagram: &Diagram) -> usize {
+    match entity {
+        Entity::Node(i) => i,
+        Entity::Group(i) => diagram.nodes.len() + i,
+    }
+}
+
 fn lower_placement(
     placement: &Placement,
     node: usize,

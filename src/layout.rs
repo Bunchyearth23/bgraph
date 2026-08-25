@@ -882,6 +882,12 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         let mut solved = place_all(diagram, &placement, &sizes, &overhang, &opts)?;
         // Legacy alignment and group frames still need the historical pass.
         constrain_alignment(&placement, &mut solved);
+        crate::constraint_layout::validate_frames(
+            diagram,
+            &placement,
+            &solved.nodes,
+            &solved.groups,
+        )?;
         solved
     };
     let placed = solved.nodes;
