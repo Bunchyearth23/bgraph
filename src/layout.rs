@@ -1677,29 +1677,76 @@ pub struct Solved {
 fn constrain_sizes(plan: &PlacementPlan<'_>, sizes: &mut [(f64, f64)]) {
     use crate::ast::ConstraintKind;
 
+    // Equality is transitive: `equal-width a b`, then `equal-width b c`
+    // means all three share one width, regardless of statement order. The old
+    // pass mutated each declaration in turn, so the first relation could be
+    // false again after the second. Build each axis' connected components
+    // before choosing its largest intrinsic dimension.
+    let mut widths = DisjointSets::new(sizes.len());
+    let mut heights = DisjointSets::new(sizes.len());
     for constraint_ref in plan.constraints() {
         let constraint = constraint_ref.declaration();
         let members = plan.constraint_members(constraint_ref);
         if members.len() < 2 {
             continue;
         }
-        // The largest wins, not the first: shrinking a box to match a
-        // narrower neighbour clips its label, and a constraint that makes
-        // text unreadable is worse than no constraint at all.
         match constraint.kind {
             ConstraintKind::SameWidth => {
-                let widest = members.iter().map(|i| sizes[*i].0).fold(0.0_f64, f64::max);
-                for i in members {
-                    sizes[i].0 = widest;
+                for member in &members[1..] {
+                    widths.union(members[0], *member);
                 }
             }
             ConstraintKind::SameHeight => {
-                let tallest = members.iter().map(|i| sizes[*i].1).fold(0.0_f64, f64::max);
-                for i in members {
-                    sizes[i].1 = tallest;
+                for member in &members[1..] {
+                    heights.union(members[0], *member);
                 }
             }
             ConstraintKind::AlignGroup => {}
+        }
+    }
+
+    // The largest wins, never the first: shrinking to a narrower neighbour
+    // would clip text, which is worse than an unmet constraint.
+    let mut widest = vec![0.0_f64; sizes.len()];
+    let mut tallest = vec![0.0_f64; sizes.len()];
+    for (node, (width, height)) in sizes.iter().copied().enumerate() {
+        let width_root = widths.find(node);
+        widest[width_root] = widest[width_root].max(width);
+        let height_root = heights.find(node);
+        tallest[height_root] = tallest[height_root].max(height);
+    }
+    for (node, size) in sizes.iter_mut().enumerate() {
+        size.0 = widest[widths.find(node)];
+        size.1 = tallest[heights.find(node)];
+    }
+}
+
+/// Tiny deterministic union-find for equality components. No hash iteration
+/// is involved, so equal-size resolution follows the diagram's node order.
+struct DisjointSets {
+    parent: Vec<usize>,
+}
+
+impl DisjointSets {
+    fn new(len: usize) -> Self {
+        Self {
+            parent: (0..len).collect(),
+        }
+    }
+
+    fn find(&mut self, node: usize) -> usize {
+        if self.parent[node] != node {
+            let root = self.find(self.parent[node]);
+            self.parent[node] = root;
+        }
+        self.parent[node]
+    }
+
+    fn union(&mut self, left: usize, right: usize) {
+        let left = self.find(left);
+        let right = self.find(right);
+        if left != right {
+            self.parent[right] = left;
         }
     }
 }

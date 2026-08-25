@@ -127,6 +127,24 @@ fn a_layout_block_aligns_and_equalizes_nodes() {
 }
 
 #[test]
+fn equal_size_constraints_are_transitive_and_order_independent() {
+    let l = build(
+        r#"node a "A" { size: 80 20 }
+           node b "B" { size: 120 30 }
+           node c "C" { size: 200 40 }
+           layout {
+             equal-width a b
+             equal-width b c
+             equal-height a b
+             equal-height b c
+           }"#,
+    );
+    for node in &l.nodes {
+        assert_eq!((node.rect.w, node.rect.h), (200.0, 40.0));
+    }
+}
+
+#[test]
 fn rows_and_columns_chain_the_order_the_author_wrote() {
     let l = build(
         r#"node a "A" { size: 40 30 }
