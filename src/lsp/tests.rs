@@ -72,12 +72,41 @@ fn enclosing_block_identifies_the_owner() {
         );
     }
 
+    let text = "node a\nlayout {\n  ";
+    assert_eq!(Context::at(text, text.len()).block, Some(Block::Layout));
+
     // A `use` takes the ordinary block — properties only.
     let text = "use c as c1 {\n  ";
     assert_eq!(Context::at(text, text.len()).block, Some(Block::Node));
 
     let text = "graph { padding: 4 }\nnode a";
     assert_eq!(Context::at(text, text.len()).block, None);
+}
+
+#[test]
+fn completion_inside_layout_offers_only_canonical_relations() {
+    let server = Server {
+        docs: HashMap::new(),
+    };
+    let text = "node a\nnode b\nlayout {\n  ";
+    let labels: Vec<String> = server
+        .items_for(text, "  ", text.len())
+        .iter()
+        .filter_map(|item| item["label"].as_str().map(str::to_string))
+        .collect();
+    assert!(labels.contains(&"place".to_string()), "{labels:?}");
+    assert!(labels.contains(&"equal-width".to_string()), "{labels:?}");
+    assert!(!labels.contains(&"node".to_string()), "{labels:?}");
+
+    let targets: Vec<String> = server
+        .items_for(text, "  place ", text.len())
+        .iter()
+        .filter_map(|item| item["label"].as_str().map(str::to_string))
+        .collect();
+    assert!(
+        targets.contains(&"a".to_string()) && targets.contains(&"b".to_string()),
+        "{targets:?}"
+    );
 }
 
 #[test]

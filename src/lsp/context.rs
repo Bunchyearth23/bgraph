@@ -6,6 +6,7 @@ pub(super) enum Block {
     Type,
     Graph,
     Style(Option<&'static str>),
+    Layout,
     Node,
     Container,
     Edge,
@@ -53,6 +54,7 @@ impl Context {
             match head.split_whitespace().next() {
                 Some("type") => Block::Type,
                 Some("graph") => Block::Graph,
+                Some("layout") => Block::Layout,
                 Some("group") | Some("activate") | Some("component") => Block::Container,
                 Some("style") => Block::Style(
                     head.split_whitespace()

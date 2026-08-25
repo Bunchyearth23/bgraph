@@ -24,6 +24,10 @@ impl Server {
             return Vec::new();
         }
 
+        if ctx.block == Some(Block::Layout) {
+            return layout_items(text, line, declared_archetype(text));
+        }
+
         let trimmed = line.trim_start();
         let archetype = declared_archetype(text);
 
@@ -334,5 +338,115 @@ impl Server {
         }
 
         Vec::new()
+    }
+}
+
+/// Completion inside the canonical geometry block.  It deliberately does not
+/// offer declarations or style properties: a `layout` says how already named
+/// entities relate, never what new entities exist.
+fn layout_items(text: &str, line: &str, archetype: &str) -> Vec<Value> {
+    if !matches!(
+        props::archetype(archetype).map(|def| def.layout_capability()),
+        Some(props::LayoutCapability::Declared | props::LayoutCapability::Hybrid)
+    ) {
+        return Vec::new();
+    }
+
+    let words: Vec<&str> = line.split_whitespace().collect();
+    let ends_with_space = line.ends_with(char::is_whitespace);
+    let preceding = if ends_with_space {
+        words.last().copied().unwrap_or("")
+    } else if words.len() >= 2 {
+        words[words.len() - 2]
+    } else {
+        ""
+    };
+    let entities = || {
+        declared_items(text, archetype)
+            .into_iter()
+            .map(|(name, label)| completion(&name, 6, "entity", &label))
+            .collect()
+    };
+
+    if words.is_empty() || (words.len() == 1 && !ends_with_space) {
+        return vec![
+            snippet(
+                "place",
+                14,
+                "place <target> <position>",
+                "Place one declared entity. Coordinates and relative anchors live only here.",
+                "place ${1:target} at (${2:x}, ${3:y})$0",
+            ),
+            snippet(
+                "align",
+                14,
+                "align <axis> <members…>",
+                "Align declared nodes on an explicit axis.",
+                "align ${1:top} ${2:first} ${3:other}$0",
+            ),
+            snippet(
+                "equal-width",
+                14,
+                "equal-width <members…>",
+                "Make declared nodes as wide as their widest member.",
+                "equal-width ${1:first} ${2:other}$0",
+            ),
+            snippet(
+                "equal-height",
+                14,
+                "equal-height <members…>",
+                "Make declared nodes as tall as their tallest member.",
+                "equal-height ${1:first} ${2:other}$0",
+            ),
+            snippet(
+                "row",
+                14,
+                "row <members…> [gap <n>]",
+                "Place members left to right in the written order.",
+                "row ${1:first} ${2:next} gap ${3:32}$0",
+            ),
+            snippet(
+                "column",
+                14,
+                "column <members…> [gap <n>]",
+                "Place members top to bottom in the written order.",
+                "column ${1:first} ${2:next} gap ${3:32}$0",
+            ),
+        ];
+    }
+
+    match words[0] {
+        "place" if words.len() == 1 || preceding == "place" => entities(),
+        "place" if words.len() == 2 && ends_with_space => props::PLACEMENTS
+            .iter()
+            .map(|(name, doc)| completion(name, 14, "position", doc))
+            .collect(),
+        "place" if is_rel_dir(preceding) => entities(),
+        "place" if preceding == "align" => props::ALIGNMENTS
+            .iter()
+            .map(|axis| {
+                completion(
+                    axis,
+                    20,
+                    "align",
+                    "Cross-axis alignment against the anchor.",
+                )
+            })
+            .collect(),
+        "align" if words.len() == 1 || preceding == "align" => {
+            ["top", "bottom", "left", "right", "center-x", "center-y"]
+                .into_iter()
+                .map(|axis| {
+                    completion(
+                        axis,
+                        20,
+                        "axis",
+                        "The edge or centre line shared by the members.",
+                    )
+                })
+                .collect()
+        }
+        "align" | "equal-width" | "equal-height" | "row" | "column" => entities(),
+        _ => Vec::new(),
     }
 }
