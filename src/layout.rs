@@ -1954,20 +1954,9 @@ fn place_all(
                 continue;
             }
 
-            let padding = group_padding(diagram, g);
-            let Some(inner) = bbox(members.iter().filter_map(|m| {
-                let r = rect_of(*m, &node_rect, &group_rect)?;
-                let (l, t, rr, b) = match m {
-                    Entity::Node(i) => overhang[*i],
-                    Entity::Group(_) => (0.0, 0.0, 0.0, 0.0),
-                };
-                Some(Rect {
-                    x: r.x - l,
-                    y: r.y - t,
-                    w: r.w + l + rr,
-                    h: r.h + t + b,
-                })
-            })) else {
+            let Some(measure) =
+                measure_frame(diagram, g, &members, &node_rect, &group_rect, overhang)
+            else {
                 // An empty group has nothing to enclose; `check` reports it.
                 group_rect[g] = Some(Rect {
                     x: 0.0,
@@ -1979,28 +1968,7 @@ fn place_all(
                 progress = true;
                 continue;
             };
-
-            // A titled group reserves a band at the top for its name. Without
-            // it the title had nowhere to go: on the border it crossed the
-            // frame, and inside it landed on the first member.
-            let title = if group.label.is_some() { 16.0 } else { 0.0 };
-            // The frame is at least as wide as its own name. A group is sized
-            // by what it holds and its name is part of that — `type network`'s
-            // "Core segment — 10.0.0.0/24" ran out of the right-hand edge of
-            // the very frame it labels, because only the members were measured
-            // (`W-118`). The same principle `W-112` applied to a caption drawn
-            // beside a box.
-            let named = group
-                .label
-                .as_deref()
-                .map(|l| text_width(&[l.to_string()], 12.0) + padding * 2.0 + 10.0)
-                .unwrap_or(0.0);
-            let frame = Rect {
-                x: inner.x - padding,
-                y: inner.y - padding - title,
-                w: (inner.w + padding * 2.0).max(named),
-                h: inner.h + padding * 2.0 + title,
-            };
+            let frame = measure.frame;
 
             let placed_at = plan
                 .declared_group_placement(g)
@@ -2079,6 +2047,59 @@ fn place_all(
     Ok(Solved {
         nodes: node_rect,
         groups: group_rect,
+    })
+}
+
+/// Geometry measured before a frame participates in placement. Keeping this
+/// separate from the fixpoint is important: the solver consumes a stable
+/// frame size, while the frame's x/y may still be constrained by an anchor.
+#[derive(Debug, Clone, Copy)]
+struct FrameMeasure {
+    frame: Rect,
+}
+
+fn measure_frame(
+    diagram: &Diagram,
+    group_index: usize,
+    members: &[Entity],
+    node_rect: &[Option<Rect>],
+    group_rect: &[Option<Rect>],
+    overhang: &[(f64, f64, f64, f64)],
+) -> Option<FrameMeasure> {
+    let rect_of = |entity: Entity| match entity {
+        Entity::Node(i) => node_rect[i],
+        Entity::Group(i) => group_rect[i],
+    };
+    let inner = bbox(members.iter().filter_map(|member| {
+        let rect = rect_of(*member)?;
+        let (left, top, right, bottom) = match member {
+            Entity::Node(i) => overhang[*i],
+            Entity::Group(_) => (0.0, 0.0, 0.0, 0.0),
+        };
+        Some(Rect {
+            x: rect.x - left,
+            y: rect.y - top,
+            w: rect.w + left + right,
+            h: rect.h + top + bottom,
+        })
+    }))?;
+    let group = &diagram.groups[group_index];
+    let padding = group_padding(diagram, group_index);
+    // A titled group reserves a band at the top for its name. Its title is
+    // part of the measured frame, just like a caption overhanging a node.
+    let title = if group.label.is_some() { 16.0 } else { 0.0 };
+    let named = group
+        .label
+        .as_deref()
+        .map(|label| text_width(&[label.to_string()], 12.0) + padding * 2.0 + 10.0)
+        .unwrap_or(0.0);
+    Some(FrameMeasure {
+        frame: Rect {
+            x: inner.x - padding,
+            y: inner.y - padding - title,
+            w: (inner.w + padding * 2.0).max(named),
+            h: inner.h + padding * 2.0 + title,
+        },
     })
 }
 
