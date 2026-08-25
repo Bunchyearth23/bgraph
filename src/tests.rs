@@ -8749,13 +8749,33 @@ fn align_group_moves_the_others_onto_the_first() {
     // box including the one the others were being lined up against.
     let l = build(
         r#"node a "A" at (0, 0) { size: 80 40 }
-           node b "B" at (120, 33) { size: 80 60 }
-           node c "C" at (240, 71) { size: 80 40 }
+           node b "B" right-of a gap 40 { size: 80 60 }
+           node c "C" right-of b gap 40 { size: 80 40 }
            align-group top a b c"#,
     );
     assert_eq!(l.nodes[0].rect.y, 0.0, "the lead moved");
     assert_eq!(l.nodes[1].rect.y, 0.0);
     assert_eq!(l.nodes[2].rect.y, 0.0);
+}
+
+#[test]
+fn an_align_group_does_not_override_an_explicit_at() {
+    let source = r#"node a "A" at (0, 0) { size: 80 40 }
+                   node b "B" at (120, 33) { size: 80 60 }
+                   align-group top a b"#;
+    let l = build(source);
+    assert_eq!(l.nodes[1].rect.y, 33.0, "an explicit `at` moved");
+    assert!(diags(source).iter().any(|diagnostic| {
+        diagnostic.severity == crate::check::Severity::Warning
+            && diagnostic.message.contains("explicit `at`")
+    }));
+}
+
+#[test]
+fn a_constraint_names_only_distinct_nodes() {
+    assert!(err("node a\nsame-width a typo").contains("unknown node `typo`"));
+    assert!(err("node a\nsame-width a a").contains("more than once"));
+    assert!(err("group g { node a }\nnode b\nsame-width g b").contains("is a group"));
 }
 
 #[test]
@@ -8938,7 +8958,7 @@ fn a_note_follows_a_box_a_constraint_moved() {
     // Solved last, against the boxes as they finally sit.
     let l = build(
         r#"node a "A" at (0, 0) { size: 80 40 }
-           node b "B" at (200, 90) { size: 80 40 }
+           node b "B" right-of a gap 120 align bottom { size: 80 80 }
            align-group top a b
            note "Beside B." right-of b gap 20"#,
     );

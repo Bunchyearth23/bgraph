@@ -63,6 +63,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
     check_styles(diagram, def, &mut out);
     let nodes = check_nodes(diagram, def, &mut out);
     check_groups(diagram, def, &nodes, &mut out);
+    check_constraints(diagram, &mut out);
     check_edges(diagram, def, &nodes, &mut out);
     check_graph(diagram, &mut out);
 
@@ -623,6 +624,73 @@ fn anchor_names(diagram: &Diagram) -> HashSet<&str> {
                 .map(|g| g.id.as_str()),
         )
         .collect()
+}
+
+/// Constraints are declarations, not best-effort layout hints. A misspelled
+/// member used to disappear inside `layout::members_of`, making `check` claim
+/// the diagram was sound while the renderer silently ignored the relation.
+fn check_constraints(diagram: &Diagram, out: &mut Vec<Diag>) {
+    let nodes: HashSet<&str> = diagram.nodes.iter().map(|node| node.id.as_str()).collect();
+    let groups: HashSet<&str> = diagram
+        .groups
+        .iter()
+        .map(|group| group.id.as_str())
+        .collect();
+
+    for constraint in &diagram.constraints {
+        let name = match constraint.kind {
+            ConstraintKind::AlignGroup => "align-group",
+            ConstraintKind::SameWidth => "same-width",
+            ConstraintKind::SameHeight => "same-height",
+        };
+        let mut seen = HashSet::new();
+        for member in &constraint.members {
+            if !seen.insert(member.as_str()) {
+                out.push(Diag::error(
+                    member.span,
+                    format!("`{name}` names `{}` more than once", member.as_str()),
+                ));
+            } else if groups.contains(member.as_str()) {
+                out.push(Diag::error(
+                    member.span,
+                    format!(
+                        "`{name}` accepts nodes, but `{}` is a group",
+                        member.as_str()
+                    ),
+                ));
+            } else if !nodes.contains(member.as_str()) {
+                out.push(Diag::error(
+                    member.span,
+                    format!("`{name}` names unknown node `{}`", member.as_str()),
+                ));
+            }
+        }
+
+        if constraint.kind != ConstraintKind::AlignGroup {
+            continue;
+        }
+        for member in constraint.members.iter().skip(1) {
+            let Some(node) = diagram
+                .nodes
+                .iter()
+                .find(|node| node.id.as_str() == member.as_str())
+            else {
+                continue;
+            };
+            if matches!(
+                node.placement.as_ref(),
+                Some(Placement::At { .. } | Placement::Cell { .. })
+            ) {
+                out.push(Diag::warn(
+                    node.span,
+                    format!(
+                        "`align-group` leaves `{}` at its explicit `at` position",
+                        node.id.as_str()
+                    ),
+                ));
+            }
+        }
+    }
 }
 
 fn placements(diagram: &Diagram) -> impl Iterator<Item = (&Spanned<String>, &Placement)> {

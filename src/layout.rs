@@ -1764,6 +1764,15 @@ fn constrain_alignment(diagram: &Diagram, index: &HashMap<&str, Entity>, solved:
                 let horizontal = spread(|r| r.x) >= spread(|r| r.y);
 
                 for i in &rects[1..] {
+                    // `at` is a required coordinate. The old late pass
+                    // silently overwrote it, despite the language contract
+                    // saying an explicit position wins over a constraint.
+                    if matches!(
+                        diagram.nodes[*i].placement.as_ref(),
+                        Some(Placement::At { .. } | Placement::Cell { .. })
+                    ) {
+                        continue;
+                    }
                     let Some(rect) = solved.nodes[*i].as_mut() else {
                         continue;
                     };
