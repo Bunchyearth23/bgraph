@@ -95,7 +95,7 @@ fn reflow(source: &str) -> String {
 pub fn migrate(source: &str) -> anyhow::Result<String> {
     // `fmt --migrate` only handles independent property migrations. V1
     // placement syntax is deliberately outside the language now.
-    let diagram = crate::parser::parse_diagram(source)?;
+    crate::parser::parse_diagram(source)?;
 
     let decls = declarations(source);
     let mut edits: Vec<(usize, usize, String)> = Vec::new();
@@ -150,52 +150,6 @@ pub fn migrate(source: &str) -> anyhow::Result<String> {
         }
     }
 
-    // v2 has one home for a box's geometry: a scoped `layout` block. The
-    // parser retained each legacy clause's exact byte range, so this rewrite
-    // moves the relation without reprinting its numbers, whitespace or
-    // comments. A local member stays local; a frame is placed by its parent.
-    let mut moved: Vec<MovedPlacement<'_>> = Vec::new();
-    for node in &diagram.nodes {
-        if let (Some(_), Some(span)) = (&node.placement, node.placement_span) {
-            moved.push(MovedPlacement {
-                target: node.id.as_str(),
-                span,
-                scope: owner_of(&diagram, node.id.as_str()),
-            });
-        }
-    }
-    for group in &diagram.groups {
-        if let (Some(_), Some(span)) = (&group.placement, group.placement_span) {
-            moved.push(MovedPlacement {
-                target: group.id.as_str(),
-                span,
-                scope: owner_of(&diagram, group.id.as_str()),
-            });
-        }
-    }
-    for placing in &diagram.uses {
-        if let (Some(_), Some(span)) = (&placing.placement, placing.placement_span) {
-            moved.push(MovedPlacement {
-                target: placing.prefix.as_str(),
-                span,
-                scope: None,
-            });
-        }
-    }
-    // A placement migration is allowed only to preserve the picture. If the
-    // source itself does not render, there is no honest baseline to compare,
-    // so do not write a plausible-looking but unverified v2 file.
-    let before_picture = if moved.is_empty() {
-        None
-    } else {
-        Some(crate::render_legacy_source(source).map_err(|error| {
-            anyhow::anyhow!(
-                "cannot verify the inline-placement migration because the source does not render: {error}"
-            )
-        })?)
-    };
-    migrate_placements(source, &diagram, &moved, &mut edits);
-
     // Right to left, so an earlier edit's offsets are still the ones measured.
     edits.sort_by_key(|(s, _, _)| *s);
     let mut out = source.to_string();
@@ -203,126 +157,7 @@ pub fn migrate(source: &str) -> anyhow::Result<String> {
         out.replace_range(s..e, &with);
     }
     crate::parser::parse_diagram(&out)?;
-    if let Some(before_picture) = before_picture {
-        let after_picture = crate::render_source(&out)?;
-        if after_picture != before_picture {
-            anyhow::bail!(
-                "the placement migration would change the rendered SVG, so it left the source untouched"
-            );
-        }
-    }
     Ok(out)
-}
-
-struct MovedPlacement<'a> {
-    target: &'a str,
-    span: crate::ast::Span,
-    /// `None` is the root layout; `Some` is the owning group's layout.
-    scope: Option<&'a str>,
-}
-
-/// The direct group that owns an entity. Group membership is already the
-/// canonical scoping relation used by the validator and solver.
-fn owner_of<'a>(diagram: &'a crate::ast::Diagram, name: &str) -> Option<&'a str> {
-    diagram
-        .groups
-        .iter()
-        .find(|group| group.members.iter().any(|member| member.as_str() == name))
-        .map(|group| group.id.as_str())
-}
-
-/// Move every inline placement into its one canonical layout scope.
-fn migrate_placements(
-    source: &str,
-    diagram: &crate::ast::Diagram,
-    moved: &[MovedPlacement<'_>],
-    edits: &mut Vec<(usize, usize, String)>,
-) {
-    use std::collections::BTreeMap;
-
-    let mut by_scope: BTreeMap<Option<&str>, Vec<&MovedPlacement<'_>>> = BTreeMap::new();
-    for placement in moved {
-        let (start, end) = cut(source, placement.span.start, placement.span.end);
-        let joint = start > 0
-            && end < source.len()
-            && source.as_bytes()[start - 1] != b'\n'
-            && source.as_bytes()[end] != b'\n';
-        edits.push((start, end, if joint { " ".into() } else { String::new() }));
-        by_scope.entry(placement.scope).or_default().push(placement);
-    }
-
-    for (scope, placements) in by_scope {
-        let statements = placements
-            .iter()
-            .map(|placement| {
-                format!(
-                    "place {} {}",
-                    placement.target,
-                    source[placement.span.start..placement.span.end].trim()
-                )
-            })
-            .collect::<Vec<_>>();
-
-        let existing = diagram
-            .layouts
-            .iter()
-            .rev()
-            .find(|layout| layout.scope.as_ref().map(|name| name.as_str()) == scope);
-        if let Some(layout) = existing {
-            let at = layout.span.end.saturating_sub(1);
-            let indent = format!("{}  ", line_indent(source, layout.span.start));
-            let text = statements
-                .iter()
-                .map(|statement| format!("\n{indent}{statement}"))
-                .collect::<String>();
-            edits.push((at, at, text));
-            continue;
-        }
-
-        match scope {
-            None => {
-                let prefix = if source.trim_end().is_empty() {
-                    ""
-                } else {
-                    "\n"
-                };
-                let text = format!("{prefix}\nlayout {{\n  {}\n}}\n", statements.join("\n  "));
-                edits.push((source.len(), source.len(), text));
-            }
-            Some(scope) => {
-                let Some(group) = diagram
-                    .groups
-                    .iter()
-                    .find(|group| group.id.as_str() == scope)
-                else {
-                    continue;
-                };
-                let at = group.span.end.saturating_sub(1);
-                let group_indent = line_indent(source, group.span.start);
-                let indent = format!("{group_indent}  ");
-                let body = statements
-                    .iter()
-                    .map(|statement| format!("{indent}  {statement}"))
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                edits.push((
-                    at,
-                    at,
-                    format!("\n{indent}layout {{\n{body}\n{indent}}}\n{group_indent}"),
-                ));
-            }
-        }
-    }
-}
-
-fn line_indent(source: &str, offset: usize) -> String {
-    let start = source[..offset.min(source.len())]
-        .rfind('\n')
-        .map_or(0, |newline| newline + 1);
-    source[start..offset.min(source.len())]
-        .chars()
-        .take_while(|character| matches!(character, ' ' | '\t'))
-        .collect()
 }
 
 const OPACITY: &str = "opacity";

@@ -56,6 +56,7 @@ pub fn parse_diagram(input: &str) -> Result<Diagram> {
 /// understand a file written before the layout DSL was unified, while every
 /// public entry point will eventually accept v2 only. Keeping the reader here
 /// lets that removal happen without giving the old syntax a second public API.
+#[cfg(test)]
 pub(crate) fn parse_legacy_diagram(input: &str) -> Result<Diagram> {
     parse_legacy(input).map_err(anyhow::Error::from)
 }
@@ -78,7 +79,7 @@ pub fn parse(input: &str) -> std::result::Result<Diagram, ParseError> {
     let diagram = parse_legacy(input)?;
     if let Some(span) = legacy_layout_span(&diagram) {
         return Err(ParseError {
-            message: "inline placement is no longer supported; run `bgraph fmt --migrate` to move it into a `layout { … }` block".into(),
+            message: "inline placement is no longer supported; use a `layout { … }` block".into(),
             span,
         });
     }

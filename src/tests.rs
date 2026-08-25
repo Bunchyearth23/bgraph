@@ -112,7 +112,7 @@ fn a_layout_place_cannot_compete_with_v1_inline_placement() {
 #[test]
 fn public_parser_refuses_the_retired_inline_layout_syntax() {
     let error = parse_diagram("node api at (0, 0)").expect_err("v1 is retired");
-    assert!(error.to_string().contains("fmt --migrate"), "{error}");
+    assert!(error.to_string().contains("layout"), "{error}");
 }
 
 #[test]
@@ -1819,7 +1819,7 @@ fn the_migration_is_idempotent_and_leaves_a_clean_file_alone() {
 }
 
 #[test]
-fn the_migration_moves_inline_positions_into_their_layout_scopes() {
+fn the_property_migrator_rejects_inline_positions() {
     let before = r#"node api "API" at (0, 0) { size: 80 40 }
 node db "Database" right-of api gap 32 align top { size: 120 60 }
 group service {
@@ -1832,30 +1832,6 @@ group service {
         format!("{error:#}").contains("inline placement"),
         "{error:#}"
     );
-    if false {
-        let after = String::new();
-
-        assert!(
-            after.contains("node api \"API\" { size: 80 40 }"),
-            "{after}"
-        );
-        assert!(after.contains("place api at (0, 0)"), "{after}");
-        assert!(
-            after.contains("place db right-of api gap 32 align top"),
-            "{after}"
-        );
-        assert!(after.contains("place cache at (0, 0)"), "{after}");
-        assert!(
-            after.contains("place audit below cache gap 24 align center-x"),
-            "{after}"
-        );
-        assert_eq!(
-            crate::render_legacy_source(before).expect("legacy source renders"),
-            crate::render_source(&after).expect("migrated source renders"),
-            "the migration changed the picture:\n{after}"
-        );
-        assert_eq!(crate::fmt::migrate(&after).expect("idempotent"), after);
-    }
 }
 
 #[test]
