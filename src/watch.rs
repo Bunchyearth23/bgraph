@@ -548,6 +548,19 @@ mod tests {
     }
 
     #[test]
+    fn preview_diagnostics_are_visible_and_escaped() {
+        let items = [crate::check::Diag {
+            severity: crate::check::Severity::Warning,
+            message: "overlap <a>".into(),
+            span: crate::ast::Span { start: 0, end: 1 },
+        }];
+        let html = diagnostics_html(&items);
+        assert!(html.contains("Diagnostics"));
+        assert!(html.contains("class=\"warning\""));
+        assert!(html.contains("overlap &lt;a&gt;"));
+    }
+
+    #[test]
     fn the_diagram_is_moved_by_transforming_a_wrapper() {
         // Transforming the wrapper leaves the SVG untouched, so what is on
         // screen is what the file exports.
