@@ -45,8 +45,12 @@
 )
 
 /// The same, reading the source from a file beside the document.
-#let bg-diagram-file(path, width: auto, alt: none) = bg-diagram(
-  read(path),
+///
+/// Pass a Typst `path`, not a string: `path("arch.bd")`. Typst resolves a
+/// path where it is created, so the package then reads relative to the calling
+/// document rather than relative to this package.
+#let bg-diagram-file(source, width: auto, alt: none) = bg-diagram(
+  read(source),
   width: width,
   alt: alt,
 )

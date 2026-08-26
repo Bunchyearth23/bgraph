@@ -150,8 +150,8 @@ For a Rust integration, see the supported embedding boundary in
 ```
 
 ```typst
-#import "typst/bgraph.typ": bg-diagram
-#bg-diagram(read("arch.bd"), width: 70%)
+#import "typst/bgraph.typ": bg-diagram, bg-diagram-file
+#bg-diagram-file(path("arch.bd"), width: 70%)
 ```
 
 A diagram that does not parse **fails the build**, with the compiler's own

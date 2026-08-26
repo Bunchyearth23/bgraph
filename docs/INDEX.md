@@ -199,6 +199,7 @@ not copies.
 | `W-162` | 2026-08-25 | Grille de placement déclarative pour nœuds et liens | `059da29` |
 | `W-163` | 2026-08-25 | Galerie vérifiée des exemples BD/SVG par archétype | `90270ae` |
 | `W-164` | 2026-08-25 | Script `./export.sh` pour produire une distribution locale sans sources : binaires Linux, Windows x86_64/ARM64 (avec `cargo-xwin`), VS Code, Zed et Typst | ce commit |
+| `W-165` | 2026-08-26 | Résolution des chemins Typst : `bg-diagram-file(path("…"))` conserve le dossier du document appelant au lieu de chercher dans le paquet installé | ce commit |
 | `W-150` | 2026-08-21 | Schéma généré du vocabulaire | non committé |
 | `W-149` | 2026-08-21 | Snapshots visuels représentatifs | non committé |
 | `W-148` | 2026-08-21 | Cohérence des chiffres et du vocabulaire documentaire | non committé |

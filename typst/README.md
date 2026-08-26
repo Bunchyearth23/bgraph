@@ -46,8 +46,12 @@ and a diagram that stops parsing stops the build.
   ui -> api
 ")
 
-#bg-diagram-file("arch.bd", width: 80%)
+#bg-diagram-file(path("arch.bd"), width: 80%)
 ```
+
+`bg-diagram-file` takes a Typst `path`, not a string. The `path("…")` must be
+created in the calling document; this preserves that document's directory
+when the package reads the `.bd` file.
 
 **A diagram that does not parse fails the build**, with the compiler's own
 message and the line of the document that asked for it. That matches what

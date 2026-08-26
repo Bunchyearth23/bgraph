@@ -24,6 +24,7 @@
 # Compiled documents. The .typ source and the diagram sources are the record.
 /out
 /export
+/bgraph.zip
 playground/public/bgraph.wasm
 playground/node_modules
 playground/dist
