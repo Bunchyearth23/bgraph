@@ -348,6 +348,11 @@ fn layout_items(text: &str, line: &str, offset: usize, archetype: &str) -> Vec<V
 
     let words: Vec<&str> = line.split_whitespace().collect();
     let ends_with_space = line.ends_with(char::is_whitespace);
+    let current = if ends_with_space {
+        ""
+    } else {
+        words.last().copied().unwrap_or("")
+    };
     let preceding = if ends_with_space {
         words.last().copied().unwrap_or("")
     } else if words.len() >= 2 {
@@ -399,6 +404,20 @@ fn layout_items(text: &str, line: &str, offset: usize, archetype: &str) -> Vec<V
             .collect()
     };
 
+    if current.starts_with('[')
+        && words
+            .first()
+            .is_some_and(|word| matches!(*word, "row" | "column"))
+    {
+        return vec![snippet(
+            "gap",
+            14,
+            "gap <n>",
+            "Distance inserted between consecutive row/column members.",
+            "gap ${1:32}]$0",
+        )];
+    }
+
     if words.is_empty() || (words.len() == 1 && !ends_with_space) {
         return vec![
             snippet(
@@ -434,14 +453,14 @@ fn layout_items(text: &str, line: &str, offset: usize, archetype: &str) -> Vec<V
                 14,
                 "row <members…> [gap <n>]",
                 "Place members left to right in the written order.",
-                "row ${1:first} ${2:next} gap ${3:32}$0",
+                "row ${1:first} ${2:next} [gap ${3:32}]$0",
             ),
             snippet(
                 "column",
                 14,
                 "column <members…> [gap <n>]",
                 "Place members top to bottom in the written order.",
-                "column ${1:first} ${2:next} gap ${3:32}$0",
+                "column ${1:first} ${2:next} [gap ${3:32}]$0",
             ),
         ];
     }

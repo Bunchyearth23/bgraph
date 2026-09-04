@@ -1,0 +1,144 @@
+bgraph Noncommercial License 1.0
+
+Copyright 2026 Bunchyearth23.
+
+This licence is written in the shape of the PolyForm licences — short sections,
+plain words, second person — because that shape is readable. It is not one of
+them, it is not endorsed by them, and it says different things. Read it; it is
+two pages.
+
+## Acceptance
+
+To get any licence under these terms you must agree to them, as both strict
+obligations and conditions to everything they grant you.
+
+## Copyright Licence
+
+The licensor grants you a copyright licence to **use** the software for any
+permitted purpose.
+
+That licence covers everything you might do with the software that would
+otherwise infringe the licensor's copyright in it, other than the things
+[No Other Rights](#no-other-rights) keeps back — in particular making changes
+and distributing the source.
+
+## Permitted Purposes
+
+Any noncommercial purpose is a permitted purpose.
+
+**Personal uses.** Use for personal study, research, experiment and testing,
+private entertainment, hobby projects, amateur pursuits or religious
+observance, without any anticipated commercial application, is use for a
+permitted purpose.
+
+**Noncommercial organisations.** Use by a charitable organisation, an
+educational institution, a public research organisation, a public safety or
+health organisation, an environmental protection organisation or a government
+institution is use for a permitted purpose, whatever the source of its funding.
+
+**Commercial use is not permitted** and needs a separate written agreement with
+the licensor. Use by or for a company, in the course of its own work, is
+commercial use — whatever the diagram is of, and whether or not anything is
+sold. So is any use that ends up in something offered for sale.
+
+## Running It For Others
+
+Running the software so that other people can use it — a shared instance, an
+internal service, the playground on a machine other people reach — is use like
+any other, and is permitted as long as it is for a permitted purpose. Offering
+it to anyone as a paid or commercial service is not.
+
+## Passing On A Build
+
+The licensor grants you a copyright licence to give another person a copy of a
+**build**, provided that:
+
+1. you pass it on exactly as you received it, unchanged;
+2. you pass on a copy of these terms with it;
+3. the person receiving it is within the permitted purposes above; and
+4. you charge nothing, directly or indirectly, for doing so.
+
+You get no licence to distribute the software in any other way.
+
+## The Source Is Confidential
+
+The source code is the licensor's confidential information, and this licence
+grants you nothing in respect of it.
+
+If you have been given access to the source, that access is **personal to
+you**. You may not copy it, publish it, mirror it, pass it to anyone else, or
+make it available to anyone else, in whole or in part, by any means.
+
+## No Changes
+
+You may not modify the software, or make anything based on it. A copy you have
+altered is not a build, and [Passing On A Build](#passing-on-a-build) does not
+cover it.
+
+This does not stop you from writing your own software that reads or writes
+files the software reads or writes.
+
+## Patent Licence
+
+The licensor grants you a patent licence for the software that covers patent
+claims the licensor can license, or becomes able to license, that you would
+infringe by using the software as these terms permit.
+
+## Patent Defence
+
+If you make any written claim that the software infringes or contributes to
+infringement of any patent, your patent licence for the software ends
+immediately. If your company makes such a claim, your patent licence ends
+immediately for work on behalf of your company.
+
+## No Other Rights
+
+These terms do not allow you to sublicense or transfer any of your licences to
+anyone else, and do not prevent the licensor from granting licences to anyone
+else. They do not imply any other licences.
+
+## Fair Use
+
+You may have "fair use", "fair dealing" or equivalent rights in the software
+under the law. These terms do not limit them.
+
+## Violations
+
+The first time you are notified in writing that you have violated any of these
+terms, or done anything with the software that your licences do not cover, your
+licences can nonetheless continue if you come into full compliance and take
+practical steps to correct past violations within 32 days of receiving notice.
+Otherwise all your licences end immediately.
+
+## No Liability
+
+***As far as the law allows, the software comes as is, without any warranty or
+condition, and the licensor will not be liable to you for any damages arising
+out of these terms or the use or nature of the software, under any kind of
+legal claim.***
+
+## Definitions
+
+The **licensor** is the individual or entity offering these terms, and the
+**software** is the software the licensor makes available under them.
+
+**You** refers to the individual or entity agreeing to these terms.
+
+**Your company** is any legal entity, sole proprietorship or other kind of
+organisation that you work for, plus all organisations that have control over,
+are under the control of, or are under common control with that organisation.
+**Control** means ownership of substantially all the assets of an entity, or
+the power to direct its management and policies by vote, contract or otherwise.
+Control can be direct or indirect.
+
+A **build** is a compiled or packaged copy of the software published by the
+licensor — a binary, an editor extension, a package, an archive from the
+licensor's releases — that you have not altered.
+
+The **source code** is the human-readable form of the software, including the
+contents of the licensor's repository.
+
+**Your licences** are all the licences granted to you for the software under
+these terms.
+
+**Use** means anything you do with the software requiring one of your licences.

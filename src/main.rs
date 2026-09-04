@@ -679,10 +679,7 @@ fn report_composed(
     use bgraph::check::Severity;
     use bgraph::report;
 
-    let mut diagnostics = bgraph::check::check(&composed.diagram);
-    if let Ok(solved) = layout::solve(&composed.diagram) {
-        diagnostics.extend(bgraph::check::after_layout(&composed.diagram, &solved));
-    }
+    let mut diagnostics = bgraph::analyze_diagram(&composed.diagram).1;
     diagnostics.sort_by_key(|d| (d.span.start, d.span.end));
 
     let (rich, colour) = report::decorate(ci);
@@ -763,26 +760,9 @@ fn check_file(input: &PathBuf, ci: bool, json_output: bool) -> Result<i32> {
 
     // Every mistake, not the first: a person fixing a file wants the list,
     // and a build log that stops at line 3 hides what is on line 40.
-    let (diagram, syntax) = parser::parse_recovering(&source);
+    let mut diagnostics = bgraph::analyze_source(&source).diagnostics;
 
-    let mut diagnostics: Vec<bgraph::check::Diag> = syntax
-        .into_iter()
-        .map(|err| bgraph::check::Diag {
-            severity: Severity::Error,
-            message: err.message,
-            span: err.span,
-        })
-        .collect();
-
-    if let Some(diagram) = &diagram {
-        diagnostics.extend(bgraph::check::check(diagram));
-        // The ones that need the boxes placed. `check` is still the only
-        // validator; this is its second pass, not a second validator.
-        if let Ok(solved) = layout::solve(diagram) {
-            diagnostics.extend(bgraph::check::after_layout(diagram, &solved));
-        }
-    }
-    diagnostics.sort_by_key(|d| (d.span.start, d.span.end));
+    diagnostics.sort_by_key(|diag| (diag.span.start, diag.span.end));
 
     let (rich, colour) = report::decorate(ci);
     let path = input.display().to_string();

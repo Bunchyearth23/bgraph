@@ -3383,3 +3383,46 @@ fn distance(a: &str, b: &str) -> usize {
 
     prev[b.len()]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{check_layout_capability, Diag, Severity};
+    use crate::{ast, props};
+
+    #[test]
+    fn layout_capability_matrix_is_exhaustive() {
+        for def in props::ARCHETYPES {
+            let mut diagram = ast::Diagram::default();
+            diagram.archetype = Some(ast::Spanned {
+                value: def.name.to_string(),
+                span: ast::Span { start: 0, end: def.name.len() },
+            });
+            diagram.layouts.push(ast::LayoutDecl {
+                scope: None,
+                statements: Vec::new(),
+                span: ast::Span { start: 0, end: 6 },
+            });
+
+            let mut out: Vec<Diag> = Vec::new();
+            check_layout_capability(&diagram, def, &mut out);
+            if def.layout_capability() == props::LayoutCapability::Declared {
+                assert!(
+                    out.is_empty(),
+                    "declared layout-capability must allow layout: {}",
+                    def.name
+                );
+            } else {
+                assert_eq!(out.len(), 1, "one diagnostic for {0}", def.name);
+                assert_eq!(out[0].severity, Severity::Error);
+                assert!(
+                    out[0]
+                        .message
+                        .contains("manages its own geometry"),
+                    "unexpected diagnostic for {0}: {1}",
+                    def.name,
+                    out[0].message
+                );
+            }
+        }
+    }
+}

@@ -15,7 +15,7 @@ pub(super) fn capabilities() -> Value {
                 "save": { "includeText": false }
             },
             "completionProvider": {
-                "triggerCharacters": [".", ":", "{"],
+                "triggerCharacters": [".", ":", "{", "["],
                 "resolveProvider": false
             },
             "hoverProvider": true,

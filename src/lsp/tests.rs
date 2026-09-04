@@ -127,6 +127,54 @@ fn completion_inside_a_local_layout_stays_with_its_direct_members() {
 }
 
 #[test]
+fn completion_in_layout_respects_layout_capability_matrix() {
+    let server = Server {
+        docs: HashMap::new(),
+    };
+
+    for def in props::ARCHETYPES {
+        let text = format!("type {}\nlayout {{\n  ", def.name);
+        let labels: Vec<String> = server
+            .items_for(&text, "  ", text.len())
+            .iter()
+            .filter_map(|item| item["label"].as_str().map(str::to_string))
+            .collect();
+
+        if def.layout_capability() == props::LayoutCapability::Declared {
+            assert!(
+                labels.contains(&"place".to_string()),
+                "layout completion should be active for {}",
+                def.name
+            );
+        } else {
+            assert!(
+                labels.is_empty(),
+                "layout completion should be blocked for managed archetype {}",
+                def.name
+            );
+        }
+    }
+}
+
+#[test]
+fn completion_in_layout_suggests_gap_after_optional_bracket() {
+    let server = Server {
+        docs: HashMap::new(),
+    };
+    let text = "type free\nnode a\nnode b\nlayout {\n  row a b [";
+    let labels: Vec<String> = server
+        .items_for(text, "  row a b [", text.len())
+        .iter()
+        .filter_map(|item| item["label"].as_str().map(String::from))
+        .collect();
+    assert!(labels.contains(&"gap".to_string()), "{labels:?}");
+    assert!(
+        !labels.contains(&"a".to_string()) && !labels.contains(&"b".to_string()),
+        "the row member list should not suggest entity names while completing the optional gap block: {labels:?}"
+    );
+}
+
+#[test]
 fn braces_inside_strings_and_comments_are_ignored() {
     let text = "node a \"{\"\nnode b";
     assert_eq!(Context::at(text, text.len()).block, None);
@@ -878,6 +926,24 @@ fn go_to_definition_finds_a_box_declared_under_its_genres_own_word() {
         answer["range"]["start"]["line"].as_u64(),
         Some(1),
         "expected the `task pay` line, got {answer}"
+    );
+}
+
+#[test]
+fn go_to_definition_from_a_declaration_jumps_to_its_layout_reference() {
+    let text = "type free\nnode source \"Source\"\nnode sink \"Sink\"\nlayout {\n  place source at (0, 0)\n  place sink right-of source\n}\n";
+    let server = server_with(text);
+    let at = text.find("source").expect("declaration is present");
+    let (line, col) = LineIndex::new(text).line_col(at + "source".len() / 2);
+    let answer = server.definition(&json!({
+        "textDocument": { "uri": "file:///t.bd" },
+        "position": { "line": line, "character": col },
+    }));
+
+    assert_eq!(
+        answer["range"]["start"]["line"].as_u64(),
+        Some(4),
+        "expected to land in the layout line, got {answer}"
     );
 }
 

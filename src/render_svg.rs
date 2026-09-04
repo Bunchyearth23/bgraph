@@ -84,7 +84,8 @@ pub fn render(layout: &Layout) -> String {
 
         let head = edge.style.head.unwrap_or(Head::Solid);
         let stroke = edge.style.stroke.as_deref().unwrap_or("#64748b");
-        let mut attrs = String::new();
+        let mut marker_attrs = String::new();
+        let mut stroke_attrs = String::new();
 
         // Each end is decided on its own: a declared cardinality replaces the
         // arrowhead there, because a crow's foot already says which way the
@@ -106,24 +107,44 @@ pub fn render(layout: &Layout) -> String {
             markers
                 .entry(id.clone())
                 .or_insert((head, stroke.to_string()));
-            let _ = write!(attrs, r#" marker-{which}="url(#{id})""#);
+            let _ = write!(marker_attrs, r#" marker-{which}="url(#{id})""#);
         }
+        let linecap = if end_head.is_some() || start_head.is_some() {
+            "butt"
+        } else {
+            "round"
+        };
         if let Some(dash) = edge.style.dash_array() {
-            let _ = write!(attrs, r#" stroke-dasharray="{dash}""#);
+            let _ = write!(stroke_attrs, r#" stroke-dasharray="{dash}""#);
         }
 
-        let path: Vec<String> = route
-            .points
+        let mut points = route.points.clone();
+        stabilise_marker_tangent(&mut points);
+        let marker_path: Vec<String> = points
             .iter()
             .map(|(x, y)| format!("{},{}", n(*x), n(*y)))
             .collect();
+        let mut line_points = points.clone();
+        trim_marker_stems(&mut line_points, marker_stem(start_head), marker_stem(end_head));
+        let path: Vec<String> = line_points
+            .iter()
+            .map(|(x, y)| format!("{},{}", n(*x), n(*y)))
+            .collect();
+        if !marker_attrs.is_empty() {
+            let _ = write!(
+                body,
+                r#"<polyline points="{}" fill="none" stroke="none"{marker_attrs}/>"#,
+                marker_path.join(" "),
+            );
+        }
         let _ = write!(
             body,
-            r#"<polyline points="{}" fill="none"{} stroke-width="{}" stroke-linejoin="round" stroke-linecap="round"{}/>"#,
+            r#"<polyline points="{}" fill="none"{} stroke-width="{}" stroke-linejoin="round" stroke-linecap="{}"{}/>"#,
             path.join(" "),
             paint("stroke", stroke),
             n(edge.style.stroke_width.unwrap_or(1.5)),
-            attrs
+            linecap,
+            stroke_attrs
         );
     }
 
@@ -941,8 +962,12 @@ fn guide_line(g: &Guide) -> String {
 }
 
 fn free_polyline(p: &Polyline) -> String {
-    let points: Vec<String> = p
-        .points
+    let mut points: Vec<(f64, f64)> = p.points.clone();
+    if p.head.is_some() {
+        stabilise_marker_tangent(&mut points);
+    }
+
+    let points: Vec<String> = points
         .iter()
         .map(|(x, y)| format!("{},{}", n(*x), n(*y)))
         .collect();
@@ -958,8 +983,9 @@ fn free_polyline(p: &Polyline) -> String {
         let _ = write!(attrs, r#" stroke-dasharray="{}""#, esc(dash));
     }
 
+    let linecap = if p.head.is_some() { "butt" } else { "round" };
     format!(
-        r#"<{} points="{}"{}{} stroke-width="{}" stroke-linejoin="round" stroke-linecap="round"{attrs}/>"#,
+        r#"<{} points="{}"{}{} stroke-width="{}" stroke-linejoin="round" stroke-linecap="{linecap}"{attrs}/>"#,
         if p.closed { "polygon" } else { "polyline" },
         points.join(" "),
         paint("fill", p.fill.as_deref().unwrap_or("none")),
@@ -1541,6 +1567,87 @@ fn long_enough(a: (f64, f64), b: (f64, f64)) -> bool {
     (a.0 - b.0).abs() + (a.1 - b.1).abs() > 6.0
 }
 
+/// SVG markers read the tangent of the first and last segments. If either end
+/// is effectively a zero-length stub, the arrow can aim away from the route.
+///
+/// This keeps those terminal segments long enough to be numerically stable,
+/// without altering routing decisions elsewhere.
+fn stabilise_marker_tangent(points: &mut Vec<(f64, f64)>) {
+    if points.len() < 3 {
+        return;
+    }
+
+    const MIN_LEN: f64 = 1.5;
+
+    let i = points.len() - 1;
+    let (a, b) = (points[i - 2], points[i - 1]);
+    let end = points[i];
+    let end_len = ((end.0 - b.0).powi(2) + (end.1 - b.1).powi(2)).sqrt();
+    if end_len > 0.0 && end_len < MIN_LEN {
+        let (px, py) = (b.0 - a.0, b.1 - a.1);
+        let prev_len = (px * px + py * py).sqrt();
+        if prev_len > 0.0 {
+            let ux = px / prev_len;
+            let uy = py / prev_len;
+            points[i - 1] = (end.0 - ux * MIN_LEN, end.1 - uy * MIN_LEN);
+        }
+    }
+
+    let (start, b, c) = (points[0], points[1], points[2]);
+    let start_len = ((b.0 - start.0).powi(2) + (b.1 - start.1).powi(2)).sqrt();
+    if start_len > 0.0 && start_len < MIN_LEN {
+        let (nx, ny) = (c.0 - b.0, c.1 - b.1);
+        let next_len = (nx * nx + ny * ny).sqrt();
+        if next_len > 0.0 {
+            let ux = nx / next_len;
+            let uy = ny / next_len;
+            points[1] = (start.0 + ux * MIN_LEN, start.1 + uy * MIN_LEN);
+        }
+    }
+}
+
+/// Length occupied behind the marker tip. The visible stroke ends here while
+/// a second, invisible polyline anchors the SVG marker at the real endpoint.
+fn marker_stem(head: Option<Head>) -> Option<f64> {
+    const OVERLAP: f64 = 1.5;
+
+    match head.filter(|head| *head != Head::None) {
+        // Let the visible stroke run a little way under the marker base. This
+        // avoids a hairline seam from SVG anti-aliasing without reaching the tip.
+        Some(Head::Solid | Head::Open | Head::Hollow) => Some(11.0 - OVERLAP),
+        _ => None,
+    }
+}
+
+fn trim_marker_stems(points: &mut [(f64, f64)], start: Option<f64>, end: Option<f64>) {
+    if points.len() < 2 {
+        return;
+    }
+
+    if let Some(amount) = end {
+        let last = points.len() - 1;
+        let (x0, y0) = points[last - 1];
+        let (x1, y1) = points[last];
+        let dx = x1 - x0;
+        let dy = y1 - y0;
+        let len = dx.hypot(dy);
+        if len > amount {
+            points[last] = (x1 - dx * amount / len, y1 - dy * amount / len);
+        }
+    }
+
+    if let Some(amount) = start {
+        let (x0, y0) = points[0];
+        let (x1, y1) = points[1];
+        let dx = x1 - x0;
+        let dy = y1 - y0;
+        let len = dx.hypot(dy);
+        if len > amount {
+            points[0] = (x0 + dx * amount / len, y0 + dy * amount / len);
+        }
+    }
+}
+
 /// An edge from a node to itself: a loop over its top edge. Sampled as a
 /// polyline so it inherits the dash, opacity and arrow-head machinery every
 /// other edge already uses.
@@ -1731,11 +1838,13 @@ fn marker_def(id: &str, head: Head, color: &str, background: &Option<String>) ->
     }
 
     let inner = match head {
-        Head::Solid => format!(r#"<path d="M0,0 L10,5 L0,10 z"{fill}/>"#),
+        // Keep the arrow tip at the marker origin. This makes the line end
+        // and the visible tip the same point in every orientation.
+        Head::Solid => format!(r#"<path d="M-11,0 L0,5.5 L-11,11 z"{fill}/>"#),
         Head::Open => format!(
-            r#"<path d="M0,0 L10,5 L0,10" fill="none"{stroke} stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>"#
+            r#"<path d="M-11,0 L0,5.5 L-11,11" fill="none"{stroke} stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>"#
         ),
-        Head::Dot => format!(r#"<circle cx="5" cy="5" r="3.5"{fill}/>"#),
+        Head::Dot => format!(r#"<circle cx="5.5" cy="5.5" r="3.5"{fill}/>"#),
         Head::None => String::new(),
         // UML. The two hollow ones are filled with the **surface** rather than
         // left transparent: the line runs under the marker, and a see-through
@@ -1756,15 +1865,18 @@ fn marker_def(id: &str, head: Head, color: &str, background: &Option<String>) ->
         }
         _ => unreachable!("cardinality is drawn by `cardinality_def`"),
     };
-    let (ref_x, width) = match head {
-        Head::Dot => (5, 11),
-        Head::Hollow => (11, 12),
-        Head::Diamond | Head::Composed => (16, 17),
-        _ => (10, 11),
+    let (ref_x, width, view_box) = match head {
+        Head::Dot => (5, 11, "0 0 11 11"),
+        Head::Hollow => (11, 12, "0 0 12 11"),
+        Head::Diamond | Head::Composed => (16, 17, "0 0 17 11"),
+        // Leave one unit of viewport past x=0: SVG clips marker content at its
+        // viewport edge, which otherwise turns the arrow tip into a flat end.
+        Head::Solid | Head::Open => (0, 13, "-12 0 13 11"),
+        _ => unreachable!("handled above"),
     };
 
     format!(
-        r#"<marker id="{id}" markerUnits="userSpaceOnUse" markerWidth="{width}" markerHeight="11" refX="{ref_x}" refY="5.5" orient="auto-start-reverse">{inner}</marker>"#
+        r#"<marker id="{id}" markerUnits="userSpaceOnUse" markerWidth="{width}" markerHeight="11" viewBox="{view_box}" refX="{ref_x}" refY="5.5" orient="auto-start-reverse">{inner}</marker>"#
     )
 }
 
@@ -1799,7 +1911,7 @@ fn cardinality_def(id: &str, head: Head, color: &str, background: &Option<String
     };
 
     format!(
-        r#"<marker id="{id}" markerUnits="userSpaceOnUse" markerWidth="19" markerHeight="18" refX="18" refY="9" orient="auto-start-reverse">{inner}</marker>"#
+        r#"<marker id="{id}" markerUnits="userSpaceOnUse" markerWidth="19" markerHeight="18" viewBox="0 0 19 18" refX="18" refY="9" orient="auto-start-reverse">{inner}</marker>"#
     )
 }
 

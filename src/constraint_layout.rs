@@ -15,7 +15,7 @@ use crate::style::GraphOpts;
 const MAX_SHADOW_NODES: usize = 512;
 
 /// Which geometric quantity a lowered relation controls.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Axis {
     X,
     Y,
@@ -24,7 +24,7 @@ pub enum Axis {
 }
 
 /// The DSL construct from which a linear constraint was lowered.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ConstraintOrigin {
     MeasuredSize,
     AbsolutePlacement,
@@ -40,7 +40,7 @@ pub enum ConstraintOrigin {
 /// The current shadow path only uses this for a precise failure message. The
 /// same records will let the production solver compute a conflict set without
 /// trying to reconstruct intent from rectangles after the fact.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ConstraintProvenance {
     pub origin: ConstraintOrigin,
     pub axis: Axis,
@@ -48,12 +48,96 @@ pub struct ConstraintProvenance {
     pub anchor: Option<usize>,
     pub span: Span,
     pub related_span: Option<Span>,
+    pub relation: &'static str,
+    pub value: f64,
 }
 
 #[derive(Clone, Debug)]
 struct SourcedConstraint {
     constraint: Constraint,
     provenance: ConstraintProvenance,
+}
+
+fn satisfiable(constraints: &[SourcedConstraint]) -> bool {
+    let mut solver = Solver::new();
+    for sourced in constraints {
+        if solver.add_constraint(sourced.constraint.clone()).is_err() {
+            return false;
+        }
+    }
+    true
+}
+
+fn explain_conflict(all: &[SourcedConstraint], failing: usize) -> Vec<ConstraintProvenance> {
+    let mut conflict: Vec<SourcedConstraint> = all[..=failing].to_vec();
+    if satisfiable(&conflict) {
+        return Vec::new();
+    }
+
+    let mut index = 0;
+    while index < conflict.len() {
+        let candidate: Vec<SourcedConstraint> = conflict
+            .iter()
+            .enumerate()
+            .filter_map(|(candidate_index, source)| {
+                if candidate_index == index {
+                    None
+                } else {
+                    Some(source.clone())
+                }
+            })
+            .collect();
+
+        if satisfiable(&candidate) {
+            conflict.remove(index);
+        } else {
+            index += 1;
+        }
+    }
+
+    conflict.sort_by_key(|sourced| {
+        (
+            sourced.provenance.span.start,
+            sourced.provenance.span.end,
+            sourced.provenance.origin,
+            sourced.provenance.axis,
+            sourced.provenance.node,
+            sourced.provenance.anchor.unwrap_or(usize::MAX),
+        )
+    });
+
+    conflict
+        .into_iter()
+        .map(|sourced| sourced.provenance)
+        .collect()
+}
+
+fn render_conflict(label: &str, constraints: &[ConstraintProvenance]) -> String {
+    if constraints.is_empty() {
+        return format!("Kasuari {label} constraint was not satisfiable and could not be isolated");
+    }
+
+    let mut entries = Vec::with_capacity(constraints.len());
+    for source in constraints {
+        entries.push(format!(
+            "{} {:?} {:?} {} {} bytes {}..{} on node {} anchor {:?}",
+            label,
+            source.origin,
+            source.axis,
+            source.relation,
+            source.value,
+            source.span.start,
+            source.span.end,
+            source.node,
+            source.anchor,
+        ));
+    }
+
+    format!(
+        "Kasuari {label} conflict ({}): {}",
+        constraints.len(),
+        entries.join("; "),
+    )
 }
 
 #[derive(Clone, Copy)]
@@ -264,18 +348,23 @@ pub fn solve_nodes(
         }
     }
 
+    sort_constraints(&mut constraints);
+
     let mut solver = Solver::new();
-    for sourced in constraints {
-        solver.add_constraint(sourced.constraint).map_err(|error| {
+    for (index, sourced) in constraints.iter().enumerate() {
+        if let Err(error) = solver.add_constraint(sourced.constraint.clone()) {
+            let conflict = explain_conflict(&constraints, index);
+            let mut message = render_conflict("node", &conflict);
             let source = sourced.provenance;
-            anyhow!(
-                "Kasuari shadow rejected a {:?} {:?} relation at bytes {}..{}: {error}",
+            message.push_str(&format!(
+                "; failed while adding {:?} {:?} at bytes {}..{}: {error}",
                 source.origin,
                 source.axis,
                 source.span.start,
                 source.span.end,
-            )
-        })?;
+            ));
+            return Err(anyhow!("{message}"));
+        }
     }
 
     Ok(Some(
@@ -499,11 +588,23 @@ pub fn validate_frames(
             );
         }
     }
+    sort_constraints(&mut constraints);
+
     let mut solver = Solver::new();
-    for sourced in constraints {
-        solver
-            .add_constraint(sourced.constraint)
-            .map_err(|error| anyhow!("Kasuari frame containment rejected: {error}"))?;
+    for (index, sourced) in constraints.iter().enumerate() {
+        if let Err(error) = solver.add_constraint(sourced.constraint.clone()) {
+            let conflict = explain_conflict(&constraints, index);
+            let mut message = render_conflict("frame", &conflict);
+            let source = sourced.provenance;
+            message.push_str(&format!(
+                "; failed while adding {:?} {:?} frame relation for bytes {}..{}: {error}",
+                source.origin,
+                source.axis,
+                source.span.start,
+                source.span.end,
+            ));
+            return Err(anyhow!("{message}"));
+        }
     }
     for entity in (0..diagram.nodes.len())
         .map(Entity::Node)
@@ -743,7 +844,33 @@ fn provenance(
         anchor: None,
         span,
         related_span: None,
+        relation: "?",
+        value: 0.0,
     }
+}
+
+fn relation_and_value(constraint: &Constraint) -> (&'static str, f64) {
+    (
+        match constraint.op() {
+            kasuari::RelationalOperator::LessOrEqual => "<=",
+            kasuari::RelationalOperator::Equal => "==",
+            kasuari::RelationalOperator::GreaterOrEqual => ">=",
+        },
+        constraint.expr().constant,
+    )
+}
+
+fn sort_constraints(constraints: &mut Vec<SourcedConstraint>) {
+    constraints.sort_by_key(|sourced| {
+        (
+            sourced.provenance.origin,
+            sourced.provenance.axis,
+            sourced.provenance.node,
+            sourced.provenance.anchor.unwrap_or(usize::MAX),
+            sourced.provenance.span.start,
+            sourced.provenance.span.end,
+        )
+    });
 }
 
 impl ConstraintProvenance {
@@ -768,9 +895,14 @@ fn push(
     constraint: Constraint,
     provenance: ConstraintProvenance,
 ) {
+    let (relation, value) = relation_and_value(&constraint);
     out.push(SourcedConstraint {
         constraint,
-        provenance,
+        provenance: ConstraintProvenance {
+            relation,
+            value,
+            ..provenance
+        },
     });
 }
 

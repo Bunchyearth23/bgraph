@@ -348,15 +348,8 @@ fn preview_diagnostics(input: &Path, data: Option<&Path>) -> Result<Vec<crate::c
     };
     #[cfg(not(feature = "json"))]
     let _ = data;
-    let diagram = crate::parser::parse_diagram(&source)?;
-    let mut diagnostics = crate::check::check(&diagram);
-    if !diagnostics
-        .iter()
-        .any(|diag| diag.severity == crate::check::Severity::Error)
-        && let Ok(layout) = crate::layout::solve(&diagram)
-    {
-        diagnostics.extend(crate::check::after_layout(&diagram, &layout));
-    }
+    let mut diagnostics = crate::analyze_source(&source).diagnostics;
+    diagnostics.sort_by_key(|diag| (diag.span.start, diag.span.end));
     Ok(diagnostics)
 }
 

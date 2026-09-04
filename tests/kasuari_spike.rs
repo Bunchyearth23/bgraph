@@ -67,6 +67,48 @@ fn the_spike_records_kasuaris_underconstrained_boundary() {
 }
 
 #[test]
+fn the_cassowary_shadow_is_stable_on_layout_permutations() {
+    let statements = [
+        "place a at (10, 20)",
+        "place b right-of a gap 30 align top",
+        "place c below b",
+        "equal-width a b",
+    ];
+    let source = |order: &[&str]| format!(
+        "node a {{ size: 80 40 }}\nnode b {{ size: 60 20 }}\nnode c {{ size: 30 30 }}\nlayout {{\n {}\n{}\n{}\n{}\n}}",
+        order[0], order[1], order[2], order[3]
+    );
+    let permutations = permute(statements);
+    let expected = bgraph::render_source(&source(&statements))
+        .unwrap_or_else(|error| panic!("baseline is rejected: {error:#}"));
+
+    for order in permutations {
+        let source = source(&order);
+        assert_eq!(
+            bgraph::render_source(&source).unwrap_or_else(|error| {
+                panic!("permuted source is rejected: {source}\n{error:#}")
+            }),
+            expected,
+            "Cassowary shadow depends on statement order: {source}"
+        );
+    }
+}
+
+#[test]
+fn the_cassowary_shadow_is_stable_through_local_repetitions() {
+    let source = "node a { size: 80 40 }\nnode b { size: 60 20 }\nnode c { size: 30 30 }\nlayout {\n place a at (10, 20)\n place b right-of a gap 30 align top\n place c below b\n equal-width a b\n}\n";
+    let baseline = bgraph::render_source(source).unwrap();
+
+    for _ in 0..512 {
+        assert_eq!(
+            bgraph::render_source(source).unwrap(),
+            baseline,
+            "render drifted on a repeated call"
+        );
+    }
+}
+
+#[test]
 fn deterministic_fork_is_stable_across_processes() {
     const CHILD: &str = "BGRAPH_KASUARI_DETERMINISM_CHILD";
     const MARKER: &str = "BGRAPH_KASUARI_VALUES=";
@@ -115,4 +157,55 @@ fn canonical_relations_match_the_cassowary_shadow() {
         bgraph::render_source(source)
             .unwrap_or_else(|error| panic!("shadow rejected:\n{source}\n{error:#}"));
     }
+}
+
+#[test]
+fn the_cassowary_shadow_reports_a_minimal_conflict_set() {
+    let source = "node a { size: 80 40 }\nnode b { size: 60 20 }\nlayout {\n place a right-of b\n place b right-of a\n}";
+
+    let error = bgraph::render_source(source).expect_err("cyclic explicit placement must fail");
+    let message = format!("{error}");
+    if message.contains("Kasuari node conflict") {
+        assert!(message.contains("bytes") && message.contains("anchor"));
+        return;
+    }
+    assert!(
+        message.contains("anchor cycle between:"),
+        "conflict was neither a Kasuari conflict payload nor an anchor cycle: {message}"
+    );
+}
+
+fn permute<T: Clone>(items: [T; 4]) -> Vec<[T; 4]> {
+    let mut out = Vec::with_capacity(24);
+    let values = items.to_vec();
+    let mut used = vec![false; values.len()];
+    let mut current = Vec::with_capacity(values.len());
+
+    fn backtrack<T: Clone>(
+        values: &[T],
+        used: &mut Vec<bool>,
+        current: &mut Vec<T>,
+        out: &mut Vec<[T; 4]>,
+    ) {
+        if current.len() == values.len() {
+            let permutation = current.clone().try_into().unwrap_or_else(|_| {
+                unreachable!("all permutations have length 4 and this path is checked above")
+            });
+            out.push(permutation);
+            return;
+        }
+        for i in 0..values.len() {
+            if used[i] {
+                continue;
+            }
+            used[i] = true;
+            current.push(values[i].clone());
+            backtrack(values, used, current, out);
+            current.pop();
+            used[i] = false;
+        }
+    }
+
+    backtrack(&values, &mut used, &mut current, &mut out);
+    out
 }

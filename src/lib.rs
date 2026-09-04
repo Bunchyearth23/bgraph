@@ -186,6 +186,69 @@ use anyhow::Result;
 
 pub use template::{Bindings, Template, Value};
 
+/// The common diagnostics payload for one source text.
+///
+/// It is the shape used by CLI/LSP/watch/wasm to make sure the same
+/// validation stages run in the same order.
+// No `Debug` is needed here; analysis objects can be consumed in the CLI, LSP,
+// and tests without requiring every downstream type to support pretty-printing.
+pub struct SourceAnalysis {
+    /// The diagram that was recovered from the source, when possible.
+    pub diagram: Option<ast::Diagram>,
+    /// A solved layout for the diagram, when `check` and `solve` both succeed.
+    pub layout: Option<layout::Layout>,
+    /// Syntax, validation and geometry diagnostics, in source order where possible.
+    pub diagnostics: Vec<check::Diag>,
+}
+
+impl SourceAnalysis {
+    /// Whether any diagnostic in this analysis is fatal.
+    pub fn has_errors(&self) -> bool {
+        self.diagnostics
+            .iter()
+            .any(|diag| diag.severity == check::Severity::Error)
+    }
+}
+
+/// Parse with recovery, run [`check`], then run geometry-aware diagnostics when
+/// layout is available.
+///
+/// This is the full pipeline used by all public analysis surfaces.
+pub fn analyze_source(source: &str) -> SourceAnalysis {
+    let (diagram, syntax) = parser::parse_recovering(source);
+    let mut diagnostics: Vec<check::Diag> = syntax
+        .into_iter()
+        .map(|err| check::Diag {
+            severity: check::Severity::Error,
+            message: err.message,
+            span: err.span,
+        })
+        .collect();
+
+    let (layout, extra) = diagram
+        .as_ref()
+        .map_or_else(|| (None, Vec::new()), analyze_diagram);
+
+    diagnostics.extend(extra);
+    SourceAnalysis {
+        diagram,
+        layout,
+        diagnostics,
+    }
+}
+
+/// Run `check` and geometry diagnostics on an already parsed diagram.
+pub fn analyze_diagram(diagram: &ast::Diagram) -> (Option<layout::Layout>, Vec<check::Diag>) {
+    let mut diagnostics = check::check(diagram);
+    let layout = if let Ok(layout) = layout::solve(diagram) {
+        diagnostics.extend(check::after_layout(diagram, &layout));
+        Some(layout)
+    } else {
+        None
+    };
+    (layout, diagnostics)
+}
+
 /// Source text to SVG, the whole rite in one call.
 ///
 /// Parses, checks, lays out and renders. The result is a complete SVG

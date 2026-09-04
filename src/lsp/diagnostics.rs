@@ -35,10 +35,7 @@ pub(crate) fn diagnostics_for(text: &str, path: Option<&std::path::Path>) -> Vec
     };
 
     let index = LineIndex::new(text);
-    let mut diags = check::check(&composed.diagram);
-    if let Ok(layout) = crate::layout::solve(&composed.diagram) {
-        diags.extend(check::after_layout(&composed.diagram, &layout));
-    }
+    let diags = crate::analyze_diagram(&composed.diagram).1;
 
     let mut out = Vec::new();
     for diag in diags {
@@ -83,22 +80,7 @@ pub(crate) fn diagnostics_for(text: &str, path: Option<&std::path::Path>) -> Vec
 
 pub(crate) fn diagnostics(text: &str) -> Vec<Value> {
     let index = LineIndex::new(text);
-    let (diagram, syntax) = crate::parser::parse_recovering(text);
-    let mut diags: Vec<check::Diag> = syntax
-        .into_iter()
-        .map(|err| check::Diag {
-            severity: Severity::Error,
-            message: err.message,
-            span: err.span,
-        })
-        .collect();
-
-    if let Some(diagram) = &diagram {
-        diags.extend(check::check(diagram));
-        if let Ok(layout) = crate::layout::solve(diagram) {
-            diags.extend(check::after_layout(diagram, &layout));
-        }
-    }
+    let mut diags = crate::analyze_source(text).diagnostics;
 
     for (span, message) in crate::template::lint(text) {
         diags.push(check::Diag {

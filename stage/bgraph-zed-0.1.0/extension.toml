@@ -1,0 +1,19 @@
+id = "bgraph"
+name = "bgraph"
+description = "Syntax highlighting and language server for the bgraph diagram DSL"
+version = "0.1.0"
+schema_version = 1
+authors = ["Bunchyearth23"]
+repository = "file:///home/bunchy/Desktop/bgraph"
+
+# The grammar lives in this same repository, under tree-sitter-bgraph/.
+# `rev` must be a real commit that contains the generated parser — run
+# ./editors/zed/install.sh to point it at the current HEAD.
+[grammars.bgraph]
+repository = "file:///home/bunchy/Desktop/bgraph"
+rev = "ed610e9bf01ad3dde0aac4a3e5abe84ed61f542e"
+path = "tree-sitter-bgraph"
+
+[language_servers.bgraph-lsp]
+name = "bgraph"
+languages = ["bgraph"]

@@ -105,43 +105,33 @@ pub extern "C" fn bgraph_result_len() -> usize {
 pub unsafe extern "C" fn bgraph_check(pointer: *const u8, len: usize) -> *const u8 {
     let bytes = unsafe { std::slice::from_raw_parts(pointer, len) };
     let source = String::from_utf8_lossy(bytes);
+    let analysis = crate::analyze_source(&source);
 
     let mut out = String::from("[");
-    match crate::parser::parse_diagram(&source) {
-        Ok(diagram) => {
-            let index = crate::lsp::LineIndex::new(&source);
-            let mut diagnostics = crate::check::check(&diagram);
-            if !diagnostics
-                .iter()
-                .any(|diag| diag.severity == crate::check::Severity::Error)
-                && let Ok(layout) = crate::layout::solve(&diagram)
-            {
-                diagnostics.extend(crate::check::after_layout(&diagram, &layout));
-            }
-            for (i, diag) in diagnostics.iter().enumerate() {
-                let (line, col) = index.line_col(diag.span.start);
-                if i > 0 {
-                    out.push(',');
-                }
-                let severity = match diag.severity {
-                    crate::check::Severity::Error => "error",
-                    crate::check::Severity::Warning => "warning",
-                };
-                out.push_str(&format!(
-                    "{{\"severity\":\"{severity}\",\"line\":{},\"col\":{},\"message\":{}}}",
-                    line + 1,
-                    col + 1,
-                    json_string(&diag.message)
-                ));
-            }
+    if analysis.diagnostics.is_empty() {
+        // Keep the zero-based protocol contract used by the JSON callers.
+        out.push(']');
+        let mut result = RESULT.lock().unwrap_or_else(|e| e.into_inner());
+        *result = out.into_bytes();
+        return result.as_ptr();
+    }
+
+    let index = crate::lsp::LineIndex::new(&source);
+    for (i, diag) in analysis.diagnostics.iter().enumerate() {
+        let (line, col) = index.line_col(diag.span.start);
+        if i > 0 {
+            out.push(',');
         }
-        // A parse error has no `Diag` to carry it — it is the reason there is
-        // no diagram to check — so it arrives here as the one diagnostic there
-        // can be, rather than as an empty list that reads like "all well".
-        Err(err) => out.push_str(&format!(
-            "{{\"severity\":\"error\",\"line\":0,\"col\":0,\"message\":{}}}",
-            json_string(&format!("{err:#}"))
-        )),
+        let severity = match diag.severity {
+            crate::check::Severity::Error => "error",
+            crate::check::Severity::Warning => "warning",
+        };
+        out.push_str(&format!(
+            "{{\"severity\":\"{severity}\",\"line\":{},\"col\":{},\"message\":{}}}",
+            line + 1,
+            col + 1,
+            json_string(&diag.message)
+        ));
     }
     out.push(']');
 
@@ -236,13 +226,36 @@ mod typst {
         // Lossy rather than fatal: a panic crossing the boundary takes the
         // document build down, which is never the right answer to bad bytes.
         let text = String::from_utf8_lossy(&source);
-        let (status, answer) = match crate::render_source(&text) {
-            Ok(svg) => (0, svg),
-            Err(err) => (1, format!("error: {err:#}")),
+        let analysis = crate::analyze_source(&text);
+        let errors: Vec<_> = analysis
+            .diagnostics
+            .iter()
+            .filter(|d| d.severity == crate::check::Severity::Error)
+            .collect();
+        let status_and_answer = match (errors.as_slice(), analysis.layout.as_ref()) {
+            ([], Some(layout)) => (0, crate::render_svg::render(layout)),
+            ([], None) => {
+                (
+                    1,
+                    String::from("error: diagram did not produce a layout after successful checks"),
+                )
+            }
+            (errors, _) => {
+                let mut message = String::from("error:\n");
+                let index = crate::lsp::LineIndex::new(&text);
+                for (i, diag) in errors.iter().enumerate() {
+                    let (line, col) = index.line_col(diag.span.start);
+                    if i > 0 {
+                        message.push('\n');
+                    }
+                    message.push_str(&format!("{}:{}: {}", line + 1, col + 1, diag.message));
+                }
+                (1, message)
+            }
         };
 
-        let bytes = answer.into_bytes();
+        let bytes = status_and_answer.1.into_bytes();
         unsafe { wasm_minimal_protocol_send_result_to_host(bytes.as_ptr(), bytes.len()) };
-        status
+        status_and_answer.0
     }
 }
