@@ -136,6 +136,7 @@ pub mod examples;
 pub mod fmt;
 #[allow(missing_docs)]
 pub mod layout;
+mod math;
 pub mod ortho;
 #[allow(missing_docs)]
 pub mod placement;

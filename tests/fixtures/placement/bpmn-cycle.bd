@@ -1,0 +1,6 @@
+type bpmn
+event alarm boundary timer { attach: work }
+task work { size: 200 80 }
+layout {
+  place work above alarm gap -20
+}

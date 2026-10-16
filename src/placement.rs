@@ -405,15 +405,13 @@ impl<'a> PlacementPlan<'a> {
                 // Attachments are simultaneous equations, so an event and its
                 // host can form a consistent cycle. This symbolic root adds
                 // no coordinates; only the direct solver may resolve it.
-                if crate::constraint_layout::uses_simultaneous_solver(self.diagram)
-                    && let Some(i) = (0..self.diagram.nodes.len()).find(|&i| {
-                        !node_coordinates[i]
-                            && matches!(
-                                self.node(i, RelDir::RightOf),
-                                EffectivePlacement::Boundary(_)
-                            )
-                    })
-                {
+                if let Some(i) = (0..self.diagram.nodes.len()).find(|&i| {
+                    !node_coordinates[i]
+                        && matches!(
+                            self.node(i, RelDir::RightOf),
+                            EffectivePlacement::Boundary(_)
+                        )
+                }) {
                     node_coordinates[i] = true;
                     node_settled[i] = self.placed_unit(Entity::Node(i)).is_none();
                     continue;

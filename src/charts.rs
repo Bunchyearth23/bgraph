@@ -60,7 +60,7 @@ pub fn luminance(color: &str) -> Option<f64> {
         if c <= 0.03928 {
             c / 12.92
         } else {
-            ((c + 0.055) / 1.055).powf(2.4)
+            crate::math::pow((c + 0.055) / 1.055, 2.4)
         }
     };
     Some(0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b))
@@ -416,8 +416,8 @@ pub fn pie(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<La
                     "both" => format!("{} · {:.0}%", trim_number(*value), percent),
                     _ => format!("{percent:.0}%"),
                 },
-                x: cx + r * mid.sin(),
-                y: cy - r * mid.cos(),
+                x: cx + r * crate::math::sin(mid),
+                y: cy - r * crate::math::cos(mid),
                 anchor: Anchor::Middle,
                 size: style.font_size.unwrap_or(12.0),
                 // This text sits on the slice, not on the surface: white reads
@@ -1109,12 +1109,12 @@ pub(crate) fn lens_area(a: f64, b: f64, d: f64) -> f64 {
         return 0.0;
     }
     if d <= (a - b).abs() {
-        return std::f64::consts::PI * a.min(b).powi(2);
+        return std::f64::consts::PI * crate::math::square(a.min(b));
     }
     let c1 = ((d * d + a * a - b * b) / (2.0 * d * a)).clamp(-1.0, 1.0);
     let c2 = ((d * d + b * b - a * a) / (2.0 * d * b)).clamp(-1.0, 1.0);
-    a * a * (c1.acos() - c1 * (1.0 - c1 * c1).max(0.0).sqrt())
-        + b * b * (c2.acos() - c2 * (1.0 - c2 * c2).max(0.0).sqrt())
+    a * a * (crate::math::acos(c1) - c1 * (1.0 - c1 * c1).max(0.0).sqrt())
+        + b * b * (crate::math::acos(c2) - c2 * (1.0 - c2 * c2).max(0.0).sqrt())
 }
 
 /// The centre distance that makes the lens exactly `want`. Bisection rather
@@ -1234,7 +1234,7 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
                 .map(|i| {
                     let a = -std::f64::consts::FRAC_PI_2
                         + i as f64 * std::f64::consts::TAU / sets.len() as f64;
-                    (d * a.cos(), d * a.sin())
+                    (d * crate::math::cos(a), d * crate::math::sin(a))
                 })
                 .collect()
         }
@@ -1319,7 +1319,7 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         // direction away from the arrangement's centre is the one direction
         // guaranteed to be clear of every other circle (`W-114`).
         let (dx, dy) = (cx - hub.0, cy - hub.1);
-        let away = dx.hypot(dy);
+        let away = crate::math::hypot(dx, dy);
         let (ux, uy) = if away < 1.0 {
             (0.0, -1.0)
         } else {
@@ -1764,7 +1764,7 @@ pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
     let point = |i: usize, v: f64| -> (f64, f64) {
         let r = scale.fraction(v).clamp(0.0, 1.0) * radius;
         let a = angle(i);
-        (cx + r * a.cos(), cy + r * a.sin())
+        (cx + r * crate::math::cos(a), cy + r * crate::math::sin(a))
     };
 
     let mut guides = Vec::new();
@@ -1820,14 +1820,14 @@ pub fn radar(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<
         if let Some(name) = axes.get(i) {
             let a = angle(i);
             let (lx, ly) = (
-                cx + (radius + 10.0) * a.cos(),
-                cy + (radius + 10.0) * a.sin(),
+                cx + (radius + 10.0) * crate::math::cos(a),
+                cy + (radius + 10.0) * crate::math::sin(a),
             );
             // The label sits outside its spoke and leans away from the centre,
             // or the names on the left overlap the shape.
-            let anchor = if a.cos() > 0.2 {
+            let anchor = if crate::math::cos(a) > 0.2 {
                 Anchor::Start
-            } else if a.cos() < -0.2 {
+            } else if crate::math::cos(a) < -0.2 {
                 Anchor::End
             } else {
                 Anchor::Middle
@@ -3959,7 +3959,10 @@ pub fn nice_scale(min: f64, max: f64, want: usize) -> Scale {
     };
 
     let raw = (max - min) / want as f64;
-    let magnitude = 10f64.powf(raw.abs().max(f64::MIN_POSITIVE).log10().floor());
+    let magnitude = crate::math::pow(
+        10.0,
+        crate::math::log10(raw.abs().max(f64::MIN_POSITIVE)).floor(),
+    );
     let step = magnitude
         * match raw / magnitude {
             r if r <= 1.0 => 1.0,

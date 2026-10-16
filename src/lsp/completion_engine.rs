@@ -196,6 +196,11 @@ impl Server {
         }
 
         if is_rel_dir(preceding) {
+            if words.first() != Some(&"note")
+                || !props::archetype(archetype).is_some_and(|def| def.layout.accepts_layout_block())
+            {
+                return Vec::new();
+            }
             return declared_items(text, archetype)
                 .into_iter()
                 .map(|(name, label)| completion(&name, 6, item, &label))
@@ -203,6 +208,11 @@ impl Server {
         }
 
         if preceding == "align" {
+            if words.first() != Some(&"note")
+                || !props::archetype(archetype).is_some_and(|def| def.layout.accepts_layout_block())
+            {
+                return Vec::new();
+            }
             return props::ALIGNMENTS
                 .iter()
                 .map(|a| completion(a, 20, "align", "Cross-axis alignment against the anchor."))
@@ -268,12 +278,19 @@ impl Server {
         if words.is_empty() || (words.len() == 1 && !ends_with_space) {
             let mut out: Vec<Value> = props::KEYWORDS
                 .iter()
+                .filter(|(name, _)| !props::LAYOUT_STATEMENTS.contains(name))
+                .filter(|(name, _)| {
+                    !matches!(*name, "layout" | "note")
+                        || props::archetype(archetype)
+                            .is_some_and(|def| def.layout.accepts_layout_block())
+                })
                 .map(|(name, doc)| {
                     // The shape each statement takes, so accepting one leaves
                     // a well-formed line rather than a bare word.
                     let insert = match *name {
                         "type" => "type ${1:archetype}$0".to_string(),
                         "graph" => "graph { $0 }".to_string(),
+                        "layout" => "layout {\n  $0\n}".to_string(),
                         "style" => "style ${1:name} {\n  $0\n}".to_string(),
                         "group" => "group ${1:id} \"${2:label}\" {\n  $0\n}".to_string(),
                         "activate" => "activate ${1:participant} {\n  $0\n}".to_string(),
@@ -339,10 +356,7 @@ impl Server {
 /// offer declarations or style properties: a `layout` says how already named
 /// entities relate, never what new entities exist.
 fn layout_items(text: &str, line: &str, offset: usize, archetype: &str) -> Vec<Value> {
-    if !matches!(
-        props::archetype(archetype).map(|def| def.layout_capability()),
-        Some(props::LayoutCapability::Declared | props::LayoutCapability::Hybrid)
-    ) {
+    if !props::archetype(archetype).is_some_and(|def| def.layout.accepts_layout_block()) {
         return Vec::new();
     }
 
@@ -500,3 +514,7 @@ fn layout_items(text: &str, line: &str, offset: usize, archetype: &str) -> Vec<V
         _ => Vec::new(),
     }
 }
+
+#[cfg(test)]
+#[path = "layout_capability_tests.rs"]
+mod layout_capability_tests;

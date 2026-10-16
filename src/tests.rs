@@ -6745,6 +6745,7 @@ fn hostile_corpus() -> Vec<(&'static str, String)> {
 #[test]
 fn hostile_input_never_panics() {
     for (name, source) in hostile_corpus() {
+        eprintln!("hostile render case: {name}");
         // Not `catch_unwind`: a panic here should fail loudly with its own
         // message and location, which is what makes the failure diagnosable.
         // The assertion is simply that the call returns at all.
@@ -7952,7 +7953,7 @@ fn completions_are_on_by_default_and_cost_the_core_nothing() {
     // here and `clap_mangen` brings one small crate, both binary-only — so
     // this is on by default, where the window cannot be. What must stay
     // true is that they are optional, so `--no-default-features` still
-    // resolves to the five dependencies this crate promises.
+    // resolves to the six dependencies this crate promises.
     let manifest = include_str!("../Cargo.toml");
 
     let defaults = manifest
@@ -10257,7 +10258,7 @@ fn the_library_needs_no_argument_parser() {
     // What makes a wasm build sane: a page has no argv, and a library
     // consumer should not compile a parser it will never call. The binaries
     // declare `cli` in `required-features`, so `cargo build` still builds
-    // them and `--no-default-features` resolves to five dependencies.
+    // them and `--no-default-features` resolves to six dependencies.
     let manifest = include_str!("../Cargo.toml");
 
     let clap = manifest

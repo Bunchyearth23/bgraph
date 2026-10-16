@@ -1457,7 +1457,7 @@ fn through(
 /// `self_loop` made for the same reason.
 fn bow(a: (f64, f64), b: (f64, f64), lift: f64) -> Vec<(f64, f64)> {
     let (dx, dy) = (b.0 - a.0, b.1 - a.1);
-    let len = dx.hypot(dy).max(1e-6);
+    let len = crate::math::hypot(dx, dy).max(1e-6);
     let amount = if lift.abs() < 1e-9 { 0.18 } else { lift };
     // Perpendicular, so the bow is always across the line rather than along it.
     let control = (
@@ -1491,15 +1491,15 @@ fn round_corners(path: &[(f64, f64)], radius: f64) -> Vec<(f64, f64)> {
     let mut out = vec![path[0]];
     for i in 1..path.len() - 1 {
         let (p, c, n) = (path[i - 1], path[i], path[i + 1]);
-        let back = ((c.0 - p.0).hypot(c.1 - p.1) / 2.0).min(radius);
-        let fwd = ((n.0 - c.0).hypot(n.1 - c.1) / 2.0).min(radius);
+        let back = (crate::math::hypot(c.0 - p.0, c.1 - p.1) / 2.0).min(radius);
+        let fwd = (crate::math::hypot(n.0 - c.0, n.1 - c.1) / 2.0).min(radius);
         let r = back.min(fwd);
         if r < 0.5 {
             out.push(c);
             continue;
         }
         let towards = |from: (f64, f64), to: (f64, f64), d: f64| {
-            let len = (to.0 - from.0).hypot(to.1 - from.1).max(1e-6);
+            let len = crate::math::hypot(to.0 - from.0, to.1 - from.1).max(1e-6);
             (
                 from.0 + (to.0 - from.0) / len * d,
                 from.1 + (to.1 - from.1) / len * d,
@@ -1586,7 +1586,7 @@ fn stabilise_marker_tangent(points: &mut [(f64, f64)]) {
     let i = points.len() - 1;
     let (a, b) = (points[i - 2], points[i - 1]);
     let end = points[i];
-    let end_len = ((end.0 - b.0).powi(2) + (end.1 - b.1).powi(2)).sqrt();
+    let end_len = (crate::math::square(end.0 - b.0) + crate::math::square(end.1 - b.1)).sqrt();
     if end_len > 0.0 && end_len < MIN_LEN {
         let (px, py) = (b.0 - a.0, b.1 - a.1);
         let prev_len = (px * px + py * py).sqrt();
@@ -1598,7 +1598,8 @@ fn stabilise_marker_tangent(points: &mut [(f64, f64)]) {
     }
 
     let (start, b, c) = (points[0], points[1], points[2]);
-    let start_len = ((b.0 - start.0).powi(2) + (b.1 - start.1).powi(2)).sqrt();
+    let start_len =
+        (crate::math::square(b.0 - start.0) + crate::math::square(b.1 - start.1)).sqrt();
     if start_len > 0.0 && start_len < MIN_LEN {
         let (nx, ny) = (c.0 - b.0, c.1 - b.1);
         let next_len = (nx * nx + ny * ny).sqrt();
@@ -1634,7 +1635,7 @@ fn trim_marker_stems(points: &mut [(f64, f64)], start: Option<f64>, end: Option<
         let (x1, y1) = points[last];
         let dx = x1 - x0;
         let dy = y1 - y0;
-        let len = dx.hypot(dy);
+        let len = crate::math::hypot(dx, dy);
         if len > amount {
             points[last] = (x1 - dx * amount / len, y1 - dy * amount / len);
         }
@@ -1645,7 +1646,7 @@ fn trim_marker_stems(points: &mut [(f64, f64)], start: Option<f64>, end: Option<
         let (x1, y1) = points[1];
         let dx = x1 - x0;
         let dy = y1 - y0;
-        let len = dx.hypot(dy);
+        let len = crate::math::hypot(dx, dy);
         if len > amount {
             points[0] = (x0 + dx * amount / len, y0 + dy * amount / len);
         }
@@ -1667,7 +1668,10 @@ fn self_loop(node: &PlacedNode) -> Vec<(f64, f64)> {
     (0..=STEPS)
         .map(|i| {
             let t = std::f64::consts::PI * (1.0 - i as f64 / STEPS as f64);
-            (cx + rx * t.cos(), top - ry * t.sin())
+            (
+                cx + rx * crate::math::cos(t),
+                top - ry * crate::math::sin(t),
+            )
         })
         .collect()
 }
@@ -1685,7 +1689,7 @@ fn boundary(node: &PlacedNode, target: (f64, f64)) -> (f64, f64) {
     let shape = node.style.shape.unwrap_or(Shape::Rect);
     if shape == Shape::Ellipse {
         let (rx, ry) = (r.w / 2.0, r.h / 2.0);
-        let t = 1.0 / ((dx / rx).powi(2) + (dy / ry).powi(2)).sqrt();
+        let t = 1.0 / (crate::math::square(dx / rx) + crate::math::square(dy / ry)).sqrt();
         return (cx + dx * t, cy + dy * t);
     }
 
@@ -2063,7 +2067,7 @@ fn pie_slices(pie: &Pie) -> String {
 /// a pie — not how SVG measures them.
 fn on_circle(cx: f64, cy: f64, r: f64, degrees: f64) -> (f64, f64) {
     let a = degrees.to_radians();
-    (cx + r * a.sin(), cy - r * a.cos())
+    (cx + r * crate::math::sin(a), cy - r * crate::math::cos(a))
 }
 
 fn wedge(pie: &Pie, start: f64, end: f64) -> String {

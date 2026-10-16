@@ -26,9 +26,8 @@ use crate::layout::{Anchor, Annotation, PlacedNode, Polyline, Rect};
 
 /// Which of the four things a statement declared.
 ///
-/// Read from the properties rather than from the keyword, because the keyword
-/// is one of two spellings — `node` is the universal synonym everywhere — and
-/// a reader of this module should not have to know which was written.
+/// Read from the resolved properties, including the written form's builtin
+/// defaults. `node` is the universal synonym for the primary task form.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Element {
     /// A box: something a person or a machine does.
@@ -89,12 +88,8 @@ pub(crate) fn boundary_attachments(
     for (event, node) in diagram.nodes.iter().enumerate() {
         let props = node.props_for(def);
         let implicit = def.style_word(node.keyword.as_str());
-        let Ok(style) = registry.resolve(
-            crate::style::Style::node_defaults(),
-            implicit,
-            &node.classes,
-            &props,
-        ) else {
+        let Ok(style) = registry.resolve_node(crate::style::Style::node_defaults(), def, node)
+        else {
             continue;
         };
         if style.stage.as_deref() != Some("boundary") {
@@ -282,7 +277,7 @@ fn circle(cx: f64, cy: f64, r: f64) -> Vec<(f64, f64)> {
     (0..STEPS)
         .map(|i| {
             let t = std::f64::consts::TAU * i as f64 / STEPS as f64;
-            (cx + r * t.cos(), cy + r * t.sin())
+            (cx + r * crate::math::cos(t), cy + r * crate::math::sin(t))
         })
         .collect()
 }
@@ -454,8 +449,14 @@ where
                 let t = std::f64::consts::TAU * k as f64 / 6.0;
                 draw(
                     vec![
-                        (cx + h * 0.30 * t.cos(), cy + h * 0.30 * t.sin()),
-                        (cx + h * 0.48 * t.cos(), cy + h * 0.48 * t.sin()),
+                        (
+                            cx + h * 0.30 * crate::math::cos(t),
+                            cy + h * 0.30 * crate::math::sin(t),
+                        ),
+                        (
+                            cx + h * 0.48 * crate::math::cos(t),
+                            cy + h * 0.48 * crate::math::sin(t),
+                        ),
                     ],
                     false,
                     false,

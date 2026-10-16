@@ -1,8 +1,8 @@
 # Placement, analyse commune et styles — travail parallèle
 
 Date : 2026-10-16. Chantiers demandés : W-153, W-154, W-155, W-156,
-W-157, W-160 et W-164 (styles). Leurs états restent `building` : le lancement
-ne vaut pas instruction de les classer `landed`.
+W-157, W-160 et W-164 (styles). Sur instruction utilisateur et après vérification,
+W-154 et W-155 passent à `landed`; les cinq autres restent `building`.
 
 ## Résultat par chantier
 
@@ -16,10 +16,45 @@ ne vaut pas instruction de les classer `landed`.
 | W-160 | Le gate commun et les hôtes réels ont passé leurs fixtures au passage précédent. La continuation ajoute une matrice de compilation native Linux/macOS/Windows et compile localement les surfaces natives croisées et wasm. | La matrice CI distante n'a pas été exécutée ici. Les nouveaux changements ne sont pas couverts par une nouvelle exécution des suites runtime ou des hôtes. Les interactions UI ne sont pas assertées. |
 | W-164 styles | Résolution et `explain` partagent les couches implicites; un override de même valeur appartient à la dernière couche. Hover distingue thème automatique et classe. Matrice validation/complétion/hover des formes BPMN et XY; quinze tests thèmes et deux `explain`. | Conserver la couverture lors de l'ajout d'un mot d'archétype. |
 
+## Clôture W-154 et W-155 — 2026-10-16
+
+Instruction utilisateur : « W-154 et 155 si prouvé alors passe les en done ».
+Les deux chantiers sont classés `landed` selon la convention de l'index, sur le
+code du commit `5d0320c`. Aucune modification d'implémentation n'est nécessaire
+pour cette clôture.
+
+Preuves reconfirmées sur ce code, toutes commandes terminées avec exit 0 :
+
+- `CARGO_TARGET_DIR=target/pipeline-work cargo test --locked --all-features --lib analysis_tests::` :
+  15 tests réussis (sept analyse source, huit multifichiers), dont localisation
+  des erreurs, récupération, Unicode, includes répétés et effacement des relais LSP.
+- Même commande avec filtre `inline` : quatre tests réussis, dont rejet V1 par
+  le parseur, refus de migration du placement inline et conflit V1/layout.
+- Gardes `the_tree_sitter_grammar_agrees_with_pest` et
+  `the_grammar_corpus_expectations_still_hold` : une réussite chacune;
+  Tree-sitter 0.26.11 présent sur PATH.
+- `./tests/runtime/gate.sh --extensions` : 17 fixtures, parité SVG des 30
+  archétypes, quatre contextes multifichiers. Comparaisons CLI/LSP, navigateur,
+  WASI, preview, Typst et renderer VSIX, incluant diagnostics Unicode.
+- Recherche exhaustive dans le code indexé : les définitions de
+  `canonical_source` et `split_inline_placement` sont absentes; les interfaces
+  de rendu et diagnostic appellent l'analyse commune.
+
+Traces temporaires : `/tmp/bgraph-close-w155-analysis.log`,
+`/tmp/bgraph-close-w154-inline.log`, `/tmp/bgraph-close-w154-grammar.log`,
+`/tmp/bgraph-close-w154-corpus.log`, `/tmp/bgraph-close-w154-w155-runtime.log`.
+Les tests et fixtures correspondants restent dans le dépôt.
+
+Portée : cette clôture prouve le noyau V2 et le partage de l'analyse.
+Elle ne clôt pas les grands graphes/cycles BPMN (W-153), le déterminisme natif
+sur les autres plateformes (W-156), la minimisation des conflits (W-157), ni
+les dernières preuves des hôtes réels et de la CI distante (W-160). La suite
+complète et les hôtes VS Code/Zed ne sont pas relancés dans cette clôture.
+
 ## Continuation : compilation et performance
 
-Les changements de cette continuation ont été relus et compilés; aucun test
-n'a été ajouté ni exécuté. Les appels existants des tests ont seulement été
+Lors de la continuation du placement/BPMN, les changements ont été relus et
+compilés; aucun test n'avait alors été ajouté ni exécuté. Les appels existants des tests ont seulement été
 adaptés au retour `Result` du minimiseur. Les résultats fonctionnels ci-dessous
 précèdent le partitionnement et le nouveau placement BPMN.
 
@@ -135,10 +170,12 @@ n'a été effectué.
 Collision d'identifiant préexistante : `W-164` désigne les styles en cours et
 l'export sans sources livré. Aucun id n'est réutilisé ou renuméroté.
 X-020, X-027 et X-028 passent à `mitigated`, rejoignant X-021 et X-031;
-les sept états parents restent inchangés.
+W-154 et W-155 sont ensuite classés `landed` sur instruction utilisateur et
+preuves de clôture ci-dessus; les cinq autres états parents restent inchangés.
 
-Les snapshots et preuves fonctionnelles précédents n'ont pas été reconfirmés
-après cette continuation. À couvrir : dépendant d'un événement attaché,
+Le gate runtime et les tests ciblés ont ensuite été reconfirmés pour la clôture
+W-154/W-155. Les snapshots, la suite complète et les hôtes réels n'ont pas été
+revalidés. À couvrir : dépendant d'un événement attaché,
 placement explicite compatible/contradictoire, distribution de plusieurs
 événements, cycles d'attache et cas >512; puis parité des runtimes et éditeurs.
 

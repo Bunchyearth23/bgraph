@@ -142,6 +142,7 @@ impl Server {
             "textDocument/completion" => Response::Result(self.completion(params)),
             "textDocument/hover" => Response::Result(self.hover(params)),
             "textDocument/definition" => Response::Result(self.definition(params)),
+            "textDocument/references" => Response::Result(self.references(params)),
             "textDocument/documentSymbol" => Response::Result(self.symbols(params)),
             "textDocument/signatureHelp" => Response::Result(self.signature(params)),
             "textDocument/documentColor" => Response::Result(self.colours(params)),
@@ -246,7 +247,7 @@ impl Server {
         let Some((text, index, offset)) = self.doc(params) else {
             return Value::Null;
         };
-        hover::hover(text, &index, offset)
+        hover::file_hover(text, &index, offset, &uri_of(params))
     }
 
     // -------------------------------------------------------- navigation
@@ -257,6 +258,20 @@ impl Server {
         };
         let uri = params["textDocument"]["uri"].as_str().unwrap_or("");
         navigation::definition(text, &index, offset, uri)
+    }
+
+    fn references(&self, params: &Value) -> Value {
+        let Some((text, _, offset)) = self.doc(params) else {
+            return json!([]);
+        };
+        navigation::references(
+            text,
+            offset,
+            &uri_of(params),
+            params["context"]["includeDeclaration"]
+                .as_bool()
+                .unwrap_or(false),
+        )
     }
 
     fn symbols(&self, params: &Value) -> Value {
@@ -494,3 +509,7 @@ mod archetype_completion_tests {
         assert!(value.contains("When the event happened"), "{value}");
     }
 }
+
+#[cfg(test)]
+#[path = "lsp/inspection_tests.rs"]
+mod inspection_tests;

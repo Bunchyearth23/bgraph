@@ -1031,6 +1031,23 @@ doesn't cost you the preview. Scroll to zoom, drag to pan, `f` to fit the
 diagram, `0` for actual size; the view is kept across the reload that a save
 triggers.
 
+**Inspect layout** opens the provenance panel. Select a node or frame in the drawing
+or its source line to see solved bounds, the five anchors, its parent and the
+layout relations controlling X, Y, width and height. Relation and diagnostic
+buttons select the originating file and line, including files brought in with
+`include`. Conflicts remain inspectable when no geometry can be solved.
+For archetypes that manage their own geometry, the panel shows the type's layout
+policy and the style cascade. Where the renderer has no individual entity bounds
+(for example pie slices), the panel says so; source selection remains available.
+The highlights are preview overlays and are absent from exported SVGs.
+
+The language server uses the same provenance: go to definition on a node or frame
+declaration jumps to its controlling layout mention, and from a layout mention
+jumps back to the declaration. Find references lists structural mentions; hover
+shows placement and paint reasons, and the outline expands layout blocks into
+relations. `bgraph explain diagram.bd frame_id` also explains frame bounds and
+translations.
+
 `check` prints `file:line:col: severity: message` and exits non-zero if any
 error was found — the form editors and CI already understand:
 

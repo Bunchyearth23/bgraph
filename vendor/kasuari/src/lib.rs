@@ -252,7 +252,7 @@ pub use self::error::{
 };
 pub use self::expression::Expression;
 pub use self::relations::{RelationalOperator, WeightedRelation};
-pub use self::solver::{InternalSolverError, Solver};
+pub use self::solver::{InternalSolverError, Solver, StaticSolver};
 pub use self::strength::Strength;
 pub use self::term::Term;
 pub use self::variable::Variable;

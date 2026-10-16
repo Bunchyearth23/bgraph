@@ -23,6 +23,7 @@ pub(super) fn capabilities() -> Value {
             "colorProvider": true,
             "documentHighlightProvider": true,
             "definitionProvider": true,
+            "referencesProvider": true,
             "documentSymbolProvider": true,
         },
         "serverInfo": {

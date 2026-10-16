@@ -254,8 +254,8 @@ fn completion_offers_node_ids_after_an_anchor_keyword() {
     let server = Server {
         docs: HashMap::new(),
     };
-    let text = "node alpha\nnode beta right-of ";
-    let items = server.items_for(text, "node beta right-of ", text.len());
+    let text = "node alpha\nnode beta\nlayout {\n  place beta right-of ";
+    let items = server.items_for(text, "  place beta right-of ", text.len());
     assert!(items.iter().any(|i| i["label"] == "alpha"));
 }
 
@@ -330,8 +330,8 @@ fn completion_inside_a_group_offers_its_members_as_anchors() {
     let server = Server {
         docs: HashMap::new(),
     };
-    let text = "type network\ngroup g \"G\" {\n  host a \"A\"\n  host b right-of ";
-    let items = server.items_for(text, "  host b right-of ", text.len());
+    let text = "type network\ngroup g \"G\" {\n  host a \"A\"\n  host b\n  layout {\n    place b right-of ";
+    let items = server.items_for(text, "    place b right-of ", text.len());
     let labels: Vec<&str> = items.iter().filter_map(|i| i["label"].as_str()).collect();
     assert!(labels.contains(&"a"));
 }

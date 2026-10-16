@@ -16,7 +16,7 @@
 //!
 //! Paint is different, because the cascade really does have layers. So the
 //! cascade is **re-run one layer at a time** and each field is attributed to
-//! the last layer that changed it.
+//! the last layer that declared it.
 
 use anyhow::{Result, bail};
 
@@ -25,8 +25,17 @@ use crate::layout::Layout;
 use crate::placement::{EffectivePlacement, PlacementPlan};
 use crate::style::{GraphOpts, Registry, Style};
 
+pub(crate) mod inspect;
+
 /// Everything known about one box, as lines ready to print.
 pub fn explain(diagram: &Diagram, layout: &Layout, id: &str) -> Result<String> {
+    if let Some(index) = diagram
+        .groups
+        .iter()
+        .position(|group| group.id.as_str() == id)
+    {
+        return explain_group(diagram, layout, index);
+    }
     let Some((index, node)) = diagram
         .nodes
         .iter()
@@ -47,7 +56,7 @@ pub fn explain(diagram: &Diagram, layout: &Layout, id: &str) -> Result<String> {
     let opts = GraphOpts::from_props(&diagram.graph)?;
     let mut out = String::new();
 
-    if let Some(placed) = layout.nodes.get(index) {
+    if let Some(placed) = layout.nodes.iter().find(|placed| placed.id == id) {
         out.push_str(&format!(
             "{id} — at {}, {} · {}×{}\n",
             round(placed.rect.x),
@@ -61,6 +70,15 @@ pub fn explain(diagram: &Diagram, layout: &Layout, id: &str) -> Result<String> {
 
     out.push_str("\nplacement\n");
     let placement = PlacementPlan::new(diagram);
+    if let Some(parent) = placement
+        .owner()
+        .get(&crate::placement::Entity::Node(index))
+    {
+        out.push_str(&format!(
+            "  parent `{}` — coordinates are local before the frame translation\n",
+            diagram.groups[*parent].id.as_str()
+        ));
+    }
     match placement.node(index, opts.flow) {
         EffectivePlacement::Boundary(boundary) => {
             out.push_str(&format!(
@@ -131,7 +149,18 @@ pub fn explain(diagram: &Diagram, layout: &Layout, id: &str) -> Result<String> {
                     "  align {}  — declared\n",
                     cross_axis_align_name(*a, *dir)
                 )),
-                None => out.push_str("  align center  — default\n"),
+                None => {
+                    let axes = placement.v2_alignment_axes(index);
+                    let cross_axis = match dir {
+                        RelDir::RightOf | RelDir::LeftOf => 1,
+                        _ => 0,
+                    };
+                    if axes[cross_axis] {
+                        out.push_str("  cross-axis alignment comes from the explicit layout alignment below\n");
+                    } else {
+                        out.push_str("  align center  — default\n");
+                    }
+                }
             }
         }
         EffectivePlacement::Flow { dir, anchor } => {
@@ -210,7 +239,7 @@ pub fn explain(diagram: &Diagram, layout: &Layout, id: &str) -> Result<String> {
     Ok(out)
 }
 
-/// Which layer of the cascade settled each colour.
+/// Which layer of the cascade settled each colour and notation property.
 ///
 /// Re-run rather than recorded: the registry resolves in one pass, so this
 /// walks the same layers again and attributes a field to the last one that
@@ -226,6 +255,11 @@ fn paint(diagram: &Diagram, node: &crate::ast::NodeDecl, id: &str) -> Result<Str
             ("fill", &layer.fill),
             ("stroke", &layer.stroke),
             ("font colour", &layer.font_color),
+            ("kind", &layer.task_kind),
+            ("stage", &layer.stage),
+            ("trigger", &layer.trigger),
+            ("gate", &layer.gate),
+            ("artifact", &layer.artifact),
         ] {
             if let Some(value) = value {
                 out.retain(|(field, _): &(&str, String)| *field != name);
@@ -234,6 +268,14 @@ fn paint(diagram: &Diagram, node: &crate::ast::NodeDecl, id: &str) -> Result<Str
         }
     };
 
+    note(
+        &crate::style::item_defaults(Style::default(), def, node.keyword.as_str()),
+        format!(
+            "the `{}` form's builtin default",
+            def.style_word(node.keyword.as_str())
+        ),
+        &mut source,
+    );
     let item_word = def.style_word(node.keyword.as_str());
     for (name, layer) in registry.implicit_layers(item_word) {
         note(layer, format!("`style {name}`"), &mut source);
@@ -257,6 +299,92 @@ fn paint(diagram: &Diagram, node: &crate::ast::NodeDecl, id: &str) -> Result<Str
         .iter()
         .map(|(field, what)| format!("  {field:<12}{what}\n"))
         .collect())
+}
+
+fn explain_group(diagram: &Diagram, layout: &Layout, index: usize) -> Result<String> {
+    let group = &diagram.groups[index];
+    let plan = PlacementPlan::new(diagram);
+    let mut out = format!("{} — frame", group.id.as_str());
+    if let Some(placed) = layout
+        .groups
+        .iter()
+        .find(|placed| placed.id == group.id.value)
+    {
+        let rect = placed.rect;
+        out.push_str(&format!(
+            " at {}, {} · {}×{}",
+            round(rect.x),
+            round(rect.y),
+            round(rect.w),
+            round(rect.h)
+        ));
+    }
+    out.push_str("\n\nplacement\n  bounds enclose the children, title and padding\n");
+    if let Some(parent) = plan.owner().get(&crate::placement::Entity::Group(index)) {
+        out.push_str(&format!(
+            "  parent `{}` — declared coordinates are local before the parent translation\n",
+            diagram.groups[*parent].id.as_str()
+        ));
+    }
+    match plan.declared_group_placement(index) {
+        Some(Placement::At { x, y }) => out.push_str(&format!(
+            "  at ({}, {}) — declared; translates this frame and its descendants\n",
+            round(*x),
+            round(*y)
+        )),
+        Some(Placement::Cell { col, row }) => out.push_str(&format!(
+            "  grid cell ({}, {}) — declared; translates this frame and its descendants\n",
+            round(*col),
+            round(*row)
+        )),
+        Some(Placement::Rel {
+            dir,
+            anchor,
+            gap,
+            align,
+        }) => {
+            let opts = GraphOpts::from_props(&diagram.graph)?;
+            let direction = match dir {
+                RelDir::RightOf => "right-of",
+                RelDir::LeftOf => "left-of",
+                RelDir::Above => "above",
+                RelDir::Below => "below",
+            };
+            out.push_str(&format!(
+                "  {direction} `{}` — declared; translates this frame and its descendants\n",
+                anchor.as_str()
+            ));
+            out.push_str(&format!(
+                "  gap {} — {}\n",
+                round(gap.unwrap_or(opts.gap)),
+                if gap.is_some() {
+                    "declared"
+                } else {
+                    "from graph gap"
+                }
+            ));
+            out.push_str(&format!(
+                "  align {} — {}\n",
+                cross_axis_align_name(align.unwrap_or(Align::Center), *dir),
+                if align.is_some() {
+                    "declared"
+                } else {
+                    "default"
+                }
+            ));
+        }
+        None => out.push_str("  no declared frame translation; bounds follow the children\n"),
+    }
+    for relation in inspect::relations(diagram, group.id.as_str()) {
+        if !relation.controls || !relation.peers.is_empty() {
+            out.push_str(&format!(
+                "  {} relation with {}\n",
+                relation.axes,
+                relation.peers.join(", ")
+            ));
+        }
+    }
+    Ok(out)
 }
 
 fn cross_axis_align_name(align: Align, dir: RelDir) -> &'static str {
@@ -355,5 +483,31 @@ mod tests {
             assert!(paint.contains(&format!("from `style {target}`")), "{paint}");
             assert!(paint.contains("from `style node`"), "{paint}");
         }
+    }
+    #[test]
+    fn frame_explanation_names_parent_bounds_and_declared_translation() {
+        let diagram =
+            crate::parser::parse(include_str!("../tests/runtime/frame-nested.bd")).unwrap();
+        let layout = crate::layout::solve(&diagram).unwrap();
+        let explanation = explain(&diagram, &layout, "inner").unwrap();
+        assert!(
+            explanation.contains("inner — frame at 260, 150 · 30×30"),
+            "{explanation}"
+        );
+        assert!(explanation.contains("parent `outer`"));
+        assert!(explanation.contains("at (50, 40) — declared"));
+        assert!(explanation.contains("translates this frame and its descendants"));
+    }
+
+    #[test]
+    fn explicit_alignment_owns_the_relative_cross_axis_in_the_explanation() {
+        let diagram = crate::parser::parse("node a\nnode b\nlayout {\n place a at (0, 0)\n place b right-of a\n align top a b\n}\n").unwrap();
+        let layout = crate::layout::solve(&diagram).unwrap();
+        let explanation = explain(&diagram, &layout, "b").unwrap();
+        assert!(
+            explanation.contains("cross-axis alignment comes from the explicit layout"),
+            "{explanation}"
+        );
+        assert!(!explanation.contains("align center  — default"));
     }
 }

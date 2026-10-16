@@ -122,7 +122,7 @@ order: source, placement, style, data, then composition.
 
 ## In a browser
 
-The core is five dependencies of pure Rust and the SVG writer is hand-written,
+The core is six dependencies of pure Rust and the SVG writer is hand-written,
 so the renderer compiles to wasm nearly as it stands:
 
 ```sh

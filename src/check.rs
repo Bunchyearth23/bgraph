@@ -9,6 +9,8 @@ use std::collections::{HashMap, HashSet};
 use crate::ast::*;
 use crate::props::{self, Ctx};
 
+mod overlaps;
+
 /// Whether a diagnostic stops the render.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Severity {
@@ -230,14 +232,29 @@ fn check_layout_capability(
     def: &'static props::ArchetypeDef,
     out: &mut Vec<Diag>,
 ) {
-    if def.layout_capability() == props::LayoutCapability::Declared {
+    if def.layout.accepts_layout_block() {
         return;
     }
     for layout in &diagram.layouts {
-        out.push(Diag::error(
-            layout.span,
+        let message = if def.layout_capability() == props::LayoutCapability::Hybrid {
+            format!(
+                "`type {}` only supports named guides ({}), not entity `layout` blocks",
+                def.name,
+                def.layout.guides().join(", ")
+            )
+        } else {
             format!(
                 "`type {}` manages its own geometry, so it cannot use a `layout` block",
+                def.name
+            )
+        };
+        out.push(Diag::error(layout.span, message));
+    }
+    for note in &diagram.notes {
+        out.push(Diag::error(
+            note.span,
+            format!(
+                "`type {}` manages its own geometry, so it cannot render a `note` statement",
                 def.name
             ),
         ));
@@ -453,45 +470,39 @@ pub fn after_layout(diagram: &Diagram, layout: &crate::layout::Layout) -> Vec<Di
             .all(|(placed, declared)| placed.id == declared.id.as_str())
     {
         let placement = crate::placement::PlacementPlan::new(diagram);
-        for (left_index, left) in layout.nodes.iter().enumerate() {
-            for (right_index, right) in layout.nodes.iter().enumerate().skip(left_index + 1) {
-                if placement
-                    .boundary(left_index)
-                    .is_some_and(|boundary| boundary.host == right_index)
-                    || placement
-                        .boundary(right_index)
-                        .is_some_and(|boundary| boundary.host == left_index)
-                {
-                    continue;
-                }
-                let overlaps = left.rect.x < right.rect.right()
-                    && left.rect.right() > right.rect.x
-                    && left.rect.y < right.rect.bottom()
-                    && left.rect.bottom() > right.rect.y;
-                if !overlaps {
-                    continue;
-                }
-                let span = diagram
-                    .nodes
-                    .get(right_index)
-                    .filter(|node| node.id.as_str() == right.id)
-                    .map(|node| node.id.span)
-                    .or_else(|| {
-                        diagram
-                            .nodes
-                            .get(left_index)
-                            .filter(|node| node.id.as_str() == left.id)
-                            .map(|node| node.id.span)
-                    })
-                    .unwrap_or_default();
-                out.push(Diag::warn(
+        let rects: Vec<_> = layout.nodes.iter().map(|node| node.rect).collect();
+        for (left_index, right_index) in overlaps::pairs(&rects) {
+            let left = &layout.nodes[left_index];
+            let right = &layout.nodes[right_index];
+            if placement
+                .boundary(left_index)
+                .is_some_and(|boundary| boundary.host == right_index)
+                || placement
+                    .boundary(right_index)
+                    .is_some_and(|boundary| boundary.host == left_index)
+            {
+                continue;
+            }
+            let span = diagram
+                .nodes
+                .get(right_index)
+                .filter(|node| node.id.as_str() == right.id)
+                .map(|node| node.id.span)
+                .or_else(|| {
+                    diagram
+                        .nodes
+                        .get(left_index)
+                        .filter(|node| node.id.as_str() == left.id)
+                        .map(|node| node.id.span)
+                })
+                .unwrap_or_default();
+            out.push(Diag::warn(
                     span,
                     format!(
                         "`{}` overlaps `{}` — declare a separating placement, gap or axis; bgraph will not move either box for you",
                         right.id, left.id
                     ),
                 ));
-            }
         }
     }
 
@@ -1505,20 +1516,7 @@ fn check_cycles(diagram: &Diagram, out: &mut Vec<Diag>) {
             Entity::Group(g) => diagram.groups[*g].id.as_str(),
         })
         .collect();
-    let mut message = format!("anchor cycle between: {}", names.join(", "));
-    if !crate::constraint_layout::uses_simultaneous_solver(diagram)
-        && unresolved.iter().any(|entity| {
-            matches!(entity, Entity::Node(i) if matches!(
-                plan.node(*i, crate::ast::RelDir::RightOf),
-                crate::placement::EffectivePlacement::Boundary(_)
-            ))
-        })
-    {
-        message.push_str(&format!(
-            "; boundary attachments require an acyclic placement order above {} nodes and groups",
-            crate::constraint_layout::MAX_DIRECT_NODES
-        ));
-    }
+    let message = format!("anchor cycle between: {}", names.join(", "));
     for entity in unresolved {
         let span = match entity {
             Entity::Node(i) => diagram.nodes[i].id.span,
@@ -1580,22 +1578,23 @@ fn resolved_groups(diagram: &Diagram, base: crate::style::Style) -> Vec<crate::s
 /// A registry that will not build means every node falls back to the base,
 /// which is exactly what an unresolvable class should give.
 fn resolved_nodes(diagram: &Diagram, base: crate::style::Style) -> Vec<crate::style::Style> {
-    let Ok(registry) = crate::style::Registry::build(&diagram.styles) else {
-        return vec![base; diagram.nodes.len()];
-    };
     let def = archetype_of(diagram);
+    let Ok(registry) = crate::style::Registry::build(&diagram.styles) else {
+        return diagram
+            .nodes
+            .iter()
+            .map(|node| crate::style::item_defaults(base.clone(), def, node.keyword.as_str()))
+            .collect();
+    };
     diagram
         .nodes
         .iter()
         .map(|node| {
             registry
-                .resolve(
-                    base.clone(),
-                    def.style_word(node.keyword.as_str()),
-                    &node.classes,
-                    &node.props_for(def),
-                )
-                .unwrap_or_default()
+                .resolve_node(base.clone(), def, node)
+                .unwrap_or_else(|_| {
+                    crate::style::item_defaults(Default::default(), def, node.keyword.as_str())
+                })
         })
         .collect()
 }

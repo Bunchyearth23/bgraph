@@ -281,7 +281,7 @@ Each genre's item words are theme targets. A single-word genre uses that word (`
 
 | Theme | Reads | What it paints |
 |---|---|---|
-| `style node` | the node vocabulary | Every box on the diagram, without being referenced. The theme layer: put what is common here and keep named classes for what differs. |
+| `style node` | the node vocabulary | Every box on the diagram, without being referenced. The theme layer: it runs before the genre's item theme; both are before classes and inline properties. Put what is common here and keep named classes for what differs. |
 | `style edge` | the edge vocabulary | Every link on the diagram, without being referenced. |
 | `style group` | the node vocabulary | Every container's frame — and a rack's mounting rails, which are what a rack has instead of a frame. |
 | `style grid` | `stroke`, `stroke-width`, `dash`, `font`, `font-size`, `font-family`, `font-color`, `font-weight` | The rules a chart draws behind its data — a rack's unit rules, a chart's gridlines — and the numbers and axis labels along them. `stroke`, `stroke-width` and `dash` are the line; `font` and `font-color` are the text. |
@@ -313,11 +313,50 @@ The surface is **explicit by default**: without a `background` the renderer stil
 
 `type` picks the genre of diagram, once, at the top of the file. Without it the file is `free`.
 
-Every archetype reads the *same* statements: a `node` is a box, a slice or a bitfield depending on the genre. The style cascade, the diagnostics and the editor support are identical in all of them — what changes is which properties carry meaning.
+Every archetype reads the *same* statements: a `node` is a box, a slice or a bitfield depending on the genre. The style cascade, the diagnostics and the editor support share the same vocabulary tables. The geometry contract below determines which placements are meaningful.
+
+### Geometry ownership
+
+`Declared` accepts the complete `layout` language: `place`, `align`, `equal-width`, `equal-height`, `row` and `column`, including local blocks inside groups. `ArchetypeManaged` computes geometry from its data and rejects `layout` blocks and `note` statements. `Hybrid` is reserved for renderers with an explicit contract of named guides; no current genre is Hybrid, and the current grammar has no named guide statements.
+
+| Archetype | Geometry | Supported layout statements | Named guides |
+|---|---|---|---|
+| `free` | `declared` | place, align, equal-width, equal-height, row, column | none |
+| `pie` | `archetype-managed` | none | none |
+| `gantt` | `archetype-managed` | none | none |
+| `class` | `declared` | place, align, equal-width, equal-height, row, column | none |
+| `timeline` | `archetype-managed` | none | none |
+| `block` | `declared` | place, align, equal-width, equal-height, row, column | none |
+| `er` | `declared` | place, align, equal-width, equal-height, row, column | none |
+| `state` | `declared` | place, align, equal-width, equal-height, row, column | none |
+| `sequence` | `archetype-managed` | none | none |
+| `xy` | `archetype-managed` | none | none |
+| `bar` | `archetype-managed` | none | none |
+| `sankey` | `archetype-managed` | none | none |
+| `wave` | `archetype-managed` | none | none |
+| `quadrant` | `archetype-managed` | none | none |
+| `treemap` | `archetype-managed` | none | none |
+| `packet` | `archetype-managed` | none | none |
+| `gitgraph` | `archetype-managed` | none | none |
+| `orgchart` | `archetype-managed` | none | none |
+| `mindmap` | `archetype-managed` | none | none |
+| `treeview` | `archetype-managed` | none | none |
+| `harness` | `declared` | place, align, equal-width, equal-height, row, column | none |
+| `venn` | `archetype-managed` | none | none |
+| `bpmn` | `declared` | place, align, equal-width, equal-height, row, column | none |
+| `network` | `declared` | place, align, equal-width, equal-height, row, column | none |
+| `rack` | `archetype-managed` | none | none |
+| `radar` | `archetype-managed` | none | none |
+| `journey` | `archetype-managed` | none | none |
+| `kanban` | `archetype-managed` | none | none |
+| `requirements` | `declared` | place, align, equal-width, equal-height, row, column | none |
+| `bytefield` | `archetype-managed` | none | none |
 
 ### `type free`
 
 Nodes and edges placed by anchors — the default when a file declares no `type`.
+
+Geometry: `declared`.
 
 ```
 node <id> ["label"]
@@ -383,6 +422,8 @@ orders -> db    "sql"
 
 A pie or donut chart. Each slice needs a value; its `fill` overrides the automatic palette.
 
+Geometry: `archetype-managed`.
+
 ```
 slice <id> ["label"] <value>
 ```
@@ -434,6 +475,8 @@ slice paid     "Paid"            410
 ### `type gantt`
 
 Bars on a calendar. A task says when it starts and either when it ends or how long it runs; a `group` becomes a section.
+
+Geometry: `archetype-managed`.
 
 ```
 task <id> ["label"] <start> <start>
@@ -493,6 +536,8 @@ group dev "software" {
 ### `type class`
 
 Boxes with a name and a list of members, placed by anchors like `free`. A bare string in the block is a member.
+
+Geometry: `declared`.
 
 ```
 class <id> ["label"]
@@ -554,6 +599,8 @@ order -> money "totals" { dash: dashed }
 
 Events on a date line. Each event needs a date; they are drawn in date order with their labels staggered above and below, so a cluster of dates stays readable without hand-placing anything.
 
+Geometry: `archetype-managed`.
+
 ```
 event <id> ["label"] <date>
 ```
@@ -592,6 +639,8 @@ event e24 "Edition 2024"    2025-02-20
 ### `type block`
 
 Architecture and C4-style component views: typed elements with a technology and a description, nested with `group`, joined by relations that carry a protocol. Placed by anchors exactly as in `free` — the archetype supplies the vocabulary and the shapes.
+
+Geometry: `declared`.
 
 ```
 block <id> ["label"] <kind>
@@ -668,6 +717,8 @@ api -> mainframe "Makes API calls to" { tech: "XML/HTTPS" }
 
 Entities and the relations between them. A bare string in the block is a column, exactly as in `class`; what `er` adds is cardinality at each end of a relation, written after the label and read at the end nearest the entity it describes — `order -> line "contains" one many` is one order, many lines.
 
+Geometry: `declared`.
+
 ```
 entity <id> ["label"]
 ```
@@ -740,6 +791,8 @@ customer -> address "ships to"  one zero-many
 
 A state machine. States are placed by anchors, exactly as in `free` — the archetype supplies the vocabulary and the shapes, not a layout engine. Nest them with `group`.
 
+Geometry: `declared`.
+
 ```
 state <id> ["label"]
 ```
@@ -810,6 +863,8 @@ placed  -> cancelled "cancel"
 
 Participants across the top, messages down the page in the order they are written. A `group` frames the messages inside it.
 
+Geometry: `archetype-managed`.
+
 ```
 participant <id> ["label"]
 ```
@@ -866,6 +921,8 @@ api  --> browser "201 Created"
 
 Lines, areas or dots over a shared x axis. One series per statement, its numbers evenly spaced across the plot — or `scatter`, which reads coordinates instead.
 
+Geometry: `archetype-managed`.
+
 ```
 series <id> ["label"] <points> …
 ```
@@ -917,6 +974,8 @@ series cache  "Cache"    30  66  37  80 139  92 150 183
 
 Bars grouped or stacked across named categories. One series per statement, its numbers in category order.
 
+Geometry: `archetype-managed`.
+
 ```
 series <id> ["label"] <points> …
 ```
@@ -958,6 +1017,8 @@ series apac "APAC"    80 130 175 260
 ### `type sankey`
 
 Flows between stages, sized by magnitude. The value rides on the link, not on what it joins: a node's height is whatever passes through it.
+
+Geometry: `archetype-managed`.
 
 ```
 node <id> ["label"]
@@ -1018,6 +1079,8 @@ pricing -> bounce   420
 
 A timing diagram. Each signal carries a wave string, one character per period, in the WaveDrom alphabet.
 
+Geometry: `archetype-managed`.
+
 ```
 signal <id> ["label"] <wave>
 ```
@@ -1064,6 +1127,8 @@ signal busy "BUSY"  "0..1...0..."
 ### `type quadrant`
 
 Points on two axes, divided into four named regions. A Wardley map is this archetype with its own axis names.
+
+Geometry: `archetype-managed`.
 
 ```
 point <id> ["label"] <x> <y>
@@ -1114,6 +1179,8 @@ point venn     "Venn"          0.35 0.18
 ### `type treemap`
 
 Nested rectangles whose area is proportional to a value. The hierarchy is group nesting; a group's area is the sum of what it contains.
+
+Geometry: `archetype-managed`.
 
 ```
 box <id> ["label"] <value>
@@ -1173,6 +1240,8 @@ group docs "Docs" {
 
 A packet / bitfield diagram. Each field needs an inclusive bit range; one crossing a row boundary is split across rows.
 
+Geometry: `archetype-managed`.
+
 ```
 field <id> ["label"] <bits> <bits>
 ```
@@ -1229,6 +1298,8 @@ field urg   "Urgent pointer"      144 159
 ### `type gitgraph`
 
 Commits, branches and merges. Parentage is the edges — `c1 -> c2` is c2's parent — and a commit with two parents is a merge. The rails are the archetype's to assign; what the author declares is which branch a commit is on and what came before it.
+
+Geometry: `archetype-managed`.
 
 ```
 commit <id> ["label"] <branch>
@@ -1287,6 +1358,8 @@ h1 -> c4
 
 Reporting lines, laid out top-down. The hierarchy comes from the edges — `ceo -> cto` — and the archetype places every box, so adding a report never means renumbering anything.
 
+Geometry: `archetype-managed`.
+
 ```
 position <id> ["label"]
 ```
@@ -1332,6 +1405,8 @@ ops -> noc
 ### `type mindmap`
 
 A root with branches either side of it. The same tree the orgchart draws, arranged outward instead of downward, so the root stays central however lopsided the tree is.
+
+Geometry: `archetype-managed`.
 
 ```
 topic <id> ["label"]
@@ -1383,6 +1458,8 @@ edit -> lsp
 
 The same tree as indented rows, one per line — a file listing, a menu, a taxonomy. Depth is the indent and order is the order written.
 
+Geometry: `archetype-managed`.
+
 ```
 entry <id> ["label"]
 ```
@@ -1426,6 +1503,8 @@ src -> lsp
 ### `type harness`
 
 Wiring harnesses. A connector's pins are its member lines — `- 1: +12V` — and a wire is an edge carrying the pin it lands on at each end. Both mechanisms already existed; what this genre adds is that a wire is checked against the pins that are really there (`D-025`).
+
+Geometry: `declared`.
 
 ```
 connector <id> ["label"]
@@ -1494,6 +1573,8 @@ j1 -> j2 "sig B"          4 4
 
 Overlapping sets. Two or three of them: with two, the lens is solved so its **area** is the number you wrote; with three the overlaps are labelled but arranged rather than solved, because three circles cannot in general honour all seven regions at once. Four is refused rather than drawn wrongly.
 
+Geometry: `archetype-managed`.
+
 ```
 set <id> ["label"] <count>
 ```
@@ -1551,6 +1632,8 @@ dev  -> arch 140
 
 A business process. Tasks, gateways, events, data artefacts and the flows between them, with pools and lanes as `group`s. Placed by anchors exactly as in `free`: the archetype supplies the vocabulary, the shapes and the diagnostics, and the author still says where everything goes. Four words, because four things have four positional shapes (`D-023`) — a task has a kind, an event has a stage and a trigger, a gateway has a gate and a datum has an artefact.
 
+Geometry: `declared`.
+
 ```
 task <id> ["label"] <kind>
 ```
@@ -1585,12 +1668,12 @@ On a `task` — these are its own, and are not offered elsewhere:
 
 | Property | Where | Syntax | Meaning |
 |---|---|---|---|
-| `kind` | node | `kind: <plain\|user\|service\|script\|manual\|send\|receive\|rule\|subprocess>` | What kind of task it is, drawn as a marker in the corner of the box. `subprocess` takes the `+` instead, and an *expanded* subprocess is a `group`. Usually written positionally — `task check "Check credit" service`. |
-| `stage` | node | `stage: <start\|intermediate\|end\|boundary>` | Where the event sits: a thin ring starts, a thick one ends, a double ring is intermediate. `boundary` is the exception — it is not a place in the flow but a place on a task, so it needs `attach`. |
+| `kind` | node | `kind: <plain\|user\|service\|script\|manual\|send\|receive\|rule\|subprocess>` | What kind of task it is, drawn as a marker in the corner of the box. The default for `task` and its `node` synonym is `plain`. `subprocess` takes the `+` instead, and an *expanded* subprocess is a `group`. Usually written positionally — `task check "Check credit" service`. |
+| `stage` | node | `stage: <start\|intermediate\|end\|boundary>` | Where the event sits: a thin ring starts, a thick one ends, a double ring is intermediate. An `event` without a stage is `intermediate`, with a `plain` trigger. `boundary` is the exception — it is not a place in the flow but a place on a task, so it needs `attach`. |
 | `trigger` | node | `trigger: <plain\|message\|timer\|error\|signal\|escalation\|conditional\|terminate>` | What makes the event happen, drawn inside the ring. Written second, after the stage — `event due "Overdue" boundary timer`. |
 | `attach` | node | `attach: <task>` | The task a `boundary` event sits on. It is placement, declared like every other placement (`D-001`): the event lands on that box's bottom edge, and several on one task spread along it in the order they are written. `label-offset` moves one by hand. |
-| `gate` | node | `gate: <exclusive\|parallel\|inclusive\|event\|complex>` | Which gateway it is, drawn as the mark inside the diamond. Usually written positionally — `gateway ok "Approved?" exclusive`. |
-| `artifact` | node | `artifact: <object\|store\|input\|output>` | Which data artefact it is. An object is a page with a folded corner, a store is a cylinder; `input` and `output` are objects carrying the arrow that says which way the data went. |
+| `gate` | node | `gate: <exclusive\|parallel\|inclusive\|event\|complex>` | Which gateway it is, drawn as the mark inside the diamond. A `gateway` without this value is `exclusive`. Usually written positionally — `gateway ok "Approved?" exclusive`. |
+| `artifact` | node | `artifact: <object\|store\|input\|output>` | Which data artefact it is. A `data` declaration defaults to `object`. An object is a page with a folded corner, a store is a cylinder; `input` and `output` are objects carrying the arrow that says which way the data went. |
 | `flow` | edge | `flow: <sequence\|message\|association\|default\|conditional>` | What the connector means. A sequence flow is a solid arrow, a message flow is dashed with a hollow head, an association is dotted with none. `default` takes the slash and `conditional` the diamond, both at the gateway end. Usually written positionally — `check -> notify "rejected" default`. |
 
 <details>
@@ -1679,6 +1762,8 @@ claim -> check  message
 
 Network topology: hosts, links and the segments that hold them. Placed by anchors exactly as in `free` — the archetype supplies the vocabulary, the shapes and the diagnostics, and a `group` is a segment or a zone.
 
+Geometry: `declared`.
+
 ```
 host <id> ["label"] <role>
 ```
@@ -1746,6 +1831,8 @@ tor -> shelf  "" "10 GbE" { from: bottom to: left }
 ### `type rack`
 
 A rack elevation. Units are numbered from 1 at the **bottom**, as a rack is, and a device occupies an inclusive span of them. Empty units are left empty: unlike a packet, a rack with gaps is a rack with room, not a rack that does not add up.
+
+Geometry: `archetype-managed`.
 
 ```
 device <id> ["label"] <u> <u>
@@ -1826,6 +1913,8 @@ group a3 "A3 — edge" {
 
 Axes radiating from a centre, one closed polygon per series. Every axis shares one scale: the shape a reader compares is only meaningful if a ring means the same thing all the way round.
 
+Geometry: `archetype-managed`.
+
 ```
 series <id> ["label"] <points> …
 ```
@@ -1869,6 +1958,8 @@ series electric "Electric"     78 95 52 40 62 96
 ### `type journey`
 
 A user journey: steps in the order they are taken, and how each actor felt at each one. `group`s are its sections, drawn as a band above the steps they hold. One line per actor, so the place where two people diverge is the thing you see first.
+
+Geometry: `archetype-managed`.
 
 ```
 step <id> ["label"] <scores> …
@@ -1926,6 +2017,8 @@ group close "Close it" {
 ### `type kanban`
 
 A board: `group`s are its columns, in the order they are declared, and the cards inside each one stack in the order they are declared. A column may carry a `limit`, and a column over it is reported — a board nobody is told is over its limit is a board that is only a picture.
+
+Geometry: `archetype-managed`.
 
 ```
 card <id> ["label"]
@@ -1989,6 +2082,8 @@ group done "Done" {
 ### `type requirements`
 
 Requirements and the typed links between them. A bare string in the block is a line of the requirement — its identifier, then what it demands — exactly as in `class`. What this genre adds is the relation vocabulary: a link says what it asserts, read tail to head, and is drawn in guillemets on the line. Placement stays declared, as in `free`.
+
+Geometry: `declared`.
 
 ```
 requirement <id> ["label"]
@@ -2069,6 +2164,8 @@ adas  -> pedal trace
 ### `type bytefield`
 
 A wire-format diagram at byte granularity — `packet` with the ruler counting bytes rather than bits. Each field needs an inclusive byte range; one crossing a row boundary is split across rows.
+
+Geometry: `archetype-managed`.
 
 ```
 field <id> ["label"] <bytes> <bytes>
