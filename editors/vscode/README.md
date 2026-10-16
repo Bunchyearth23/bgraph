@@ -42,7 +42,7 @@ not underlined.
 Both write `bgraph-<version>.vsix` beside this file. Install it with:
 
 ```sh
-code --install-extension bgraph-0.1.0.vsix
+code --install-extension bgraph-1.0.0.vsix
 ```
 
 A VSIX is a zip with an OPC content-types part and a manifest, so `package.sh`

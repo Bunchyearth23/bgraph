@@ -1,7 +1,7 @@
 id = "bgraph"
 name = "bgraph"
 description = "Syntax highlighting and language server for the bgraph diagram DSL"
-version = "0.1.0"
+version = "1.0.0"
 schema_version = 1
 authors = ["Bunchyearth23"]
 repository = "file:///home/bunchy/Desktop/bgraph"
@@ -11,7 +11,7 @@ repository = "file:///home/bunchy/Desktop/bgraph"
 # ./editors/zed/install.sh to point it at the current HEAD.
 [grammars.bgraph]
 repository = "file:///home/bunchy/Desktop/bgraph"
-rev = "7b07f73baf0bbcbf62a82ebbc6865ab0acc44c1a"
+rev = "2a556a64bfebf36f53bddcf448cdfbdee7b16da9"
 path = "tree-sitter-bgraph"
 
 [language_servers.bgraph-lsp]

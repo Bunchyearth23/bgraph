@@ -1,0 +1,3 @@
+type bpmn { title: "w" }
+style node { font: 12 }
+task r "Arête vers un autre worker :\nfetch entre relais" service { size: 176 84 }

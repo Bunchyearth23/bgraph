@@ -387,7 +387,7 @@ fn attachments(layout: &Layout) -> Vec<[Option<(f64, f64)>; 2]> {
     /// One end of one edge: which edge, and whether this is its tail.
     type End = (usize, bool);
     /// Everything wanting one side of one box, in one direction.
-    type Bucket = (usize, Side, bool, Vec<End>);
+    type Bucket = (usize, Side, bool, u8, Vec<End>);
 
     // Which side each end of each edge uses, declared or derived.
     let side_of = |edge: &crate::layout::PlacedEdge, at_from: bool| -> Option<Side> {
@@ -399,10 +399,19 @@ fn attachments(layout: &Layout) -> Vec<[Option<(f64, f64)>; 2]> {
         if declared.is_some() {
             return declared;
         }
+        let node = &layout.nodes[if at_from { edge.from } else { edge.to }];
+        if node.style.stage.as_deref() == Some("boundary") && node.style.attach.is_some() {
+            return Some(Side::Bottom);
+        }
         let (a, b) = (layout.nodes[edge.from].rect, layout.nodes[edge.to].rect);
         let (dx, dy) = (b.cx() - a.cx(), b.cy() - a.cy());
+        let horizontal = if edge.style.flow.as_deref() == Some("association") {
+            dx.abs() / node.rect.w.max(1.0) >= dy.abs() / node.rect.h.max(1.0)
+        } else {
+            dx.abs() >= dy.abs()
+        };
         // The same rule the elbow used: whichever axis dominates decides.
-        Some(match (dx.abs() >= dy.abs(), at_from) {
+        Some(match (horizontal, at_from) {
             (true, true) => {
                 if dx >= 0.0 {
                     Side::Right
@@ -451,21 +460,42 @@ fn attachments(layout: &Layout) -> Vec<[Option<(f64, f64)>; 2]> {
             let Some(side) = side_of(edge, at_from) else {
                 continue;
             };
-            match buckets
-                .iter_mut()
-                .find(|(n, s, out, _)| *n == node && *s == side && *out == at_from)
-            {
-                Some((_, _, _, ends)) => ends.push((e, at_from)),
-                None => buckets.push((node, side, at_from, vec![(e, at_from)])),
+            let kind = match edge.style.flow.as_deref() {
+                Some("message") => 1,
+                Some("association") => 2,
+                _ => 0,
+            };
+            match buckets.iter_mut().find(|(n, s, out, flow, _)| {
+                *n == node && *s == side && *out == at_from && *flow == kind
+            }) {
+                Some((_, _, _, _, ends)) => ends.push((e, at_from)),
+                None => buckets.push((node, side, at_from, kind, vec![(e, at_from)])),
             }
         }
     }
 
     let mut out = vec![[None, None]; layout.edges.len()];
-    for (node, side, _, ends) in buckets {
+    for (node, side, _, _, ends) in buckets {
+        let blocked: Vec<_> = if side == Side::Bottom {
+            layout
+                .nodes
+                .iter()
+                .filter(|event| {
+                    event.style.stage.as_deref() == Some("boundary")
+                        && event.style.attach.as_deref() == Some(layout.nodes[node].id.as_str())
+                })
+                .map(|event| event.rect)
+                .collect()
+        } else {
+            Vec::new()
+        };
         // One line on a side keeps the middle, which is what every drawing did
         // before this existed — so a diagram with no crowding does not move.
-        if ends.len() < 2 && !declares(&layout.edges[ends[0].0], ends[0].1) {
+        if ends.len() < 2
+            && !declares(&layout.edges[ends[0].0], ends[0].1)
+            && layout.edges[ends[0].0].style.router != Some(Router::Ortho)
+            && blocked.is_empty()
+        {
             continue;
         }
         let r = layout.nodes[node].rect;
@@ -496,12 +526,35 @@ fn attachments(layout: &Layout) -> Vec<[Option<(f64, f64)>; 2]> {
                 .or_else(|| edge.style.lane.map(|l| (l - 1.0).clamp(0.0, n - 1.0)))
                 .unwrap_or(k as f64);
             let along = (slot + 1.0) / (n + 1.0);
-            let on_rect = match side {
+            let mut on_rect = match side {
                 Side::Top => (r.x + r.w * along, r.y),
                 Side::Bottom => (r.x + r.w * along, r.bottom()),
                 Side::Left => (r.x, r.y + r.h * along),
                 Side::Right => (r.right(), r.y + r.h * along),
             };
+            if port.is_none() && !blocked.is_empty() {
+                let free = |x: f64| {
+                    blocked
+                        .iter()
+                        .all(|event| x < event.x - 5.0 || x > event.right() + 5.0)
+                };
+                if !free(on_rect.0) {
+                    let mut candidates: Vec<_> = blocked
+                        .iter()
+                        .flat_map(|event| [event.x - 6.0, event.right() + 6.0])
+                        .filter(|x| *x >= r.x + 6.0 && *x <= r.right() - 6.0 && free(*x))
+                        .collect();
+                    candidates.sort_by(|a, b| {
+                        (a - on_rect.0)
+                            .abs()
+                            .total_cmp(&(b - on_rect.0).abs())
+                            .then(a.total_cmp(b))
+                    });
+                    if let Some(x) = candidates.first() {
+                        on_rect.0 = *x;
+                    }
+                }
+            }
             // Onto the **outline**, not the bounding box. A hexagon's widest
             // point is at mid-height, so a port two thirds of the way down its
             // right-hand side sits outside the shape entirely and the line
@@ -509,6 +562,50 @@ fn attachments(layout: &Layout) -> Vec<[Option<(f64, f64)>; 2]> {
             // first time this ran. `boundary` follows the ray from the centre,
             // so the offset survives and the point lands on the drawn edge.
             out[*e][usize::from(!at_from)] = Some(boundary(&layout.nodes[node], on_rect));
+        }
+    }
+    // Keep an aligned straight message straight when a boundary event moves
+    // its departure port. Indexed ports remain the author's explicit choice.
+    for (i, edge) in layout.edges.iter().enumerate() {
+        if edge.style.router != Some(Router::Straight)
+            || edge.style.from_port.is_some()
+            || edge.style.to_port.is_some()
+            || edge.style.flow.as_deref() != Some("message")
+        {
+            continue;
+        }
+        let a = &layout.nodes[edge.from];
+        let b = &layout.nodes[edge.to];
+        if (a.rect.cx() - b.rect.cx()).abs() < 0.01 {
+            let x = out[i][0].or(out[i][1]).map(|p| p.0);
+            if let Some(x) = x {
+                let ay = if b.rect.cy() > a.rect.cy() {
+                    a.rect.bottom()
+                } else {
+                    a.rect.y
+                };
+                let by = if b.rect.cy() > a.rect.cy() {
+                    b.rect.y
+                } else {
+                    b.rect.bottom()
+                };
+                let blocked = layout.nodes.iter().any(|event| {
+                    event.style.stage.as_deref() == Some("boundary")
+                        && [a.id.as_str(), b.id.as_str()]
+                            .contains(&event.style.attach.as_deref().unwrap_or(""))
+                        && x >= event.rect.x - 5.0
+                        && x <= event.rect.right() + 5.0
+                        && (ay == a.rect.bottom() || by == b.rect.bottom())
+                });
+                if !blocked
+                    && x > a.rect.x
+                    && x < a.rect.right()
+                    && x > b.rect.x
+                    && x < b.rect.right()
+                {
+                    out[i] = [Some(boundary(a, (x, ay))), Some(boundary(b, (x, by)))];
+                }
+            }
         }
     }
     out
@@ -549,29 +646,44 @@ pub fn route_all(layout: &Layout) -> Vec<Routed> {
                 // frame is not: a box inside one can only be reached by
                 // crossing it, so treating a frame as solid would refuse the
                 // routes that are correct.
-                let obstacles: Vec<crate::layout::Rect> = layout
+                let mut obstacles: Vec<crate::layout::Rect> = layout
                     .nodes
                     .iter()
                     .enumerate()
                     .filter(|(i, _)| !crate::layout::endpoint_of(layout, edge, *i))
                     .map(|(_, n)| n.rect)
                     .collect();
-                let line = route(
-                    &layout.nodes[edge.from],
-                    &layout.nodes[edge.to],
-                    edge.style.router.unwrap_or(Router::Straight),
-                    &obstacles,
-                    ports[e],
-                    &used,
+                obstacles.extend(
+                    layout
+                        .annotations
+                        .iter()
+                        .filter(|text| !text.title)
+                        .map(crate::labels::annotation_rect),
                 );
-                let line = through(line, &edge.via, &obstacles, edge.style.router, &used);
+                obstacles.extend(
+                    layout
+                        .groups
+                        .iter()
+                        .filter_map(crate::labels::group_title_rect),
+                );
+                let line = if edge.style.router == Some(Router::Ortho) {
+                    orthogonal(layout, edge, ports[e], &obstacles, &used)
+                } else {
+                    let line = route(
+                        &layout.nodes[edge.from],
+                        &layout.nodes[edge.to],
+                        edge.style.router.unwrap_or(Router::Straight),
+                        &obstacles,
+                        ports[e],
+                        &used,
+                    );
+                    through(line, &edge.via, &obstacles, edge.style.router, &used)
+                };
                 // Two lines between the same pair lie on top of each other
                 // when both are straight. Each takes its own bow, alternating
                 // sides so a pair separates rather than both leaning one way.
                 let line = match siblings[e] {
-                    Some((k, n)) if edge.style.router == Some(Router::Ortho) => {
-                        offset_ortho(line, k, n)
-                    }
+                    Some(_) if edge.style.router == Some(Router::Ortho) => line,
                     Some((k, n)) => {
                         // The sign follows the *pair*, not the direction the
                         // edge was written in. A bow is perpendicular to the
@@ -638,27 +750,6 @@ pub fn route_all(layout: &Layout) -> Vec<Routed> {
     routed
 }
 
-/// Separate orthogonal duplicates while preserving their declared endpoints.
-/// The interior channel is shifted, leaving short stubs at each box so the
-/// attachment remains exact.
-fn offset_ortho(mut line: Vec<(f64, f64)>, index: usize, total: usize) -> Vec<(f64, f64)> {
-    if line.len() < 3 || total < 2 {
-        return line;
-    }
-    let offset = 12.0 * (index as f64 - (total as f64 - 1.0) / 2.0);
-    let horizontal =
-        (line.last().unwrap().0 - line[0].0).abs() >= (line.last().unwrap().1 - line[0].1).abs();
-    let end = line.len() - 1;
-    for point in &mut line[1..end] {
-        if horizontal {
-            point.1 += offset;
-        } else {
-            point.0 += offset;
-        }
-    }
-    line
-}
-
 /// A label sits on the midpoint of its own edge by default, and slides along
 /// the perpendicular when that would put it on top of something else.
 fn place_label(
@@ -690,7 +781,7 @@ fn place_label(
     let step = h * 0.85;
 
     let mut best = (
-        f64::MAX,
+        (true, f64::MAX),
         Rect {
             x: 0.0,
             y: 0.0,
@@ -699,9 +790,13 @@ fn place_label(
         },
     );
 
-    for k in [0.0, 1.0, -1.0, 2.0, -2.0, 3.0, -3.0] {
-        let cx = anchor.0 + px * step * k;
-        let cy = anchor.1 + py * step * k;
+    for (along, k) in [0.0, 0.2, -0.2, 0.35, -0.35].into_iter().flat_map(|along| {
+        [0.0, 1.0, -1.0, 2.0, -2.0, 3.0, -3.0]
+            .into_iter()
+            .map(move |k| (along, k))
+    }) {
+        let cx = anchor.0 + dx * along + px * step * k;
+        let cy = anchor.1 + dy * along + py * step * k;
         let rect = Rect {
             x: cx - w / 2.0,
             y: cy - h / 2.0,
@@ -709,14 +804,15 @@ fn place_label(
             h,
         };
 
-        // Distance is a real cost, not a tie-break: a label three steps from
-        // its own edge reads as belonging to something else, which is worse
-        // than crossing one line.
-        let cost = label_cost(&rect, index, routed, layout, taken) + k.abs() * 0.4;
+        // Prefer a clear candidate; keep the search near its own segment so
+        // the reader can still tell which edge the label belongs to.
+        let collision = label_cost(&rect, index, routed, layout, taken);
+        let distance = k.abs() * 0.4 + along.abs() * len / step * 0.4;
+        let cost = (collision > 1e-9, collision + distance);
         if cost < best.0 {
             best = (cost, rect);
         }
-        if cost < 0.001 {
+        if cost == (false, 0.0) {
             break;
         }
     }
@@ -750,10 +846,19 @@ fn label_cost(
     // sitting on top of it, and charging both the same exiles the label.
     for node in &layout.nodes {
         cost += 2.0 * overlap_fraction(rect, &node.rect);
+        if let Some(label) = moved_node_label(node) {
+            cost += 4.0 * overlap_fraction(rect, &label);
+        }
+    }
+    for annotation in &layout.annotations {
+        cost += 4.0 * overlap_fraction(rect, &crate::labels::annotation_rect(annotation));
     }
     // A frame is a boundary the reader uses; a label astride one is confusing
     // about what it belongs to.
     for group in &layout.groups {
+        if let Some(title) = crate::labels::group_title_rect(group) {
+            cost += 4.0 * overlap_fraction(rect, &title);
+        }
         for pair in [
             [
                 (group.rect.x, group.rect.y),
@@ -813,13 +918,15 @@ fn label_anchor(points: &[(f64, f64)]) -> ((f64, f64), (f64, f64)) {
 
 /// How much of `a` lies inside `b`, from 0 to 1.
 fn overlap_fraction(a: &Rect, b: &Rect) -> f64 {
-    let w = (a.right().min(b.right()) - a.x.max(b.x)).max(0.0);
-    let h = (a.bottom().min(b.bottom()) - a.y.max(b.y)).max(0.0);
     let area = a.w * a.h;
-    if area <= 0.0 { 0.0 } else { (w * h) / area }
+    if area <= 0.0 {
+        0.0
+    } else {
+        crate::labels::overlap(*a, *b) / area
+    }
 }
 
-fn segment_hits(p: (f64, f64), q: (f64, f64), r: &Rect) -> bool {
+pub(crate) fn segment_hits(p: (f64, f64), q: (f64, f64), r: &Rect) -> bool {
     let inside =
         |(x, y): (f64, f64)| (r.x..=r.right()).contains(&x) && (r.y..=r.bottom()).contains(&y);
     if inside(p) || inside(q) {
@@ -886,8 +993,21 @@ fn bounds(layout: &Layout, routed: &[Routed]) -> (f64, f64, f64, f64) {
     let mut max_x = f64::MIN;
     let mut max_y = f64::MIN;
 
-    let mut boxes: Vec<Rect> = layout.nodes.iter().map(|n| n.rect).collect();
-    boxes.extend(layout.groups.iter().map(|g| g.rect));
+    let outer = |rect: Rect, style: &Style| {
+        let margin = crate::spacing::Margins::of(style);
+        Rect {
+            x: rect.x - margin.left,
+            y: rect.y - margin.top,
+            w: rect.w + margin.left + margin.right,
+            h: rect.h + margin.top + margin.bottom,
+        }
+    };
+    let mut boxes: Vec<Rect> = layout
+        .nodes
+        .iter()
+        .map(|n| outer(n.rect, &n.style))
+        .collect();
+    boxes.extend(layout.groups.iter().map(|g| outer(g.rect, &g.style)));
     for p in &layout.polylines {
         for &(x, y) in &p.points {
             boxes.push(Rect {
@@ -1290,6 +1410,60 @@ fn outline(r: &Rect, shape: Shape) -> Vec<(f64, f64)> {
 // ---------------------------------------------------------------- edges
 
 #[allow(clippy::too_many_arguments)]
+fn orthogonal(
+    layout: &Layout,
+    edge: &crate::layout::PlacedEdge,
+    ports: [Option<(f64, f64)>; 2],
+    obstacles: &[Rect],
+    used: &[crate::ortho::Used],
+) -> Vec<(f64, f64)> {
+    let from = &layout.nodes[edge.from];
+    let to = &layout.nodes[edge.to];
+    let fallback = route(from, to, Router::Straight, &[], ports, &[]);
+    let start = ports[0].unwrap_or(fallback[0]);
+    let end = ports[1].unwrap_or(fallback[1]);
+    let outward = |node: &PlacedNode, p: (f64, f64)| {
+        if node.style.stage.as_deref() == Some("boundary") && node.style.attach.is_some() {
+            return (0.0, 16.0);
+        }
+        let r = node.rect;
+        let dx = (p.0 - r.cx()) / r.w.max(1.0);
+        let dy = (p.1 - r.cy()) / r.h.max(1.0);
+        if dx.abs() >= dy.abs() {
+            (dx.signum() * 16.0, 0.0)
+        } else {
+            (0.0, dy.signum() * 16.0)
+        }
+    };
+    let a = outward(from, start);
+    let b = outward(to, end);
+    let a = (start.0 + a.0, start.1 + a.1);
+    let b = (end.0 + b.0, end.1 + b.1);
+    let mut obstacles = obstacles.to_vec();
+    obstacles.extend([from.rect, to.rect]);
+    // The host is solid for a boundary flow once its port has left the event.
+    for node in [from, to] {
+        if let Some(host) = node
+            .style
+            .attach
+            .as_deref()
+            .and_then(|id| layout.nodes.iter().find(|n| n.id == id))
+        {
+            obstacles.push(host.rect);
+        }
+    }
+    let mut out = vec![start, a];
+    let mut at = a;
+    for stop in edge.via.iter().chain(std::iter::once(&b)) {
+        let leg = crate::ortho::route_points(at, *stop, &obstacles, used)
+            .unwrap_or_else(|| vec![at, (stop.0, at.1), *stop]);
+        out.extend(leg.into_iter().skip(1));
+        at = *stop;
+    }
+    out.push(end);
+    straighten(out)
+}
+
 fn route(
     from: &PlacedNode,
     to: &PlacedNode,
@@ -1323,8 +1497,8 @@ fn route(
             bow(start, end, 0.0)
         }
         // `X-004`. The solver goes around the boxes; the elbow below is what is
-        // left when there is no way round — a box wholly enclosed, or a diagram
-        // too large for the grid to pay for itself. Keeping the old line rather
+        // left when there is no way round, such as a box wholly enclosed.
+        // Keeping the old line rather
         // than dropping the edge is deliberate: `check::after_layout` then says
         // the line crosses something, which is a drawing that admits it is
         // wrong, where a missing edge is one that lies.
@@ -1438,7 +1612,7 @@ fn through(
         // the other and avoids everything else, which is exactly the question.
         let leg = if router == Some(Router::Ortho) {
             crate::ortho::route(dot(at), dot(*stop), obstacles, used)
-                .unwrap_or_else(|| vec![at, *stop])
+                .unwrap_or_else(|| vec![at, (stop.0, at.1), *stop])
         } else {
             vec![at, *stop]
         };

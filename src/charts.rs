@@ -4692,15 +4692,10 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
 
     // Participants across the top, each owning a column.
     const HEAD_H: f64 = 42.0;
-    let head_y = title_h;
-    let lifeline_top = head_y + HEAD_H;
-    let first_row = lifeline_top + row * 0.9;
-    let rows = diagram.edges.len();
-    let bottom = first_row + rows as f64 * row + row * 0.4;
-
-    let centre = |i: usize| column * i as f64 + column / 2.0;
-
-    for (i, node) in diagram.nodes.iter().enumerate() {
+    let mut centres = Vec::with_capacity(diagram.nodes.len());
+    let mut cursor = 0.0;
+    let mut header_bottom = title_h + HEAD_H;
+    for node in &diagram.nodes {
         let style = registry.resolve(
             Style::node_defaults(),
             def.style_word(node.keyword.as_str()),
@@ -4708,28 +4703,167 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             &node.props_for(def),
         )?;
         let label = node.label.clone().unwrap_or_else(|| node.id.value.clone());
-        let w = (text_width(
-            std::slice::from_ref(&label),
-            style.font_size.unwrap_or(13.0),
-        ) + style.padding.unwrap_or(14.0) * 2.0)
-            .min(column - 12.0)
-            .max(50.0);
+        let lines: Vec<String> = label.split('\n').map(str::to_string).collect();
+        let w = style.width.unwrap_or(
+            (text_width(&lines, style.font_size.unwrap_or(13.0))
+                + style.padding.unwrap_or(14.0) * 2.0)
+                .max(50.0),
+        );
+        let h = style.height.unwrap_or(
+            (lines.len() as f64 * style.font_size.unwrap_or(13.0) * 1.2
+                + style.padding.unwrap_or(14.0) * 2.0)
+                .max(HEAD_H),
+        );
+        let margin = crate::spacing::Margins::of(&style);
+        let outer = w + margin.left + margin.right;
+        let pitch = column.max(outer + 12.0);
+        let x = cursor + (pitch - outer) / 2.0 + margin.left;
+        centres.push(x + w / 2.0);
+        cursor += pitch;
+        header_bottom = header_bottom.max(title_h + margin.top + h + margin.bottom);
 
         nodes.push(PlacedNode {
             id: node.id.as_str().to_string(),
-            lines: vec![label],
+            lines,
             rect: Rect {
-                x: centre(i) - w / 2.0,
-                y: head_y,
+                x,
+                y: title_h + margin.top,
                 w,
-                h: HEAD_H,
+                h,
             },
             style,
         });
+    }
+    let centre = |i: usize| centres[i];
+    let message_styles: Vec<Style> = diagram
+        .edges
+        .iter()
+        .map(|edge| {
+            registry.resolve(
+                Style::edge_defaults(),
+                "edge",
+                &edge.classes,
+                &edge.effective_props(def.edge_slots),
+            )
+        })
+        .collect::<Result<_>>()?;
 
-        // The lifeline: dashed, recessive, the whole height of the exchange.
+    // Include descendant messages: a parent frame may contain only nested frames.
+    let group_rows: Vec<Vec<usize>> = diagram
+        .groups
+        .iter()
+        .map(|group| {
+            diagram
+                .edges
+                .iter()
+                .enumerate()
+                .filter_map(|(i, edge)| group.span.contains(edge.span.start).then_some(i))
+                .collect()
+        })
+        .collect();
+    // Reserve the title band and external space before scheduling message rows.
+    let mut frames: Vec<_> = diagram
+        .groups
+        .iter()
+        .enumerate()
+        .map(|(g, group)| -> Result<_> {
+            if group.activates {
+                return Ok(None);
+            }
+            let (Some(&first), Some(&last)) = (group_rows[g].first(), group_rows[g].last()) else {
+                return Ok(None);
+            };
+            let style = registry.resolve(
+                Style::group_defaults(),
+                "group",
+                &group.classes,
+                &group.props,
+            )?;
+            let margin = crate::spacing::Margins::of(&style);
+            let padding = style.padding.unwrap_or(18.0);
+            let band = if group.label.is_some() {
+                style.font_size.unwrap_or(12.0) * 1.3 + padding
+            } else {
+                padding
+            };
+            Ok(Some((
+                first,
+                last,
+                (row * 0.62 + 14.0).max(band + 6.0),
+                (row * 0.42).max(padding),
+                margin,
+                style,
+            )))
+        })
+        .collect::<Result<_>>()?;
+    let mut order: Vec<_> = (0..frames.len()).filter(|&i| frames[i].is_some()).collect();
+    order.sort_by_key(|&i| diagram.groups[i].span.start);
+    let mut parents = vec![None; frames.len()];
+    let mut stack: Vec<usize> = Vec::new();
+    for &i in &order {
+        while stack
+            .last()
+            .is_some_and(|&parent| diagram.groups[parent].span.end <= diagram.groups[i].span.start)
+        {
+            stack.pop();
+        }
+        parents[i] = stack.last().copied();
+        stack.push(i);
+    }
+    for &i in order.iter().rev() {
+        let Some(parent) = parents[i] else {
+            continue;
+        };
+        let (first, last, above, below, margin, _) = frames[i].as_ref().unwrap();
+        let (first, last, above, below, margin) = (*first, *last, *above, *below, *margin);
+        let parent = frames[parent].as_mut().unwrap();
+        let padding = parent.5.padding.unwrap_or(18.0);
+        if first == parent.0 {
+            parent.2 = parent
+                .2
+                .max(above + margin.top + padding + parent.5.font_size.unwrap_or(12.0) * 1.3);
+        }
+        if last == parent.1 {
+            parent.3 = parent.3.max(below + margin.bottom + padding);
+        }
+    }
+    let mut ys: Vec<f64> = Vec::with_capacity(diagram.edges.len());
+    let mut occupied = header_bottom;
+    for (r, style) in message_styles.iter().enumerate() {
+        let mut before = (style.font_size.unwrap_or(12.0) / 2.0 + 9.0).max(row * 0.22 + 6.0);
+        if diagram
+            .groups
+            .iter()
+            .enumerate()
+            .any(|(g, group)| group.activates && group_rows[g].first() == Some(&r))
+        {
+            before = before.max(row * 0.3);
+        }
+        let nominal = ys
+            .last()
+            .map_or(header_bottom + row * 0.9, |last| last + row);
+        let mut y = nominal.max(occupied + before + 8.0);
+        for frame in frames.iter().flatten().filter(|frame| frame.0 == r) {
+            y = y.max(occupied + frame.4.top + frame.2 + 8.0);
+        }
+        ys.push(y);
+        occupied = y + (style.font_size.unwrap_or(12.0) / 2.0).max(row * 0.16 + 4.0);
+        if diagram
+            .groups
+            .iter()
+            .enumerate()
+            .any(|(g, group)| group.activates && group_rows[g].last() == Some(&r))
+        {
+            occupied = occupied.max(y + row * 0.3);
+        }
+        for frame in frames.iter().flatten().filter(|frame| frame.1 == r) {
+            occupied = occupied.max(y + frame.3 + frame.4.bottom);
+        }
+    }
+    let bottom = occupied + row * 0.4;
+    for (i, node) in nodes.iter().enumerate() {
         guides.push(Guide {
-            from: (centre(i), lifeline_top),
+            from: (centre(i), node.rect.bottom()),
             to: (centre(i), bottom),
             color: if theme.dark { "#334155" } else { "#d4d4d8" }.into(),
             width: 1.0,
@@ -4741,9 +4875,13 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
     // a call is outstanding (`D-024`). It is a thin `PlacedNode` pushed after
     // the lifeline rather than a `Guide`, because guides draw *beneath*
     // everything and this has to sit on top of the line it covers.
-    for group in diagram.groups.iter().filter(|g| g.activates) {
-        let (Some(&first), Some(&last)) = (group.edge_members.first(), group.edge_members.last())
-        else {
+    for (g, group) in diagram
+        .groups
+        .iter()
+        .enumerate()
+        .filter(|(_, g)| g.activates)
+    {
+        let (Some(&first), Some(&last)) = (group_rows[g].first(), group_rows[g].last()) else {
             continue;
         };
         let Some(&col) = index.get(group.id.as_str()) else {
@@ -4761,8 +4899,8 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         // *inside* the frame and read as two things colliding rather than one
         // ending (`W-121`).
         const REACH: f64 = 0.3;
-        let top = first_row + first as f64 * row - row * REACH;
-        let height = (last - first) as f64 * row + row * REACH * 2.0;
+        let top = ys[first] - row * REACH;
+        let height = ys[last] - ys[first] + row * REACH * 2.0;
         nodes.push(PlacedNode {
             id: String::new(),
             lines: Vec::new(),
@@ -4774,6 +4912,10 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             },
             style: Style {
                 radius: Some(2.0),
+                margin_top: Some(0.0),
+                margin_right: Some(0.0),
+                margin_bottom: Some(0.0),
+                margin_left: Some(0.0),
                 // A bar, not a box. Taking the participant's own fill made it
                 // the same dark slate as the header on a dark surface, so it
                 // read as a hole punched in the picture rather than as a mark
@@ -4788,8 +4930,12 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
     }
 
     // A group frames the rows of the messages it holds.
-    for group in diagram.groups.iter().filter(|g| !g.activates) {
-        let rows_inside: Vec<usize> = group.edge_members.clone();
+    let mut placed_frames = vec![None; frames.len()];
+    for (g, (group, frame)) in diagram.groups.iter().zip(&frames).enumerate() {
+        let Some((_, _, above, below, _, style)) = frame else {
+            continue;
+        };
+        let rows_inside = &group_rows[g];
         let Some(&first) = rows_inside.first() else {
             continue;
         };
@@ -4822,18 +4968,10 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             .max()
             .unwrap_or(diagram.nodes.len().saturating_sub(1));
 
-        let style = registry.resolve(
-            Style::group_defaults(),
-            "group",
-            &group.classes,
-            &group.props,
-        )?;
         // The frame sits between the message before it and the one after,
         // never a whole row above — that would swallow the previous message.
         // Its title needs a band of its own inside that, or it lands on the
         // first message and on the lifeline it crosses.
-        let above = row * 0.62 + 14.0;
-        let below = row * 0.42;
 
         // Wide enough to carry its own title clear of the first lifeline it
         // spans. A plate cannot help here: an activation bar is a node and is
@@ -4841,10 +4979,11 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         let title_w = group
             .label
             .as_ref()
-            .map(|l| text_width(std::slice::from_ref(l), 12.0) + 26.0)
+            .map(|l| text_width(std::slice::from_ref(l), style.font_size.unwrap_or(12.0)) + 26.0)
             .unwrap_or(0.0);
         let left = (centre(lo) - column * 0.36).min(centre(lo) - title_w);
 
+        placed_frames[g] = Some(groups.len());
         groups.push(PlacedGroup {
             id: String::new(),
             lines: group
@@ -4854,12 +4993,27 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
                 .unwrap_or_else(|| vec![group.id.value.clone()]),
             rect: Rect {
                 x: left,
-                y: first_row + first as f64 * row - above,
+                y: ys[first] - above,
                 w: (centre(hi) - left) + column * 0.36,
-                h: (last - first) as f64 * row + above + below,
+                h: ys[last] - ys[first] + above + below,
             },
-            style,
+            style: style.clone(),
         });
+    }
+
+    for &i in order.iter().rev() {
+        if let Some(parent) = parents[i] {
+            let child = groups[placed_frames[i].unwrap()].rect;
+            let parent = &mut groups[placed_frames[parent].unwrap()];
+            let margin = frames[i].as_ref().unwrap().4;
+            let padding = parent.style.padding.unwrap_or(18.0);
+            let right = parent
+                .rect
+                .right()
+                .max(child.right() + margin.right + padding);
+            parent.rect.x = parent.rect.x.min(child.x - margin.left - padding);
+            parent.rect.w = right - parent.rect.x;
+        }
     }
 
     // Messages, one row each, in the order they were written.
@@ -4868,14 +5022,9 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         else {
             continue;
         };
-        let style = registry.resolve(
-            Style::edge_defaults(),
-            "edge",
-            &edge.classes,
-            &edge.effective_props(def.edge_slots),
-        )?;
+        let style = &message_styles[r];
         let stroke = style.stroke.clone().unwrap_or_else(|| "#64748b".into());
-        let y = first_row + r as f64 * row;
+        let y = ys[r];
 
         let mut label = edge.label.clone().unwrap_or_default();
         if numbered {
@@ -4923,9 +5072,9 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
                 y: ly,
                 anchor,
                 size: style.font_size.unwrap_or(12.0),
-                color: ink(&style, &theme),
+                color: ink(style, &theme),
                 weight: style.font_weight.clone().unwrap_or_else(|| "400".into()),
-                family: family(&style),
+                family: family(style),
                 title: false,
             });
         }

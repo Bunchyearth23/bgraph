@@ -1,0 +1,3 @@
+type bpmn { title: "no wrap" }
+task a "Une étiquette assez longue pour déborder de la boîte" service { width: 140 }
+layout { place a at (0, 0) }

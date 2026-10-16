@@ -1,0 +1,20 @@
+type bpmn { title: "boundary" }
+style task { size: 176 74 }
+group w "Worker" {
+  task t "Lancer" service
+  task r "Relance" service
+  task top "Acquitter" send
+  layout { place t at (0, 120)
+    place r at (210, 240)
+    place top at (0, 0) }
+}
+group m "Modules" {
+  task c "Capture" service
+  layout { place c at (0, 0) }
+}
+event e "Mort" boundary error { attach: t }
+layout { place w at (0, 0)
+  place m below w gap 60 align left }
+t -> top
+e -> r { from: bottom }
+t -> c message

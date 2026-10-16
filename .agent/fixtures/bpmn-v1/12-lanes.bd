@@ -1,0 +1,17 @@
+type bpmn
+style node { fill: #ffffff }
+group pool "Pool" {
+ width: 600
+ group lane_a "Petite voie" {
+  task a "A" service
+  layout { place a at (0, 0) }
+ }
+ group lane_b "Grande voie" {
+  task b "Une étiquette sur deux lignes\navec une largeur imposée" service { width: 160 }
+  layout { place b at (0, 0) }
+ }
+ layout {
+  place lane_a at (0, 0)
+  place lane_b below lane_a gap 12
+ }
+}

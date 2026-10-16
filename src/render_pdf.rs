@@ -87,6 +87,11 @@ fn render_pages(layout: &Layout, page: Option<Page>) -> Vec<u8> {
     let (dx, dy, width, height) = crate::render_svg::canvas(layout);
 
     let mut c = Content::new(height);
+    c.font = layout
+        .opts
+        .embed_font
+        .as_ref()
+        .and_then(|(_, bytes)| EmbeddedFont::new(bytes));
 
     if let Some(background) = &layout.opts.background
         && background != "none"
@@ -109,8 +114,46 @@ fn render_pages(layout: &Layout, page: Option<Page>) -> Vec<u8> {
     }
 
     for group in &layout.groups {
-        c.box_of(&offset(group.rect, dx, dy), Shape::Rect, &group.style);
-        c.text_lines(&group.lines, &offset(group.rect, dx, dy), &group.style);
+        let rect = offset(group.rect, dx, dy);
+        c.box_of(&rect, Shape::Rect, &group.style);
+        if group.lines.iter().any(|line| !line.is_empty()) {
+            let size = group.style.font_size.unwrap_or(12.0);
+            let (ox, oy) = group.style.label_offset.unwrap_or_default();
+            let text = group.lines.join(" ");
+            let at = (rect.x + 12.0 + ox, rect.y + size * 1.3 + oy);
+            if let Some(background) = layout
+                .opts
+                .background
+                .as_deref()
+                .filter(|color| *color != "none")
+            {
+                c.fill_colour(background);
+                let plate = Rect {
+                    x: at.0 - 3.0,
+                    y: at.1 - size * 0.72,
+                    w: crate::layout::text_width(std::slice::from_ref(&text), size) + 6.0,
+                    h: size * 1.4,
+                };
+                c.path(
+                    &[
+                        (plate.x, plate.y),
+                        (plate.right(), plate.y),
+                        (plate.right(), plate.bottom()),
+                        (plate.x, plate.bottom()),
+                    ],
+                    true,
+                );
+                let _ = writeln!(c.body, "f");
+            }
+            c.fill_colour(group.style.font_color.as_deref().unwrap_or("#64748b"));
+            c.show(
+                &text,
+                (at.0, at.1 + size * 0.34),
+                size,
+                Anchor::Start,
+                group.style.font_weight.as_deref().unwrap_or("600"),
+            );
+        }
     }
 
     // Slices need arcs, which are the one thing a rectangle cannot fake.
@@ -231,7 +274,7 @@ fn render_pages(layout: &Layout, page: Option<Page>) -> Vec<u8> {
         );
     }
 
-    assemble(&c.body, &c.alphas, width, height, page)
+    assemble(&c.body, &c.alphas, c.font.as_ref(), width, height, page)
 }
 
 fn shift((x, y): (f64, f64), dx: f64, dy: f64) -> (f64, f64) {
@@ -258,6 +301,164 @@ fn num(v: f64) -> String {
     }
 }
 
+/// Whether a font has the TrueType outlines and metrics the PDF writer reads.
+pub fn supports_embedded_font(bytes: &[u8]) -> bool {
+    EmbeddedFont::new(bytes).is_some()
+}
+
+struct EmbeddedFont {
+    bytes: Vec<u8>,
+    cmap: usize,
+    hmtx: usize,
+    metrics: usize,
+    units: f64,
+    bbox: [f64; 4],
+    ascent: f64,
+    descent: f64,
+    chars: BTreeMap<char, u16>,
+    glyphs: Vec<(char, u16, f64)>,
+}
+
+impl EmbeddedFont {
+    fn new(bytes: &[u8]) -> Option<Self> {
+        let u16_at = |i| Some(u16::from_be_bytes(bytes.get(i..i + 2)?.try_into().ok()?));
+        let u32_at = |i| Some(u32::from_be_bytes(bytes.get(i..i + 4)?.try_into().ok()?));
+        if !matches!(u32_at(0)?, 0x0001_0000 | 0x7472_7565) {
+            return None;
+        }
+        let table = |tag: &[u8; 4]| {
+            for i in 0..usize::from(u16_at(4)?) {
+                let at = 12 + i * 16;
+                if bytes.get(at..at + 4)? == tag {
+                    let offset = u32_at(at + 8)? as usize;
+                    let length = u32_at(at + 12)? as usize;
+                    bytes.get(offset..offset.checked_add(length)?)?;
+                    return Some(offset);
+                }
+            }
+            None
+        };
+        let head = table(b"head")?;
+        let hhea = table(b"hhea")?;
+        let hmtx = table(b"hmtx")?;
+        table(b"glyf")?;
+        let cmap = table(b"cmap")?;
+        let units = f64::from(u16_at(head + 18)?);
+        let metrics = usize::from(u16_at(hhea + 34)?);
+        if units == 0.0 || metrics == 0 {
+            return None;
+        }
+        bytes.get(hmtx..hmtx + metrics * 4)?;
+        let signed = |i| Some(f64::from(u16_at(i)? as i16) * 1000.0 / units);
+        Some(Self {
+            bbox: [
+                signed(head + 36)?,
+                signed(head + 38)?,
+                signed(head + 40)?,
+                signed(head + 42)?,
+            ],
+            ascent: signed(hhea + 4)?,
+            descent: signed(hhea + 6)?,
+            bytes: bytes.to_vec(),
+            cmap,
+            hmtx,
+            metrics,
+            units,
+            chars: BTreeMap::new(),
+            glyphs: Vec::new(),
+        })
+    }
+
+    fn encode(&mut self, text: &str, size: f64) -> (String, f64) {
+        let mut encoded = String::from("<");
+        let mut width = 0.0;
+        for ch in text.chars() {
+            let cid = if let Some(cid) = self.chars.get(&ch) {
+                *cid
+            } else {
+                let glyph = crate::subset::glyph_of(&self.bytes, self.cmap, ch).unwrap_or(0);
+                let at = self.hmtx + usize::from(glyph).min(self.metrics - 1) * 4;
+                let advance = f64::from(u16::from_be_bytes([self.bytes[at], self.bytes[at + 1]]))
+                    * 1000.0
+                    / self.units;
+                // A PDF CID font has at most 65535 distinct encoded characters.
+                let cid = u16::try_from(self.glyphs.len() + 1).unwrap_or(0);
+                if cid != 0 {
+                    self.glyphs.push((ch, glyph, advance));
+                }
+                self.chars.insert(ch, cid);
+                cid
+            };
+            let _ = write!(encoded, "{cid:04X}");
+            if cid != 0 {
+                width += self.glyphs[usize::from(cid) - 1].2 * size / 1000.0;
+            }
+        }
+        encoded.push('>');
+        (encoded, width)
+    }
+
+    fn objects(&self, objects: &mut Vec<String>) {
+        let base = objects.len() + 1;
+        let font = format!(
+            "<< /Type /Font /Subtype /Type0 /BaseFont /BgraphEmbedded /Encoding /Identity-H /DescendantFonts [{} 0 R] /ToUnicode {} 0 R >>",
+            base + 2,
+            base + 6
+        );
+        objects.extend([font.clone(), font]);
+        let widths = self
+            .glyphs
+            .iter()
+            .map(|(_, _, w)| num(*w))
+            .collect::<Vec<_>>()
+            .join(" ");
+        objects.push(format!("<< /Type /Font /Subtype /CIDFontType2 /BaseFont /BgraphEmbedded /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /FontDescriptor {} 0 R /CIDToGIDMap {} 0 R /DW 1000 /W [1 [{widths}]] >>", base + 3, base + 5));
+        objects.push(format!("<< /Type /FontDescriptor /FontName /BgraphEmbedded /Flags 32 /FontBBox [{}] /ItalicAngle 0 /Ascent {} /Descent {} /CapHeight {} /StemV 80 /FontFile2 {} 0 R >>", self.bbox.map(num).join(" "), num(self.ascent), num(self.descent), num(self.ascent), base + 4));
+        let hex = |bytes: &[u8]| {
+            let mut out = String::with_capacity(bytes.len() * 2 + 1);
+            for byte in bytes {
+                let _ = write!(out, "{byte:02X}");
+            }
+            out.push('>');
+            out
+        };
+        let font_data = hex(&self.bytes);
+        objects.push(format!(
+            "<< /Length {} /Length1 {} /Filter /ASCIIHexDecode >>\nstream\n{font_data}\nendstream",
+            font_data.len(),
+            self.bytes.len()
+        ));
+        let mut gids = vec![0, 0];
+        for (_, glyph, _) in &self.glyphs {
+            gids.extend(glyph.to_be_bytes());
+        }
+        let gids = hex(&gids);
+        objects.push(format!(
+            "<< /Length {} /Filter /ASCIIHexDecode >>\nstream\n{gids}\nendstream",
+            gids.len()
+        ));
+        let mut unicode = String::from(
+            "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def\n/CMapName /BgraphUnicode def\n/CMapType 2 def\n1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n",
+        );
+        for (chunk, entries) in self.glyphs.chunks(100).enumerate() {
+            let _ = writeln!(unicode, "{} beginbfchar", entries.len());
+            for (i, (ch, _, _)) in entries.iter().enumerate() {
+                let _ = write!(unicode, "<{:04X}> <", chunk * 100 + i + 1);
+                for unit in ch.encode_utf16(&mut [0; 2]) {
+                    let _ = write!(unicode, "{unit:04X}");
+                }
+                let _ = writeln!(unicode, ">");
+            }
+            let _ = writeln!(unicode, "endbfchar");
+        }
+        unicode.push_str("endcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n");
+        objects.push(format!(
+            "<< /Length {} >>\nstream\n{unicode}endstream",
+            unicode.len()
+        ));
+    }
+}
+
 /// The content stream, plus the alpha states it needed along the way.
 struct Content {
     body: String,
@@ -265,6 +466,7 @@ struct Content {
     /// operator, so each distinct alpha is collected and named once.
     alphas: BTreeMap<String, f64>,
     height: f64,
+    font: Option<EmbeddedFont>,
 }
 
 impl Content {
@@ -273,6 +475,7 @@ impl Content {
             body: String::new(),
             alphas: BTreeMap::new(),
             height,
+            font: None,
         }
     }
 
@@ -405,6 +608,7 @@ impl Content {
     }
 
     fn box_of(&mut self, r: &Rect, shape: Shape, style: &crate::style::Style) {
+        self.dash(style.dash.as_deref(), style.stroke_width.unwrap_or(1.5));
         match shape {
             Shape::Ellipse => self.ellipse(r),
             Shape::Diamond => {
@@ -663,7 +867,14 @@ impl Content {
         // table `W-040` added is exact here rather than an estimate.
         let bold = weight == "bold" || weight.parse::<u32>().is_ok_and(|w| w >= 600);
         let font = if bold { "/F2" } else { "/F1" };
-        let width = crate::layout::advance(text, size);
+        let (encoded, width) = if let Some(font) = &mut self.font {
+            font.encode(text, size)
+        } else {
+            (
+                format!("({})", escape(text)),
+                crate::layout::advance(text, size),
+            )
+        };
         let x = match anchor {
             Anchor::Start => at.0,
             Anchor::Middle => at.0 - width / 2.0,
@@ -671,18 +882,16 @@ impl Content {
         };
         let _ = writeln!(
             self.body,
-            "BT {font} {} Tf {} {} Td ({}) Tj ET",
+            "BT {font} {} Tf {} {} Td {encoded} Tj ET",
             num(size),
             num(x),
-            num(self.y(at.1)),
-            escape(text)
+            num(self.y(at.1))
         );
     }
 }
 
 /// PDF strings are parenthesised, so the delimiters and the escape character
-/// have to be escaped. Anything outside Latin-1 has no place in a base-14 font
-/// and is dropped rather than emitted as mojibake.
+/// have to be escaped. Base-14 fonts use Windows-1252, never UTF-8.
 fn escape(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for c in text.chars() {
@@ -691,8 +900,44 @@ fn escape(text: &str) -> String {
                 out.push('\\');
                 out.push(c);
             }
-            c if (c as u32) < 0x100 && !c.is_control() => out.push(c),
-            _ => out.push('?'),
+            c if c.is_ascii() && !c.is_control() => out.push(c),
+            c if (c as u32) < 0x100 && !c.is_control() => {
+                let _ = write!(out, "\\{:03o}", c as u32);
+            }
+            _ => {
+                let byte = match c {
+                    '€' => 0x80,
+                    '‚' => 0x82,
+                    'ƒ' => 0x83,
+                    '„' => 0x84,
+                    '…' => 0x85,
+                    '†' => 0x86,
+                    '‡' => 0x87,
+                    'ˆ' => 0x88,
+                    '‰' => 0x89,
+                    'Š' => 0x8a,
+                    '‹' => 0x8b,
+                    'Œ' => 0x8c,
+                    'Ž' => 0x8e,
+                    '‘' => 0x91,
+                    '’' => 0x92,
+                    '“' => 0x93,
+                    '”' => 0x94,
+                    '•' => 0x95,
+                    '–' => 0x96,
+                    '—' => 0x97,
+                    '˜' => 0x98,
+                    '™' => 0x99,
+                    'š' => 0x9a,
+                    '›' => 0x9b,
+                    'œ' => 0x9c,
+                    'ž' => 0x9e,
+                    'Ÿ' => 0x9f,
+                    '\u{202f}' => 0xa0,
+                    _ => b'?',
+                };
+                let _ = write!(out, "\\{byte:03o}");
+            }
         }
     }
     out
@@ -703,6 +948,7 @@ fn escape(text: &str) -> String {
 fn assemble(
     body: &str,
     alphas: &BTreeMap<String, f64>,
+    font: Option<&EmbeddedFont>,
     width: f64,
     height: f64,
     page: Option<Page>,
@@ -772,14 +1018,15 @@ fn assemble(
         "<< /Length {} >>\nstream\n{body}endstream",
         body.len()
     ));
-    objects.push(
-        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"
-            .to_string(),
-    );
-    objects.push(
-        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>"
-            .to_string(),
-    );
+    if let Some(font) = font {
+        font.objects(&mut objects);
+    } else {
+        objects.push(
+            "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"
+                .to_string(),
+        );
+        objects.push("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>".to_string());
+    }
 
     let mut out = String::from("%PDF-1.4\n");
     let mut offsets = Vec::with_capacity(objects.len());

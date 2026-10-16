@@ -53,7 +53,7 @@ struct Cli {
     #[arg(long, value_name = "NAME")]
     theme: Option<String>,
 
-    /// Carry a font inside the SVG, so its text is exact on a machine that
+    /// Carry a TrueType font inside SVG or PDF, so text works on a machine that
     /// does not have it. The file grows by the size of the font
     #[arg(long, value_name = "FILE")]
     embed_font: Option<PathBuf>,
@@ -611,6 +611,11 @@ fn run() -> Result<i32> {
         "pdf" => {
             #[cfg(feature = "pdf")]
             {
+                if let Some((_, bytes)) = &layout.opts.embed_font
+                    && !bgraph::render_pdf::supports_embedded_font(bytes)
+                {
+                    bail!("PDF embedding requires a valid TrueType font with glyf outlines (.ttf)");
+                }
                 let bytes = match &cli.page {
                     Some(size) => {
                         let page = bgraph::render_pdf::Page::parse(size).with_context(|| {

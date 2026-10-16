@@ -1,0 +1,10 @@
+type bpmn { title: "kink" }
+style task { size: 176 74 }
+task a "A" service
+task b "B" service
+data d "D" store
+layout { place a at (0, 0)
+  place b at (210, 0)
+  place d at (110, 120) }
+a -> b
+a -> d association

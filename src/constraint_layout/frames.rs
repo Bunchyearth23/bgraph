@@ -10,6 +10,20 @@ pub(super) fn solve(
     overhang: &[(f64, f64, f64, f64)],
     opts: &GraphOpts,
 ) -> Result<SolvedGeometry> {
+    let margins = crate::spacing::entities(diagram)?;
+    let bpmn = crate::check::archetype_of(diagram).name == "bpmn";
+    let mut spacing = margins.clone();
+    #[cfg(feature = "bpmn")]
+    if crate::check::archetype_of(diagram).name == "bpmn" {
+        for (space, &(left, top, right, bottom)) in spacing.iter_mut().zip(overhang) {
+            space.left += left;
+            space.top += top;
+            space.right += right;
+            space.bottom += bottom;
+        }
+    }
+    #[cfg(not(feature = "bpmn"))]
+    let _ = &mut spacing;
     let count = diagram.nodes.len() + diagram.groups.len();
     let mut order: Vec<_> = (0..count).collect();
     order.sort_by_key(|&index| entity_name(diagram, index));
@@ -27,7 +41,7 @@ pub(super) fn solve(
     order.sort_by_key(|&group| diagram.groups[group].id.as_str());
     let mut extra_names = Vec::new();
     for group in order {
-        if plan.declared_group_placement(group).is_some() {
+        if bpmn || plan.declared_group_placement(group).is_some() {
             let x = Variable::new();
             let y = Variable::new();
             translations[group] = Some((x, y));
@@ -53,13 +67,71 @@ pub(super) fn solve(
         .map(|grid| grid.pitch(sizes))
         .unwrap_or((1.0, 1.0));
     let mut constraints = Vec::new();
+    let registry = crate::style::Registry::build(&diagram.styles)?;
+    let group_styles: Vec<_> = diagram
+        .groups
+        .iter()
+        .map(|group| {
+            registry.resolve(
+                crate::style::Style::group_defaults(),
+                "group",
+                &group.classes,
+                &group.props,
+            )
+        })
+        .collect::<Result<_>>()?;
+    if bpmn {
+        for (group, translation) in translations.iter().enumerate() {
+            let Some((tx, ty)) = translation else {
+                continue;
+            };
+            let vars = variables[diagram.nodes.len() + group];
+            let offset = local_offset(Entity::Group(group));
+            let padding = crate::layout::group_padding(diagram, group);
+            let title = if diagram.groups[group].label.is_some() {
+                16.0
+            } else {
+                0.0
+            };
+            let source = provenance(
+                ConstraintOrigin::ContainerOrigin,
+                Axis::X,
+                diagram.nodes.len() + group,
+                diagram.groups[group].span,
+            );
+            push(
+                &mut constraints,
+                (*tx + offset.0) | EQ(Strength::REQUIRED) | (vars.x + padding),
+                source,
+            );
+            push(
+                &mut constraints,
+                (*ty + offset.1) | EQ(Strength::REQUIRED) | (vars.y + padding + title),
+                source.with_axis(Axis::Y),
+            );
+        }
+    }
     for (node, (&vars, &size)) in variables.iter().zip(sizes).enumerate() {
+        let flexible = [ConstraintKind::SameWidth, ConstraintKind::SameHeight].map(|kind| {
+            plan.constraints().any(|item| {
+                item.declaration().kind == kind
+                    && item
+                        .declaration()
+                        .members
+                        .iter()
+                        .any(|member| member.as_str() == diagram.nodes[node].id.as_str())
+                    && item.declaration().members.iter().any(|member| {
+                        matches!(plan.index().get(member.as_str()), Some(Entity::Group(_)))
+                    })
+            })
+        });
         lower_size(
             vars,
             node,
             diagram.nodes[node].span,
             intrinsic[node],
             size,
+            flexible,
             &mut constraints,
         );
         if let Some(attachment) = plan.boundary(node) {
@@ -97,6 +169,7 @@ pub(super) fn solve(
             diagram,
             plan,
             &variables,
+            &spacing,
             node,
             vars,
             placement.as_ref(),
@@ -117,6 +190,7 @@ pub(super) fn solve(
                 diagram,
                 plan,
                 &variables,
+                &spacing,
                 index,
                 vars,
                 Some(placement),
@@ -148,6 +222,35 @@ pub(super) fn solve(
             index,
             declaration.span,
         );
+        for (value, variable, axis) in [
+            (group_styles[group].width, vars.w, Axis::Width),
+            (group_styles[group].height, vars.h, Axis::Height),
+        ] {
+            if let Some(value) = value {
+                push(
+                    &mut constraints,
+                    variable | EQ(Strength::REQUIRED) | value,
+                    provenance(
+                        ConstraintOrigin::SizeConstraint,
+                        axis,
+                        index,
+                        declaration.span,
+                    ),
+                );
+            }
+        }
+        if let Some(pool) = plan.lane_pool(group) {
+            let parent = variables[diagram.nodes.len() + pool];
+            let padding = crate::layout::group_padding(diagram, pool);
+            let margin = margins[index];
+            push(
+                &mut constraints,
+                (vars.x + vars.w + padding + margin.right)
+                    | EQ(Strength::REQUIRED)
+                    | (parent.x + parent.w),
+                source,
+            );
+        }
         push(
             &mut constraints,
             vars.w | GE(Strength::REQUIRED) | named_width,
@@ -165,9 +268,17 @@ pub(super) fn solve(
             let child_index = entity_index(entity, diagram);
             let child = variables[child_index];
             let (left, top, right, bottom) = match entity {
+                Entity::Node(_) if bpmn => (0.0, 0.0, 0.0, 0.0),
                 Entity::Node(node) => overhang[node],
                 Entity::Group(_) => (0.0, 0.0, 0.0, 0.0),
             };
+            let margin = margins[child_index];
+            let (left, top, right, bottom) = (
+                left + if bpmn { 0.0 } else { margin.left },
+                top + if bpmn { 0.0 } else { margin.top },
+                right + margin.right,
+                bottom + margin.bottom,
+            );
             let source = provenance(
                 ConstraintOrigin::FrameBounds,
                 Axis::X,
@@ -243,7 +354,7 @@ pub(super) fn solve(
         if declaration.kind != ConstraintKind::AlignGroup {
             continue;
         }
-        let members = plan.constraint_members(item);
+        let members = plan.constraint_indices(item);
         let Some((&lead, rest)) = members.split_first() else {
             continue;
         };
@@ -458,6 +569,7 @@ fn lower_entity_placement(
     diagram: &Diagram,
     plan: &PlacementPlan<'_>,
     variables: &[Variables],
+    margins: &[crate::spacing::Margins],
     index: usize,
     vars: Variables,
     placement: Option<&Placement>,
@@ -489,6 +601,7 @@ fn lower_entity_placement(
                 diagram,
                 plan,
                 variables,
+                margins,
                 default_gap: opts.gap,
                 grid_pitch,
                 out: constraints,

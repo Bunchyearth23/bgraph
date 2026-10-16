@@ -185,7 +185,7 @@ fn layout_signature(text: &str, line: &str, words: &[&str]) -> Value {
             format!("{word} first other …"),
             &["first", "other"],
             slot.saturating_sub(1).min(1),
-            "Give nodes a common size large enough for their labels.",
+            "Give nodes or groups a common size large enough for their contents.",
         ),
         "row" | "column" => (
             format!("{word} first next … gap distance"),

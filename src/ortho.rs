@@ -30,11 +30,10 @@
 //! thousandths of a point as `i64`, and equal costs are settled by the state's
 //! own index. The same input gives the same path, always.
 //!
-//! **It can decline.** A box wholly enclosed by others has no path, and a
-//! diagram past [`MAX_OBSTACLES`] is not worth the grid. Both return `None`, the
-//! caller keeps the old elbow, and `check::after_layout` says out loud that the
-//! line crosses something — which is the honest outcome, and better than a
-//! missing edge.
+//! **It can decline.** A box wholly enclosed by others has no path. The caller
+//! keeps a visible fallback and `check::after_layout` reports its crossings.
+//! Large processes first try local channels while checking every obstacle;
+//! their obstacle count does not disable avoidance.
 
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
@@ -54,11 +53,6 @@ const CLEARANCE: f64 = 16.0;
 /// fewest elbows wins among equally short ones, low enough that the router will
 /// not walk an extra screen to save one.
 const TURN_COST: f64 = 30.0;
-
-/// Past this many boxes the grid stops paying for itself — it grows as the
-/// square of the count, and it is built once per edge. A diagram this size gets
-/// the old elbow and the diagnostic that goes with it, rather than a pause.
-const MAX_OBSTACLES: usize = 60;
 
 /// Coordinates are compared at this resolution, so a line that is a rounding
 /// error away from another is the same line and the grid stays small.
@@ -96,20 +90,91 @@ const LANE: f64 = 11.0;
 /// elbows in between — the same shape the old router returned, so nothing
 /// downstream learns that this exists.
 pub fn route(a: Rect, b: Rect, obstacles: &[Rect], used: &[Used]) -> Option<Vec<(f64, f64)>> {
-    if obstacles.len() > MAX_OBSTACLES {
-        return None;
-    }
-
     let (xs, ys) = lines(a, b, obstacles, used);
     let nx = xs.len();
     let at = |v: &[f64], want: f64| v.binary_search_by(|p| order(*p, want)).ok();
     let start = at(&xs, snap(a.cx()))? + at(&ys, snap(a.cy()))? * nx;
     let goal = at(&xs, snap(b.cx()))? + at(&ys, snap(b.cy()))? * nx;
 
-    let path = search(start, goal, &xs, &ys, obstacles, used)?;
+    let path = search(start, goal, &xs, &ys, obstacles, used, CLEARANCE - 0.5)?;
     let points: Vec<(f64, f64)> = path.iter().map(|p| (xs[p % nx], ys[p / nx])).collect();
 
     clip(straighten(points), a, b)
+}
+
+/// Route exact ports and waypoints, without moving endpoints after avoidance.
+pub(crate) fn route_points(
+    start: (f64, f64),
+    end: (f64, f64),
+    obstacles: &[Rect],
+    used: &[Used],
+) -> Option<Vec<(f64, f64)>> {
+    if start == end {
+        return Some(vec![start]);
+    }
+    let clear = |path: &[(f64, f64)]| {
+        path.windows(2).all(|pair| {
+            !obstacles
+                .iter()
+                .any(|rect| enters(pair[0], pair[1], rect, CLEARANCE - 0.5))
+                && overlap(pair[0], pair[1], used) < EPS
+        })
+    };
+    let middle = ((start.0 + end.0) / 2.0, (start.1 + end.1) / 2.0);
+    for path in [
+        vec![start, (end.0, start.1), end],
+        vec![start, (start.0, end.1), end],
+        vec![start, (middle.0, start.1), (middle.0, end.1), end],
+        vec![start, (start.0, middle.1), (end.0, middle.1), end],
+    ] {
+        if clear(&path) {
+            return Some(straighten(path));
+        }
+    }
+    let dot = |p: (f64, f64)| Rect {
+        x: p.0,
+        y: p.1,
+        w: 0.0,
+        h: 0.0,
+    };
+    // Local channels keep large processes cheap; every segment is still checked
+    // against all obstacles. Retry with all channels when the local grid fails.
+    let near = Rect {
+        x: start.0.min(end.0) - 64.0,
+        y: start.1.min(end.1) - 64.0,
+        w: (start.0 - end.0).abs() + 128.0,
+        h: (start.1 - end.1).abs() + 128.0,
+    };
+    let local: Vec<_> = obstacles
+        .iter()
+        .copied()
+        .filter(|r| {
+            r.x < near.right() && r.right() > near.x && r.y < near.bottom() && r.bottom() > near.y
+        })
+        .collect();
+    for channels in [&local[..], obstacles] {
+        let (mut xs, mut ys) = lines(dot(start), dot(end), channels, &[]);
+        xs.extend([start.0, end.0]);
+        ys.extend([start.1, end.1]);
+        xs.sort_by(|a, b| order(*a, *b));
+        xs.dedup();
+        ys.sort_by(|a, b| order(*a, *b));
+        ys.dedup();
+        let at = |v: &[f64], want: f64| v.binary_search_by(|p| order(*p, want)).ok();
+        let begin = at(&xs, start.0)? + at(&ys, start.1)? * xs.len();
+        let finish = at(&xs, end.0)? + at(&ys, end.1)? * xs.len();
+        if let Some(path) = search(begin, finish, &xs, &ys, obstacles, used, CLEARANCE - 0.5) {
+            return Some(straighten(
+                path.iter()
+                    .map(|p| (xs[p % xs.len()], ys[p / xs.len()]))
+                    .collect(),
+            ));
+        }
+        if local.len() == obstacles.len() {
+            break;
+        }
+    }
+    None
 }
 
 /// The candidate lines a path may turn on.
@@ -180,6 +245,7 @@ fn search(
     ys: &[f64],
     obstacles: &[Rect],
     used: &[Used],
+    clearance: f64,
 ) -> Option<Vec<usize>> {
     let nx = xs.len();
     let point = |p: usize| (xs[p % nx], ys[p / nx]);
@@ -234,7 +300,7 @@ fn search(
         ] {
             let Some(next) = next else { continue };
             let to = point(next);
-            if obstacles.iter().any(|r| enters((x, y), to, r)) {
+            if obstacles.iter().any(|r| enters((x, y), to, r, clearance)) {
                 continue;
             }
             let step = ((to.0 - x).abs() + (to.1 - y).abs()) * GRID;
@@ -291,8 +357,7 @@ fn overlap(p: (f64, f64), q: (f64, f64), used: &[Used]) -> f64 {
 ///
 /// A hair less than the clearance, so a line *on* a channel — which is exactly
 /// a clearance away — is still allowed.
-fn enters(p: (f64, f64), q: (f64, f64), r: &Rect) -> bool {
-    let m = CLEARANCE - 0.5;
+fn enters(p: (f64, f64), q: (f64, f64), r: &Rect, m: f64) -> bool {
     p.0.max(q.0) > r.x - m + EPS
         && p.0.min(q.0) < r.right() + m - EPS
         && p.1.max(q.1) > r.y - m + EPS
@@ -310,7 +375,7 @@ fn straighten(points: Vec<(f64, f64)>) -> Vec<(f64, f64)> {
             let (a, b) = (out[out.len() - 2], out[out.len() - 1]);
             let straight = (a.0 - b.0).abs() < EPS && (b.0 - p.0).abs() < EPS
                 || (a.1 - b.1).abs() < EPS && (b.1 - p.1).abs() < EPS;
-            if straight {
+            if straight && (b.0 - a.0) * (p.0 - b.0) + (b.1 - a.1) * (p.1 - b.1) >= 0.0 {
                 out.pop();
             }
         }

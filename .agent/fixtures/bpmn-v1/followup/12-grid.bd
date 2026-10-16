@@ -1,0 +1,28 @@
+type bpmn { title: "grid" }
+graph { grid: 6 4 34 46 }
+style task { size: 176 84 }
+group p "P" {
+  group l1 "L1" {
+    task a "A" service
+    task b "B" service
+    layout { place a at (0, 0)
+      place b at (3, 0) }
+  }
+  group l2 "L2" {
+    event e "E" start message
+    task c "C" service
+    layout { place e at (2, 0)
+      place c at (3, 0) }
+  }
+  layout { place l1 at (0, 0)
+    place l2 below l1 gap 0 }
+}
+group q "Q" {
+  task d "D" send
+  layout { place d at (3, 0) }
+}
+layout { place p at (0, 0)
+  place q below p gap 1 }
+a -> b
+e -> c
+d -> c message

@@ -1,0 +1,2 @@
+type bpmn
+task a "Une étiquette longue sur plusieurs lignes" service { size: 140 44 }

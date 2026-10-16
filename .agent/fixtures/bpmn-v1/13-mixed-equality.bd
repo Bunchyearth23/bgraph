@@ -1,0 +1,10 @@
+group frame "Cadre" {
+ width: 400
+ node child "Enfant"
+}
+node peer "Même largeur"
+layout {
+ place frame at (0, 0)
+ place peer below frame gap 24
+ equal-width frame peer
+}

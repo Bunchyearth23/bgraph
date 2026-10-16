@@ -143,6 +143,16 @@ An edge to a group is refused — a frame has no obvious endpoint. Style them
 with `style group { … }` or a `.class`; the default is a dashed border, a
 transparent fill and the label set into the top-left.
 
+Parent frames paint before their children. `style node` is the common layer
+for groups too; `style group { fill: none }` makes frames transparent while
+leaving node fills intact. `width`, `height` and `size` on declared groups are
+required dimensions, with a constraint error when the contents cannot fit.
+`equal-width` and `equal-height` accept both nodes and groups.
+
+In BPMN, a group containing only other groups defines a pool of lanes. Its
+direct child groups fill the pool's inner width, excluding parent padding and
+their own external margins. No invisible spacer nodes are needed.
+
 ## Placement
 
 | Form | Meaning |
@@ -165,6 +175,15 @@ the graph's `flow` direction and `gap`. The first node lands at `(0, 0)`.
 Sizes come from the label plus `padding` unless `size`, `width` or `height`
 says otherwise. The canvas is derived from the content — nothing is ever
 clipped, and negative coordinates are fine.
+Labels wrap to a declared width using measured advances. Fixed heights and
+extremely narrow widths can still overflow; the validator reports those cases.
+
+Orthogonal paths search from their actual ports through every `via`, avoiding
+boxes, external captions and group titles. Boundary-event ports leave away
+from the host and automatic task ports avoid its attached events. Message and
+association ports do not displace BPMN sequence-flow ports. No obstacle-count
+threshold disables avoidance. An impossible route retains a visible fallback
+and a diagnostic. BPMN start/end warnings count sequence flows only.
 
 ## Arrows
 
@@ -217,6 +236,38 @@ pie, or `style event { … }` for BPMN events — with `style node` and `style e
 remaining universal aliases, applied first so the specific name wins where both are declared. `extends` flattens a chain
 child-first. An unknown property or an unknown `.class` is an error.
 
+### External spacing
+
+BPMN event and gateway captions choose a nearby position clear of flows,
+nodes and other labels. Their measured footprints also contribute to relative
+gaps and containing frames. Explicit `at` coordinates and alignments still
+refer to visible shapes. A declared `label-offset` pins the caption.
+Edge labels also avoid annotations and group titles and can slide along
+their segment. Avoidance is bounded; remaining collisions produce diagnostics
+rather than silently moving declared nodes.
+
+`margin` reserves space outside a box or frame, while `padding` reserves space
+inside its outline. It follows CSS side order:
+
+```
+margin: 16            // all sides
+margin: 8 16         // vertical, horizontal
+margin: 8 16 12      // top, horizontal, bottom
+margin: 8 16 12 20   // top, right, bottom, left
+margin-top: 24       // override one side
+```
+
+The four individual properties participate in the same style cascade as the
+shorthand. Values are finite nonnegative drawing units; `auto` and collapsing
+margins are not supported. Unit suffixes remain advisory: `50%` means 50 drawing
+units, not a percentage of the parent. Adjacent margins add to `gap`.
+Absolute `at` coordinates and explicit alignment still address visible outlines.
+
+Supported by the nine declared-layout genres and by `sequence` participants
+and group frames. Other managed genres reject the property. Sequence frames
+reserve their title band and external margins before scheduling messages, so
+a first frame cannot touch participant headers and nested frames stay separated.
+
 ### Themes, and everything else
 
 A **theme** is a style the renderer looks up on its own; it paints without
@@ -250,10 +301,15 @@ Aliases are marked. They behave identically to the property they alias; the edit
 | `radius` | node | `radius: <number>` | Corner rounding — applies to the `rect` shape. |
 | `corner` *(alias)* | node | `corner: <number>` | Alias of `radius`. |
 | `shape` | node | `shape: <rect\|stadium\|ellipse\|diamond\|hexagon\|cylinder>` | Outline geometry. Edge endpoints are clipped against it. |
-| `size` | node | `size: <width> <height>` | Fixed size. Without it the box is sized from the label and `padding`. |
-| `width` | node | `width: <number>` | Fixed width; the height still follows the label. |
+| `size` | node | `size: <width> <height>` | Fixed size of a node or declared group. Without it, bounds follow the label or contents and padding. A group cannot be smaller than its contents. |
+| `width` | node | `width: <number>` | Fixed width of a node or declared group. Node labels wrap to the available width; height follows the resulting lines unless fixed too. |
 | `height` | node | `height: <number>` | Fixed height; the width still follows the label. |
 | `padding` | node | `padding: <number>` | Inset between the label and the outline; drives the auto-size. |
+| `margin` | node | `margin: <all> \| <vertical> <horizontal> \| <top> <horizontal> <bottom> \| <top> <right> <bottom> <left>` | External spacing, in drawing units, with CSS side order. Nonnegative numbers only; no auto or margin collapsing. Supported by declared-layout boxes/frames and sequence participants/frames. Margins add to relative gaps and container bounds; absolute coordinates and explicit alignments still address the visible outline. |
+| `margin-top` | node | `margin-top: <number>` | External space above a box or frame; overrides this side of margin. |
+| `margin-right` | node | `margin-right: <number>` | External space to the right of a box or frame; overrides this side of margin. |
+| `margin-bottom` | node | `margin-bottom: <number>` | External space below a box or frame; overrides this side of margin. |
+| `margin-left` | node | `margin-left: <number>` | External space to the left of a box or frame; overrides this side of margin. |
 | `font` | both | `font: <size> "<family>" <color> <weight>` | Shorthand read by value kind, so the order is free: a number is the size, a string the family, a color the ink, a bare word the weight. |
 | `font-size` | both | `font-size: <number>` | Text size in user units. |
 | `font-family` | both | `font-family: "<family>"` | Font stack, emitted verbatim into the SVG. |
@@ -303,12 +359,12 @@ Declared once, in `graph { … }`. These are diagram-wide and are not part of th
 | `sketch` | `sketch: <on\|off>` | Draw as if by hand. A sketched architecture says "this is a proposal" where a crisp one says "this is decided" — information rather than ornament. Deterministic: the wobble is a hash of each shape's own geometry, so the same file always produces the same file. |
 | `grid` | `grid: <columns> <rows> <gap-col> <gap-row>` | Declares a bounded placement grid. Columns and rows are positive integers; the last two values are non-negative gaps between tracks. Positions, gaps and waypoints use cells in this mode; without a four-value grid, the legacy free coordinate units remain available. |
 | `gap` | `gap: <number>` | Default distance used by anchors that omit `gap`. |
-| `background` | `background: <color>` | Canvas fill. Also backs edge labels so they stay readable. |
+| `background` | `background: <color>` | Canvas fill, including alpha: `#ffffff80` is about 50% opaque, `#ffffff00` fully transparent and `#ffffffff` opaque. `none` or `transparent` removes the fill. Also backs edge labels. |
 | `bg` *(alias)* | `bg: <color>` | Alias of `background`. |
 | `flow` | `flow: <right\|left\|down\|up>` | Direction used to place nodes that declare no placement. |
 | `direction` *(alias)* | `direction: <right\|left\|down\|up>` | Alias of `flow`. |
 
-The surface is **explicit by default**: without a `background` the renderer still paints `#ffffff`, so the live preview and the exported file agree. Write `background: none` (or `transparent`) for a transparent SVG — the preview then shows a checkerboard rather than pretending.
+The surface is **explicit by default**: without a `background` the renderer still paints `#ffffff`, so the live preview and the exported file agree. Write `background: none` (or `transparent`) for a transparent SVG — the preview then shows a checkerboard rather than pretending. Alpha also works here: `background: #ffffff80` gives a white surface at about 50% opacity. The final two hex digits are `00` for transparent through `ff` for opaque; `#rgba` is the short form. SVG, PDF and PNG retain the alpha; the live preview shows it over its checkerboard.
 
 ## Archetypes
 

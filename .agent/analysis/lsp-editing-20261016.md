@@ -32,10 +32,16 @@ insufficient typing assistance in Zed.
 - Add layout signature help for coordinates, relative placements and members.
 - Expose the shared formatter through LSP document formatting.
 
-## Evidence and remaining work
+## Evidence
 
 `cargo build --locked --bins` and `cargo clippy --locked --lib -- -D warnings`
-succeeded. No test suite was added or run for this request.
+succeeded. No test suite was added or run locally for this request.
 The updated release server is installed at the existing Zed launch path.
-Restart the language server in Zed to load the new executable and capabilities;
-interactive Zed behaviour after that restart remains to be confirmed.
+
+On 2026-10-16, the user confirmed interactive LSP and snippet behaviour:
+« tout est bon pour lsp et snippets ». This is user-provided runtime evidence,
+distinct from automated validation; individual scenarios were not enumerated.
+
+GitHub CI run `38911975982` completed successfully for commit
+`2a556a64bfebf36f53bddcf448cdfbdee7b16da9`, including the editing corrections:
+https://github.com/Bunchyearth23/bgraph/actions/runs/38911975982

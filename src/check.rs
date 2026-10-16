@@ -101,6 +101,7 @@ pub(crate) fn frame_geometry(
     overhang: &[(f64, f64, f64, f64)],
 ) -> Vec<Diag> {
     let plan = crate::placement::PlacementPlan::new(diagram);
+    let margins = crate::spacing::entities(diagram).unwrap_or_default();
     let mut diagnostics = Vec::new();
     for (index, group) in diagram.groups.iter().enumerate() {
         let members: Vec<_> = group
@@ -108,15 +109,54 @@ pub(crate) fn frame_geometry(
             .iter()
             .filter_map(|member| plan.index().get(member.as_str()).copied())
             .collect();
-        let Some(measured) =
-            crate::layout::measure_frame(diagram, index, &members, nodes, groups, overhang)
-        else {
+        let Some(measured) = crate::layout::measure_frame(
+            diagram, index, &members, nodes, groups, overhang, &margins,
+        ) else {
             continue;
         };
         let Some(actual) = groups[index] else {
             continue;
         };
-        let expected = measured.frame;
+        let mut expected = measured.frame;
+        if archetype_of(diagram).name == "bpmn" {
+            let style = crate::layout::group_style(diagram, index);
+            if actual.x <= expected.x + 1e-7 {
+                if style.width.is_none() {
+                    expected.w += expected.x - actual.x;
+                }
+                expected.x = actual.x;
+            }
+            if actual.y <= expected.y + 1e-7 {
+                if style.height.is_none() {
+                    expected.h += expected.y - actual.y;
+                }
+                expected.y = actual.y;
+            }
+        }
+        for (kind, actual_size, expected_size) in [
+            (ConstraintKind::SameWidth, actual.w, &mut expected.w),
+            (ConstraintKind::SameHeight, actual.h, &mut expected.h),
+        ] {
+            if actual_size >= *expected_size - 1e-7
+                && plan.constraints().any(|item| {
+                    item.declaration().kind == kind
+                        && item
+                            .declaration()
+                            .members
+                            .iter()
+                            .any(|member| member.as_str() == group.id.as_str())
+                })
+            {
+                *expected_size = actual_size;
+            }
+        }
+        if plan.lane_pool(index).is_some()
+            && actual.x <= expected.x + 1e-7
+            && actual.right() >= expected.right() - 1e-7
+        {
+            expected.x = actual.x;
+            expected.w = actual.w;
+        }
         if [
             (actual.x, expected.x),
             (actual.y, expected.y),
@@ -142,6 +182,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
 
     let def = check_archetype(diagram, &mut out);
     let archetype = def.name;
+    check_margins(diagram, def, &mut out);
     check_styles(diagram, def, &mut out);
     let nodes = check_nodes(diagram, def, &mut out);
     check_groups(diagram, def, &nodes, &mut out);
@@ -319,6 +360,67 @@ pub fn after_layout(diagram: &Diagram, layout: &crate::layout::Layout) -> Vec<Di
     let mut out = Vec::new();
     check_final_placements(diagram, layout, &mut out);
     let routed = crate::render_svg::route_all(layout);
+    if archetype_of(diagram).layout_capability() == props::LayoutCapability::Declared {
+        for (declared, node) in diagram.nodes.iter().zip(&layout.nodes) {
+            if node.lines.iter().all(String::is_empty) {
+                continue;
+            }
+            let font = node.style.font_size.unwrap_or(14.0);
+            if crate::layout::text_width(&node.lines, font) > node.rect.w + 1e-7
+                || (node.lines.len().saturating_sub(1) as f64 * 1.35 + 1.2) * font
+                    > node.rect.h + 1e-7
+            {
+                out.push(Diag::warn(declared.span, format!(
+                    "the text of `{}` exceeds its fixed box — increase `width` or `height`, or shorten the label",
+                    declared.id.as_str()
+                )));
+            }
+        }
+    }
+    #[cfg(feature = "bpmn")]
+    if archetype_of(diagram).name == "bpmn" {
+        let captions: Vec<_> = diagram
+            .nodes
+            .iter()
+            .zip(&layout.nodes)
+            .filter_map(|(declared, placed)| {
+                if !placed.lines.is_empty() {
+                    return None;
+                }
+                declared.label.as_deref().map(|text| {
+                    (
+                        declared,
+                        crate::labels::caption_rect(placed.rect, text, &placed.style),
+                    )
+                })
+            })
+            .collect();
+        for (i, (declared, rect)) in captions.iter().enumerate() {
+            let covered =
+                layout
+                    .nodes
+                    .iter()
+                    .any(|node| crate::labels::overlap(*rect, node.rect) > 1e-7)
+                    || captions.iter().enumerate().any(|(j, (_, other))| {
+                        i != j && crate::labels::overlap(*rect, *other) > 1e-7
+                    })
+                    || routed.iter().any(|route| {
+                        route
+                            .points
+                            .windows(2)
+                            .any(|pair| crate::render_svg::segment_hits(pair[0], pair[1], rect))
+                            || route.label.as_ref().is_some_and(|(_, other)| {
+                                crate::labels::overlap(*rect, *other) > 1e-7
+                            })
+                    });
+            if covered {
+                out.push(Diag::warn(declared.span, format!(
+                    "the caption of `{}` overlaps a node, a label or a flow — increase the available space, or choose `label-offset`",
+                    declared.id.as_str()
+                )));
+            }
+        }
+    }
 
     // A frame is a containment contract: every direct member must remain
     // inside the frame after translations and size constraints have settled.
@@ -391,6 +493,27 @@ pub fn after_layout(diagram: &Diagram, layout: &crate::layout::Layout) -> Vec<Di
                     node.id
                 ),
             ));
+        } else if let Some(annotation) = layout.annotations.iter().find(|annotation| {
+            crate::labels::overlap(*label, crate::labels::annotation_rect(annotation)) > 1e-7
+        }) {
+            out.push(Diag::warn(edge.span, format!(
+                "the label `{text}` overlaps the text `{}` — widen the gap, or choose `label-offset`",
+                annotation.text
+            )));
+        } else if routed.iter().skip(i + 1).any(|other| {
+            other
+                .label
+                .as_ref()
+                .is_some_and(|(_, rect)| crate::labels::overlap(*label, *rect) > 1e-7)
+        }) || layout
+            .groups
+            .iter()
+            .filter_map(crate::labels::group_title_rect)
+            .any(|rect| crate::labels::overlap(*label, rect) > 1e-7)
+        {
+            out.push(Diag::warn(edge.span, format!(
+                "the label `{text}` overlaps another label or a group title — widen the gap, or choose `label-offset`"
+            )));
         }
     }
 
@@ -419,9 +542,8 @@ pub fn after_layout(diagram: &Diagram, layout: &crate::layout::Layout) -> Vec<Di
     }
 
     for (edge, route) in layout.edges.iter().zip(&routed) {
-        // A straight edge is clipped against both shapes and goes nowhere
-        // near anything else by construction. An elbow is routed around
-        // nothing at all, so it can cross a box on its way (`X-004`).
+        // An impossible orthogonal route retains its visible fallback. Judge
+        // the final path, including explicit ports and waypoints.
         if edge.style.router != Some(crate::style::Router::Ortho) {
             continue;
         }
@@ -440,8 +562,8 @@ pub fn after_layout(diagram: &Diagram, layout: &crate::layout::Layout) -> Vec<Di
                 out.push(Diag::warn(
                     edge.span,
                     "this `ortho` edge passes through a box on its way — the router \
-                     turns corners but avoids nothing, so move a node, widen the gap, \
-                     or use `router: straight`"
+                     could not find a clear route with these ports and waypoints; move a node, widen the gap, \
+                     or change `from`, `to` or `via`"
                         .to_string(),
                 ));
                 break;
@@ -545,6 +667,27 @@ fn check_final_placements(diagram: &Diagram, layout: &crate::layout::Layout, out
                 .map(|group| (group.id.as_str(), group.rect)),
         )
         .collect();
+    let margins: HashMap<_, _> = layout
+        .nodes
+        .iter()
+        .zip(&diagram.nodes)
+        .map(|(node, declared)| {
+            (
+                node.id.as_str(),
+                crate::labels::node_spacing(
+                    node,
+                    declared.label.as_deref(),
+                    archetype_of(diagram).name == "bpmn",
+                ),
+            )
+        })
+        .chain(
+            layout
+                .groups
+                .iter()
+                .map(|group| (group.id.as_str(), crate::spacing::Margins::of(&group.style))),
+        )
+        .collect();
     for (index, node) in layout.nodes.iter().enumerate() {
         if let Some(boundary) = plan.boundary(index) {
             let host = layout.nodes[boundary.host].rect;
@@ -612,11 +755,16 @@ fn check_final_placements(diagram: &Diagram, layout: &crate::layout::Layout, out
         };
         let axes = plan.v2_alignment_axes(index);
         let gap = gap.unwrap_or(layout.opts.gap);
+        let margin = margins
+            .get(node.id.as_str())
+            .copied()
+            .unwrap_or_default()
+            .gap_to(margins.get(anchor).copied().unwrap_or_default(), dir);
         match dir {
-            RelDir::RightOf => check("x", node.rect.x, target.right() + gap * pitch.0),
-            RelDir::LeftOf => check("x", node.rect.right(), target.x - gap * pitch.0),
-            RelDir::Below => check("y", node.rect.y, target.bottom() + gap * pitch.1),
-            RelDir::Above => check("y", node.rect.bottom(), target.y - gap * pitch.1),
+            RelDir::RightOf => check("x", node.rect.x, target.right() + gap * pitch.0 + margin),
+            RelDir::LeftOf => check("x", node.rect.right(), target.x - gap * pitch.0 - margin),
+            RelDir::Below => check("y", node.rect.y, target.bottom() + gap * pitch.1 + margin),
+            RelDir::Above => check("y", node.rect.bottom(), target.y - gap * pitch.1 - margin),
         }
         let horizontal = matches!(dir, RelDir::RightOf | RelDir::LeftOf);
         if align.is_some() || !axes[usize::from(horizontal)] {
@@ -716,6 +864,54 @@ fn frame_names(diagram: &Diagram) -> HashSet<&str> {
 
 fn style_names(diagram: &Diagram) -> HashSet<&str> {
     diagram.styles.iter().map(|s| s.name.as_str()).collect()
+}
+
+fn check_margins(diagram: &Diagram, def: &props::ArchetypeDef, out: &mut Vec<Diag>) {
+    let mut validate = |properties: &[Prop], allowed: bool| {
+        for prop in properties
+            .iter()
+            .filter(|prop| crate::spacing::is_margin(&prop.name))
+        {
+            if !allowed || !crate::spacing::supported(def) {
+                out.push(Diag::error(prop.name_span,
+                    format!("`{}` is supported only on declared-layout boxes/frames and sequence participants/frames", prop.name)));
+            }
+            if prop.values.iter().any(Value::is_hole) {
+                continue;
+            }
+            let valid = crate::spacing::Margins::parse(&prop.values).is_some()
+                && (prop.name == "margin" || prop.values.len() == 1);
+            if !valid {
+                out.push(Diag::error(
+                    prop.values_span,
+                    format!(
+                        "`{}` needs {} finite nonnegative number(s)",
+                        prop.name,
+                        if prop.name == "margin" {
+                            "one to four"
+                        } else {
+                            "one"
+                        }
+                    ),
+                ));
+            }
+        }
+    };
+    for style in &diagram.styles {
+        validate(&style.props, true);
+    }
+    for node in &diagram.nodes {
+        validate(&node.props_for(def), true);
+    }
+    for group in &diagram.groups {
+        validate(&group.props, !group.activates);
+    }
+    for edge in &diagram.edges {
+        validate(&edge.effective_props(def.edge_slots), false);
+    }
+    for note in &diagram.notes {
+        validate(&note.props, false);
+    }
 }
 
 fn check_styles(diagram: &Diagram, def: &'static props::ArchetypeDef, out: &mut Vec<Diag>) {
@@ -1038,7 +1234,9 @@ fn check_constraint(
                 member.span,
                 format!("`{name}` names `{}` more than once", member.as_str()),
             ));
-        } else if groups.contains_key(member.as_str()) {
+        } else if groups.contains_key(member.as_str())
+            && constraint.kind == ConstraintKind::AlignGroup
+        {
             out.push(Diag::error(
                 member.span,
                 format!(
@@ -1046,7 +1244,7 @@ fn check_constraint(
                     member.as_str()
                 ),
             ));
-        } else if !nodes.contains(member.as_str()) {
+        } else if !nodes.contains(member.as_str()) && !groups.contains_key(member.as_str()) {
             out.push(Diag::error(
                 member.span,
                 format!("`{name}` names unknown node `{}`", member.as_str()),
@@ -2468,6 +2666,17 @@ fn check_bpmn(diagram: &Diagram, out: &mut Vec<Diag>) {
     for (node, style) in diagram.nodes.iter().zip(&styles) {
         let stage = style.stage.as_deref();
         let attach = style.attach.as_deref();
+        if style.label_position.is_some()
+            && !matches!(
+                crate::bpmn::element_of(style),
+                crate::bpmn::Element::Event | crate::bpmn::Element::Gateway
+            )
+        {
+            out.push(Diag::error(
+                node.id.span,
+                "`label-position` is only supported by external BPMN event and gateway captions",
+            ));
+        }
 
         if stage == Some("boundary") && attach.is_none() {
             out.push(Diag::error(
@@ -2516,7 +2725,61 @@ fn check_bpmn(diagram: &Diagram, out: &mut Vec<Diag>) {
     // is the one place where refusing would stop somebody sketching.
     let mut into: HashMap<&str, usize> = HashMap::new();
     let mut outof: HashMap<&str, usize> = HashMap::new();
+    let registry = crate::style::Registry::build(&diagram.styles).ok();
+    if let Some(registry) = &registry {
+        for group in &diagram.groups {
+            if registry
+                .resolve(
+                    crate::style::Style::group_defaults(),
+                    "group",
+                    &group.classes,
+                    &group.props,
+                )
+                .is_ok_and(|style| style.label_position.is_some())
+            {
+                out.push(Diag::error(group.span, "`label-position` is not supported on groups; use `label-offset` for a frame title"));
+            }
+        }
+        for note in &diagram.notes {
+            if registry
+                .resolve(
+                    crate::style::Style::node_defaults(),
+                    "note",
+                    &note.classes,
+                    &note.props,
+                )
+                .is_ok_and(|style| style.label_position.is_some())
+            {
+                out.push(Diag::error(note.span, "`label-position` is only supported by external BPMN event and gateway captions"));
+            }
+        }
+    }
     for edge in &diagram.edges {
+        let flow = registry.as_ref().and_then(|registry| {
+            registry
+                .resolve(
+                    crate::style::Style::edge_defaults(),
+                    "edge",
+                    &edge.classes,
+                    &edge.effective_props(archetype_of(diagram).edge_slots),
+                )
+                .ok()
+        });
+        if flow
+            .as_ref()
+            .is_some_and(|style| style.label_position.is_some())
+        {
+            out.push(Diag::error(
+                edge.span,
+                "`label-position` is not supported on edges; use `label-offset`",
+            ));
+        }
+        if flow
+            .as_ref()
+            .is_some_and(|style| matches!(style.flow.as_deref(), Some("message" | "association")))
+        {
+            continue;
+        }
         *outof.entry(edge.from.as_str()).or_default() += 1;
         *into.entry(edge.to.as_str()).or_default() += 1;
     }
@@ -3492,6 +3755,20 @@ fn check_props_refined(
             out.push(Diag::error(
                 prop.name_span,
                 format!("`{}` needs a value — {}", prop.name, def.syntax),
+            ));
+            continue;
+        }
+        if prop.name == "label-position"
+            && !prop.values.iter().any(Value::is_hole)
+            && (prop.values.len() != 1
+                || !matches!(
+                    prop.values[0].as_word(),
+                    Some("top" | "right" | "bottom" | "left")
+                ))
+        {
+            out.push(Diag::error(
+                prop.values_span,
+                "`label-position` needs one side: top, right, bottom or left",
             ));
             continue;
         }

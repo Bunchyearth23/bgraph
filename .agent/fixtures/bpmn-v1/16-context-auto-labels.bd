@@ -1,0 +1,351 @@
+// Audiospy en BPMN — de la pipeline composée dans le navigateur jusqu'à
+// l'enregistrement relu dans le Player. Quatre participants (navigateur, core,
+// worker, modules) ; les flux pointillés sont les messages qui les traversent
+// (HTTPS, sujets NATS, relais TCP), les flux pleins l'ordre à l'intérieur d'un
+// participant, les pointillés fins les données lues ou écrites.
+//
+// GÉNÉRÉ par audiospy-bpmn.py (grille de colonnes, deux passes) : modifier le
+// script, pas ce fichier.
+type bpmn { title: "Audiospy — déployer, capter, enregistrer, relire" }
+graph { background: #ffffff padding: 40 }
+
+style node   { font: 12 #111827 stroke: #334155 1.2 }
+style edge   { stroke: #475569 1.2 font: 10 #475569 }
+style task   { size: 176 74 fill: #ffffff }
+style data   { size: 176 74 }
+style spacer { stroke: none fill: none size: 1 1 }
+
+group op "Opérateur — SPA Svelte (navigateur)" {
+  padding: 38
+  event op_need "Une source\nà enregistrer" start plain
+  task op_build "Composer la pipeline\nWorkbench (xyflow)" user
+  task op_save "Enregistrer\nPOST /pipelines" send
+  task op_run "Démarrer\nPOST /pipelines/{id}/start" send
+  event op_state "Pipeline Running\n(sondage /pipelines)" intermediate message {  }
+  task op_play "Écouter / regarder\nPlayer · direct HLS" user
+  event op_end "Enregistrement\nrelu" end plain
+  task op_l "" plain .spacer
+  task op_r "" plain .spacer
+  layout {
+    place op_need at (68, 17)
+    place op_build at (210, 0)
+    place op_save at (420, 0)
+    place op_run at (630, 0)
+    place op_state at (2378, 17)
+    place op_play at (2520, 0)
+    place op_end at (2798, 17)
+    place op_l at (0, 0)
+    place op_r at (3955, 0)
+  }
+}
+
+group core "aspy-core — plan de contrôle (:3023 HTTPS · Postgres · hub NATS)" {
+  padding: 22
+  group core_l0 "API et déploiement" {
+    padding: 16
+    event c_save "POST /pipelines" start message {  }
+    task c_persist "Persister\nla pipeline" service
+    event c_saved "Enregistrée" end plain
+    data d_pg "PostgreSQL 18\npipelines · profils" store
+    event c_req "POST /pipelines\n/{id}/start" start message
+    task c_guard "Garde d'accès\n(ASPY_AUTH_MODE)" rule
+    task c_flat "Aplatir les composites\n(aspy_blocks)" service
+    task c_val "Valider le graphe\n(deployment_validator)" rule
+    gateway c_ok "Valide ?" exclusive
+    event c_400 "Refus 4xx\navec les erreurs" end error
+    task c_build "Étapes par worker\narêtes relay:<flux>#<arête>" service
+    task c_pub "Publier Deploy\n(JetStream)" send
+    event c_ack "DeployAck" intermediate message {  }
+    event c_run "Running" end message
+    task core_l0_l "" plain .spacer
+    task core_l0_r "" plain .spacer
+    layout {
+      place c_save at (488, 17)
+      place c_persist at (420, 120)
+      place c_saved at (488, 257)
+      place d_pg at (0, 120)
+      place c_req at (698, 137)
+      place c_guard at (840, 120)
+      place c_flat at (1050, 120)
+      place c_val at (1260, 120)
+      place c_ok at (1534, 133)
+      place c_400 at (1538, 257)
+      place c_build at (1680, 120)
+      place c_pub at (1890, 120)
+      place c_ack at (2168, 137)
+      place c_run at (2378, 137)
+      place core_l0_l at (0, 0)
+      place core_l0_r at (3955, 0)
+    }
+  }
+  group core_l1 "Catalogue et lecture" {
+    padding: 16
+    event c_get "GET /sounds/{id}/stream\nGET /live/{session}/…" start message
+    gateway c_own "Profil lu\nd'ici ?" exclusive
+    task c_local "Lire le profil\n206 + Range" service
+    data d_med3 "Profils de stockage" store
+    task c_proxy "Lire via le worker\ndétenteur" service
+    event c_503 "503\nX-Aspy-Held-By" end error
+    event c_reg "sounds.register" start message {  }
+    task c_ins "Inscrire la ligne sounds\ndate dans [2000, now+1h]" service
+    data d_pg2 "PostgreSQL 18\nsounds" store
+    task core_l1_l "" plain .spacer
+    task core_l1_r "" plain .spacer
+    layout {
+      place c_get at (2588, 17)
+      place c_own at (2794, 13)
+      place c_local at (2940, 0)
+      place d_med3 at (3150, 0)
+      place c_proxy at (2940, 120)
+      place c_503 at (3218, 137)
+      place c_reg at (3638, 137)
+      place c_ins at (3780, 120)
+      place d_pg2 at (3780, 240)
+      place core_l1_l at (0, 0)
+      place core_l1_r at (3955, 0)
+    }
+  }
+  group core_l2 "Politique de stockage — une passe à la fois, toutes les heures" {
+    padding: 16
+    event c_tick "Toutes\nles heures" start timer
+    task c_reco "Reprendre les opérations\nouvertes (au boot)" service
+    task c_tier "Tiering\net rétention" service
+    task c_repl "Réplication\net transcodage" service
+    task c_sweep "Balayer les orphelins\nélaguer sur preuve seule" service
+    data d_med2 "Profils de stockage" store
+    event c_pdone "Passe close" end plain
+    task core_l2_l "" plain .spacer
+    task core_l2_r "" plain .spacer
+    layout {
+      place c_tick at (68, 17)
+      place c_reco at (210, 0)
+      place c_tier at (420, 0)
+      place c_repl at (630, 0)
+      place c_sweep at (840, 0)
+      place d_med2 at (630, 120)
+      place c_pdone at (908, 137)
+      place core_l2_l at (0, 0)
+      place core_l2_r at (3955, 0)
+    }
+  }
+  group core_l3 "Supervision" {
+    padding: 16
+    event c_sync "workers.sync.request" start message {  }
+    event c_hb "workers.heartbeat" start message {  }
+    task c_hbt "État des workers,\nstats et épisodes" service
+    event c_sched "Toutes\nles 60 s" start timer
+    task c_schedt "Planificateur :\nstart / stop par fenêtre" service
+    task c_synct "Renvoyer au worker\nses pipelines (Deploy)" send
+    task core_l3_l "" plain .spacer
+    task core_l3_r "" plain .spacer
+    layout {
+      place c_sync at (488, 137)
+      place c_hb at (698, 17)
+      place c_hbt at (840, 0)
+      place c_sched at (1118, 17)
+      place c_schedt at (1260, 0)
+      place c_synct at (1680, 120)
+      place core_l3_l at (0, 0)
+      place core_l3_r at (3955, 0)
+    }
+  }
+  layout {
+    place core_l0 at (0, 0)
+    place core_l1 at (0, 396)
+    place core_l2 at (0, 776)
+    place core_l3 at (0, 1038)
+  }
+}
+
+group wk "aspy-worker — agent et relais de données (leaf NATS · :3027)" {
+  padding: 22
+  group wk_l0 "Agent" {
+    padding: 16
+    event w_boot "Démarrage\ndu worker" start plain
+    task w_rtl "Numéroter les clés RTL\n(avant NATS)" script
+    task w_syncreq "Demander son état\nworkers.sync.request" send
+    event w_cmd "Deploy ou Stop\nworkers.deploy.{id}" intermediate message {  }
+    task w_ack "Acquitter\nDeployAck" send
+    event w_resync "Toutes\nles 60 s" start timer
+    task w_resynct "Resynchroniser :\nrelancer les étapes mortes" service
+    task w_decl "Déclarer flux et arêtes\nau relais" service
+    task w_spawn "Lancer un processus\npar nœud (groupe)" service
+    task w_relau "Relancer après 1 → 30 s\ndisjoncteur au 8e échec" service
+    event w_hbtick "Périodique" start timer
+    task w_hb "Battement + stats\nworkers.heartbeat" send
+    task wk_l0_l "" plain .spacer
+    task wk_l0_r "" plain .spacer
+    layout {
+      place w_boot at (68, 17)
+      place w_rtl at (210, 0)
+      place w_syncreq at (420, 0)
+      place w_cmd at (1958, 17)
+      place w_ack at (2100, 0)
+      place w_resync at (68, 137)
+      place w_resynct at (210, 120)
+      place w_decl at (1890, 120)
+      place w_spawn at (2100, 120)
+      place w_relau at (2310, 240)
+      place w_hbtick at (488, 257)
+      place w_hb at (630, 240)
+      place wk_l0_l at (0, 0)
+      place wk_l0_r at (3955, 0)
+    }
+  }
+  group wk_l1 "Relais de données — un par worker" {
+    padding: 16
+    task r_pub "Recevoir les trames\nd'une sortie (pub)" receive
+    data r_ring "Anneau par sortie\nborné · numéroté" store
+    task r_sub "Servir chaque arête\nà son curseur (sub)" send
+    task r_ack "Avancer le curseur\nà l'acquittement" receive
+    task r_fetch "Arête vers un autre worker :\nfetch entre relais" service
+    task wk_l1_l "" plain .spacer
+    task wk_l1_r "" plain .spacer
+    layout {
+      place r_pub at (2310, 0)
+      place r_ring at (2520, 0)
+      place r_sub at (2730, 0)
+      place r_ack at (2940, 0)
+      place r_fetch at (2520, 120)
+      place wk_l1_l at (0, 0)
+      place wk_l1_r at (3955, 0)
+    }
+  }
+  layout {
+    place wk_l0 at (0, 0)
+    place wk_l1 at (0, 382)
+  }
+}
+
+group mod "Modules — un processus par nœud de la pipeline" {
+  padding: 38
+  task m_cap "Capture\nnetwork · rtlsdr · alsa\ndvb · decklink · v4l2" service
+  task m_dsp "Traitement\nselector · fmdemod\nresampler · agc" service
+  task m_enc "Encodeur\nMP3 · WAV · FLAC" service
+  event m_end "STREAM_END\nfichier fermé" intermediate signal
+  task m_sto "file_sink\nécrire, téléverser" service
+  task m_reg "Inscrire le son\nsounds.register" send
+  event m_done "Fichier\ncatalogué" end plain
+  task m_vid "video_encoder\ncoupe sur image clé" service
+  task m_hls "hls_sink direct\nfenêtre glissante" service
+  data d_spool "Spool encodeur\nlast-emitted" object
+  task m_ship "Livrer le fichier ouvert\nsortie 143" service
+  data d_media "Profils de stockage\nlocal · FTP · SFTP · S3 · SMB" store
+  task mod_l "" plain .spacer
+  task mod_r "" plain .spacer
+  layout {
+    place m_cap at (2100, 0)
+    place m_dsp at (2730, 0)
+    place m_enc at (2940, 0)
+    place m_end at (3218, 17)
+    place m_sto at (3360, 0)
+    place m_reg at (3570, 0)
+    place m_done at (3848, 17)
+    place m_vid at (2100, 120)
+    place m_hls at (2310, 120)
+    place d_spool at (2730, 120)
+    place m_ship at (2940, 120)
+    place d_media at (3570, 120)
+    place mod_l at (0, 0)
+    place mod_r at (3955, 0)
+  }
+}
+
+event m_term "SIGTERM" boundary signal { attach: m_enc }
+event w_died "Module mort" boundary error { attach: w_spawn }
+
+layout {
+  place op at (0, 0)
+  place core at (0, 252)
+  place wk at (0, 1664)
+  place mod at (0, 2418)
+}
+
+// ── Navigateur
+op_need -> op_build
+op_build -> op_save
+op_save -> op_run
+op_run -> op_state
+op_state -> op_play
+op_play -> op_end
+
+// ── Core : API et déploiement
+c_save -> c_persist
+c_persist -> c_saved
+c_req -> c_guard
+c_guard -> c_flat
+c_flat -> c_val
+c_val -> c_ok
+c_ok -> c_build "oui"
+c_ok -> c_400 "non" default
+c_build -> c_pub
+c_pub -> c_ack
+c_ack -> c_run
+
+// ── Core : catalogue, politique, supervision
+c_get -> c_own
+c_own -> c_local "oui"
+c_own -> c_proxy "non" default
+c_proxy -> c_503 "worker absent"
+c_reg -> c_ins
+c_tick -> c_reco
+c_reco -> c_tier
+c_tier -> c_repl
+c_repl -> c_sweep
+c_sweep -> c_pdone
+c_hb -> c_hbt
+c_sync -> c_synct
+c_sched -> c_schedt
+c_schedt -> c_flat "start / stop"
+
+// ── Worker
+w_boot -> w_rtl
+w_rtl -> w_syncreq
+w_syncreq -> w_cmd
+w_cmd -> w_decl
+w_decl -> w_spawn
+w_spawn -> w_ack
+w_died -> w_relau { from: bottom to: left } via (below w_died gap 63)
+w_resync -> w_resynct
+w_hbtick -> w_hb
+r_pub -> r_ring
+r_ring -> r_sub
+r_sub -> r_ack
+r_ring -> r_fetch
+
+// ── Modules
+m_cap -> m_dsp "via le relais"
+m_dsp -> m_enc
+m_enc -> m_end "rotation"
+m_end -> m_sto
+m_sto -> m_reg { from: right to: left }
+m_reg -> m_done
+m_term -> m_ship
+m_ship -> m_sto
+m_cap -> m_vid "média opaque"
+m_cap -> m_hls
+
+// ── Messages entre participants (traits verticaux : même colonne)
+op_save -> c_save "HTTPS" message
+op_run -> c_req "HTTPS" message
+c_run -> op_state "statut" message
+op_play -> c_get "Range" message
+c_pub -> w_cmd "workers.deploy.{id}" message
+w_ack -> c_ack "workers.deploy.ack" message
+c_synct -> w_cmd message
+w_syncreq -> c_sync message
+w_hb -> c_hb message
+w_spawn -> m_cap "exec relay:…" message { from: bottom 1 of 4 to: top 1 of 4 }
+m_cap -> r_pub "trames" message
+r_sub -> m_dsp "trames" message
+m_enc -> r_ack "acquittement" message
+m_reg -> c_reg message
+
+// ── Données
+c_persist -> d_pg association
+c_ins -> d_pg2 association
+c_local -> d_med3 association
+c_tier -> d_med2 association { from: bottom }
+c_sweep -> d_med2 association { from: bottom }
+m_sto -> d_media association { from: bottom }
+m_enc -> d_spool association

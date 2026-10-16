@@ -17,6 +17,7 @@ pub(super) struct Context {
     pub(super) in_string: bool,
     pub(super) in_comment: bool,
     pub(super) block: Option<Block>,
+    pub(super) block_start: Option<usize>,
     pub(super) statement_start: usize,
     pub(super) scope_start: Option<usize>,
 }
@@ -99,6 +100,7 @@ impl Context {
             in_string,
             in_comment,
             block,
+            block_start: stack.last().map(|(brace, _)| *brace),
             statement_start,
             scope_start,
         }

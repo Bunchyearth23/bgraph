@@ -242,6 +242,7 @@ struct Lowering<'plan, 'diagram, 'out> {
     diagram: &'diagram Diagram,
     plan: &'plan PlacementPlan<'diagram>,
     variables: &'plan [Variables],
+    margins: &'plan [crate::spacing::Margins],
     default_gap: f64,
     grid_pitch: (f64, f64),
     out: &'out mut Vec<SourcedConstraint>,
@@ -297,15 +298,19 @@ fn lower_size(
     span: Span,
     intrinsic: (f64, f64),
     resolved: (f64, f64),
+    flexible: [bool; 2],
     out: &mut Vec<SourcedConstraint>,
 ) {
-    for (variable, axis, natural, final_size) in [
+    for (index, (variable, axis, natural, final_size)) in [
         (vars.w, Axis::Width, intrinsic.0, resolved.0),
         (vars.h, Axis::Height, intrinsic.1, resolved.1),
-    ] {
+    ]
+    .into_iter()
+    .enumerate()
+    {
         push(
             out,
-            if natural == final_size {
+            if natural == final_size && !flexible[index] {
                 variable | EQ(Strength::REQUIRED) | natural
             } else {
                 variable | GE(Strength::REQUIRED) | natural
@@ -327,7 +332,7 @@ fn lower_size_equalities(
             ConstraintKind::SameHeight => Axis::Height,
             ConstraintKind::AlignGroup => continue,
         };
-        let members = plan.constraint_members(item);
+        let members = plan.constraint_indices(item);
         let Some((&lead, rest)) = members.split_first() else {
             continue;
         };
@@ -370,11 +375,14 @@ fn lower_relative(
     let anchor = entity_index(anchor, lowering.diagram);
     let target = lowering.variables[anchor];
     let gap = gap.unwrap_or(lowering.default_gap);
-    let gap_x = if matches!(dir, RelDir::RightOf | RelDir::LeftOf) {
+    let mut gap_x = if matches!(dir, RelDir::RightOf | RelDir::LeftOf) {
         gap * lowering.grid_pitch.0
     } else {
         gap * lowering.grid_pitch.1
     };
+    let own = lowering.margins[source.node];
+    let other = lowering.margins[anchor];
+    gap_x += own.gap_to(other, dir);
     let align = alignment.declared.unwrap_or(Align::Center);
 
     match dir {

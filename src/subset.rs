@@ -256,7 +256,7 @@ fn glyph_range(
 ///
 /// Format 4 and format 12 only — the two a modern font actually uses for
 /// Unicode. A font offering neither is one this leaves alone.
-fn glyph_of(font: &[u8], cmap: usize, c: char) -> Option<u16> {
+pub(crate) fn glyph_of(font: &[u8], cmap: usize, c: char) -> Option<u16> {
     let tables = be16(font, cmap + 2)? as usize;
     let mut best: Option<usize> = None;
     for i in 0..tables {

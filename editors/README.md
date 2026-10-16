@@ -49,7 +49,7 @@ Packaged. Build the extension and install it:
 ```sh
 cd editors/vscode
 ./package.sh                    # or ./package.sh --no-server for highlighting only
-code --install-extension bgraph-0.1.0.vsix
+code --install-extension bgraph-1.0.0.vsix
 ```
 
 ### Diagrams in the Markdown preview

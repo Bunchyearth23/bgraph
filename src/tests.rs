@@ -1674,18 +1674,14 @@ fn a_routed_path_is_the_same_every_time_it_is_asked_for() {
 
 #[test]
 fn a_route_that_cannot_be_found_keeps_the_elbow_and_says_so() {
-    // The router declines past `MAX_OBSTACLES`, because the grid grows as the
-    // square of the box count and is built once per edge. What matters is what
-    // happens *then*: the old elbow is kept and `check::after_layout` reports
-    // the crossing, so the drawing admits it is wrong. Dropping the edge would
-    // be a drawing that lies, which is the worse of the two.
+    // A target enclosed by an unrelated box has no clear route, even when the
+    // diagram is large. The visible fallback must still report the crossing.
     let mut source = String::from("node a \"A\"\nlayout {\n  place a at (0, 0)\n}\n");
     source.push_str(
-        "node mid \"in the way\" { size: 120 60 }\nlayout {\n  place mid at (200, 0)\n}\n",
+        "node mid \"in the way\" { size: 420 200 }\nlayout {\n  place mid at (300, -80)\n}\n",
     );
     source.push_str("node b \"B\"\nlayout {\n  place b at (500, 0)\n}\n");
-    // Well clear of the line from `a` to `b`, so the only box in the way is
-    // `mid` and the count is the only thing that changed.
+    // Unrelated boxes must not be the reason avoidance declines.
     for i in 0..70 {
         source.push_str(&format!(
             "node f{i} \"f\"\nlayout {{ place f{i} at (0, {}) }}\n",
@@ -1704,7 +1700,7 @@ fn a_route_that_cannot_be_found_keeps_the_elbow_and_says_so() {
     assert!(
         found
             .iter()
-            .any(|message| message.contains("router: straight"))
+            .any(|message| message.contains("ports and waypoints"))
     );
 }
 

@@ -87,7 +87,7 @@ impl Server {
             let items: Vec<&'static props::PropDef> = props::archetype(archetype)
                 .map(props::item_table)
                 .unwrap_or_default();
-            let table: Vec<&'static props::PropDef> = match block {
+            let mut table: Vec<&'static props::PropDef> = match block {
                 Block::Graph => props::GRAPH_PROPS.iter().collect(),
                 Block::Type => props::archetype(archetype)
                     .map_or(&[][..], |a| a.props)
@@ -95,6 +95,18 @@ impl Server {
                     .collect(),
                 _ => items,
             };
+            let external_caption = match block {
+                Block::Node => ctx.block_start.is_some_and(|brace| {
+                    let start = Context::at(text, brace).statement_start;
+                    matches!(
+                        text[start..brace].split_whitespace().next(),
+                        Some("event" | "gateway")
+                    )
+                }),
+                Block::Style(None | Some("event" | "gateway")) => true,
+                _ => false,
+            };
+            table.retain(|prop| prop.name != "label-position" || external_caption);
 
             // `name: <here>` — complete the value, if the property enumerates.
             if let Some(colon) = line.rfind(':') {
@@ -435,22 +447,22 @@ fn layout_items(text: &str, line: &str, offset: usize, archetype: &str) -> Vec<V
                 "equal-width",
                 14,
                 "equal-width <members…>",
-                "Make declared nodes as wide as their widest member.",
+                "Give nodes or groups a common width containing their contents.",
                 &format!(
                     "equal-width {} {}$0",
-                    choices(1, "first", true, 0),
-                    choices(2, "other", true, 1)
+                    choices(1, "first", false, 0),
+                    choices(2, "other", false, 1)
                 ),
             ),
             snippet(
                 "equal-height",
                 14,
                 "equal-height <members…>",
-                "Make declared nodes as tall as their tallest member.",
+                "Give nodes or groups a common height containing their contents.",
                 &format!(
                     "equal-height {} {}$0",
-                    choices(1, "first", true, 0),
-                    choices(2, "other", true, 1)
+                    choices(1, "first", false, 0),
+                    choices(2, "other", false, 1)
                 ),
             ),
             snippet(
@@ -566,7 +578,10 @@ fn layout_items(text: &str, line: &str, offset: usize, archetype: &str) -> Vec<V
             .collect(),
         "row" | "column" if words.contains(&"gap") => Vec::new(),
         "align" | "equal-width" | "equal-height" | "row" | "column" => {
-            let mut out = entities(true, &words[1..slot]);
+            let mut out = entities(
+                matches!(words[0], "align" | "row" | "column"),
+                &words[1..slot],
+            );
             if matches!(words[0], "row" | "column") && slot >= 3 {
                 out.push(gap());
             }

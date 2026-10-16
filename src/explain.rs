@@ -64,6 +64,7 @@ pub fn explain(diagram: &Diagram, layout: &Layout, id: &str) -> Result<String> {
             round(placed.rect.w),
             round(placed.rect.h)
         ));
+        out.push_str(&margin_details(&placed.style));
     } else {
         out.push_str(&format!("{id}\n"));
     }
@@ -299,6 +300,23 @@ fn paint(diagram: &Diagram, node: &crate::ast::NodeDecl, id: &str) -> Result<Str
         .iter()
         .map(|(field, what)| format!("  {field:<12}{what}\n"))
         .collect())
+}
+
+fn margin_details(style: &Style) -> String {
+    let margin = crate::spacing::Margins::of(style);
+    if [margin.top, margin.right, margin.bottom, margin.left]
+        .iter()
+        .all(|value| *value == 0.0)
+    {
+        return String::new();
+    }
+    format!(
+        "  external margin (top/right/bottom/left): {} {} {} {}\n",
+        round(margin.top),
+        round(margin.right),
+        round(margin.bottom),
+        round(margin.left)
+    )
 }
 
 fn explain_group(diagram: &Diagram, layout: &Layout, index: usize) -> Result<String> {

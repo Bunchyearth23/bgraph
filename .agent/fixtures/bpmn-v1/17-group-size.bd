@@ -1,0 +1,13 @@
+type bpmn
+style fixed { size: 600 260 }
+group first "Classe" .fixed {
+ task a "A" service
+}
+group second "Inline" {
+ size: 600 260
+ task b "B" service
+}
+layout {
+ place first at (0, 0)
+ place second below first gap 20
+}

@@ -466,7 +466,80 @@ pub(crate) fn wrap(text: &str, columns: usize) -> Vec<String> {
     lines
 }
 
+fn wrap_width(lines: &[String], width: f64, font: f64) -> Vec<String> {
+    let mut out = Vec::new();
+    for line in lines {
+        if advance(line, font) <= width {
+            out.push(line.clone());
+            continue;
+        }
+        let mut current = String::new();
+        // French closing punctuation and nonbreaking spaces travel with the
+        // preceding word, even when a fixed box forces wrapping.
+        let mut units: Vec<String> = Vec::new();
+        let mut unit = String::new();
+        for ch in line.chars() {
+            if ch.is_whitespace() && ch != '\u{a0}' && ch != '\u{202f}' {
+                if !unit.is_empty() {
+                    units.push(std::mem::take(&mut unit));
+                }
+            } else {
+                unit.push(ch);
+            }
+        }
+        if !unit.is_empty() {
+            units.push(unit);
+        }
+        let mut words: Vec<String> = Vec::new();
+        for unit in units {
+            if unit.starts_with([':', ';', '!', '?', '»']) && !words.is_empty() {
+                let last = words.last_mut().unwrap();
+                last.push(' ');
+                last.push_str(&unit);
+            } else {
+                words.push(unit);
+            }
+        }
+        for word in &words {
+            let joined = if current.is_empty() {
+                word.to_string()
+            } else {
+                format!("{current} {word}")
+            };
+            if advance(&joined, font) <= width {
+                current = joined;
+                continue;
+            }
+            if !current.is_empty() {
+                out.push(std::mem::take(&mut current));
+            }
+            for ch in word.chars() {
+                if !current.is_empty()
+                    && advance(&format!("{current}{ch}"), font) > width
+                    && !matches!(ch, ':' | ';' | '!' | '?' | '»' | '\u{a0}' | '\u{202f}')
+                    && !current.ends_with(['\u{a0}', '\u{202f}', ' '])
+                {
+                    out.push(std::mem::take(&mut current));
+                }
+                current.push(ch);
+            }
+        }
+        out.push(current);
+    }
+    out
+}
+
 pub fn solve(diagram: &Diagram) -> Result<Layout> {
+    solve_with_captions(diagram, &[], 3)
+}
+
+fn solve_with_captions(
+    diagram: &Diagram,
+    caption_offsets: &[(f64, f64)],
+    refinements: u8,
+) -> Result<Layout> {
+    #[cfg(not(feature = "bpmn"))]
+    let _ = (caption_offsets, refinements);
     // `check` is the authority on what is valid; the bails below only guard
     // invariants it has already established.
     if let Some(diag) = crate::check::first_error(diagram) {
@@ -516,6 +589,8 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     // The label of a shape that cannot hold one, kept for the pass that draws
     // it underneath. One entry per node, so the two stay in step.
     let mut captions: Vec<Option<String>> = Vec::with_capacity(diagram.nodes.len());
+    #[cfg(feature = "bpmn")]
+    let mut pinned_captions = Vec::with_capacity(diagram.nodes.len());
 
     let item = crate::check::archetype_of(diagram);
     let machine = item.name == "state";
@@ -687,6 +762,13 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         #[cfg(not(feature = "bpmn"))]
         let marked = false;
 
+        #[cfg(feature = "bpmn")]
+        {
+            pinned_captions.push(style.label_offset.is_some() || style.label_position.is_some());
+            if outside && style.label_offset.is_none() {
+                style.label_offset = caption_offsets.get(styles.len()).copied();
+            }
+        }
         let mut lines: Vec<String> = if mark || outside {
             captions.push(node.label.clone());
             Vec::new()
@@ -699,6 +781,16 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
                 .map(|l| l.trim().to_string())
                 .collect()
         };
+        if !outside
+            && !architecture
+            && !compartments
+            && let Some(width) = style.width
+        {
+            let font = style.font_size.unwrap_or(14.0);
+            let pad = style.padding.unwrap_or(14.0);
+            let allowance = shape_allowance(style.shape, width, 44.0).0 - width;
+            lines = wrap_width(&lines, (width - pad * 2.0 - allowance).max(1.0), font);
+        }
 
         // The address goes on its own line under the name, and the box is
         // sized from it like any other line — declared and not drawn would be
@@ -778,10 +870,26 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         .iter()
         .zip(sizes.iter())
         .zip(styles.iter())
-        .map(|((caption, (w, _)), style)| {
+        .map(|((caption, (w, h)), style)| {
             let Some(text) = caption else {
                 return (0.0, 0.0, 0.0, 0.0);
             };
+            #[cfg(feature = "bpmn")]
+            if process {
+                let ext = crate::labels::caption_overhang(
+                    Rect {
+                        x: 0.0,
+                        y: 0.0,
+                        w: *w,
+                        h: *h,
+                    },
+                    text,
+                    style,
+                );
+                return (ext.left, ext.top, ext.right, ext.bottom);
+            }
+            #[cfg(not(feature = "bpmn"))]
+            let _ = h;
             let size = style.font_size.unwrap_or(14.0) * 0.85;
             let lines: Vec<String> = text.split('\n').map(|l| l.trim().to_string()).collect();
             let side = ((text_width(&lines, size) - w) / 2.0).max(0.0);
@@ -1004,7 +1112,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         });
     }
 
-    let groups = diagram
+    let mut groups = diagram
         .groups
         .iter()
         .enumerate()
@@ -1029,6 +1137,15 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
             })
         })
         .collect::<Result<Vec<_>>>()?;
+    groups.sort_by_key(|group| {
+        let mut depth = 0;
+        let mut entity = index.get(group.id.as_str()).copied();
+        while let Some(parent) = entity.and_then(|entity| placement.owner().get(&entity).copied()) {
+            depth += 1;
+            entity = Some(Entity::Group(parent));
+        }
+        depth
+    });
 
     // A class's members are drawn as their own lines, under a rule that
     // separates them from the name.
@@ -1505,10 +1622,14 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     // A BPMN diagram's marks come last, because every one of them is placed
     // against boxes already placed by the common solver, including boundaries.
     #[cfg(feature = "bpmn")]
+    let mut caption_annotations = 0..0;
+    #[cfg(feature = "bpmn")]
     if process {
         let (marks, labels) = crate::bpmn::decorate(&nodes, &captions);
         polylines.extend(marks);
+        let start = annotations.len();
         annotations.extend(labels);
+        caption_annotations = start..annotations.len();
     }
 
     // `graph { title }` on a genre that draws boxes rather than a chart. The
@@ -1561,6 +1682,19 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     // The same funnel the chart genres go through, for the same reason: a
     // heading can only be placed once the drawing's width is known.
     place_title(&mut out);
+    #[cfg(feature = "bpmn")]
+    if process && refinements > 0 && captions.iter().any(Option::is_some) {
+        let offsets =
+            crate::labels::place_captions(&out, &captions, &pinned_captions, caption_annotations);
+        if offsets.iter().zip(&out.nodes).any(|(offset, node)| {
+            let old = node.style.label_offset.unwrap_or_default();
+            (offset.0 - old.0).abs() > 1e-7 || (offset.1 - old.1).abs() > 1e-7
+        }) {
+            // Feed caption footprints back through the same solver so frames
+            // and relative gaps enclose the text at its chosen position.
+            return solve_with_captions(diagram, &offsets, refinements - 1);
+        }
+    }
     Ok(out)
 }
 
@@ -1824,6 +1958,7 @@ fn place_all(
     overhang: &[(f64, f64, f64, f64)],
     opts: &GraphOpts,
 ) -> Result<Solved> {
+    let margins = crate::spacing::entities(diagram)?;
     let index = plan.index();
     let mut node_rect: Vec<Option<Rect>> = vec![None; diagram.nodes.len()];
     let mut group_rect: Vec<Option<Rect>> = vec![None; diagram.groups.len()];
@@ -1971,9 +2106,15 @@ fn place_all(
                 continue;
             }
 
-            let Some(measure) =
-                measure_frame(diagram, g, &members, &node_rect, &group_rect, overhang)
-            else {
+            let Some(measure) = measure_frame(
+                diagram,
+                g,
+                &members,
+                &node_rect,
+                &group_rect,
+                overhang,
+                &margins,
+            ) else {
                 // An empty group has nothing to enclose; `check` reports it.
                 group_rect[g] = Some(Rect {
                     x: 0.0,
@@ -2082,6 +2223,7 @@ pub(crate) fn measure_frame(
     node_rect: &[Option<Rect>],
     group_rect: &[Option<Rect>],
     overhang: &[(f64, f64, f64, f64)],
+    margins: &[crate::spacing::Margins],
 ) -> Option<FrameMeasure> {
     let rect_of = |entity: Entity| match entity {
         Entity::Node(i) => node_rect[i],
@@ -2089,15 +2231,22 @@ pub(crate) fn measure_frame(
     };
     let inner = bbox(members.iter().filter_map(|member| {
         let rect = rect_of(*member)?;
+        let bpmn = crate::check::archetype_of(diagram).name == "bpmn";
         let (left, top, right, bottom) = match member {
+            Entity::Node(_) if bpmn => (0.0, 0.0, 0.0, 0.0),
             Entity::Node(i) => overhang[*i],
             Entity::Group(_) => (0.0, 0.0, 0.0, 0.0),
         };
+        let index = match member {
+            Entity::Node(i) => *i,
+            Entity::Group(i) => diagram.nodes.len() + i,
+        };
+        let margin = margins.get(index).copied().unwrap_or_default();
         Some(Rect {
-            x: rect.x - left,
-            y: rect.y - top,
-            w: rect.w + left + right,
-            h: rect.h + top + bottom,
+            x: rect.x - left - if bpmn { 0.0 } else { margin.left },
+            y: rect.y - top - if bpmn { 0.0 } else { margin.top },
+            w: rect.w + left + right + if bpmn { 0.0 } else { margin.left } + margin.right,
+            h: rect.h + top + bottom + if bpmn { 0.0 } else { margin.top } + margin.bottom,
         })
     }))?;
     let group = &diagram.groups[group_index];
@@ -2110,12 +2259,13 @@ pub(crate) fn measure_frame(
         .as_deref()
         .map(|label| text_width(&[label.to_string()], 12.0) + padding * 2.0 + 10.0)
         .unwrap_or(0.0);
+    let style = group_style(diagram, group_index);
     Some(FrameMeasure {
         frame: Rect {
             x: inner.x - padding,
             y: inner.y - padding - title,
-            w: (inner.w + padding * 2.0).max(named),
-            h: inner.h + padding * 2.0 + title,
+            w: style.width.unwrap_or((inner.w + padding * 2.0).max(named)),
+            h: style.height.unwrap_or(inner.h + padding * 2.0 + title),
         },
     })
 }
@@ -2217,13 +2367,21 @@ fn bbox(rects: impl Iterator<Item = Rect>) -> Option<Rect> {
 }
 
 pub(crate) fn group_padding(diagram: &Diagram, g: usize) -> f64 {
-    diagram.groups[g]
-        .props
-        .iter()
-        .find(|p| p.name == "padding")
-        .and_then(|p| p.values.first())
-        .and_then(|v| v.as_num())
-        .unwrap_or(18.0)
+    group_style(diagram, g).padding.unwrap_or(18.0)
+}
+
+pub(crate) fn group_style(diagram: &Diagram, g: usize) -> Style {
+    let group = &diagram.groups[g];
+    Registry::build(&diagram.styles)
+        .and_then(|registry| {
+            registry.resolve(
+                Style::group_defaults(),
+                "group",
+                &group.classes,
+                &group.props,
+            )
+        })
+        .unwrap_or_else(|_| Style::group_defaults())
 }
 
 #[cfg(test)]

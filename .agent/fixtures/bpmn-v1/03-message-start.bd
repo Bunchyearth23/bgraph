@@ -1,0 +1,19 @@
+type bpmn { title: "message start" }
+group a "Client" {
+  task send "Envoyer" send
+  layout { place send at (0, 0) }
+}
+group b "Serveur" {
+  event got "Reçu" start message
+  task work "Traiter" service
+  event out "Répondu" end message
+  layout { place got at (0, 0)
+    place work right-of got gap 40
+    place out right-of work gap 40 }
+}
+layout { place a at (0, 0)
+  place b below a gap 60 align left }
+got -> work
+work -> out
+send -> got message
+out -> send message

@@ -25,13 +25,15 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**État enregistré : aucun chantier en construction, planifié ou bloqué;
+**État enregistré : trois chantiers en construction (`W-166`, `W-167`, `W-168`), aucun planifié ou bloqué;
 aucune question ni risque ouvert.** L'objectif « all non blocked W done and
 proven » est atteint pour les sept chantiers de sa portée : `W-153`, `W-156`,
 `W-157`, `W-158`, `W-159`, `W-160` et `W-164` styles. `W-154` et `W-155`
 avaient déjà été clôturés sur instruction utilisateur.
-CI finale `38898281988` entièrement verte au commit `8630085` : 16 jobs,
-714 tests, cinq runners natifs comparés strictement, runtimes et performance.
+CI de validation des chantiers `38898281988` verte au commit `8630085` :
+16 jobs, 714 tests, cinq runners natifs, runtimes et performance.
+Dernière CI `38911975982` également terminée avec succès sur `main`,
+commit `2a556a6` (documentation et corrections LSP incluses).
 Pour reprendre, lire l'entrée du chantier et son risque associé ci-dessous; les travaux
 livrés et les décisions historiques sont conservés dans **Settled**.
 
@@ -47,8 +49,16 @@ Correction LSP demandée le 2026-10-16 : contexte des blocs et portées en saisi
 snippets `layout` numériques, options de placement, aide aux paramètres et
 formatage via le LSP. Compilation et Clippy réussis ; serveur local mis à jour.
 Le source fourni avec `(0, 0)` ne reproduit pas le faux diagnostic annoncé.
-Reste le contrôle interactif après redémarrage du serveur dans Zed.
+Validation interactive du LSP et des snippets confirmée par l'utilisateur
+le 2026-10-16 (« tout est bon pour lsp et snippets »).
 Détail : `.agent/analysis/lsp-editing-20261016.md`.
+
+Alpha du fond clarifié le 2026-10-16 : `graph { background: #ffffff80 }`
+utilise le canal alpha existant (`D-016`), sans nouvelle propriété.
+Guide français, référence générée et aide LSP explicitent `#RRGGBBAA` et
+`#RGBA`. Rendus observés : SVG `fill-opacity="0.5"`, pixel PNG de fond
+RGBA `(255, 255, 255, 128)`, état PDF `/ca 0.502`.
+Exemple local : `/tmp/bgraph-background-alpha.bd`.
 
 ### Questions
 
@@ -66,6 +76,9 @@ deux lignes distinctes dans **Work landed**; aucun id renuméroté.
 
 | id | state | title | notes |
 |---|---|---|---|
+| `W-166` | building | Marges extérieures et cadres de séquence sans chevauchement | `margin` CSS (1–4 valeurs et côtés), cascade, validation/complétion, gaps et conteneurs raccordés. Séquences : cadres/titres/activations et participants espacés avant placement, imbrication prise en compte. Neuf genres déclarés et `sequence` ; autres genres refusés explicitement. Builds, Clippy, MkDocs et rendus SVG/PDF/PNG observés ; galerie régénérée. Restent validation utilisateur et exemples des autres genres concernés ; suites non relancées. `.agent/analysis/margins-20261016.md`. |
+| `W-167` | building | Libellés BPMN et textes des liens sans chevauchement | Légendes d'événements/losanges placées selon les routes/textes ; empreintes incluses dans les gaps/cadres. Liens : évitement des annotations/titres et recherche le long du segment. `label-offset` explicite conservé ; collisions résiduelles signalées. Builds, Clippy, MkDocs et rendus SVG/PDF/PNG observés ; trois sorties de galerie régénérées, CLI/LSP locaux installés. Restent validation utilisateur ; suites/CI non relancées. `.agent/analysis/bpmn-labels-20261016.md`. |
+| `W-168` | building | Rapport utilisateur BPMN : dix corrections pour la 1.0.0 | Ordre parent/enfant, dimensions de groupes et largeur des lanes, diagnostics message, départs de bordure et ports hôtes, via orthogonaux, obstacles >60, ports par type de flux, texte à largeur fixe et étiquettes obstacles. Reproductions originales retrouvées et conservées dans `.agent/fixtures/bpmn-v1/`. Détail et preuves : `.agent/analysis/bpmn-v1-20261016.md`. |
 
 ### Risks
 
@@ -101,6 +114,8 @@ Risques ouverts et résiduels; les entrées indiquent les chantiers associés et
 ### Decisions
 | id | state | date | title | was |
 |---|---|---|---|---|
+| `D-052` | active | 2026-10-16 | **`margin` réserve l'espace extérieur d'une boîte ou d'un cadre**, avec l'ordre CSS haut/droite/bas/gauche et ses formes à 1–4 valeurs. Les marges s'ajoutent au `gap` et aux limites du conteneur, sans déplacer un `at` ni changer un alignement explicite. Cascade par côté ; valeurs finies positives ou nulles, sans `auto` ni fusion CSS. Support explicite des géométries déclarées et des séquences. | demande utilisateur, `W-166` |
+| `D-053` | active | 2026-10-16 | **Les groupes déclarés ont des dimensions effectives et les lanes BPMN remplissent leur pool.** `width`, `height` et `size` sont requis et peuvent entrer en conflit avec le contenu ; les égalités de taille acceptent les groupes. En BPMN, un groupe contenant exclusivement des groupes constitue une pool de lanes : ses enfants remplissent sa largeur intérieure, padding et marges déduits. Le parent est peint en premier. `style node` reste la couche commune des éléments et cadres ; les styles `task`/`group` permettent de les spécialiser. | rapport utilisateur pour la 1.0.0, `W-168` |
 | `D-051` | active | 2026-08-25 | **La grille choisit l’unité de placement.** Sans `graph { grid: ... }`, les positions, gaps et offsets sont exprimés en unités libres; avec une grille, ces mêmes valeurs sont exprimées en cases et converties par le solveur selon les dimensions et les gaps déclarés. Une déclaration explicite ne peut pas être déplacée silencieusement par un arrondi ou un changement de mode. | utilisateur |
 | `D-050` | amended | 2026-08-25 | **La compatibilité de toutes les surfaces est un gate du cœur de placement, et le fork Kasuari est ce cœur.** Le fork couvre natif, `--no-default-features`, wasm et Typst. La première bascule conservait un chemin transitionnel au-delà de 512 entités; W-153 le retire le 2026-10-16 après optimisation du solveur add-only, des dépendances et de la validation. Nœuds, frames et attaches BPMN ont désormais un seul solveur sans seuil. Gate local et CI distante complets verts : cinq runners natifs, 714 tests et performance à `8630085` (`38898281988`), clôturant W-156/W-160. `.agent/analysis/all-w-completion.md`. | `Q-016` |
 | `D-049` | active | 2026-08-24 | **Les collisions sont diagnostiquées, jamais réparées par le render.** Cassowary ne choisit ni l'ordre ni l'axe de séparation entre deux rectangles; l'auteur fournit la relation manquante. Une éventuelle commande `arrange` reste une transformation explicite qui propose du DSL et un diff, entièrement séparée du solveur de rendu. | `Q-015` |

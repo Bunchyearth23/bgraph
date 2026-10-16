@@ -1,0 +1,9 @@
+type bpmn { title: "lane hidden" }
+style node { fill: #ffffff }
+group pool "Pool" {
+  group lane "Lane" {
+    task a "A" service
+    layout { place a at (0, 0) }
+  }
+  layout { place lane at (0, 0) }
+}

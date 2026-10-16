@@ -180,7 +180,11 @@ fn graph_settings(m: &mut String) {
          renderer still paints `#ffffff`, so the live preview and the exported \
          file agree. Write `background: none` (or `transparent`) for a \
          transparent SVG — the preview then shows a checkerboard rather than \
-         pretending.\n",
+         pretending. Alpha also works here: `background: #ffffff80` gives \
+         a white surface at about 50% opacity. The final two hex digits are \
+         `00` for transparent through `ff` for opaque; `#rgba` is the short form. \
+         SVG, PDF and PNG retain the alpha; the live preview shows it over \
+         its checkerboard.\n",
     );
 }
 
@@ -550,6 +554,16 @@ An edge to a group is refused — a frame has no obvious endpoint. Style them
 with `style group { … }` or a `.class`; the default is a dashed border, a
 transparent fill and the label set into the top-left.
 
+Parent frames paint before their children. `style node` is the common layer
+for groups too; `style group { fill: none }` makes frames transparent while
+leaving node fills intact. `width`, `height` and `size` on declared groups are
+required dimensions, with a constraint error when the contents cannot fit.
+`equal-width` and `equal-height` accept both nodes and groups.
+
+In BPMN, a group containing only other groups defines a pool of lanes. Its
+direct child groups fill the pool's inner width, excluding parent padding and
+their own external margins. No invisible spacer nodes are needed.
+
 ## Placement
 
 | Form | Meaning |
@@ -572,6 +586,15 @@ the graph's `flow` direction and `gap`. The first node lands at `(0, 0)`.
 Sizes come from the label plus `padding` unless `size`, `width` or `height`
 says otherwise. The canvas is derived from the content — nothing is ever
 clipped, and negative coordinates are fine.
+Labels wrap to a declared width using measured advances. Fixed heights and
+extremely narrow widths can still overflow; the validator reports those cases.
+
+Orthogonal paths search from their actual ports through every `via`, avoiding
+boxes, external captions and group titles. Boundary-event ports leave away
+from the host and automatic task ports avoid its attached events. Message and
+association ports do not displace BPMN sequence-flow ports. No obstacle-count
+threshold disables avoidance. An impossible route retains a visible fallback
+and a diagnostic. BPMN start/end warnings count sequence flows only.
 
 ## Arrows
 
@@ -623,6 +646,41 @@ The implicit theme is the word written for the item — `style slice { … }` in
 pie, or `style event { … }` for BPMN events — with `style node` and `style edge`
 remaining universal aliases, applied first so the specific name wins where both are declared. `extends` flattens a chain
 child-first. An unknown property or an unknown `.class` is an error.
+
+### External spacing
+
+BPMN event and gateway captions choose a nearby position clear of flows,
+nodes and other labels. Their measured footprints also contribute to relative
+gaps and containing frames. Explicit `at` coordinates and alignments still
+refer to visible shapes. A declared `label-offset` pins the caption.
+`label-position: top|right|bottom|left` pins the side of an external BPMN
+event or gateway caption; `label-offset` then adjusts that position. Other
+elements reject `label-position` rather than ignoring it.
+Edge labels also avoid annotations and group titles and can slide along
+their segment. Avoidance is bounded; remaining collisions produce diagnostics
+rather than silently moving declared nodes.
+
+`margin` reserves space outside a box or frame, while `padding` reserves space
+inside its outline. It follows CSS side order:
+
+```
+margin: 16            // all sides
+margin: 8 16         // vertical, horizontal
+margin: 8 16 12      // top, horizontal, bottom
+margin: 8 16 12 20   // top, right, bottom, left
+margin-top: 24       // override one side
+```
+
+The four individual properties participate in the same style cascade as the
+shorthand. Values are finite nonnegative drawing units; `auto` and collapsing
+margins are not supported. Unit suffixes remain advisory: `50%` means 50 drawing
+units, not a percentage of the parent. Adjacent margins add to `gap`.
+Absolute `at` coordinates and explicit alignment still address visible outlines.
+
+Supported by the nine declared-layout genres and by `sequence` participants
+and group frames. Other managed genres reject the property. Sequence frames
+reserve their title band and external margins before scheduling messages, so
+a first frame cannot touch participant headers and nested frames stay separated.
 
 ### Themes, and everything else
 

@@ -134,6 +134,7 @@ pub mod charts;
 pub mod bpmn;
 pub mod examples;
 pub mod fmt;
+mod labels;
 #[allow(missing_docs)]
 pub mod layout;
 mod math;
@@ -152,6 +153,7 @@ pub mod render_pdf;
 pub mod render_png;
 pub mod render_svg;
 pub mod report;
+mod spacing;
 #[allow(missing_docs)]
 pub mod style;
 pub mod subset;

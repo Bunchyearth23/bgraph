@@ -310,6 +310,13 @@ artefact are all drawn as marks: the shape says what the element *is* and the
 mark says which one. A `group` is a pool or a lane. Because the shape carries
 the meaning, the colour is free for whatever you are tracking.
 
+A group whose direct members are all groups defines a pool of lanes: these
+child frames stretch to the pool's inner width. A declared group `width`,
+`height` or `size` is enforced, and an undersized frame is an error. Parents
+paint before children. `style node` is the common layer for groups too;
+use `style task` for task-only sizes or `style group { fill: none }` for
+transparent frames.
+
 A **boundary event** sits on a task rather than in the flow, and says so by
 naming it — `event late "14 days" boundary timer { attach: pay }`. That is
 declared placement like every other: you say which box, and where on it is a
@@ -639,6 +646,8 @@ layout {
 because shrinking to match a narrower neighbour clips the label. They are
 applied *before* placement, so widening a box pushes its neighbours along
 instead of landing on top of them.
+Both size equalities accept groups as well as nodes. Fixed group dimensions
+and content containment remain required constraints.
 
 `align` gives a set one cross-axis coordinate. The **first** name
 decides, not an average: an average moves every box, including the one the
@@ -973,6 +982,7 @@ graph {
   background: #0b1120   // canvas fill (also backs edge labels)
                         // omit it and the surface is #ffffff, explicitly;
                         // `background: none` gives a transparent SVG
+                        // `background: #0b112080` is about 50% opaque
   padding: 40           // margin around the drawing
   gap: 70               // default anchor distance
   flow: right           // right | left | down | up — for unplaced nodes

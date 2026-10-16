@@ -85,7 +85,7 @@ Depuis la racine du dépôt, avec Node/npm, `zip` et la cible Rust wasm :
 ```sh
 rustup target add wasm32-unknown-unknown
 ./editors/vscode/package.sh
-code --install-extension editors/vscode/bgraph-0.1.0.vsix
+code --install-extension editors/vscode/bgraph-1.0.0.vsix
 ```
 
 Adaptez le nom du VSIX à la version produite par le script. Si vous avez

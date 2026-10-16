@@ -166,8 +166,8 @@ impl<'a> PlacementPlan<'a> {
     }
 
     /// Constraints resolve their member names through the same namespace as
-    /// every other placement relation. Validation reports non-node members;
-    /// consumers can therefore skip them without inventing a second error.
+    /// every other placement relation. This projection keeps the node-only
+    /// measuring passes separate from the frame solver's entity indices.
     pub fn constraint_members(&self, constraint: ConstraintRef<'a>) -> Vec<usize> {
         constraint
             .declaration()
@@ -178,6 +178,34 @@ impl<'a> PlacementPlan<'a> {
                 Some(Entity::Group(_)) | None => None,
             })
             .collect()
+    }
+
+    /// Solver indices for both nodes and frames, in the written order.
+    pub(crate) fn constraint_indices(&self, constraint: ConstraintRef<'a>) -> Vec<usize> {
+        constraint
+            .declaration()
+            .members
+            .iter()
+            .filter_map(|member| self.index.get(member.as_str()))
+            .map(|entity| match entity {
+                Entity::Node(node) => *node,
+                Entity::Group(group) => self.diagram.nodes.len() + group,
+            })
+            .collect()
+    }
+
+    /// A BPMN pool containing only groups supplies the width of its lanes.
+    pub(crate) fn lane_pool(&self, group: usize) -> Option<usize> {
+        if self.diagram.archetype.as_ref().map(|kind| kind.as_str()) != Some("bpmn") {
+            return None;
+        }
+        let parent = *self.owner.get(&Entity::Group(group))?;
+        let members = &self.diagram.groups[parent].members;
+        (!members.is_empty()
+            && members
+                .iter()
+                .all(|member| matches!(self.index.get(member.as_str()), Some(Entity::Group(_)))))
+        .then_some(parent)
     }
 
     pub fn constraints(&self) -> impl Iterator<Item = ConstraintRef<'a>> + '_ {

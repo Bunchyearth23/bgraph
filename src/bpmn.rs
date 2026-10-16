@@ -249,13 +249,13 @@ pub fn decorate(
         }
 
         if let Some(caption) = captions.get(i).and_then(|c| c.clone()) {
-            let (dx, dy) = s.label_offset.unwrap_or((0.0, 0.0));
             let size = s.font_size.unwrap_or(14.0) * 0.85;
+            let bounds = crate::labels::caption_rect(r, &caption, s);
             for (line, part) in caption.split('\n').enumerate() {
                 text.push(Annotation {
                     text: part.trim().to_string(),
-                    x: r.cx() + dx,
-                    y: r.bottom() + 6.0 + size + line as f64 * size * 1.3 + dy,
+                    x: bounds.cx(),
+                    y: bounds.y + 3.0 + size * 0.6 + line as f64 * size * 1.3,
                     anchor: Anchor::Middle,
                     size,
                     color: s.font_color.clone().unwrap_or_else(|| "#1f2937".into()),

@@ -1,0 +1,2 @@
+type bpmn { title: "e" }
+task s "" plain { size: 1 1 stroke: none fill: none }

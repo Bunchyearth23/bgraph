@@ -1,0 +1,18 @@
+type bpmn
+style event { label-position: right }
+event got "Message reçu" start message
+task sender "Client"
+gateway decision "Choisir" exclusive { label-position: top }
+event accepted "Accepté" end message
+event refused "Refusé" end error
+layout {
+ place got at (0, 0)
+ place sender below got gap 80
+ place decision right-of got gap 150
+ place accepted right-of decision gap 100
+ place refused below accepted gap 80
+}
+sender -> got message
+got -> decision
+decision -> accepted "oui"
+decision -> refused "non"

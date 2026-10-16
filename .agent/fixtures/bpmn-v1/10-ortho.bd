@@ -1,0 +1,8 @@
+type bpmn { title: "ortho" }
+task a "A" service
+task m "Milieu" service
+task b "B" service
+layout { place a at (0, 0)
+  place m at (200, 0)
+  place b at (400, 0) }
+a -> b

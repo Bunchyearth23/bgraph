@@ -54,6 +54,58 @@ Les formes usuelles sont `rect`, `stadium`, `ellipse`, `diamond`,
 `hexagon` et `cylinder`. Le routage `ortho` cherche un passage à angles droits
 autour des boîtes ; `straight` trace un lien direct.
 
+## Marges extérieures
+
+`padding` réserve de l'espace **dans** la boîte. `margin` réserve de l'espace
+**autour** de la boîte ou du cadre, avec l'ordre des côtés de CSS :
+
+```text
+margin: 16
+margin: 8 16
+margin: 8 16 12
+margin: 8 16 12 20
+margin-top: 24
+```
+
+Ces formes correspondent à : tous les côtés ; vertical / horizontal ; haut /
+horizontal / bas ; haut / droite / bas / gauche. Les côtés individuels
+(`margin-top`, `margin-right`, `margin-bottom`, `margin-left`) se combinent
+avec les styles, `extends` et les propriétés écrites sur l'élément.
+
+```bgraph
+style node { margin: 8 16 }
+node api "API"
+node db "Base"
+layout {
+  place api at (0, 0)
+  place db right-of api gap 40
+}
+api -> db
+```
+
+Ici, l'espace entre les bords vaut **72** : 16 de marge à droite de `api`,
+40 de `gap`, puis 16 à gauche de `db`. Les dimensions visibles des boîtes
+ne changent pas. Un groupe englobe aussi les marges de ses enfants.
+Les coordonnées absolues et les alignements explicites restent attachés aux
+bords visibles ; une marge ne déplace pas un `at` imposé.
+
+Pour une séquence :
+
+```text
+style participant { margin-bottom: 12 }
+style group { margin: 16 8 }
+```
+
+Le calcul réserve la place des titres de cadres, des marges et des messages
+avant de dessiner les lignes de vie. Cela évite qu'un premier cadre touche
+les participants et garde les cadres imbriqués séparés.
+
+Les marges sont disponibles dans les neuf genres à placement déclaré et
+dans `sequence`. Les autres genres les refusent explicitement. Les valeurs
+sont des distances finies positives ou nulles ; `auto`, les valeurs négatives
+et la fusion des marges CSS ne sont pas pris en charge. Les suffixes d'unité
+restent indicatifs : `50%` vaut 50 unités, sans calcul de pourcentage relatif.
+
 ## Appliquer un thème
 
 ```sh
@@ -71,6 +123,27 @@ Sans thème ni fond déclaré, le fond est blanc. Pour exporter un fond transpar
 ```text
 graph { background: none }
 ```
+
+Pour un fond partiellement transparent, ajoutez l'alpha à la couleur :
+
+```bgraph
+graph { background: #ffffff80 }
+```
+
+Le format est `#RRGGBBAA` : les deux derniers chiffres contrôlent l'opacité
+du fond, indépendamment des formes et des textes.
+
+| Alpha | Opacité approximative |
+|---|---|
+| `00` | 0 % — transparent |
+| `40` | 25 % |
+| `80` | 50 % |
+| `bf` | 75 % |
+| `ff` | 100 % — opaque |
+
+Cela fonctionne dans les exports SVG, PDF et PNG. La preview affiche un damier
+derrière le fond pour rendre sa transparence visible. Le format court `#RGBA`
+est également accepté, par exemple `#fff8` (environ 53 % d'opacité).
 
 ## Partager une palette
 

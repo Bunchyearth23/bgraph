@@ -1,0 +1,6 @@
+type bpmn { title: "group width" }
+group pool "Pool" {
+  width: 600
+  task a "A" service
+  layout { place a at (0, 0) }
+}

@@ -20,10 +20,10 @@ wave fabdd2fc4a1ac449
 sankey b5e032e5c047e1c0
 bar b1d352fdefe09510
 xy e8c0122d8f484331
-sequence fa2d26de689a1770
+sequence 469aac8612de831d
 gantt 78c33f8be421a4cd
 timeline eff03215861c92e2
-block 5c1b971350bb8d08
+block 065e04b17c38e785
 er 8c10ed9d59ea1bac
 requirements 47bb8cfdc0bd99b4
 class 98315938259a2f98
@@ -38,5 +38,5 @@ gitgraph 7d2b025cd7ade74b
 orgchart 03e000f0f4679aa9
 mindmap ac0e41d0b2167c31
 treeview 48025b9dca170d38
-state 735c9941cc0fa050
-bpmn d22bc417f7898e14
+state 5529e732304f06f8
+bpmn f56404a47bfd514d

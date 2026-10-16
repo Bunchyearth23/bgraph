@@ -1,0 +1,5 @@
+type bpmn { title: "Opérateur — déployer" }
+group p "Équipe" {
+  task a "Démarrer" user
+  layout { place a at (0, 0) }
+}

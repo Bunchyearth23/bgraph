@@ -1,0 +1,9 @@
+type bpmn { title: "lane offset" }
+group p "P" {
+  group l1 "L1" { task a "A" service
+    layout { place a at (0, 0) } }
+  group l2 "L2" { task b "B" service
+    layout { place b at (420, 0) } }
+  layout { place l1 at (0, 0)
+    place l2 at (0, 140) }
+}

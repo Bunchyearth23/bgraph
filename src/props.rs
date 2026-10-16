@@ -359,7 +359,7 @@ pub const PROPS: &[PropDef] = &[
         ctx: Ctx::Node,
         words: &[],
         syntax: "size: <width> <height>",
-        doc: "Fixed size. Without it the box is sized from the label and `padding`.",
+        doc: "Fixed size of a node or declared group. Without it, bounds follow the label or contents and padding. A group cannot be smaller than its contents.",
     },
     PropDef {
         name: "width",
@@ -367,7 +367,7 @@ pub const PROPS: &[PropDef] = &[
         ctx: Ctx::Node,
         words: &[],
         syntax: "width: <number>",
-        doc: "Fixed width; the height still follows the label.",
+        doc: "Fixed width of a node or declared group. Node labels wrap to the available width; height follows the resulting lines unless fixed too.",
     },
     PropDef {
         name: "height",
@@ -384,6 +384,46 @@ pub const PROPS: &[PropDef] = &[
         words: &[],
         syntax: "padding: <number>",
         doc: "Inset between the label and the outline; drives the auto-size.",
+    },
+    PropDef {
+        name: "margin",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "margin: <all> | <vertical> <horizontal> | <top> <horizontal> <bottom> | <top> <right> <bottom> <left>",
+        doc: "External spacing, in drawing units, with CSS side order. Nonnegative numbers only; no auto or margin collapsing. Supported by declared-layout boxes/frames and sequence participants/frames. Margins add to relative gaps and container bounds; absolute coordinates and explicit alignments still address the visible outline.",
+    },
+    PropDef {
+        name: "margin-top",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "margin-top: <number>",
+        doc: "External space above a box or frame; overrides this side of margin.",
+    },
+    PropDef {
+        name: "margin-right",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "margin-right: <number>",
+        doc: "External space to the right of a box or frame; overrides this side of margin.",
+    },
+    PropDef {
+        name: "margin-bottom",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "margin-bottom: <number>",
+        doc: "External space below a box or frame; overrides this side of margin.",
+    },
+    PropDef {
+        name: "margin-left",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &[],
+        syntax: "margin-left: <number>",
+        doc: "External space to the left of a box or frame; overrides this side of margin.",
     },
     PropDef {
         name: "font",
@@ -635,7 +675,9 @@ pub const GRAPH_PROPS: &[PropDef] = &[
         ctx: Ctx::Both,
         words: &[],
         syntax: "background: <color>",
-        doc: "Canvas fill. Also backs edge labels so they stay readable.",
+        doc: "Canvas fill, including alpha: `#ffffff80` is about 50% opaque, \
+              `#ffffff00` fully transparent and `#ffffffff` opaque. \
+              `none` or `transparent` removes the fill. Also backs edge labels.",
     },
     PropDef {
         name: "bg",
@@ -691,7 +733,8 @@ pub fn item_table(def: &ArchetypeDef) -> Vec<&'static PropDef> {
         .chain(
             PROPS
                 .iter()
-                .filter(|p| lookup(p.name, def.item_props).is_none()),
+                .filter(|p| lookup(p.name, def.item_props).is_none())
+                .filter(|p| !crate::spacing::is_margin(p.name) || crate::spacing::supported(def)),
         )
         .collect()
 }
@@ -1082,6 +1125,14 @@ pub const BPMN_PROPS: &[PropDef] = &[PropDef {
 }];
 
 pub const BPMN_ITEM_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "label-position",
+        alias: false,
+        ctx: Ctx::Node,
+        words: &["top", "right", "bottom", "left"],
+        syntax: "label-position: <top|right|bottom|left>",
+        doc: "Pin an external BPMN event or gateway caption to this side. Without it, the side is chosen automatically. label-offset adds a manual adjustment.",
+    },
     PropDef {
         name: "kind",
         alias: false,

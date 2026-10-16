@@ -1,0 +1,182 @@
+[
+  {
+    "source": ".agent/fixtures/bpmn-v1/01-lane-hidden.bd",
+    "sha256": "e7dfef8dff60841ac652189712846f7513ed2e21fdc48719bf9d27f6de2810f5",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": ".agent/fixtures/bpmn-v1/01-lane-hidden.bd: no problems found\n",
+    "elapsed_seconds": 0.007
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/02-group-width.bd",
+    "sha256": "8c5d3d9246235af9396215693ba57d3e1dd9da0cd08c576c81cdad91939dfe10",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": ".agent/fixtures/bpmn-v1/02-group-width.bd: no problems found\n",
+    "elapsed_seconds": 0.007
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/03-message-start.bd",
+    "sha256": "50ceaf826b55d1d0c4a2407e47546d7685341c39e66e1064dcec6d650b227a44",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": ".agent/fixtures/bpmn-v1/03-message-start.bd: no problems found\n",
+    "elapsed_seconds": 0.009
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/04-boundary.bd",
+    "sha256": "38113d62b57a009b2cd2bc47aab34621651caabad486817ad098a4804d1c2cfc",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": ".agent/fixtures/bpmn-v1/04-boundary.bd: no problems found\n",
+    "elapsed_seconds": 0.009
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/04b-boundary-from-bottom.bd",
+    "sha256": "d4275e8eefdff365d5dac4d584e18d6e407f69d8829d09fb3cea8d43e143c559",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": ".agent/fixtures/bpmn-v1/04b-boundary-from-bottom.bd: no problems found\n",
+    "elapsed_seconds": 0.021
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/05-via.bd",
+    "sha256": "32a85511e59e504363b8136dc57e3f9cb20f00fef33b8fefd2fb40982c85dce4",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": ".agent/fixtures/bpmn-v1/05-via.bd: no problems found\n",
+    "elapsed_seconds": 0.027
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/06-boundary-in-context.bd",
+    "sha256": "caa0c50fa665dabf17b05e2b8dcdb42fa9dfa739367eb34819327e41afdb35ae",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": "/home/bunchy/Desktop/bgraph/.agent/fixtures/bpmn-v1/06-boundary-in-context.bd:24:3: warning: the caption of `op_state` overlaps a node, a label or a flow — increase the available space, or choose `label-offset`\n/home/bunchy/Desktop/bgraph/.agent/fixtures/bpmn-v1/06-boundary-in-context.bd:58:5: warning: the caption of `c_ack` overlaps a node, a label or a flow — increase the available space, or choose `label-offset`\n",
+    "elapsed_seconds": 0.269
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/07-via-in-context.bd",
+    "sha256": "57f6ceb52631e69c9b128cbcd7e1ba88344ae1fc6a1cfb43f2bb6efa6528bca8",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": "/home/bunchy/Desktop/bgraph/.agent/fixtures/bpmn-v1/07-via-in-context.bd:24:3: warning: the caption of `op_state` overlaps a node, a label or a flow — increase the available space, or choose `label-offset`\n/home/bunchy/Desktop/bgraph/.agent/fixtures/bpmn-v1/07-via-in-context.bd:58:5: warning: the caption of `c_ack` overlaps a node, a label or a flow — increase the available space, or choose `label-offset`\n",
+    "elapsed_seconds": 0.189
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/08-no-wrap.bd",
+    "sha256": "67b1c831b988e0654496ae8714c8b20a05fb909a0fa39a2386c75a4816c3c293",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": ".agent/fixtures/bpmn-v1/08-no-wrap.bd: no problems found\n",
+    "elapsed_seconds": 0.007
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/09-kink-in-context.bd",
+    "sha256": "63a21a532c980b7a7b527aacdcd46fb7d1e1e0abf68fc2f0adddddf9d5a5e93d",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": "/home/bunchy/Desktop/bgraph/.agent/fixtures/bpmn-v1/09-kink-in-context.bd:24:3: warning: the caption of `op_state` overlaps a node, a label or a flow — increase the available space, or choose `label-offset`\n/home/bunchy/Desktop/bgraph/.agent/fixtures/bpmn-v1/09-kink-in-context.bd:58:5: warning: the caption of `c_ack` overlaps a node, a label or a flow — increase the available space, or choose `label-offset`\n",
+    "elapsed_seconds": 0.181
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/09-kink.bd",
+    "sha256": "30eb7bf2b7baca25d91cdf3c071ed518c57cf60a7661c5d43bfe9157f8ce2bd0",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": ".agent/fixtures/bpmn-v1/09-kink.bd: no problems found\n",
+    "elapsed_seconds": 0.007
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/10-ortho-through-box.bd",
+    "sha256": "6b9b72e19d0256eb11b6a031951401b7e5c8d8fc9f9eb7bce9ea56da33e44bd4",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": "/home/bunchy/Desktop/bgraph/.agent/fixtures/bpmn-v1/10-ortho-through-box.bd:24:3: warning: the caption of `op_state` overlaps a node, a label or a flow — increase the available space, or choose `label-offset`\n/home/bunchy/Desktop/bgraph/.agent/fixtures/bpmn-v1/10-ortho-through-box.bd:58:5: warning: the caption of `c_ack` overlaps a node, a label or a flow — increase the available space, or choose `label-offset`\n",
+    "elapsed_seconds": 0.6
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/10-ortho.bd",
+    "sha256": "95ab7a973feb2b7669bce663413d4be598133100c2ad21752ce3c715570f3659",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": ".agent/fixtures/bpmn-v1/10-ortho.bd: no problems found\n",
+    "elapsed_seconds": 0.006
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/11-cross-group.bd",
+    "sha256": "be7803672d05d68007a3b0454669faf8b9a1c0c2958ccbc2dc83e8a1eab95feb",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": ".agent/fixtures/bpmn-v1/11-cross-group.bd: no problems found\n",
+    "elapsed_seconds": 0.007
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/12-lanes.bd",
+    "sha256": "7ac19bc07f5e041e3c04f0c66401b11bb3240eaf6b3a9f7eef9b2fd686ca2671",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": ".agent/fixtures/bpmn-v1/12-lanes.bd: no problems found\n",
+    "elapsed_seconds": 0.007
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/13-mixed-equality.bd",
+    "sha256": "8f9d464e944c37dc6e718ef9cb0c4c8a108862893067086ff1f056530fcfe08e",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": ".agent/fixtures/bpmn-v1/13-mixed-equality.bd: no problems found\n",
+    "elapsed_seconds": 0.006
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/14-fixed-height.bd",
+    "sha256": "634382de8612072bb7b78a20d4e1203487bbd2bc3254571432a52a5663e2db72",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": "/home/bunchy/Desktop/bgraph/.agent/fixtures/bpmn-v1/14-fixed-height.bd:2:1: warning: the text of `a` exceeds its fixed box — increase `width` or `height`, or shorten the label\n",
+    "elapsed_seconds": 0.006
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/15-label-position.bd",
+    "sha256": "b8e52090866c510aba7893f5d2eaf1551838da135bd3f7730f49ab14da39d5c2",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": "/home/bunchy/Desktop/bgraph/.agent/fixtures/bpmn-v1/15-label-position.bd:5:9: warning: `decision` is a gateway with one way in and one way out, so it branches nothing — either give it the other paths or make it a task\n",
+    "elapsed_seconds": 0.007
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/16-context-auto-labels.bd",
+    "sha256": "a3e88e4f709a45eb14b5c5ea71fdc3e2235902288db2242b4487e028ed3fb9d3",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": ".agent/fixtures/bpmn-v1/16-context-auto-labels.bd: no problems found\n",
+    "elapsed_seconds": 0.507
+  },
+  {
+    "source": ".agent/fixtures/bpmn-v1/17-group-size.bd",
+    "sha256": "20cf113f6e0fc0db8c052fdf817301b99d208817a4860f4e421839ef5bc0cd22",
+    "render_exit": 0,
+    "svg_exit": 0,
+    "check_exit": 0,
+    "diagnostics": ".agent/fixtures/bpmn-v1/17-group-size.bd: no problems found\n",
+    "elapsed_seconds": 0.006
+  }
+]

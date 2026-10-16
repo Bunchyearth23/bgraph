@@ -164,6 +164,10 @@ pub struct Style {
     pub width: Option<f64>,
     pub height: Option<f64>,
     pub padding: Option<f64>,
+    pub margin_top: Option<f64>,
+    pub margin_right: Option<f64>,
+    pub margin_bottom: Option<f64>,
+    pub margin_left: Option<f64>,
     pub font_size: Option<f64>,
     pub font_family: Option<String>,
     pub font_color: Option<String>,
@@ -172,6 +176,7 @@ pub struct Style {
     /// label: a position the author declared is a decision, so the automatic
     /// avoidance leaves it alone.
     pub label_offset: Option<(f64, f64)>,
+    pub label_position: Option<String>,
     pub head: Option<Head>,
     /// Cardinality at the tail of an edge — `er` only.
     pub from_head: Option<Head>,
@@ -325,11 +330,16 @@ impl Style {
             width,
             height,
             padding,
+            margin_top,
+            margin_right,
+            margin_bottom,
+            margin_left,
             font_size,
             font_family,
             font_color,
             font_weight,
             label_offset,
+            label_position,
             head,
             from_head,
             to_head,
@@ -480,6 +490,9 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
                     .join(" "),
             })
         }
+        "label-position" => {
+            style.label_position = first.and_then(|x| x.as_word()).map(String::from)
+        }
         "radius" | "corner" => style.radius = first.and_then(|x| x.as_num()),
         "shape" => {
             let word = first.and_then(|x| x.as_word()).unwrap_or_default();
@@ -495,6 +508,18 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
         "width" => style.width = first.and_then(|x| x.as_num()),
         "height" => style.height = first.and_then(|x| x.as_num()),
         "padding" => style.padding = first.and_then(|x| x.as_num()),
+        "margin" => {
+            if let Some(margin) = crate::spacing::Margins::parse(v) {
+                style.margin_top = Some(margin.top);
+                style.margin_right = Some(margin.right);
+                style.margin_bottom = Some(margin.bottom);
+                style.margin_left = Some(margin.left);
+            }
+        }
+        "margin-top" => style.margin_top = first.and_then(|x| x.as_num()),
+        "margin-right" => style.margin_right = first.and_then(|x| x.as_num()),
+        "margin-bottom" => style.margin_bottom = first.and_then(|x| x.as_num()),
+        "margin-left" => style.margin_left = first.and_then(|x| x.as_num()),
         "font" => {
             // `font: 14 "Inter" #e2e8f0 bold` — order-free, read by value kind.
             for value in v {
