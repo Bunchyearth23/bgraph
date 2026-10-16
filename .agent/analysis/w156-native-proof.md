@@ -135,7 +135,7 @@ The final portable-source Windows ARM64 MSVC CLI and LSP also cross-build
 successfully (`/tmp/bgraph-goal-windows-arm64-final.log`, exit 0). This adds
 compilation evidence only; it is not native Windows ARM execution.
 
-## What is not yet proved
+## Historical local-only limit — superseded by the remote proof below
 
 QEMU and Wine execute the target binaries locally; they do not prove real
 Windows, native ARM operating systems, macOS or hosted CI. The five-platform
@@ -144,3 +144,54 @@ host and no macOS host was supplied. W-156/W-160 remain unfinished until actual
 native execution evidence exists. No commit or publication was performed.
 
 Graft: 5 retrieval calls, approximately 271,941 source-reading tokens saved.
+
+## Actual five-platform CI proof — independently audited
+
+The native execution requirement is now proven on GitHub-hosted runners at
+commit **`90163b769f8be9a125424eba3ba4694ee4a1e967`**,
+[CI run 38895893757](https://github.com/Bunchyearth23/bgraph/actions/runs/38895893757).
+All five native jobs succeeded, followed by the successful
+[exact aggregate comparison](https://github.com/Bunchyearth23/bgraph/actions/runs/38895893757/job/116957844648).
+
+| Real runner | Reported target OS / architecture | Successful job ID | Artifact ID |
+|---|---|---:|---:|
+| ubuntu-latest | Linux / x86_64 | 116956144216 | 12043678261 |
+| ubuntu-24.04-arm | Linux / aarch64 | 116956144363 | 12043997139 |
+| windows-latest | Windows / x86_64 | 116956144479 | 12044231612 |
+| windows-11-arm | Windows / aarch64 | 116956144388 | 12043329488 |
+| macos-latest | macOS / aarch64 | 116956143968 | 12043513421 |
+
+Independent audit retrieved job/provider metadata and all five original ZIP
+archives by artifact ID. Every archive's SHA-256 matches GitHub's recorded
+digest, and its JSON matches the separately downloaded artifact bytes. Each
+document matches the revision, compiler version, default feature set, debug
+profile, expected target OS/architecture and its provider runner label. Each
+proves **three in-process runs and three fresh child processes**, with **three
+runs per child**. The complete catalog has **52 cases: 30 examples and 22
+fixtures, including 42 valid and 10 invalid inputs**.
+
+The official strict comparator was rerun locally with `GITHUB_SHA` set to the
+commit above and all five real artifacts: **exit 0**. Independent Python
+comparison of every entire snapshot object also passed. Source text, SVG bytes,
+all raw geometry bits and diagnostics agree without quantization or tolerance.
+The remote aggregate additionally passed all 18 rejection self-tests.
+
+Machine-readable evidence, including artifact archive/file checksums, all job
+IDs, provider runner IDs and shared source/snapshot/geometry/diagnostic hashes:
+**`native-ci-proof.json`**. The shared canonical snapshot SHA-256 is
+`3c7d8a73b2090d64e3788a07dc68f035ba51ec412371996a06ee92021ea00fb4`.
+
+Audit logs/artifacts:
+
+- `/tmp/bgraph-ci-artifacts-38895893757-final/`
+- `/tmp/bgraph-ci-native-aggregate-38895893757.log`
+- `/tmp/bgraph-ci-native-independent-audit.log`
+
+**This proves native W-156 parity at that revision; it does not make the
+overall workflow successful.** Its separate `check` job failed on
+`a_subset_font_is_smaller_and_still_a_font` (NotoColorEmoji did not shrink)
+and `representative_png_snapshots_are_byte_stable`. Those failures are recorded
+in `/tmp/bgraph-ci-check-failure-38895893757.log` and the machine proof.
+W-160's complete CI requirement still needs the subsequent corrected run.
+
+This independent audit used one graft retrieval, approximately 3,623 tokens saved.

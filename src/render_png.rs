@@ -32,6 +32,9 @@ pub fn render(layout: &Layout, scale: f64) -> Result<Vec<u8>> {
     let mut options = resvg::usvg::Options::default();
     options.fontdb_mut().load_system_fonts();
     resolve_generic_families(&mut options);
+    if let Some((family, bytes)) = &layout.opts.embed_font {
+        load_embedded_font(&mut options, family, bytes)?;
+    }
 
     let tree = resvg::usvg::Tree::from_str(&svg, &options)
         .map_err(|e| anyhow::anyhow!("the SVG this crate just wrote did not parse: {e}"))?;
@@ -59,6 +62,44 @@ pub fn render(layout: &Layout, scale: f64) -> Result<Vec<u8>> {
     pixmap
         .encode_png()
         .context("the pixmap could not be encoded as a PNG")
+}
+
+fn load_embedded_font(
+    options: &mut resvg::usvg::Options,
+    family: &str,
+    bytes: &[u8],
+) -> Result<()> {
+    // usvg does not load the SVG's data-URL @font-face. Register its CSS
+    // alias explicitly: a file stem need not match the font's internal name.
+    let mut embedded = resvg::usvg::fontdb::Database::new();
+    embedded.load_font_data(bytes.to_vec());
+    anyhow::ensure!(
+        !embedded.is_empty(),
+        "the embedded font `{family}` contains no usable font faces"
+    );
+    let database = options.fontdb_mut();
+    let replaced: Vec<_> = database
+        .faces()
+        .filter(|face| face.families.iter().any(|(name, _)| name == family))
+        .cloned()
+        .collect();
+    for mut face in replaced {
+        database.remove_face(face.id);
+        face.families.retain(|(name, _)| name != family);
+        if !face.families.is_empty() {
+            face.id = resvg::usvg::fontdb::ID::dummy();
+            database.push_face_info(face);
+        }
+    }
+    for face in embedded.faces() {
+        let mut face = face.clone();
+        face.id = resvg::usvg::fontdb::ID::dummy();
+        // Keep the parsed language without exposing the internal family as
+        // another alias that could compete with unrelated installed fonts.
+        face.families = vec![(family.to_owned(), face.families[0].1)];
+        database.push_face_info(face);
+    }
+    Ok(())
 }
 
 /// Tell the renderer what the generic font families mean.
@@ -124,5 +165,122 @@ fn resolve_generic_families(options: &mut resvg::usvg::Options) {
     }
     if let Some(mono) = mono {
         options.fontdb_mut().set_monospace_family(mono);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const FONT: &[u8] = include_bytes!("../tests/fixtures/fonts/DejaVuSans.ttf");
+    const FAMILY: &str = "Bgraph PNG Fixture";
+
+    #[test]
+    fn embedded_font_alias_renders_without_system_fonts() {
+        let mut options = resvg::usvg::Options::default();
+        assert!(options.fontdb.is_empty());
+        let svg = r#"<svg xmlns="http://www.w3.org/2000/svg" width="180" height="40"><text x="5" y="28" font-size="24" font-family="Bgraph PNG Fixture">Office 123</text></svg>"#;
+        let raster = |options: &resvg::usvg::Options| {
+            let tree = resvg::usvg::Tree::from_str(svg, options).unwrap();
+            let mut pixmap = tiny_skia::Pixmap::new(180, 40).unwrap();
+            resvg::render(
+                &tree,
+                tiny_skia::Transform::identity(),
+                &mut pixmap.as_mut(),
+            );
+            pixmap
+        };
+        let missing = raster(&options);
+        assert!(missing.pixels().iter().all(|pixel| pixel.alpha() == 0));
+
+        load_embedded_font(&mut options, FAMILY, FONT).unwrap();
+        let embedded = raster(&options);
+        assert!(embedded.pixels().iter().any(|pixel| pixel.alpha() != 0));
+        assert_ne!(embedded.data(), missing.data());
+        assert_eq!(options.fontdb.faces().count(), 1);
+        let face = options.fontdb.faces().next().unwrap();
+        assert_eq!(face.families[0].0, FAMILY);
+        assert_eq!(
+            options
+                .fontdb
+                .with_face_data(face.id, |bytes, _| bytes == FONT),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn embedded_font_takes_precedence_over_an_installed_alias() {
+        let mut options = resvg::usvg::Options::default();
+        load_embedded_font(&mut options, FAMILY, FONT).unwrap();
+        let previous = options.fontdb.faces().next().unwrap().id;
+        let mut bold = options.fontdb.face(previous).unwrap().clone();
+        bold.id = resvg::usvg::fontdb::ID::dummy();
+        bold.weight = resvg::usvg::fontdb::Weight::BOLD;
+        let bold = options.fontdb_mut().push_face_info(bold);
+
+        load_embedded_font(&mut options, FAMILY, FONT).unwrap();
+        assert!(options.fontdb.face(previous).is_none());
+        assert!(options.fontdb.face(bold).is_none());
+        assert_eq!(options.fontdb.faces().count(), 1);
+        assert_eq!(options.fontdb.faces().next().unwrap().families[0].0, FAMILY);
+    }
+
+    #[test]
+    fn replacing_an_embedded_alias_preserves_other_installed_families() {
+        use resvg::usvg::fontdb::{Family, Query, Source, Stretch, Style, Weight};
+
+        let mut options = resvg::usvg::Options::default();
+        options.fontdb_mut().load_font_data(FONT.to_vec());
+        let mut installed = options.fontdb.faces().next().unwrap().clone();
+        options.fontdb_mut().remove_face(installed.id);
+        let language = installed.families[0].1;
+        installed.families = vec![(FAMILY.into(), language), ("Other family".into(), language)];
+        installed.weight = Weight::BOLD;
+        installed.style = Style::Italic;
+        installed.stretch = Stretch::Condensed;
+        options.fontdb_mut().push_face_info(installed.clone());
+
+        load_embedded_font(&mut options, FAMILY, FONT).unwrap();
+        let embedded = options
+            .fontdb
+            .query(&Query {
+                families: &[Family::Name(FAMILY)],
+                ..Query::default()
+            })
+            .unwrap();
+        let retained = options
+            .fontdb
+            .query(&Query {
+                families: &[Family::Name("Other family")],
+                weight: installed.weight,
+                style: installed.style,
+                stretch: installed.stretch,
+            })
+            .unwrap();
+        assert_ne!(embedded, retained);
+        assert_eq!(
+            options.fontdb.face(embedded).unwrap().weight,
+            Weight::NORMAL
+        );
+        let retained = options.fontdb.face(retained).unwrap();
+        assert_eq!(retained.families, vec![("Other family".into(), language)]);
+        assert_eq!(retained.index, installed.index);
+        assert_eq!(retained.weight, installed.weight);
+        assert_eq!(retained.style, installed.style);
+        assert_eq!(retained.stretch, installed.stretch);
+        let (Source::Binary(retained), Source::Binary(installed)) =
+            (&retained.source, &installed.source)
+        else {
+            panic!("the fixture was loaded as binary data");
+        };
+        assert!(std::sync::Arc::ptr_eq(retained, installed));
+    }
+
+    #[test]
+    fn an_invalid_embedded_font_is_reported() {
+        let mut options = resvg::usvg::Options::default();
+        let error = load_embedded_font(&mut options, FAMILY, b"not a font").unwrap_err();
+        assert!(error.to_string().contains(FAMILY));
+        assert!(options.fontdb.is_empty());
     }
 }

@@ -128,3 +128,17 @@ per-call means are 1.116 s for 20,000 connected nodes and 222.29 ms for the
 public `render_source` pipeline with 5,000 nodes, each measured twice. The
 remaining cases and original ten-run guards all pass. Full final-source
 performance observations are appended to `w153-completion.md`.
+
+## Actual remote native proof
+
+The five-platform gate has now executed successfully at
+`90163b769f8be9a125424eba3ba4694ee4a1e967` in
+[run 38895893757](https://github.com/Bunchyearth23/bgraph/actions/runs/38895893757).
+Real Linux x86_64/ARM64, Windows x86_64/ARM64 and macOS ARM64 jobs all passed,
+and their aggregate compared all 52 cases exactly. Independent audit verified
+GitHub's archive digests, revision/default-feature metadata, every repetition
+count, source/SVG/raw-bit/diagnostic equality and the actual provider jobs.
+Full evidence is in `native-ci-proof.json` and the remote-execution section of
+`w156-native-proof.md`. This supersedes the earlier lack of macOS and Windows
+ARM native execution evidence. The overall workflow remains failed on two
+separate font-dependent tests; complete W-160 CI proof awaits the corrected run.

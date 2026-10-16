@@ -15,11 +15,11 @@ remains active until every requirement below is proved.
 | Work | Completion requirement | Current evidence / remaining proof |
 |---|---|---|
 | W-153 | One simultaneous declared solver for nodes, frames, attachments and large diagrams; no production fallback or silent displacement; source validation, nested local origins and cycles; viable performance. | **Landed.** Unique solver at every size, 107 vendor tests and seven completion regressions; final full suite and runtime gate green. Final guard: 20k nodes 1.116s per complete call; no budget increased. `w153-completion.md`. |
-| W-156 | Same source/version gives identical raw coordinates and output between repeated runs and every supported native/wasm runtime. | **Building, still required.** 52 exact-equal cases on Linux x64, ARM/QEMU and Windows MSVC/Wine, repeated processes; genuine Windows sine bug corrected with pinned portable math. Five real runners/macOS/Windows ARM and hosted CI remain unexecuted. `w156-native-proof.md`, `w156-portable-math.md`. |
+| W-156 | Same source/version gives identical raw coordinates and output between repeated runs and every supported native/wasm runtime. | **Landed.** Five real native runner jobs and aggregate comparison succeeded at `90163b7`; all 52 cases strictly identical, repeated in memory and fresh processes. Independent download/digest audit: `native-ci-proof.json`. Global font-test failures remain in W-160. |
 | W-157 | Minimum-cardinality source conflict, provenance and values, across the whole model; deterministic diagnostics on every surface; internal errors remain typed. | **Landed.** Eight tests including 24 exhaustive seven-equation model oracles; independent proof review; later smaller component selected; exact diagnostic across every runtime. `w157-completion.md`. |
 | W-158 | Visible preview inspector for bounds, anchors, parents, X/Y relations and conflicts; source/geometry selection; LSP declaration↔layout navigation, provenance hover and outline. | **Landed.** 75 LSP / 14 watch / 4 explain tests, actual Chromium six scenarios with reviewed screenshots and zero JS errors; real VS Code navigation/references/hover/outline passes. `w158-completion.md`. |
 | W-159 | Exhaustive Declared/ArchetypeManaged/Hybrid contract in vocabulary; validation, completion, docs/schema and solver dispatch derived once; nothing accepted then ignored. | **Landed.** 9 Declared / 21 Managed / no actual Hybrid. Exhaustive matrix and all 30 final feature configurations pass; complete gallery/runtime proof. `w159-completion.md`. |
-| W-160 | Reproducible no-default/CLI/LSP/browser/WASI/preview/Typst/VSIX gate and actual editor loading; native CI really executed, not merely configured. | **Building, still required.** Final 22-fixture / 30-archetype / four-file-context gate, Chromium UI, real VS Code and real Zed all pass. Five-runner hosted CI not executed; cannot close from YAML or emulation. `w160-completion.md`. |
+| W-160 | Reproducible no-default/CLI/LSP/browser/WASI/preview/Typst/VSIX gate and actual editor loading; native CI really executed, not merely configured. | **Building.** Real five-platform native CI and aggregate comparison passed. Hosted global check found two font-dependent tests; fixed licensed font, production PNG embedded-font support and alias-preservation regression now pass 6/6 locally. Final full suite and hosted rerun pending. `w160-completion.md`, `w160-font-portability.md`. |
 | W-164 styles | Canonical archetype target for every alternative word, correct cascade and override provenance, editor completion/hover and generated reference. | **Landed.** Six public integrations and four correctly shaped BPMN words verified, 40 paint/override combinations, real LSP theme/provenance, generated reference current. `w164-completion.md`. |
 
 ## Final integrated evidence
@@ -91,15 +91,19 @@ These references prove runner availability, not execution of this repository.
 
 ## Resume
 
-All independent local implementation, runtime, UI, editor and performance work
-is complete. The goal remains **incomplete, awaiting external access**. Required next evidence:
-run this exact revision on the five native runners and execute the strict
-aggregate comparison/hosted CI. GitHub is unauthenticated; no macOS host or
-external runner access was supplied. The earlier access question remains
-unanswered. A real host or authenticated, explicitly authorized remote CI run
-is necessary; additional local compile-only or emulated runs cannot fill this gap.
+The user has authorized the private validation branch. Commit
+`90163b769f8be9a125424eba3ba4694ee4a1e967` was created in the isolated worktree
+`/tmp/bgraph-ci-validation-20261016`, with all 68 changed/new files checked
+byte-for-byte against the validated worktree, and pushed successfully to
+`codex/placement-proof-20261016`. The local main branch and index are untouched.
 
-Both unfinished work items remain in the original objective scope.
+GitHub browser authentication completed successfully. Actual run
+[38895893757](https://github.com/Bunchyearth23/bgraph/actions/runs/38895893757)
+is `in_progress` for this exact commit. All five native runner jobs have
+started, including macOS ARM64 and Windows ARM64; eight feature builds are
+already successful. Follow the confirmed live run, download all five native
+artifacts, execute the strict comparison, and inspect every job before closure.
+W-156/W-160 remain in the original scope until these observations complete.
 
 ## Access revalidation after local completion
 
@@ -133,3 +137,37 @@ identity. Existing GitHub SSH repository access works; the standard Git
 credential helper supplies no GitHub HTTP credential. Remote CI can start
 on the branch push, but job/artifact API access remains unavailable until
 GitHub CLI authentication is provided. No release tag is created.
+
+## Private validation branch pushed
+
+`git push --set-upstream origin codex/placement-proof-20261016` completed
+exit 0 on the user's explicit authorization. The branch contains the full
+validated implementation, fixtures, CI matrix and reports at commit `90163b7`.
+No release tag, release workflow dispatch or registry publication occurred.
+The API authentication process is confirmed live; runner progress is not
+yet observable without its browser authorization.
+
+## Remote execution observed
+
+GitHub CLI authentication completed as the repository owner. Run `38895893757`
+was inspected through the authenticated API: head SHA equals `90163b7`, status
+`in_progress`; all five native targets have active jobs. This resolves the
+previous external-access obstacle. `gh run watch` now follows this specific
+live run; no duplicate workflow or release was dispatched.
+
+## First hosted run: native proof and font failures
+
+Run `38895893757` completed with failure only in the global `check` test step.
+The five actual native runner jobs, strict aggregate comparator, eight feature
+builds and 22/30/4 runtime gate all succeeded. All five native artifacts were
+downloaded and the strict comparator rerun locally with the exact GITHUB_SHA;
+52 source/SVG/raw-geometry/diagnostic snapshots match exactly.
+
+Two previously machine-dependent tests fail on the runner's installed fonts:
+the generic first-font subset test selects NotoColorEmoji (no glyf/loca outlines),
+and PNG goldens use different installed text faces. The fix in progress supplies
+a fixed licensed test font. Investigation also found a production issue: PNG's
+usvg font database did not load the font already provided by `embed_font`; the
+approved fix makes PNG honor that existing option. Assertions and byte-level
+PNG goldens remain strict. W-160 remains unfinished until corrected hosted CI
+fully succeeds; the failed run is not described as green.

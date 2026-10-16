@@ -25,13 +25,14 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**État enregistré : deux chantiers en construction, aucun planifié, un risque ouvert;
+**État enregistré : un chantier en construction, aucun planifié, aucun risque ouvert;
 aucune question ouverte ni chantier bloqué.** `W-154` et `W-155` sont
 livrés sur instruction utilisateur. L'objectif explicite « all non blocked W done
 and proven » autorise aussi la clôture vérifiée de `W-153`, `W-157`, `W-158`,
-`W-159` et `W-164` styles. Restent `W-156` et `W-160` : preuve locale complète,
-mais exécution des cinq runners natifs/CI distante encore nécessaire, sans
-session GitHub authentifiée ni hôte macOS fourni.
+`W-159` et `W-164` styles. `W-156` est aussi livré après comparaison exacte
+des cinq runners natifs réels. Reste `W-160` : les tests et artefacts natifs
+passent, mais deux tests dépendants des polices système nécessitent un correctif
+et une relance de la CI globale. Accès GitHub et autorisation de push acquis.
 Pour reprendre, lire l'entrée du chantier et son risque associé ci-dessous; les travaux
 livrés et les décisions historiques sont conservés dans **Settled**.
 
@@ -51,8 +52,7 @@ deux lignes distinctes dans **Work landed**; aucun id renuméroté.
 
 | id | state | title | notes |
 |---|---|---|---|
-| `W-156` | building | Déterminisme Cassowary multiplateforme | Solveur et math portables canoniques; libm 0.2.16 corrigé après trois écarts sinus Windows réellement reproduits. Parité exacte des 52 cas (SVG, bits f64, diagnostics) sur Linux x64, ARM sous QEMU et Windows MSVC sous Wine, avec répétitions/processus neufs. Restent les cinq exécutions natives réelles et le comparateur CI strict, non remplacés par l'émulation. Preuves : `.agent/analysis/w156-native-proof.md`, `.agent/analysis/w156-portable-math.md`. |
-| `W-160` | building | Gate runtime wasm, Typst et surfaces sans dépendances | Gate final vert : 22 fixtures, 30 archétypes, quatre contextes fichier; CLI/LSP/wasm/WASI/preview/Typst/VSIX. Trente configurations de features, Chromium six scénarios, hôtes réels VS Code et Zed verts. Reste l'exécution CI distante avec les cinq runners natifs; aucun push ni déclenchement effectué. Preuves : `.agent/analysis/w160-completion.md`, bilan intégré. |
+| `W-160` | building | Gate runtime wasm, Typst et surfaces sans dépendances | Gate final vert : 22 fixtures, 30 archétypes, quatre contextes fichier; CLI/LSP/wasm/WASI/preview/Typst/VSIX. Trente configurations de features, Chromium six scénarios, hôtes réels VS Code et Zed verts. Branche privée `codex/placement-proof-20261016` poussée sur accord utilisateur (`90163b7`); authentification GitHub confirmée; CI `38895893757` : les cinq runners natifs et le comparateur strict passent. Le contrôle global échoue sur deux tests dépendants des polices système; correction avec police de test fixe et prise en compte réelle des fontes embarquées en PNG en cours avant relance. Preuves : `.agent/analysis/w160-completion.md`, bilan intégré. |
 
 ### Risks
 
@@ -63,7 +63,7 @@ Risques ouverts et résiduels; les entrées indiquent les chantiers associés et
 | `X-019` | retired | Une passe tardive peut invalider une position déjà résolue | W-153 livré : nœuds, frames et attaches BPMN ont un solveur simultané unique, sans seuil ni fallback de production. Dépendants/cycles >512, origines locales et permutations vérifiés; 20 000 nœuds passent la garde de performance. `.agent/analysis/w153-completion.md`. |
 | `X-020` | mitigated | Les interfaces ne partagent pas une sémantique unique du placement | Analyse et diagnostics partagés entre surfaces; récupération des erreurs multifichiers avec source map et relatedInformation LSP. Parité runtime et hôtes VS Code/Zed réels vérifiés, avec contrats Unicode explicites. W-155/W-160; preuves : `.agent/analysis/parallel-work-validation.md`. |
 | `X-021` | mitigated | Étendre le placement sans unifier le DSL multiplie les chemins concurrents | La V1 est retirée des deux grammaires et de l’AST; le convertisseur caché dans les tests est maintenant supprimé, avec migration des fixtures vers V2. Maintenir un seul bloc `layout` lors des prochaines extensions. W-154; preuves : `.agent/analysis/parallel-work-validation.md`. |
-| `X-022` | open | Une solution Cassowary sous-contrainte peut être correcte mais instable | Ordre canonique et math portables fixés; 52 cas identiques au bit entre Linux x64, ARM/QEMU et Windows MSVC/Wine, plus parité des runtimes wasm. L’émulation ne prouve pas les cinq OS/runners natifs : ces exécutions restent requises par W-156. `.agent/analysis/w156-native-proof.md`. |
+| `X-022` | mitigated | Une solution Cassowary sous-contrainte peut être correcte mais instable | W-156 livré : cinq runners natifs réels, 52 cas strictement identiques (sources, SVG, bits f64, diagnostics), trois répétitions en mémoire et trois processus neufs par runner. Archives retéléchargées et digests GitHub vérifiés indépendamment. `.agent/analysis/native-ci-proof.json`; run `38895893757`, jobs natifs et agrégateur verts. |
 | `X-023` | mitigated | Un solveur plus puissant peut rendre les contradictions moins compréhensibles | W-157 livré : minimum de cardinalité sur le modèle complet et tous les composants, provenance/valeurs conservées, erreurs internes typées. Huit tests, oracle exhaustif sur 24 modèles, revue indépendante et gate des interfaces verts. Coût exponentiel du minimum exact explicite; bornes non linéaires séparées. `.agent/analysis/w157-completion.md`. |
 | `X-024` | retired | La migration v1 → v2 peut préserver le parse et changer le dessin | Retiré par la décision de ne fournir aucune migration V1→V2 : les fichiers V1 sont refusés, sans tentative de réécriture. |
 | `X-025` | mitigated | Séparer le layout peut éloigner une boîte de la raison de sa position | W-158 livré : inspecteur visible, ancres/parents/relations/conflits, navigation source ↔ layout, hover, références, outline et explain des cadres. Six scénarios Chromium et inspection réelle VS Code vérifiés. Managed expose sa politique/cascade sans inventer de bounds 1:n. `.agent/analysis/w158-completion.md`. |
@@ -141,6 +141,7 @@ not copies.
 
 | id | date | title | commit |
 |---|---|---|---|
+| `W-156` | 2026-10-16 | Déterminisme natif prouvé sur Linux x64/ARM, Windows x64/ARM et macOS ARM : 52 cas strictement identiques, répétitions et archives vérifiées; matrice native CI et comparateur verts. `.agent/analysis/native-ci-proof.json`. | `90163b7` |
 | `W-153` | 2026-10-16 | Solveur déclaré unique sans seuil/fallback, frames et attaches BPMN simultanées, validation exacte et garde 20 000 nœuds verte. Suite intégrée et runtimes verts; objectif utilisateur autorisant la clôture. `.agent/analysis/w153-completion.md`. | non committé |
 | `W-157` | 2026-10-16 | Conflit de cardinalité minimum sur tous les composants, provenance complète et erreurs internes typées; oracle exhaustif, revue indépendante et gate runtime verts. `.agent/analysis/w157-completion.md`. | non committé |
 | `W-158` | 2026-10-16 | Inspecteur preview visible et navigation/provenance LSP; six scénarios Chromium et hôte VS Code réels vérifiés. `.agent/analysis/w158-completion.md`. | non committé |

@@ -7573,7 +7573,27 @@ fn representative_png_snapshots_are_byte_stable() {
             .find_map(|line| line.split_once(' ').filter(|(found, _)| *found == name))
             .and_then(|(_, hash)| u64::from_str_radix(hash, 16).ok())
             .unwrap_or_else(|| panic!("no PNG snapshot for `{name}`"));
-        let png = crate::render_png::render(&build(source), 1.0).expect("PNG snapshot renders");
+        let mut layout = build(source);
+        // The same font bytes and CSS alias on every host, including hosts
+        // without DejaVu installed. Exercise the public embedded-font path.
+        let family = "Bgraph PNG Fixture";
+        layout.opts.embed_font = Some((
+            family.into(),
+            std::sync::Arc::new(include_bytes!("../tests/fixtures/fonts/DejaVuSans.ttf").to_vec()),
+        ));
+        for node in &mut layout.nodes {
+            node.style.font_family = Some(family.into());
+        }
+        for group in &mut layout.groups {
+            group.style.font_family = Some(family.into());
+        }
+        for edge in &mut layout.edges {
+            edge.style.font_family = Some(family.into());
+        }
+        for annotation in &mut layout.annotations {
+            annotation.family = family.into();
+        }
+        let png = crate::render_png::render(&layout, 1.0).expect("PNG snapshot renders");
         let got = png.iter().fold(0xcbf29ce484222325_u64, |hash, byte| {
             (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
         });
@@ -10881,13 +10901,12 @@ fn some_font() -> (std::path::PathBuf, Vec<u8>) {
 
 #[test]
 fn a_subset_font_is_smaller_and_still_a_font() {
-    let (path, font) = some_font();
-    let subset = crate::subset::keep_glyphs_for(&font, "Ligature: office");
+    let font = include_bytes!("../tests/fixtures/fonts/DejaVuSans.ttf");
+    let subset = crate::subset::keep_glyphs_for(font, "Ligature: office");
 
     assert!(
         subset.len() < font.len(),
-        "{} did not shrink: {} → {}",
-        path.display(),
+        "DejaVuSans.ttf did not shrink: {} → {}",
         font.len(),
         subset.len()
     );
