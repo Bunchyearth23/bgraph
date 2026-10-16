@@ -9,24 +9,70 @@ name: ci
 on:
   push:
   pull_request:
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   native-builds:
-    name: Native build (${{ matrix.os }})
+    name: Native build and determinism (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: windows-11-arm
+            target: aarch64-pc-windows-msvc
+          - os: macos-latest
+            target: aarch64-apple-darwin
     steps:
       - uses: actions/checkout@v4
+      - name: Install the native target
+        run: rustup target add ${{ matrix.target }}
       - name: Build the CLI and language server
-        run: cargo build --locked --release --bins
+        run: cargo build --locked --release --target ${{ matrix.target }} --bins
       - name: Build the embeddable library without default features
-        run: cargo build --locked --release --no-default-features --lib
+        run: cargo build --locked --release --target ${{ matrix.target }} --no-default-features --lib
+      - name: Prove native SVG, raw geometry and diagnostic determinism
+        env:
+          BGRAPH_NATIVE_SNAPSHOT: native-snapshot.json
+          BGRAPH_NATIVE_RUNNER: ${{ matrix.os }}
+          BGRAPH_NATIVE_REVISION: ${{ github.sha }}
+        run: cargo test --locked --target ${{ matrix.target }} --test native_parity -- native_snapshot --exact --nocapture
+      - name: Upload complete native evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-snapshot-v1-${{ matrix.os }}-${{ github.sha }}
+          path: native-snapshot.json
+          if-no-files-found: error
+          retention-days: 14
+
+  native-parity:
+    name: Exact native parity (five platforms)
+    needs: native-builds
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check rejection of incomplete or changed evidence
+        run: node tests/runtime/compare-native.mjs --self-test
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: native-snapshot-v1-*-${{ github.sha }}
+          path: native-snapshots
+      - name: Require all five platforms and compare exact snapshots
+        run: node tests/runtime/compare-native.mjs native-snapshots
 
   runtime-gate:
     name: Runtime and extension parity

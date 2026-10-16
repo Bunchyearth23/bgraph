@@ -158,7 +158,8 @@ pub const THEME_STYLES: &[ThemeStyle] = &[
         ctx: Some(Ctx::Node),
         only: &[],
         doc: "Every box on the diagram, without being referenced. The theme \
-              layer: put what is common here and keep named classes for what \
+             layer: it runs before the genre's item theme; both are before \
+             classes and inline properties. Put what is common here and keep named classes for what \
               differs.",
     },
     ThemeStyle {
@@ -1088,7 +1089,8 @@ pub const BPMN_ITEM_PROPS: &[PropDef] = &[
         words: BPMN_TASK_KINDS,
         syntax: "kind: <plain|user|service|script|manual|send|receive|rule|subprocess>",
         doc: "What kind of task it is, drawn as a marker in the corner of the \
-              box. `subprocess` takes the `+` instead, and an *expanded* \
+              box. The default for `task` and its `node` synonym is `plain`. \
+              `subprocess` takes the `+` instead, and an *expanded* \
               subprocess is a `group`. Usually written positionally — \
               `task check \"Check credit\" service`.",
     },
@@ -1099,7 +1101,8 @@ pub const BPMN_ITEM_PROPS: &[PropDef] = &[
         words: BPMN_STAGES,
         syntax: "stage: <start|intermediate|end|boundary>",
         doc: "Where the event sits: a thin ring starts, a thick one ends, a \
-              double ring is intermediate. `boundary` is the exception — it \
+              double ring is intermediate. An `event` without a stage is \
+              `intermediate`, with a `plain` trigger. `boundary` is the exception — it \
               is not a place in the flow but a place on a task, so it needs \
               `attach`.",
     },
@@ -1130,6 +1133,7 @@ pub const BPMN_ITEM_PROPS: &[PropDef] = &[
         words: BPMN_GATES,
         syntax: "gate: <exclusive|parallel|inclusive|event|complex>",
         doc: "Which gateway it is, drawn as the mark inside the diamond. \
+              A `gateway` without this value is `exclusive`. \
               Usually written positionally — `gateway ok \"Approved?\" exclusive`.",
     },
     PropDef {
@@ -1138,7 +1142,8 @@ pub const BPMN_ITEM_PROPS: &[PropDef] = &[
         ctx: Ctx::Node,
         words: BPMN_ARTIFACTS,
         syntax: "artifact: <object|store|input|output>",
-        doc: "Which data artefact it is. An object is a page with a folded \
+        doc: "Which data artefact it is. A `data` declaration defaults to `object`. \
+              An object is a page with a folded \
               corner, a store is a cylinder; `input` and `output` are objects \
               carrying the arrow that says which way the data went.",
     },
@@ -1482,6 +1487,8 @@ pub const ER_ITEM_PROPS: &[PropDef] = &[
 /// the editor support all carry over unchanged.
 pub struct ArchetypeDef {
     pub name: &'static str,
+    /// Geometry ownership and its renderer, declared together.
+    pub layout: LayoutStrategy,
     /// What this archetype calls its elements: `node`, `slice`, `field`.
     /// `node` stays a universal synonym everywhere.
     pub item: &'static str,
@@ -1524,16 +1531,81 @@ pub enum LayoutCapability {
     Hybrid,
 }
 
-const DECLARED_LAYOUT_ARCHETYPES: &[&str] = &[
-    "free",
-    "class",
-    "block",
-    "er",
-    "state",
-    "harness",
-    "bpmn",
-    "network",
-    "requirements",
+/// A genre-owned renderer. It receives the same styles and options as declared layout.
+pub type ArchetypeSolver = fn(
+    &crate::ast::Diagram,
+    crate::style::GraphOpts,
+    &crate::style::Registry,
+) -> anyhow::Result<crate::layout::Layout>;
+
+/// Geometry ownership and dispatch cannot disagree: managed geometry carries
+/// its renderer. Hybrid contracts name their supported guides explicitly;
+/// no current archetype or layout statement implements such a guide.
+#[derive(Clone, Copy)]
+pub enum LayoutStrategy {
+    Declared,
+    ArchetypeManaged(ArchetypeSolver),
+    Hybrid {
+        solver: ArchetypeSolver,
+        guides: &'static [&'static str],
+    },
+}
+
+impl LayoutStrategy {
+    pub fn capability(self) -> LayoutCapability {
+        match self {
+            Self::Declared => LayoutCapability::Declared,
+            Self::ArchetypeManaged(_) => LayoutCapability::ArchetypeManaged,
+            Self::Hybrid { .. } => LayoutCapability::Hybrid,
+        }
+    }
+
+    pub fn solver(self) -> Option<ArchetypeSolver> {
+        match self {
+            Self::Declared => None,
+            Self::ArchetypeManaged(solver) | Self::Hybrid { solver, .. } => Some(solver),
+        }
+    }
+
+    pub fn guides(self) -> &'static [&'static str] {
+        match self {
+            Self::Hybrid { guides, .. } => guides,
+            _ => &[],
+        }
+    }
+
+    /// The current grammar has entity relations, but no named guide statement.
+    pub fn accepts_layout_block(self) -> bool {
+        matches!(self, Self::Declared)
+    }
+
+    pub fn statements(self) -> &'static [&'static str] {
+        if self.accepts_layout_block() {
+            LAYOUT_STATEMENTS
+        } else {
+            &[]
+        }
+    }
+}
+
+impl LayoutCapability {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Declared => "declared",
+            Self::ArchetypeManaged => "archetype-managed",
+            Self::Hybrid => "hybrid",
+        }
+    }
+}
+
+/// Entity relations implemented by the canonical layout grammar.
+pub const LAYOUT_STATEMENTS: &[&str] = &[
+    "place",
+    "align",
+    "equal-width",
+    "equal-height",
+    "row",
+    "column",
 ];
 
 /// A second word for the same archetype, with a positional shape of its own.
@@ -1546,11 +1618,7 @@ pub struct AltItem {
 impl ArchetypeDef {
     /// The placement contract of this diagram genre.
     pub fn layout_capability(&self) -> LayoutCapability {
-        if DECLARED_LAYOUT_ARCHETYPES.contains(&self.name) {
-            LayoutCapability::Declared
-        } else {
-            LayoutCapability::ArchetypeManaged
-        }
+        self.layout.capability()
     }
 
     /// Whether this archetype answers to the word the author wrote. `node` is
@@ -1612,6 +1680,7 @@ pub const VARIADIC: usize = usize::MAX;
 pub const ARCHETYPES: &[ArchetypeDef] = &[
     ArchetypeDef {
         name: "free",
+        layout: LayoutStrategy::Declared,
         item: "node",
         doc: "Nodes and edges placed by anchors — the default when a file \
               declares no `type`.",
@@ -1625,6 +1694,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "pie")]
     ArchetypeDef {
         name: "pie",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::pie),
         item: "slice",
         doc: "A pie or donut chart. Each slice needs a value; its `fill` \
               overrides the automatic palette.",
@@ -1641,6 +1711,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "gantt")]
     ArchetypeDef {
         name: "gantt",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::gantt),
         item: "task",
         doc: "Bars on a calendar. A task says when it starts and either when \
               it ends or how long it runs; a `group` becomes a section.",
@@ -1657,6 +1728,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "class")]
     ArchetypeDef {
         name: "class",
+        layout: LayoutStrategy::Declared,
         item: "class",
         doc: "Boxes with a name and a list of members, placed by anchors like \
               `free`. A bare string in the block is a member.",
@@ -1670,6 +1742,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "timeline")]
     ArchetypeDef {
         name: "timeline",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::timeline),
         item: "event",
         doc: "Events on a date line. Each event needs a date; they are drawn \
               in date order with their labels staggered above and below, so a \
@@ -1687,6 +1760,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "block")]
     ArchetypeDef {
         name: "block",
+        layout: LayoutStrategy::Declared,
         item: "block",
         doc: "Architecture and C4-style component views: typed elements with a \
               technology and a description, nested with `group`, joined by \
@@ -1705,6 +1779,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "er")]
     ArchetypeDef {
         name: "er",
+        layout: LayoutStrategy::Declared,
         item: "entity",
         doc: "Entities and the relations between them. A bare string in the \
               block is a column, exactly as in `class`; what `er` adds is \
@@ -1730,6 +1805,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "state")]
     ArchetypeDef {
         name: "state",
+        layout: LayoutStrategy::Declared,
         item: "state",
         doc: "A state machine. States are placed by anchors, exactly as in \
               `free` — the archetype supplies the vocabulary and the shapes, \
@@ -1744,6 +1820,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "sequence")]
     ArchetypeDef {
         name: "sequence",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::sequence),
         item: "participant",
         doc: "Participants across the top, messages down the page in the order \
               they are written. A `group` frames the messages inside it.",
@@ -1757,6 +1834,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "xy")]
     ArchetypeDef {
         name: "xy",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::xy),
         item: "series",
         doc: "Lines, areas or dots over a shared x axis. One series per \
               statement, its numbers evenly spaced across the plot — or \
@@ -1785,6 +1863,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "bar")]
     ArchetypeDef {
         name: "bar",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::bar),
         item: "series",
         doc: "Bars grouped or stacked across named categories. One series per \
               statement, its numbers in category order.",
@@ -1801,6 +1880,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "sankey")]
     ArchetypeDef {
         name: "sankey",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::sankey),
         item: "node",
         doc: "Flows between stages, sized by magnitude. The value rides on the \
               link, not on what it joins: a node's height is whatever passes \
@@ -1818,6 +1898,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "wave")]
     ArchetypeDef {
         name: "wave",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::wave),
         item: "signal",
         doc: "A timing diagram. Each signal carries a wave string, one \
               character per period, in the WaveDrom alphabet.",
@@ -1834,6 +1915,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "quadrant")]
     ArchetypeDef {
         name: "quadrant",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::quadrant),
         item: "point",
         doc: "Points on two axes, divided into four named regions. A Wardley \
               map is this archetype with its own axis names.",
@@ -1856,6 +1938,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "treemap")]
     ArchetypeDef {
         name: "treemap",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::treemap),
         item: "box",
         doc: "Nested rectangles whose area is proportional to a value. The \
               hierarchy is group nesting; a group's area is the sum of what \
@@ -1873,6 +1956,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "packet")]
     ArchetypeDef {
         name: "packet",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::packet),
         item: "field",
         doc: "A packet / bitfield diagram. Each field needs an inclusive bit \
               range; one crossing a row boundary is split across rows.",
@@ -1889,6 +1973,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "gitgraph")]
     ArchetypeDef {
         name: "gitgraph",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::gitgraph),
         item: "commit",
         doc: "Commits, branches and merges. Parentage is the edges — \
               `c1 -> c2` is c2's parent — and a commit with two parents is a \
@@ -1907,6 +1992,9 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "orgchart")]
     ArchetypeDef {
         name: "orgchart",
+        layout: LayoutStrategy::ArchetypeManaged(|diagram, opts, registry| {
+            crate::charts::tree(diagram, opts, registry, crate::charts::TreeKind::Org)
+        }),
         item: "position",
         doc: "Reporting lines, laid out top-down. The hierarchy comes from the \
               edges — `ceo -> cto` — and the archetype places every box, so \
@@ -1921,6 +2009,9 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "mindmap")]
     ArchetypeDef {
         name: "mindmap",
+        layout: LayoutStrategy::ArchetypeManaged(|diagram, opts, registry| {
+            crate::charts::tree(diagram, opts, registry, crate::charts::TreeKind::Mind)
+        }),
         item: "topic",
         doc: "A root with branches either side of it. The same tree the \
               orgchart draws, arranged outward instead of downward, so the \
@@ -1935,6 +2026,9 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "treeview")]
     ArchetypeDef {
         name: "treeview",
+        layout: LayoutStrategy::ArchetypeManaged(|diagram, opts, registry| {
+            crate::charts::tree(diagram, opts, registry, crate::charts::TreeKind::View)
+        }),
         item: "entry",
         doc: "The same tree as indented rows, one per line — a file listing, a \
               menu, a taxonomy. Depth is the indent and order is the order \
@@ -1949,6 +2043,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "harness")]
     ArchetypeDef {
         name: "harness",
+        layout: LayoutStrategy::Declared,
         item: "connector",
         doc: "Wiring harnesses. A connector's pins are its member lines — \
               `- 1: +12V` — and a wire is an edge carrying the pin it lands on \
@@ -1968,6 +2063,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "venn")]
     ArchetypeDef {
         name: "venn",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::venn),
         item: "set",
         doc: "Overlapping sets. Two or three of them: with two, the lens is \
               solved so its **area** is the number you wrote; with three the \
@@ -1990,6 +2086,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "bpmn")]
     ArchetypeDef {
         name: "bpmn",
+        layout: LayoutStrategy::Declared,
         item: "task",
         doc: "A business process. Tasks, gateways, events, data artefacts and \
               the flows between them, with pools and lanes as `group`s. \
@@ -2048,6 +2145,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "network")]
     ArchetypeDef {
         name: "network",
+        layout: LayoutStrategy::Declared,
         item: "host",
         doc: "Network topology: hosts, links and the segments that hold them. \
               Placed by anchors exactly as in `free` — the archetype supplies \
@@ -2069,6 +2167,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "rack")]
     ArchetypeDef {
         name: "rack",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::rack),
         item: "device",
         doc: "A rack elevation. Units are numbered from 1 at the **bottom**, \
               as a rack is, and a device occupies an inclusive span of them. \
@@ -2087,6 +2186,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "radar")]
     ArchetypeDef {
         name: "radar",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::radar),
         item: "series",
         doc: "Axes radiating from a centre, one closed polygon per series. \
               Every axis shares one scale: the shape a reader compares is only \
@@ -2104,6 +2204,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "journey")]
     ArchetypeDef {
         name: "journey",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::journey),
         item: "step",
         doc: "A user journey: steps in the order they are taken, and how each \
               actor felt at each one. `group`s are its sections, drawn as a \
@@ -2122,6 +2223,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "kanban")]
     ArchetypeDef {
         name: "kanban",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::kanban),
         item: "card",
         doc: "A board: `group`s are its columns, in the order they are \
               declared, and the cards inside each one stack in the order they \
@@ -2138,6 +2240,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "requirements")]
     ArchetypeDef {
         name: "requirements",
+        layout: LayoutStrategy::Declared,
         item: "requirement",
         doc: "Requirements and the typed links between them. A bare string in \
               the block is a line of the requirement — its identifier, then \
@@ -2158,6 +2261,7 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
     #[cfg(feature = "bytefield")]
     ArchetypeDef {
         name: "bytefield",
+        layout: LayoutStrategy::ArchetypeManaged(crate::charts::bytefield),
         item: "field",
         doc: "A wire-format diagram at byte granularity — `packet` with the \
               ruler counting bytes rather than bits. Each field needs an \
@@ -2940,7 +3044,7 @@ pub const KEYWORDS: &[(&str, &str)] = &[
         "Canonical placement block (v2): `layout { place api at (0, 0) }`. \
          Declarations say what exists; this block says where it goes. It may \
          also live inside a `group`, where it can place that group's direct \
-         members. Inline placement is being removed during the v2 migration.",
+         members. Available only when the archetype supports declared layout.",
     ),
     (
         "place",
@@ -2970,7 +3074,7 @@ pub const KEYWORDS: &[(&str, &str)] = &[
     ),
     (
         "use",
-        "Place a component: `use service as web right-of jobs { label: \"Web\" }`. \
+        "Place a component: `use service as web { label: \"Web\" }`. \
          The instance is a frame, so it is anchored like any other group.",
     ),
     (
@@ -2993,7 +3097,7 @@ pub const KEYWORDS: &[(&str, &str)] = &[
     ),
     (
         "node",
-        "Declare a node: `node <id> \"<label>\" .class <placement> { … }`.",
+        "Declare a node: `node <id> \"<label>\" .class { … }`.",
     ),
 ];
 
@@ -3012,3 +3116,7 @@ pub const PLACEMENTS: &[(&str, &str)] = &[
 ];
 
 pub const ALIGNMENTS: &[&str] = &["left", "right", "center", "middle", "top", "bottom"];
+
+#[cfg(test)]
+#[path = "layout_capability_tests.rs"]
+mod layout_capability_tests;

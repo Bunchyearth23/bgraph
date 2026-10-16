@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 
 use crate::{
     ast::Span,
-    lsp::{Context, LineIndex, declared_archetype},
+    lsp::{Block, Context, LineIndex, declared_archetype},
     props,
 };
 
@@ -24,9 +24,20 @@ pub(super) fn response(
     offset: usize,
     items_for: impl FnOnce(&str) -> Vec<Value>,
 ) -> Value {
-    let prefix = &text[..offset];
-    let line_start = prefix.rfind('\n').map(|index| index + 1).unwrap_or(0);
-    json!({ "isIncomplete": false, "items": items_for(&prefix[line_start..]) })
+    let ctx = Context::at(text, offset);
+    let mut items = items_for(&text[ctx.statement_start..offset]);
+    let word = super::context::word_at(text, offset)
+        .map(|(_, span)| span)
+        .unwrap_or(Span {
+            start: offset,
+            end: offset,
+        });
+    let range = LineIndex::new(text).range(word);
+    for item in &mut items {
+        let insert = item.get("insertText").unwrap_or(&item["label"]).clone();
+        item["textEdit"] = json!({"range": range, "newText": insert});
+    }
+    json!({ "isIncomplete": !items.is_empty(), "items": items })
 }
 
 pub(super) fn snippet(label: &str, kind: u8, detail: &str, doc: &str, insert: &str) -> Value {
@@ -54,13 +65,19 @@ pub(super) fn item_snippet(word: &str, slots: &[props::Slot]) -> String {
 /// The positional form offered for the statement under the cursor.
 pub(super) fn signature(text: &str, offset: usize) -> Value {
     let ctx = Context::at(text, offset);
-    if ctx.in_string || ctx.in_comment || ctx.block.is_some() {
+    if ctx.in_string || ctx.in_comment {
         return Value::Null;
     }
 
     let prefix = &text[..offset];
-    let line_start = prefix.rfind('\n').map(|i| i + 1).unwrap_or(0);
-    let words: Vec<&str> = prefix[line_start..].split_whitespace().collect();
+    let line = &prefix[ctx.statement_start..];
+    let words: Vec<&str> = line.split_whitespace().collect();
+    if ctx.block == Some(Block::Layout) {
+        return layout_signature(text, line, &words);
+    }
+    if ctx.block.is_some_and(|block| block != Block::Container) {
+        return Value::Null;
+    }
     let Some(&word) = words.first() else {
         return Value::Null;
     };
@@ -103,6 +120,96 @@ pub(super) fn signature(text: &str, offset: usize) -> Value {
         }],
         "activeSignature": 0,
         "activeParameter": active,
+    })
+}
+
+fn layout_signature(text: &str, line: &str, words: &[&str]) -> Value {
+    if !props::archetype(declared_archetype(text))
+        .is_some_and(|def| def.layout.accepts_layout_block())
+    {
+        return Value::Null;
+    }
+    let slot = words
+        .len()
+        .saturating_sub(usize::from(!line.ends_with(char::is_whitespace)));
+    let Some(&word) = words.first() else {
+        return Value::Null;
+    };
+    let (label, parameters, active, doc): (String, &[&str], usize, &str) = match word {
+        "place" if words.get(2).is_some_and(|word| super::is_rel_dir(word)) => {
+            let active = if words.contains(&"align") {
+                3
+            } else if words.contains(&"gap") {
+                2
+            } else {
+                usize::from(slot >= 3)
+            };
+            (
+                format!("place target {} anchor gap distance align axis", words[2]),
+                &["target", "anchor", "distance", "axis"],
+                active,
+                "Place an existing element relative to an anchor. gap and align are optional.",
+            )
+        }
+        "place" => {
+            let active = if slot < 2 {
+                0
+            } else if line.contains(',') {
+                2
+            } else {
+                1
+            };
+            if line.contains("(col") {
+                (
+                    "place target at (col column, row row-index)".into(),
+                    &["target", "column", "row-index"],
+                    active,
+                    "Place an element in a cell of the declared graph grid.",
+                )
+            } else {
+                (
+                    "place target at (x, y)".into(),
+                    &["target", "x", "y"],
+                    active,
+                    "Set the top-left corner. Both coordinates accept zero and negative numbers.",
+                )
+            }
+        }
+        "align" => (
+            "align axis first other …".into(),
+            &["axis", "first", "other"],
+            slot.saturating_sub(1).min(2),
+            "Align nodes on top, bottom, left, right, center-x or center-y.",
+        ),
+        "equal-width" | "equal-height" => (
+            format!("{word} first other …"),
+            &["first", "other"],
+            slot.saturating_sub(1).min(1),
+            "Give nodes a common size large enough for their labels.",
+        ),
+        "row" | "column" => (
+            format!("{word} first next … gap distance"),
+            &["first", "next", "distance"],
+            if words.contains(&"gap") {
+                2
+            } else {
+                slot.saturating_sub(1).min(1)
+            },
+            "Arrange direct nodes in order. The optional gap has no square brackets.",
+        ),
+        _ => return Value::Null,
+    };
+    let mut from = 0;
+    let parameters: Vec<_> = parameters.iter().map(|parameter| {
+        let start = from + label[from..].find(parameter).expect("signature parameter");
+        let end = start + parameter.len();
+        from = end;
+        json!({"label": [label[..start].encode_utf16().count(), label[..end].encode_utf16().count()]})
+    }).collect();
+    json!({
+        "signatures": [{"label": label, "parameters": parameters,
+            "documentation": {"kind": "markdown", "value": doc}, "activeParameter": active}],
+        "activeSignature": 0, "activeParameter": active,
     })
 }
 

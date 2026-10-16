@@ -6,6 +6,84 @@ use crate::props;
 
 use super::{Block, Context, LineIndex, declared_archetype, text_of, word_at};
 
+/// Inspect structural entities before falling back to vocabulary documentation.
+pub(super) fn file_hover(text: &str, index: &LineIndex, offset: usize, uri: &str) -> Value {
+    if crate::template::holes_in(text)
+        .iter()
+        .any(|hole| hole.span.contains(offset))
+    {
+        return hover(text, index, offset);
+    }
+    if let Some(document) = super::navigation::SourceDocument::new(text, uri)
+        && let Some(id) = document.id_at(offset)
+    {
+        let file_analysis = super::diagnostic_engine::path_of(uri)
+            .and_then(|path| crate::analyze_file_source(&path, text).ok());
+        let local_analysis;
+        let analysis = if let Some(file) = &file_analysis {
+            &file.analysis
+        } else {
+            local_analysis = crate::analyze_source(text);
+            &local_analysis
+        };
+        if let Some(entity) =
+            crate::explain::inspect::entities(&document.diagram, analysis.layout.as_ref())
+                .into_iter()
+                .find(|entity| entity.id == id)
+        {
+            let mut out = format!("**{}** `{id}`", entity.kind);
+            if let Some(rect) = entity.bounds {
+                out.push_str(&format!(
+                    "\n\nBounds: x {:.2}, y {:.2} · {:.2} × {:.2}",
+                    rect.x, rect.y, rect.w, rect.h
+                ));
+            }
+            if let Some(parent) = entity.parent {
+                out.push_str(&format!("\n\nParent frame: `{parent}`"));
+            }
+            out.push_str(&format!(
+                "\n\n**placement and paint provenance**\n\n```\n{}\n```",
+                entity.reason.trim()
+            ));
+            let mut sources = vec![("Declaration".to_string(), entity.declaration)];
+            for relation in entity.relations {
+                sources.push((format!("{} relation", relation.axes), relation.span));
+            }
+            for (label, span) in sources {
+                let location = document.location(span);
+                let link = format!(
+                    "{}#L{},{}",
+                    location["uri"].as_str().unwrap_or(""),
+                    location["range"]["start"]["line"].as_u64().unwrap_or(0) + 1,
+                    location["range"]["start"]["character"]
+                        .as_u64()
+                        .unwrap_or(0)
+                        + 1
+                );
+                out.push_str(&format!(
+                    "\n\n[{label}]({link})\n\n```bgraph\n{}\n```",
+                    document.source(span).trim()
+                ));
+            }
+            for diagnostic in &analysis.diagnostics {
+                if diagnostic.span.start < entity.span.end
+                    && entity.span.start < diagnostic.span.end
+                    || crate::explain::inspect::relations(&document.diagram, &id)
+                        .iter()
+                        .any(|relation| {
+                            diagnostic.span.start < relation.span.end
+                                && relation.span.start < diagnostic.span.end
+                        })
+                {
+                    out.push_str(&format!("\n\n**diagnostic:** {}", diagnostic.message));
+                }
+            }
+            return json!({ "contents": { "kind": "markdown", "value": out } });
+        }
+    }
+    hover(text, index, offset)
+}
+
 /// Documentation and resolved details for the word under the cursor.
 pub(super) fn hover(text: &str, index: &LineIndex, offset: usize) -> Value {
     let Some((word, span)) = word_at(text, offset) else {
@@ -55,7 +133,10 @@ pub(super) fn hover(text: &str, index: &LineIndex, offset: usize) -> Value {
                 prop.name, prop.syntax, prop.doc
             )
         })
-    } else if before.ends_with('.') || before.ends_with("extends") {
+    } else if before.ends_with('.')
+        || before.ends_with("extends")
+        || before.split_whitespace().last() == Some("style")
+    {
         describe_style(text, &word)
     } else if text[line_start..span.start].trim().is_empty()
         && props::archetype(archetype).is_some_and(|def| def.accepts(&word))
@@ -98,11 +179,7 @@ fn item_form(def: &props::ArchetypeDef, word: &str) -> String {
 
 pub(super) fn describe_node(text: &str, id: &str) -> Option<String> {
     let diagram = crate::parser::parse(text).ok()?;
-    let (i, node) = diagram
-        .nodes
-        .iter()
-        .enumerate()
-        .find(|(_, node)| node.id.as_str() == id)?;
+    let node = diagram.nodes.iter().find(|node| node.id.as_str() == id)?;
     let mut out = format!("**node** `{id}`");
     if let Some(label) = &node.label {
         out.push_str(&format!(" — {:?}", label));
@@ -118,7 +195,7 @@ pub(super) fn describe_node(text: &str, id: &str) -> Option<String> {
         ));
     }
     if let Ok(layout) = crate::layout::solve(&diagram)
-        && let Some(placed) = layout.nodes.get(i)
+        && let Some(placed) = layout.nodes.iter().find(|placed| placed.id == id)
     {
         let rect = placed.rect;
         let style = &placed.style;

@@ -600,12 +600,15 @@ becomes
 
 ```
 node ui   "Browser"          // the reader
-node api  "API" right-of ui
+node api  "API"
+layout {
+  place ui at (0, 0)
+  place api right-of ui
+}
 ```
 
-It **inserts into lines** rather than rewriting them, so a comment, a column
-lined up by hand and a trailing note all survive — `fmt` leaves interior
-alignment alone and this goes further still.
+It inserts `layout` blocks without rewriting declarations, so comments and
+columns lined up by hand survive.
 
 **The picture does not change.** That is the whole promise, and it is checked
 rather than asserted: the file is rendered before and after, and if the two
@@ -657,9 +660,9 @@ layout {
 }
 ```
 
-**Anchors may point forward.** The solver runs repeated passes, so
-`node a right-of b` before `node b` is declared works fine. A genuine loop
-is reported as `anchor cycle between: a, b`.
+**Anchors may point forward.** A `place a right-of b` relation can reference
+a node declared later. The solver resolves the declared relations together;
+contradictory relations are reported as errors.
 
 **A node with no placement** flows from the previous one in source order,
 using the graph's `flow` direction and `gap`. The first node lands at
@@ -1030,6 +1033,23 @@ The watch page shows parse and layout errors in place, so a broken file
 doesn't cost you the preview. Scroll to zoom, drag to pan, `f` to fit the
 diagram, `0` for actual size; the view is kept across the reload that a save
 triggers.
+
+**Inspect layout** opens the provenance panel. Select a node or frame in the drawing
+or its source line to see solved bounds, the five anchors, its parent and the
+layout relations controlling X, Y, width and height. Relation and diagnostic
+buttons select the originating file and line, including files brought in with
+`include`. Conflicts remain inspectable when no geometry can be solved.
+For archetypes that manage their own geometry, the panel shows the type's layout
+policy and the style cascade. Where the renderer has no individual entity bounds
+(for example pie slices), the panel says so; source selection remains available.
+The highlights are preview overlays and are absent from exported SVGs.
+
+The language server uses the same provenance: go to definition on a node or frame
+declaration jumps to its controlling layout mention, and from a layout mention
+jumps back to the declaration. Find references lists structural mentions; hover
+shows placement and paint reasons, and the outline expands layout blocks into
+relations. `bgraph explain diagram.bd frame_id` also explains frame bounds and
+translations.
 
 `check` prints `file:line:col: severity: message` and exits non-zero if any
 error was found — the form editors and CI already understand:

@@ -49,6 +49,9 @@ pub fn schema() -> String {
                 "item": def.item,
                 "items": def.items().collect::<Vec<_>>(),
                 "description": def.doc,
+                "layoutCapability": def.layout_capability().as_str(),
+                "layoutStatements": def.layout.statements(),
+                "layoutGuides": def.layout.guides(),
                 "settings": def.props.iter().map(&property).collect::<Vec<_>>(),
                 "itemProperties": def.item_props.iter().map(&property).collect::<Vec<_>>(),
                 "slots": def.slots.iter().map(|slot| json!({
@@ -190,12 +193,41 @@ fn archetypes(m: &mut String) {
          Without it the file is `free`.\n\n\
          Every archetype reads the *same* statements: a `node` is a box, a \
          slice or a bitfield depending on the genre. The style cascade, the \
-         diagnostics and the editor support are identical in all of them — \
-         what changes is which properties carry meaning.\n",
+         diagnostics and the editor support share the same vocabulary tables. \
+         The geometry contract below determines which placements are meaningful.\n",
     );
+
+    m.push_str(
+        "\n### Geometry ownership\n\n\
+         `Declared` accepts the complete `layout` language: `place`, `align`, \
+         `equal-width`, `equal-height`, `row` and `column`, including local blocks \
+         inside groups. `ArchetypeManaged` computes geometry from its data and \
+         rejects `layout` blocks and `note` statements. `Hybrid` is reserved for \
+         renderers with an explicit contract of named guides; no current genre \
+         is Hybrid, and the current grammar has no named guide statements.\n\n\
+         | Archetype | Geometry | Supported layout statements | Named guides |\n\
+         |---|---|---|---|\n",
+    );
+    for def in props::ARCHETYPES {
+        let statements = def.layout.statements().join(", ");
+        let guides = def.layout.guides().join(", ");
+        let _ = writeln!(
+            m,
+            "| `{}` | `{}` | {} | {} |",
+            def.name,
+            def.layout_capability().as_str(),
+            if statements.is_empty() {
+                "none"
+            } else {
+                &statements
+            },
+            if guides.is_empty() { "none" } else { &guides },
+        );
+    }
 
     for def in props::ARCHETYPES {
         let _ = write!(m, "\n### `type {}`\n\n{}\n", def.name, squash(def.doc));
+        let _ = writeln!(m, "\nGeometry: `{}`.", def.layout_capability().as_str());
 
         let shape = slot_shape(def.slots);
         let _ = write!(
@@ -530,8 +562,9 @@ transparent fill and the label set into the top-left.
 | `gap <n>` | distance to the anchor; defaults to the graph `gap` |
 | `align <kw>` | cross-axis alignment against the anchor |
 
-Anchors may point **forward**: the solver runs repeated passes, so a node may
-be anchored to one declared later. A genuine loop is reported as an error.
+Anchors may point **forward**: a `place` relation may reference a node declared
+later. The solver resolves the declared relations together; contradictory
+relations are reported as errors.
 
 A node with no placement flows from the previous one in source order, using
 the graph's `flow` direction and `gap`. The first node lands at `(0, 0)`.
@@ -679,7 +712,7 @@ value nobody has bound yet.
 From the shell:
 
 ```
-bgraph revenue.bd -o revenue.svg --set year=2026 --set emea=4820
+bgraph revenue.bd -o revenue.svg --set year=2026 --set emea=4820 --set amer_label=Americas --set amer=6310
 bgraph revenue.bd --emit --set …          # print the filled source instead
 ```
 
@@ -693,7 +726,8 @@ let svg = template.render(
     &Bindings::new()
         .set("year", 2026i64)
         .set("emea", 4820i64)
-        .set("amer_label", "Americas"),
+        .set("amer_label", "Americas")
+        .set("amer", 6310i64),
 )?;
 ```
 
@@ -738,16 +772,17 @@ conditions**. A line naming two lists is refused when the template is read,
 because there is no number of repetitions a reader could predict. No rows
 means the line is not written at all: a chart of nothing draws nothing.
 
-Rows come from the library, not the CLI. `--set` binds scalars; a list of rows
-is what a document generator has and a shell argument is not.
+Rows can come from `Bindings::rows` in Rust, an array of objects supplied with
+`--data`, or a CSV bound with `--rows name=file.csv`. `--set` binds scalars.
 
 ## Building only what you use
 
 Every archetype is a cargo feature, so a program that needs one chart does not
-compile the other fourteen:
+compile the unused genres. The project is not published on crates.io; with
+access to the source repository, use a path dependency:
 
 ```toml
-bgraph = { version = "0.1", default-features = false, features = ["pie"] }
+bgraph = { path = "/path/to/bgraph", default-features = false, features = ["pie"] }
 ```
 
 `free` is not a feature — it is the language itself, and a file that declares

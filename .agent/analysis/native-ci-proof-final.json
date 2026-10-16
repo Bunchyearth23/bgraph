@@ -1,0 +1,349 @@
+{
+  "schemaVersion": 1,
+  "auditedAtUtc": "2026-10-16T12:15:08.431665+00:00",
+  "repository": "Bunchyearth23/bgraph",
+  "runId": 38898281988,
+  "revision": "863008506ed4f2546de7c2b95f9983a4ce26ddbe",
+  "runUrl": "https://github.com/Bunchyearth23/bgraph/actions/runs/38898281988",
+  "runStatus": "completed",
+  "overallRunConclusion": "success",
+  "observedNativeOutcome": "pass",
+  "scope": "Final native source/SVG/unrounded-geometry/diagnostic parity and actual overall CI success at this immutable revision.",
+  "compilerVersion": "0.1.0",
+  "buildProfile": "debug",
+  "features": {
+    "cli": true,
+    "pdf": true,
+    "json": true,
+    "csv": true,
+    "completions": true,
+    "png": false,
+    "wasm": false,
+    "typst": false
+  },
+  "caseCount": 52,
+  "exampleCount": 30,
+  "fixtureCount": 22,
+  "validCaseCount": 42,
+  "invalidCaseCount": 10,
+  "hashEncoding": "SHA-256 of UTF-8 JSON, sorted object keys, no whitespace, literal Unicode, original array order. Sources use [[case.id,case.source],...]; SVG/geometry use [[case.id,field],...]; diagnostics use [[case.id,case.diagnostics,case.renderError],...]. Snapshot hashes the snapshot object. Archive/JSON hashes use original raw bytes.",
+  "commonSha256": {
+    "sources": "f3bc9f950e2e3848416ec848d15ca5af53646976bcdfeb37c381aed4e4afbb74",
+    "snapshot": "3c7d8a73b2090d64e3788a07dc68f035ba51ec412371996a06ee92021ea00fb4",
+    "svg": "ed54515cd64aad8967c135270f11e436667d7b31e5c0ad7b1904827c05f43c4f",
+    "geometryBits": "8f4764e3c45606507bb0c3af7778cdc2a0c21008771d6a9436990ad813f8f204",
+    "diagnosticsAndRenderError": "84e34f66fadbe8d2d2dfe96cffcbcb2d026979b376b327f1fbe39d80841e5c0d"
+  },
+  "previousProof": {
+    "path": "native-ci-proof.json",
+    "runId": 38895893757,
+    "revision": "90163b769f8be9a125424eba3ba4694ee4a1e967",
+    "overallRunConclusion": "failure",
+    "semanticSnapshotUnchanged": true
+  },
+  "aggregateJob": {
+    "id": 116965688729,
+    "url": "https://github.com/Bunchyearth23/bgraph/actions/runs/38898281988/job/116965688729",
+    "conclusion": "success",
+    "comparatorRejectsChangedProofCount": 18
+  },
+  "independentComparison": {
+    "command": "GITHUB_SHA=863008506ed4f2546de7c2b95f9983a4ce26ddbe node tests/runtime/compare-native.mjs /tmp/bgraph-ci-audit-38898281988/artifacts",
+    "exitCode": 0,
+    "stdout": "Native parity passed: five runners, 52 identical sources/SVG/geometry-bit/diagnostic snapshots, 3 local runs and 3 fresh processes per runner.",
+    "checks": [
+      "five provider jobs succeeded on their matching runner labels",
+      "each document matches final run revision, default features and expected native os/arch",
+      "three local runs and three fresh children each repeated three times on every platform",
+      "all 52 cases compare without normalization of SVG, geometry bits or diagnostics",
+      "five archive SHA-256 digests independently match GitHub metadata",
+      "semantic snapshots match the first historical run exactly",
+      "all 16 jobs in the final remote workflow succeeded"
+    ],
+    "log": "/tmp/bgraph-ci-native-independent-final.log"
+  },
+  "platforms": [
+    {
+      "runner": "ubuntu-latest",
+      "os": "linux",
+      "arch": "x86_64",
+      "jobId": 116963947115,
+      "jobConclusion": "success",
+      "jobUrl": "https://github.com/Bunchyearth23/bgraph/actions/runs/38898281988/job/116963947115",
+      "providerRunnerId": 1000000628,
+      "providerRunnerName": "GitHub Actions 1000000628",
+      "runnerLabels": [
+        "ubuntu-latest"
+      ],
+      "artifactId": 12044692194,
+      "artifactName": "native-snapshot-v1-ubuntu-latest-863008506ed4f2546de7c2b95f9983a4ce26ddbe",
+      "archiveSha256": "10cb8b96c3843db3ce6f89787fa7e26b925a9e8f44badfe481d1503e54ca4d0a",
+      "archiveDigestVerified": true,
+      "jsonSha256": "00115900dcc75844f165b52a74e4f536ca36d543e80e87859c5262ec0be4d17a",
+      "jsonMatchesRemoteArchive": true,
+      "sourceSha256": "f3bc9f950e2e3848416ec848d15ca5af53646976bcdfeb37c381aed4e4afbb74",
+      "snapshotSha256": "3c7d8a73b2090d64e3788a07dc68f035ba51ec412371996a06ee92021ea00fb4",
+      "verification": {
+        "childInProcessRuns": [
+          3,
+          3,
+          3
+        ],
+        "freshProcesses": 3,
+        "inProcessRuns": 3
+      }
+    },
+    {
+      "runner": "ubuntu-24.04-arm",
+      "os": "linux",
+      "arch": "aarch64",
+      "jobId": 116963947229,
+      "jobConclusion": "success",
+      "jobUrl": "https://github.com/Bunchyearth23/bgraph/actions/runs/38898281988/job/116963947229",
+      "providerRunnerId": 1000000629,
+      "providerRunnerName": "GitHub Actions 1000000629",
+      "runnerLabels": [
+        "ubuntu-24.04-arm"
+      ],
+      "artifactId": 12044822136,
+      "artifactName": "native-snapshot-v1-ubuntu-24.04-arm-863008506ed4f2546de7c2b95f9983a4ce26ddbe",
+      "archiveSha256": "2da1e779bdc334b9a7090f42dec3ecc05fcf6e6ed6f13217587f0f9b7465fdc9",
+      "archiveDigestVerified": true,
+      "jsonSha256": "915f5cfb127e86dc301832bc625fea47c13f9f9d9ce84dba10c4d360c22a0842",
+      "jsonMatchesRemoteArchive": true,
+      "sourceSha256": "f3bc9f950e2e3848416ec848d15ca5af53646976bcdfeb37c381aed4e4afbb74",
+      "snapshotSha256": "3c7d8a73b2090d64e3788a07dc68f035ba51ec412371996a06ee92021ea00fb4",
+      "verification": {
+        "childInProcessRuns": [
+          3,
+          3,
+          3
+        ],
+        "freshProcesses": 3,
+        "inProcessRuns": 3
+      }
+    },
+    {
+      "runner": "windows-latest",
+      "os": "windows",
+      "arch": "x86_64",
+      "jobId": 116963947312,
+      "jobConclusion": "success",
+      "jobUrl": "https://github.com/Bunchyearth23/bgraph/actions/runs/38898281988/job/116963947312",
+      "providerRunnerId": 1000000632,
+      "providerRunnerName": "GitHub Actions 1000000632",
+      "runnerLabels": [
+        "windows-latest"
+      ],
+      "artifactId": 12044927232,
+      "artifactName": "native-snapshot-v1-windows-latest-863008506ed4f2546de7c2b95f9983a4ce26ddbe",
+      "archiveSha256": "0e7cc1954f3f9100fc9ab170d98c794ddbc20e7220903a10de5860636d6d2b03",
+      "archiveDigestVerified": true,
+      "jsonSha256": "42817d97ce1138417a8f9ff190e310dd0ca991dcf84674657b523db9b65744a8",
+      "jsonMatchesRemoteArchive": true,
+      "sourceSha256": "f3bc9f950e2e3848416ec848d15ca5af53646976bcdfeb37c381aed4e4afbb74",
+      "snapshotSha256": "3c7d8a73b2090d64e3788a07dc68f035ba51ec412371996a06ee92021ea00fb4",
+      "verification": {
+        "childInProcessRuns": [
+          3,
+          3,
+          3
+        ],
+        "freshProcesses": 3,
+        "inProcessRuns": 3
+      }
+    },
+    {
+      "runner": "windows-11-arm",
+      "os": "windows",
+      "arch": "aarch64",
+      "jobId": 116963947118,
+      "jobConclusion": "success",
+      "jobUrl": "https://github.com/Bunchyearth23/bgraph/actions/runs/38898281988/job/116963947118",
+      "providerRunnerId": 1000000631,
+      "providerRunnerName": "GitHub Actions 1000000631",
+      "runnerLabels": [
+        "windows-11-arm"
+      ],
+      "artifactId": 12044802793,
+      "artifactName": "native-snapshot-v1-windows-11-arm-863008506ed4f2546de7c2b95f9983a4ce26ddbe",
+      "archiveSha256": "acc0cbc1ae56a5e157043e249c4399c211555a8475ef78694134edef36d5e17f",
+      "archiveDigestVerified": true,
+      "jsonSha256": "7636147efe1181aa37c53397a3a796e9ebe536c30499421bdef837aa457cda84",
+      "jsonMatchesRemoteArchive": true,
+      "sourceSha256": "f3bc9f950e2e3848416ec848d15ca5af53646976bcdfeb37c381aed4e4afbb74",
+      "snapshotSha256": "3c7d8a73b2090d64e3788a07dc68f035ba51ec412371996a06ee92021ea00fb4",
+      "verification": {
+        "childInProcessRuns": [
+          3,
+          3,
+          3
+        ],
+        "freshProcesses": 3,
+        "inProcessRuns": 3
+      }
+    },
+    {
+      "runner": "macos-latest",
+      "os": "macos",
+      "arch": "aarch64",
+      "jobId": 116963947218,
+      "jobConclusion": "success",
+      "jobUrl": "https://github.com/Bunchyearth23/bgraph/actions/runs/38898281988/job/116963947218",
+      "providerRunnerId": 1000000630,
+      "providerRunnerName": "GitHub Actions 1000000630",
+      "runnerLabels": [
+        "macos-latest"
+      ],
+      "artifactId": 12045136215,
+      "artifactName": "native-snapshot-v1-macos-latest-863008506ed4f2546de7c2b95f9983a4ce26ddbe",
+      "archiveSha256": "5ac9e7c0451c72effbad7adcc0ba07f5de7d76a1af65787efdac2d7a18d3d140",
+      "archiveDigestVerified": true,
+      "jsonSha256": "5ec371c0977cfd03a6e700f502a41a1e4830695607c7fcc7abbec6a15f6d8cc3",
+      "jsonMatchesRemoteArchive": true,
+      "sourceSha256": "f3bc9f950e2e3848416ec848d15ca5af53646976bcdfeb37c381aed4e4afbb74",
+      "snapshotSha256": "3c7d8a73b2090d64e3788a07dc68f035ba51ec412371996a06ee92021ea00fb4",
+      "verification": {
+        "childInProcessRuns": [
+          3,
+          3,
+          3
+        ],
+        "freshProcesses": 3,
+        "inProcessRuns": 3
+      }
+    }
+  ],
+  "overallCi": {
+    "jobCount": 16,
+    "allJobsSucceeded": true,
+    "jobs": [
+      {
+        "id": 116963946950,
+        "name": "Runtime and extension parity",
+        "conclusion": "success"
+      },
+      {
+        "id": 116963947079,
+        "name": "Feature build (bpmn)",
+        "conclusion": "success"
+      },
+      {
+        "id": 116963947115,
+        "name": "Native build and determinism (ubuntu-latest)",
+        "conclusion": "success"
+      },
+      {
+        "id": 116963947118,
+        "name": "Native build and determinism (windows-11-arm)",
+        "conclusion": "success"
+      },
+      {
+        "id": 116963947123,
+        "name": "Feature build (none)",
+        "conclusion": "success"
+      },
+      {
+        "id": 116963947135,
+        "name": "Feature build (packet)",
+        "conclusion": "success"
+      },
+      {
+        "id": 116963947208,
+        "name": "check",
+        "conclusion": "success"
+      },
+      {
+        "id": 116963947218,
+        "name": "Native build and determinism (macos-latest)",
+        "conclusion": "success"
+      },
+      {
+        "id": 116963947221,
+        "name": "Feature build (packet,json,csv,pdf)",
+        "conclusion": "success"
+      },
+      {
+        "id": 116963947224,
+        "name": "Feature build (cli,completions)",
+        "conclusion": "success"
+      },
+      {
+        "id": 116963947229,
+        "name": "Native build and determinism (ubuntu-24.04-arm)",
+        "conclusion": "success"
+      },
+      {
+        "id": 116963947236,
+        "name": "Feature build (png)",
+        "conclusion": "success"
+      },
+      {
+        "id": 116963947312,
+        "name": "Native build and determinism (windows-latest)",
+        "conclusion": "success"
+      },
+      {
+        "id": 116963947347,
+        "name": "Feature build (wasm)",
+        "conclusion": "success"
+      },
+      {
+        "id": 116963947354,
+        "name": "Feature build (pie)",
+        "conclusion": "success"
+      },
+      {
+        "id": 116965688729,
+        "name": "Exact native parity (five platforms)",
+        "conclusion": "success"
+      }
+    ],
+    "checkJobId": 116963947208,
+    "testSuites": [
+      {
+        "passed": 693,
+        "failed": 0,
+        "ignored": 1
+      },
+      {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "passed": 0,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "passed": 9,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "passed": 1,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "passed": 6,
+        "failed": 0,
+        "ignored": 0
+      },
+      {
+        "passed": 3,
+        "failed": 0,
+        "ignored": 0
+      }
+    ],
+    "passedTestCount": 714,
+    "ignoredTestCount": 1,
+    "checkLog": "/tmp/bgraph-ci-check-success-38898281988.log"
+  }
+}

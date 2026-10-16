@@ -17,6 +17,8 @@ pub(super) struct Context {
     pub(super) in_string: bool,
     pub(super) in_comment: bool,
     pub(super) block: Option<Block>,
+    pub(super) statement_start: usize,
+    pub(super) scope_start: Option<usize>,
 }
 
 impl Context {
@@ -25,8 +27,9 @@ impl Context {
         let mut chars = text[..offset.min(text.len())].char_indices().peekable();
         let mut in_string = false;
         let mut in_comment = false;
-        while let Some((_, c)) = chars.next() {
-            let i = chars.peek().map(|(j, _)| *j).unwrap_or(text.len());
+        let mut statement_start = 0;
+        let mut parentheses = 0usize;
+        while let Some((i, c)) = chars.next() {
             match c {
                 '\\' if in_string => {
                     chars.next();
@@ -34,41 +37,70 @@ impl Context {
                 '"' => in_string = !in_string,
                 '/' if !in_string && matches!(chars.peek(), Some((_, '/'))) => {
                     in_comment = true;
-                    for (_, c) in chars.by_ref() {
+                    for (j, c) in chars.by_ref() {
                         if c == '\n' {
                             in_comment = false;
+                            statement_start = j + 1;
+                            parentheses = 0;
                             break;
                         }
                     }
                 }
-                '{' if !in_string => stack.push(i - c.len_utf8()),
+                '{' if !in_string && matches!(chars.peek(), Some((_, '{'))) => {
+                    chars.next();
+                    while let Some((_, ch)) = chars.next() {
+                        if ch == '}' && matches!(chars.peek(), Some((_, '}'))) {
+                            chars.next();
+                            break;
+                        }
+                    }
+                }
+                '{' if !in_string => {
+                    let head = &text[statement_start..i];
+                    let block = match head.split_whitespace().next() {
+                        Some("type") => Block::Type,
+                        Some("graph") => Block::Graph,
+                        Some("layout") => Block::Layout,
+                        Some("group" | "activate" | "component") => Block::Container,
+                        Some("style") => {
+                            Block::Style(head.split_whitespace().nth(1).and_then(|name| {
+                                props::archetype(declared_archetype(text))
+                                    .and_then(|def| props::theme_target(def, name))
+                                    .map(|target| target.name())
+                            }))
+                        }
+                        _ if declares_an_edge(head) => Block::Edge,
+                        _ => Block::Node,
+                    };
+                    stack.push((i, block));
+                    statement_start = i + 1;
+                }
                 '}' if !in_string => {
                     stack.pop();
+                    statement_start = i + 1;
+                    parentheses = 0;
                 }
+                '(' if !in_string => parentheses += 1,
+                ')' if !in_string => parentheses = parentheses.saturating_sub(1),
+                '\n' if !in_string => {
+                    statement_start = i + 1;
+                    parentheses = 0;
+                }
+                ';' | ',' if !in_string && parentheses == 0 => statement_start = i + 1,
                 _ => {}
             }
         }
-        let block = stack.pop().map(|brace| {
-            let line_start = text[..brace].rfind('\n').map(|i| i + 1).unwrap_or(0);
-            let head = &text[line_start..brace];
-            match head.split_whitespace().next() {
-                Some("type") => Block::Type,
-                Some("graph") => Block::Graph,
-                Some("layout") => Block::Layout,
-                Some("group") | Some("activate") | Some("component") => Block::Container,
-                Some("style") => Block::Style(head.split_whitespace().nth(1).and_then(|name| {
-                    props::archetype(declared_archetype(text))
-                        .and_then(|def| props::theme_target(def, name))
-                        .map(|target| target.name())
-                })),
-                _ if declares_an_edge(head) => Block::Edge,
-                _ => Block::Node,
-            }
-        });
+        let block = stack.last().map(|(_, block)| *block);
+        let scope_start = stack
+            .iter()
+            .rev()
+            .find_map(|(brace, block)| (*block == Block::Container).then_some(*brace));
         Context {
             in_string,
             in_comment,
             block,
+            statement_start,
+            scope_start,
         }
     }
 }

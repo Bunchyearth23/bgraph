@@ -70,7 +70,7 @@ disagree.
 - `cargo run --bin bgraph -- check /tmp/a.bd` — diagnostics as `file:line:col`
 - `cargo run --bin bgraph -- docs -o docs/reference.md` — regenerate the manual
 - `cargo test` (555 tests: `src/tests.rs` + `#[cfg(test)]` in `src/lsp.rs`)
-- `cargo build --no-default-features` — the five-dependency library. **A CI
+- `cargo build --no-default-features` — the six-dependency library. **A CI
   step, and it has been red before**: a `#[cfg]` on a type without one on its
   users compiles under `default` and not here
 - `./playground/build.sh` — the wasm module, into `playground/public/`

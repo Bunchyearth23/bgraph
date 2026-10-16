@@ -1,5 +1,6 @@
 # Reproducible PNG snapshots. `0` means the test prints the initial FNV-1a.
+# Text uses tests/fixtures/fonts/DejaVuSans.ttf via the embedded-font path.
 # A snapshot comparison is intentionally exact: threshold = 0 differing bytes.
 shapes a14676b474c3a993
-labels 15fb52553492552c
-charts 3ac0788c44ba9a76
+labels 8ecbbf6662c1541f
+charts c7b79283142cd658

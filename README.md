@@ -49,6 +49,18 @@ bgraph fmt --migrate old.bd        # rewrite what a language change removed
 
 ## Start here
 
+**Documentation utilisateur en français : [guide](docs/guide/index.md).**
+Le site MkDocs ajoute une navigation, une recherche et la galerie des 30 types :
+
+```sh
+./docs.sh
+```
+
+Ouvrez <http://127.0.0.1:8000>. Pour produire le site statique dans `site/` :
+`./docs.sh build`.
+Voir [maintenir la documentation](docs/guide/documentation.md) pour Windows
+et l'organisation des pages.
+
 1. Create a file from a worked archetype:
 
    ```sh
@@ -122,7 +134,7 @@ order: source, placement, style, data, then composition.
 
 ## In a browser
 
-The core is five dependencies of pure Rust and the SVG writer is hand-written,
+The core is six dependencies of pure Rust and the SVG writer is hand-written,
 so the renderer compiles to wasm nearly as it stands:
 
 ```sh

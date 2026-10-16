@@ -1,16 +1,14 @@
-//! Anchor solver: turns declarative placement into absolute rectangles.
-//!
-//! Nodes are resolved by repeated passes — a node whose anchor is not placed
-//! yet simply waits for the next round. If a full pass places nothing, the
-//! remaining nodes form an anchor cycle.
+//! Turns declarations into measured boxes and solves all placement relations simultaneously.
 
 use std::collections::HashMap;
 
 use anyhow::{Result, bail};
 
 use crate::ast::*;
+#[cfg(test)]
+use crate::placement::EffectivePlacement;
 pub use crate::placement::Entity;
-use crate::placement::{EffectivePlacement, PlacementPlan};
+use crate::placement::PlacementPlan;
 use crate::style::{GraphOpts, Registry, Shape, StateKind, Style};
 
 #[derive(Debug, Clone, Copy)]
@@ -492,72 +490,11 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     }
     let registry = Registry::build(&diagram.styles)?;
 
-    // The archetype decides what the statements mean.
-    let chart: Option<Result<Layout>> = match diagram
-        .archetype
-        .as_ref()
-        .map(|a| a.as_str())
-        .unwrap_or("free")
-    {
-        #[cfg(feature = "pie")]
-        "pie" => Some(crate::charts::pie(diagram, opts.clone(), &registry)),
-        #[cfg(feature = "packet")]
-        "packet" => Some(crate::charts::packet(diagram, opts.clone(), &registry)),
-        #[cfg(feature = "kanban")]
-        "kanban" => Some(crate::charts::kanban(diagram, opts.clone(), &registry)),
-        #[cfg(feature = "journey")]
-        "journey" => Some(crate::charts::journey(diagram, opts.clone(), &registry)),
-        #[cfg(feature = "radar")]
-        "radar" => Some(crate::charts::radar(diagram, opts.clone(), &registry)),
-        #[cfg(feature = "rack")]
-        "rack" => Some(crate::charts::rack(diagram, opts.clone(), &registry)),
-        #[cfg(feature = "venn")]
-        "venn" => Some(crate::charts::venn(diagram, opts.clone(), &registry)),
-        #[cfg(feature = "gitgraph")]
-        "gitgraph" => Some(crate::charts::gitgraph(diagram, opts.clone(), &registry)),
-        #[cfg(feature = "orgchart")]
-        "orgchart" => Some(crate::charts::tree(
-            diagram,
-            opts.clone(),
-            &registry,
-            crate::charts::TreeKind::Org,
-        )),
-        #[cfg(feature = "mindmap")]
-        "mindmap" => Some(crate::charts::tree(
-            diagram,
-            opts.clone(),
-            &registry,
-            crate::charts::TreeKind::Mind,
-        )),
-        #[cfg(feature = "treeview")]
-        "treeview" => Some(crate::charts::tree(
-            diagram,
-            opts.clone(),
-            &registry,
-            crate::charts::TreeKind::View,
-        )),
-        #[cfg(feature = "bytefield")]
-        "bytefield" => Some(crate::charts::bytefield(diagram, opts.clone(), &registry)),
-        #[cfg(feature = "treemap")]
-        "treemap" => Some(crate::charts::treemap(diagram, opts.clone(), &registry)),
-        #[cfg(feature = "quadrant")]
-        "quadrant" => Some(crate::charts::quadrant(diagram, opts.clone(), &registry)),
-        #[cfg(feature = "wave")]
-        "wave" => Some(crate::charts::wave(diagram, opts.clone(), &registry)),
-        #[cfg(feature = "sankey")]
-        "sankey" => Some(crate::charts::sankey(diagram, opts.clone(), &registry)),
-        #[cfg(feature = "bar")]
-        "bar" => Some(crate::charts::bar(diagram, opts.clone(), &registry)),
-        #[cfg(feature = "xy")]
-        "xy" => Some(crate::charts::xy(diagram, opts.clone(), &registry)),
-        #[cfg(feature = "sequence")]
-        "sequence" => Some(crate::charts::sequence(diagram, opts.clone(), &registry)),
-        #[cfg(feature = "gantt")]
-        "gantt" => Some(crate::charts::gantt(diagram, opts.clone(), &registry)),
-        #[cfg(feature = "timeline")]
-        "timeline" => Some(crate::charts::timeline(diagram, opts.clone(), &registry)),
-        _ => None,
-    };
+    // The same archetype contract controls validation and geometry dispatch.
+    let chart = crate::check::archetype_of(diagram)
+        .layout
+        .solver()
+        .map(|solve| solve(diagram, opts.clone(), &registry));
 
     // One funnel for every genre. A heading can only be placed once the
     // drawing's width is known, and that is after the archetype has finished —
@@ -630,18 +567,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     };
     for node in &diagram.nodes {
         let mut style = registry
-            .resolve(
-                node_base.clone(),
-                item.style_word(node.keyword.as_str()),
-                &node.classes,
-                // `props_for`, not `effective_props(item.slots)`: the
-                // positional shape follows the **word the author wrote**
-                // (`D-023`). The free path read the archetype's primary slots
-                // instead, which was invisible for as long as `xy` was the only
-                // genre with a second word — and `xy` is a chart, so it never
-                // came through here. `bpmn` is the first to have four.
-                &node.props_for(item),
-            )
+            .resolve_node(node_base.clone(), item, node)
             .map_err(|e| e.context(format!("in node `{}`", node.id.as_str())))?;
 
         // A pseudo-state is a mark, not a box: it takes a shape and a fixed
@@ -837,10 +763,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         labels.push(lines);
     }
 
-    // Pass 2 — place. Nodes and groups share one namespace and one fixpoint:
-    // a node waits for its anchor, a group waits for its members. A group
-    // carrying a placement translates its whole subtree once solved, so its
-    // members only count as anchorable after that translation.
+    // Pass 2 — solve all node relations, frame bounds and local translations together.
     // Size constraints run *before* placement, because a box widened after
     // the fact does not push its neighbours along — it lands on top of them.
     // Placement already knows how to lay out boxes of a given size, so the
@@ -867,34 +790,20 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         })
         .collect();
 
-    // Nodes, frames and local origins share one Cassowary system. Graphs above
-    // its measured size budget keep the validated transitional path.
-    let solved = if let Some(nodes) = crate::constraint_layout::solve_declared(
+    // Every declared relation, local origin and content-sized frame is solved simultaneously.
+    let geometry = crate::constraint_layout::solve_declared(
         diagram,
         &placement,
         &sizes,
         &intrinsic_sizes,
         &overhang,
         &opts,
-    )? {
-        Solved {
-            nodes: nodes.nodes.into_iter().map(Some).collect(),
-            groups: nodes.groups.into_iter().map(Some).collect(),
-            frame_translations: Vec::new(),
-        }
-    } else {
-        let mut solved = place_all(diagram, &placement, &sizes, &overhang, &opts)?;
-        // The large-graph fallback is checked against the same final contracts.
-        constrain_alignment(&placement, &mut solved);
-        crate::constraint_layout::validate_frames(
-            diagram,
-            &placement,
-            &solved.nodes,
-            &solved.groups,
-            &solved.frame_translations,
-            &opts,
-        )?;
-        solved
+    )?;
+    let solved = Solved {
+        nodes: geometry.nodes.into_iter().map(Some).collect(),
+        groups: geometry.groups.into_iter().map(Some).collect(),
+        #[cfg(test)]
+        frame_translations: Vec::new(),
     };
     let frame_errors =
         crate::check::frame_geometry(diagram, &solved.nodes, &solved.groups, &overhang);
@@ -1692,24 +1601,10 @@ pub struct Solved {
     pub nodes: Vec<Option<Rect>>,
     pub groups: Vec<Option<Rect>>,
     /// Incremental translations actually applied by the transitional placer.
+    #[cfg(test)]
     pub frame_translations: Vec<(f64, f64)>,
 }
 
-/// One fixpoint over both kinds of entity.
-///
-/// A node waits for its anchor; a group waits for its members. A group is
-/// *sized* by its members — never the other way round — which keeps `D-001`
-/// intact: the nodes still say where they go. A group that carries a
-/// placement translates its whole subtree once its members have landed, and
-/// its members only become anchorable after that translation, so nothing
-/// outside can latch onto a position that is about to move.
-/// Apply the declared constraints to the solved rectangles.
-///
-/// A pass over what is already placed, in declaration order, adjusting one
-/// axis and never the order — which is the whole of what `D-031` allows,
-/// because `D-001` makes the order the author's to state. Nothing here can
-/// move a box past another one.
-///
 /// `equal-width` and `equal-height`, applied to the intrinsic sizes.
 fn constrain_sizes(plan: &PlacementPlan<'_>, sizes: &mut [(f64, f64)]) {
     use crate::ast::ConstraintKind;
@@ -1789,6 +1684,7 @@ impl DisjointSets {
 }
 
 /// `align`, applied to the solved rectangles.
+#[cfg(test)]
 fn constrain_alignment(plan: &PlacementPlan<'_>, solved: &mut Solved) {
     use crate::ast::{ConstraintAxis, ConstraintKind};
 
@@ -1913,6 +1809,8 @@ fn snap_to_grid(rect: Rect, opts: &GraphOpts, sizes: &[(f64, f64)]) -> Rect {
     }
 }
 
+/// Previous fixpoint placer, retained only as a geometry oracle.
+#[cfg(test)]
 fn place_all(
     diagram: &Diagram,
     plan: &PlacementPlan<'_>,
@@ -2171,7 +2069,7 @@ fn place_all(
     })
 }
 
-/// The exact content-bounds contract shared by validation and the fallback.
+/// The exact content-bounds contract checked after simultaneous placement.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct FrameMeasure {
     pub(crate) frame: Rect,
@@ -2222,6 +2120,7 @@ pub(crate) fn measure_frame(
     })
 }
 
+#[cfg(test)]
 fn translate_subtree(
     diagram: &Diagram,
     index: &HashMap<&str, Entity>,
@@ -2250,6 +2149,7 @@ fn translate_subtree(
     }
 }
 
+#[cfg(test)]
 fn settle_subtree(
     diagram: &Diagram,
     index: &HashMap<&str, Entity>,
@@ -2346,7 +2246,7 @@ mod frame_solver_tests {
                 .iter()
                 .map(|node| (node.rect.w, node.rect.h))
                 .collect();
-            let baseline = place_all(
+            let mut baseline = place_all(
                 &diagram,
                 &plan,
                 &sizes,
@@ -2354,6 +2254,7 @@ mod frame_solver_tests {
                 &actual.opts,
             )
             .unwrap();
+            constrain_alignment(&plan, &mut baseline);
             let mut largest_delta = 0.0_f64;
             for (actual, baseline) in actual
                 .nodes
@@ -2422,7 +2323,6 @@ mod frame_solver_tests {
                 let actual = crate::constraint_layout::solve_declared(
                     &diagram, &plan, &sizes, &sizes, &overhang, &opts,
                 )
-                .unwrap()
                 .unwrap();
                 let new_time = started.elapsed();
                 for (actual, baseline) in actual

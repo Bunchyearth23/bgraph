@@ -1,0 +1,13 @@
+graph { flow: down }
+node a { size: 40 20 }
+node b { size: 80 20 }
+node c
+node d
+layout {
+  align left a b
+  align right a b
+
+  place c at (0, 0)
+  place d at (0, 80)
+  align top c d
+}

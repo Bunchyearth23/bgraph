@@ -16,6 +16,18 @@ fn large_graph() -> String {
     source
 }
 
+fn placement_chain(count: usize) -> String {
+    let mut source = (0..count)
+        .map(|index| format!("node n{index} {{ size: 10 10 }}\n"))
+        .collect::<String>();
+    source.push_str("layout {\n place n0 at (0, 0)\n row ");
+    for index in 0..count {
+        source.push_str(&format!("n{index} "));
+    }
+    source.push_str("gap 2\n}\n");
+    source
+}
+
 fn ortho() -> String {
     let mut source = String::new();
     for row in 0..8 {
@@ -78,11 +90,10 @@ fn frames(count: usize, nested: bool) -> String {
     }
 }
 
-fn measure(name: &str, source: &str) -> Duration {
-    const RUNS: u32 = 10;
+fn measure(name: &str, source: &str, runs: u32) -> Duration {
     let parse_start = Instant::now();
     let mut diagrams = Vec::new();
-    for _ in 0..RUNS {
+    for _ in 0..runs {
         diagrams.push(bgraph::parser::parse_diagram(source).expect("benchmark parses"));
     }
     let parse = parse_start.elapsed();
@@ -92,13 +103,33 @@ fn measure(name: &str, source: &str) -> Duration {
         .map(|diagram| bgraph::layout::solve(diagram).expect("benchmark lays out"))
         .collect();
     let layout = layout_start.elapsed();
+    let validation_start = Instant::now();
+    for (diagram, solved) in diagrams.iter().zip(&layouts) {
+        std::hint::black_box(bgraph::check::after_layout(diagram, solved));
+    }
+    let validation = validation_start.elapsed();
     let render_start = Instant::now();
     for solved in &layouts {
         let _ = bgraph::render_svg::render(solved);
     }
     let render = render_start.elapsed();
-    let total = parse + layout + render;
-    println!("{name:12} parse={parse:?} layout={layout:?} render={render:?} total={total:?}");
+    let total = parse + layout + validation + render;
+    println!(
+        "{name:12} runs={runs} parse={parse:?} layout={layout:?} layout_mean={:?} validation={validation:?} render={render:?} total={total:?} mean={:?}",
+        layout / runs,
+        total / runs
+    );
+    total
+}
+
+fn measure_public_source() -> Duration {
+    let source = placement_chain(5_000);
+    let start = Instant::now();
+    for _ in 0..2 {
+        std::hint::black_box(bgraph::render_source(&source).expect("public pipeline renders"));
+    }
+    let total = start.elapsed();
+    println!("public-5000  runs=2 total={total:?} mean={:?}", total / 2);
     total
 }
 
@@ -144,6 +175,8 @@ fn measure_composition() -> Duration {
 }
 
 fn main() {
+    let case_filter =
+        std::env::args().find_map(|arg| arg.strip_prefix("--case=").map(str::to_owned));
     let cases = [
         ("large-graph", large_graph()),
         ("ortho", ortho()),
@@ -153,17 +186,48 @@ fn main() {
         ("frames-100", frames(100, false)),
         ("nested-50", frames(50, true)),
         ("nested-100", frames(100, true)),
+        ("chain-2000", placement_chain(2_000)),
+        ("chain-20000", placement_chain(20_000)),
+        ("frames-600", frames(600, false)),
+        ("nested-1000", frames(1_000, true)),
     ];
     let mut totals: Vec<_> = cases
         .iter()
-        .map(|(name, source)| measure(name, source))
+        .filter(|(name, _)| case_filter.as_ref().is_none_or(|filter| name == filter))
+        .map(|(name, source)| {
+            // The original cases retain their 5s total/10-run guard. Large-document
+            // budgets are per invocation, measured twice to keep the CI gate short.
+            let (runs, limit) = match *name {
+                "chain-2000" | "frames-600" => (2, Duration::from_millis(500) * 2),
+                "chain-20000" => (2, Duration::from_secs(3) * 2),
+                "nested-1000" => (2, Duration::from_secs(2) * 2),
+                _ => (10, Duration::from_secs(5)),
+            };
+            (*name, measure(name, source, runs), limit)
+        })
         .collect();
-    totals.push(measure_composition());
+    if case_filter
+        .as_deref()
+        .is_none_or(|filter| filter == "compose")
+    {
+        totals.push(("compose", measure_composition(), Duration::from_secs(5)));
+    }
+    if case_filter
+        .as_deref()
+        .is_none_or(|filter| filter == "public-5000")
+    {
+        totals.push((
+            "public-5000",
+            measure_public_source(),
+            Duration::from_secs(4),
+        ));
+    }
     if std::env::args().any(|argument| argument == "--check") {
-        let limit = Duration::from_secs(5);
-        assert!(
-            totals.iter().all(|total| *total <= limit),
-            "a benchmark exceeded the 5s regression threshold"
-        );
+        for (name, total, limit) in totals {
+            assert!(
+                total <= limit,
+                "{name} exceeded its regression budget: {total:?} > {limit:?}"
+            );
+        }
     }
 }

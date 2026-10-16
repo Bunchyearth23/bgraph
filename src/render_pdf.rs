@@ -454,7 +454,7 @@ impl Content {
         // radians from three o'clock.
         let at = |deg: f64, r: f64| {
             let a = (90.0 - deg).to_radians();
-            (cx + r * a.cos(), cy + r * a.sin())
+            (cx + r * crate::math::cos(a), cy + r * crate::math::sin(a))
         };
         let steps = (((end - start).abs() / 90.0).ceil() as usize).max(1);
         let step = (end - start) / steps as f64;
@@ -490,13 +490,19 @@ impl Content {
 
     fn arc(&mut self, cx: f64, cy: f64, r: f64, from: f64, to: f64) {
         let (a0, a1) = ((90.0 - from).to_radians(), (90.0 - to).to_radians());
-        let k = 4.0 / 3.0 * ((a1 - a0) / 4.0).tan();
+        let k = 4.0 / 3.0 * crate::math::tan((a1 - a0) / 4.0);
         let (p0, p1) = (
-            (cx + r * a0.cos(), cy + r * a0.sin()),
-            (cx + r * a1.cos(), cy + r * a1.sin()),
+            (cx + r * crate::math::cos(a0), cy + r * crate::math::sin(a0)),
+            (cx + r * crate::math::cos(a1), cy + r * crate::math::sin(a1)),
         );
-        let c1 = (p0.0 - k * r * a0.sin(), p0.1 + k * r * a0.cos());
-        let c2 = (p1.0 + k * r * a1.sin(), p1.1 - k * r * a1.cos());
+        let c1 = (
+            p0.0 - k * r * crate::math::sin(a0),
+            p0.1 + k * r * crate::math::cos(a0),
+        );
+        let c2 = (
+            p1.0 + k * r * crate::math::sin(a1),
+            p1.1 - k * r * crate::math::cos(a1),
+        );
         let _ = writeln!(
             self.body,
             "{} {} {} {} {} {} c",

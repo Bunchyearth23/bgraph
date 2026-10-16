@@ -6,23 +6,24 @@ use crate::check::{self, Severity};
 /// A `file://` URI as a path, when it is one.
 pub(crate) fn path_of(uri: &str) -> Option<std::path::PathBuf> {
     let rest = uri.strip_prefix("file://")?;
-    let mut out = String::with_capacity(rest.len());
+    let mut out = Vec::with_capacity(rest.len());
     let mut chars = rest.chars();
     while let Some(c) = chars.next() {
         if c != '%' {
-            out.push(c);
+            let mut encoded = [0; 4];
+            out.extend_from_slice(c.encode_utf8(&mut encoded).as_bytes());
             continue;
         }
         let hex: String = chars.by_ref().take(2).collect();
         match u8::from_str_radix(&hex, 16) {
-            Ok(byte) => out.push(byte as char),
+            Ok(byte) => out.push(byte),
             Err(_) => {
-                out.push('%');
-                out.push_str(&hex);
+                out.push(b'%');
+                out.extend_from_slice(hex.as_bytes());
             }
         }
     }
-    Some(std::path::PathBuf::from(out))
+    String::from_utf8(out).ok().map(std::path::PathBuf::from)
 }
 
 pub(crate) fn diagnostics_for(text: &str, path: Option<&std::path::Path>) -> Vec<Value> {

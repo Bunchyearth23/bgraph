@@ -1,0 +1,54 @@
+site_name: bgraph — guide utilisateur
+site_description: Créer, placer, styliser et exporter des diagrammes avec bgraph.
+docs_dir: docs/guide
+site_dir: site
+strict: true
+theme:
+  name: readthedocs
+  locale: fr
+  highlightjs: false
+  navigation_depth: 3
+plugins:
+  - search:
+      lang: [fr, en]
+hooks:
+  - docs/site_hooks.py
+watch:
+  - docs/reference.md
+  - docs/language.md
+  - docs/API.md
+  - examples
+markdown_extensions:
+  - admonition
+  - attr_list
+  - toc:
+      permalink: true
+extra_css:
+  - stylesheets/extra.css
+validation:
+  nav:
+    omitted_files: warn
+  links:
+    anchors: warn
+    unrecognized_links: warn
+nav:
+  - Accueil: index.md
+  - Premiers pas:
+      - Installer bgraph: installation.md
+      - Créer son premier diagramme: demarrage.md
+  - Dessiner:
+      - Placer les éléments: placement.md
+      - Styles et couleurs: styles.md
+      - Choisir un type de diagramme: graphiques.md
+      - Galerie des 30 types: galerie.md
+  - Utiliser au quotidien:
+      - Commandes et exports: commandes.md
+      - Zed et VS Code: editeurs.md
+      - Fichiers, composants et données: composition.md
+      - Rust, navigateur et Typst: integrations.md
+      - Résoudre un problème: depannage.md
+  - Référence:
+      - Langage complet (anglais): language.md
+      - Propriétés et types (générée, anglais): reference.md
+      - API Rust (anglais): API.md
+  - Maintenir cette documentation: documentation.md

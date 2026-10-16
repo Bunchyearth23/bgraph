@@ -6745,6 +6745,7 @@ fn hostile_corpus() -> Vec<(&'static str, String)> {
 #[test]
 fn hostile_input_never_panics() {
     for (name, source) in hostile_corpus() {
+        eprintln!("hostile render case: {name}");
         // Not `catch_unwind`: a panic here should fail loudly with its own
         // message and location, which is what makes the failure diagnosable.
         // The assertion is simply that the call returns at all.
@@ -7572,7 +7573,27 @@ fn representative_png_snapshots_are_byte_stable() {
             .find_map(|line| line.split_once(' ').filter(|(found, _)| *found == name))
             .and_then(|(_, hash)| u64::from_str_radix(hash, 16).ok())
             .unwrap_or_else(|| panic!("no PNG snapshot for `{name}`"));
-        let png = crate::render_png::render(&build(source), 1.0).expect("PNG snapshot renders");
+        let mut layout = build(source);
+        // The same font bytes and CSS alias on every host, including hosts
+        // without DejaVu installed. Exercise the public embedded-font path.
+        let family = "Bgraph PNG Fixture";
+        layout.opts.embed_font = Some((
+            family.into(),
+            std::sync::Arc::new(include_bytes!("../tests/fixtures/fonts/DejaVuSans.ttf").to_vec()),
+        ));
+        for node in &mut layout.nodes {
+            node.style.font_family = Some(family.into());
+        }
+        for group in &mut layout.groups {
+            group.style.font_family = Some(family.into());
+        }
+        for edge in &mut layout.edges {
+            edge.style.font_family = Some(family.into());
+        }
+        for annotation in &mut layout.annotations {
+            annotation.family = family.into();
+        }
+        let png = crate::render_png::render(&layout, 1.0).expect("PNG snapshot renders");
         let got = png.iter().fold(0xcbf29ce484222325_u64, |hash, byte| {
             (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
         });
@@ -7952,7 +7973,7 @@ fn completions_are_on_by_default_and_cost_the_core_nothing() {
     // here and `clap_mangen` brings one small crate, both binary-only — so
     // this is on by default, where the window cannot be. What must stay
     // true is that they are optional, so `--no-default-features` still
-    // resolves to the five dependencies this crate promises.
+    // resolves to the six dependencies this crate promises.
     let manifest = include_str!("../Cargo.toml");
 
     let defaults = manifest
@@ -10257,7 +10278,7 @@ fn the_library_needs_no_argument_parser() {
     // What makes a wasm build sane: a page has no argv, and a library
     // consumer should not compile a parser it will never call. The binaries
     // declare `cli` in `required-features`, so `cargo build` still builds
-    // them and `--no-default-features` resolves to five dependencies.
+    // them and `--no-default-features` resolves to six dependencies.
     let manifest = include_str!("../Cargo.toml");
 
     let clap = manifest
@@ -10880,13 +10901,12 @@ fn some_font() -> (std::path::PathBuf, Vec<u8>) {
 
 #[test]
 fn a_subset_font_is_smaller_and_still_a_font() {
-    let (path, font) = some_font();
-    let subset = crate::subset::keep_glyphs_for(&font, "Ligature: office");
+    let font = include_bytes!("../tests/fixtures/fonts/DejaVuSans.ttf");
+    let subset = crate::subset::keep_glyphs_for(font, "Ligature: office");
 
     assert!(
         subset.len() < font.len(),
-        "{} did not shrink: {} → {}",
-        path.display(),
+        "DejaVuSans.ttf did not shrink: {} → {}",
         font.len(),
         subset.len()
     );

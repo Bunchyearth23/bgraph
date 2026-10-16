@@ -17,10 +17,14 @@ const fixtures = [
   ['underconstrained', 'valid'], ['fractional', 'valid'],
   ['frame-nested', 'valid'], ['frame-external', 'valid'],
   ['overlap', 'warning'], ['missing-anchor', 'error'],
-  ['conflict', 'error'], ['managed-layout', 'error'],
+  ['conflict', 'error'], ['minimum-conflict', 'error'], ['managed-layout', 'error'],
   ['unknown-component', 'error'],
   ['unicode-error', 'error'], ['size-chain-conflict', 'error'],
   ['frame-inflation-conflict', 'error'],
+  ['bpmn-dependent', 'valid', 'fixtures/placement/bpmn-dependent.bd'],
+  ['bpmn-attach-conflict', 'error', 'fixtures/placement/bpmn-attach-conflict.bd'],
+  ['bpmn-cycle', 'valid', 'fixtures/placement/bpmn-cycle.bd'],
+  ['bpmn-cycle-conflict', 'error', 'fixtures/placement/bpmn-cycle-conflict.bd'],
 ];
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -213,8 +217,8 @@ const wasi = instantiate('wasi');
 const typst = typstRenderer();
 copyFileSync(join(root, 'typst/bgraph.typ'), join(scratch, 'bgraph.typ'));
 copyFileSync(join(scratch, 'typst.wasm'), join(scratch, 'bgraph.wasm'));
-for (const [name, expectation] of fixtures) {
-  const file = join(root, `tests/runtime/${name}.bd`);
+for (const [name, expectation, fixturePath] of fixtures) {
+  const file = join(root, 'tests', fixturePath ?? `runtime/${name}.bd`);
   const source = readFileSync(file, 'utf8');
   const checked = run(cli, ['check', file, '--json']);
   assert.equal(checked.status, expectation === 'error' ? 1 : 0, `${name}: ${checked.stderr}`);
@@ -224,6 +228,11 @@ for (const [name, expectation] of fixtures) {
     assert.equal(again.stdout, checked.stdout, `${name}: native diagnostic serialization drifted`);
   }
   const diagnostics = normalize(JSON.parse(checked.stdout));
+  if (name === 'minimum-conflict') {
+    assert.equal(diagnostics.length, 3, 'minimum conflict must win across independent components');
+    assert.deepEqual(diagnostics.map(d => d.line), [10, 11, 12],
+      'the earlier four-equation conflict must not hide the later three-equation conflict');
+  }
   if (expectation === 'valid') assert.equal(diagnostics.length, 0, `${name}: unexpected diagnostics`);
   else assert(diagnostics.some(d => d.severity === expectation), `${name}: missing ${expectation}`);
   assert.deepEqual(lspDiagnostics(source, file), diagnostics, `${name}: LSP differs from CLI`);

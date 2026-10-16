@@ -716,12 +716,51 @@ pub fn layer_from_props(props: &[Prop]) -> Result<Style> {
     Ok(style)
 }
 
+/// Builtin notation supplied by the written form, underneath author styles.
+/// The genre guard matters: `event` also belongs to timeline.
+pub fn item_defaults(mut base: Style, def: &crate::props::ArchetypeDef, written: &str) -> Style {
+    if def.name == "bpmn" {
+        match def.style_word(written) {
+            "task" => {
+                base.task_kind.get_or_insert_with(|| "plain".into());
+            }
+            "event" => {
+                base.stage.get_or_insert_with(|| "intermediate".into());
+                base.trigger.get_or_insert_with(|| "plain".into());
+            }
+            "gateway" => {
+                base.gate.get_or_insert_with(|| "exclusive".into());
+            }
+            "data" => {
+                base.artifact.get_or_insert_with(|| "object".into());
+            }
+            _ => {}
+        }
+    }
+    base
+}
+
 /// Named style blocks, already flattened through their `extends` chain.
 pub struct Registry {
     resolved: HashMap<String, Style>,
 }
 
 impl Registry {
+    /// Resolve one declaration through builtin form defaults and the common cascade.
+    pub fn resolve_node(
+        &self,
+        base: Style,
+        def: &crate::props::ArchetypeDef,
+        node: &NodeDecl,
+    ) -> Result<Style> {
+        self.resolve(
+            item_defaults(base, def, node.keyword.as_str()),
+            def.style_word(node.keyword.as_str()),
+            &node.classes,
+            &node.props_for(def),
+        )
+    }
+
     pub fn build(decls: &[StyleDecl]) -> Result<Registry> {
         let by_name: HashMap<&str, &StyleDecl> =
             decls.iter().map(|d| (d.name.as_str(), d)).collect();

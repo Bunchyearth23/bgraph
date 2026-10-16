@@ -3,8 +3,8 @@ use serde_json::{Value, json};
 use crate::props::{self, Ctx};
 
 use super::{
-    Block, Context, Server, completion, declared, declared_archetype, declared_items,
-    is_ident_char, is_rel_dir, item_snippet, snippet,
+    Block, Context, Server, completion, declaration_span, declared, declared_archetype,
+    declared_items, is_ident_char, is_rel_dir, item_snippet, item_words, snippet,
 };
 
 impl Server {
@@ -196,6 +196,11 @@ impl Server {
         }
 
         if is_rel_dir(preceding) {
+            if words.first() != Some(&"note")
+                || !props::archetype(archetype).is_some_and(|def| def.layout.accepts_layout_block())
+            {
+                return Vec::new();
+            }
             return declared_items(text, archetype)
                 .into_iter()
                 .map(|(name, label)| completion(&name, 6, item, &label))
@@ -203,6 +208,11 @@ impl Server {
         }
 
         if preceding == "align" {
+            if words.first() != Some(&"note")
+                || !props::archetype(archetype).is_some_and(|def| def.layout.accepts_layout_block())
+            {
+                return Vec::new();
+            }
             return props::ALIGNMENTS
                 .iter()
                 .map(|a| completion(a, 20, "align", "Cross-axis alignment against the anchor."))
@@ -268,12 +278,19 @@ impl Server {
         if words.is_empty() || (words.len() == 1 && !ends_with_space) {
             let mut out: Vec<Value> = props::KEYWORDS
                 .iter()
+                .filter(|(name, _)| !props::LAYOUT_STATEMENTS.contains(name))
+                .filter(|(name, _)| {
+                    !matches!(*name, "layout" | "note")
+                        || props::archetype(archetype)
+                            .is_some_and(|def| def.layout.accepts_layout_block())
+                })
                 .map(|(name, doc)| {
                     // The shape each statement takes, so accepting one leaves
                     // a well-formed line rather than a bare word.
                     let insert = match *name {
                         "type" => "type ${1:archetype}$0".to_string(),
                         "graph" => "graph { $0 }".to_string(),
+                        "layout" => "layout {\n  $0\n}".to_string(),
                         "style" => "style ${1:name} {\n  $0\n}".to_string(),
                         "group" => "group ${1:id} \"${2:label}\" {\n  $0\n}".to_string(),
                         "activate" => "activate ${1:participant} {\n  $0\n}".to_string(),
@@ -339,20 +356,12 @@ impl Server {
 /// offer declarations or style properties: a `layout` says how already named
 /// entities relate, never what new entities exist.
 fn layout_items(text: &str, line: &str, offset: usize, archetype: &str) -> Vec<Value> {
-    if !matches!(
-        props::archetype(archetype).map(|def| def.layout_capability()),
-        Some(props::LayoutCapability::Declared | props::LayoutCapability::Hybrid)
-    ) {
+    if !props::archetype(archetype).is_some_and(|def| def.layout.accepts_layout_block()) {
         return Vec::new();
     }
 
     let words: Vec<&str> = line.split_whitespace().collect();
     let ends_with_space = line.ends_with(char::is_whitespace);
-    let current = if ends_with_space {
-        ""
-    } else {
-        words.last().copied().unwrap_or("")
-    };
     let preceding = if ends_with_space {
         words.last().copied().unwrap_or("")
     } else if words.len() >= 2 {
@@ -360,63 +369,44 @@ fn layout_items(text: &str, line: &str, offset: usize, archetype: &str) -> Vec<V
     } else {
         ""
     };
-    let parsed = crate::parser::parse(text).ok();
-    let local_members = parsed.as_ref().and_then(|diagram| {
-        let layout = diagram
-            .layouts
-            .iter()
-            .find(|layout| layout.span.contains(offset))?;
-        let scope = layout.scope.as_ref()?;
-        let group = diagram
-            .groups
-            .iter()
-            .find(|group| group.id.as_str() == scope.as_str())?;
-        Some(
-            group
-                .members
-                .iter()
-                .map(|member| member.as_str().to_string())
-                .collect::<Vec<_>>(),
-        )
-    });
-    let node_names = parsed.as_ref().map(|diagram| {
-        diagram
-            .nodes
-            .iter()
-            .map(|node| node.id.as_str().to_string())
-            .collect::<Vec<_>>()
-    });
-    let entities = |nodes_only: bool| {
-        declared_items(text, archetype)
-            .into_iter()
-            .filter(|(name, _)| {
-                local_members
-                    .as_ref()
-                    .is_none_or(|members| members.iter().any(|member| member == name))
+    let scope = Context::at(text, offset).scope_start;
+    // Completion must keep its scope even while the current statement cannot parse.
+    let names: Vec<_> = item_words(archetype)
+        .into_iter()
+        .flat_map(|word| {
+            declared(text, word)
+                .into_iter()
+                .map(move |(name, label)| (word, name, label))
+        })
+        .filter(|(word, name, _)| {
+            scope.is_none_or(|scope| {
+                declaration_span(text, word, name)
+                    .is_some_and(|span| Context::at(text, span.start).scope_start == Some(scope))
             })
-            .filter(|(name, _)| {
-                !nodes_only
-                    || node_names
-                        .as_ref()
-                        .is_none_or(|nodes| nodes.iter().any(|node| node == name))
+        })
+        .collect();
+    let entities = |nodes_only: bool, excluded: &[&str]| -> Vec<Value> {
+        names
+            .iter()
+            .filter(|(word, name, _)| {
+                (!nodes_only || *word != "group") && !excluded.contains(&name.as_str())
             })
-            .map(|(name, label)| completion(&name, 6, "entity", &label))
+            .map(|(_, name, label)| completion(name, 6, "entity", label))
             .collect()
     };
-
-    if current.starts_with('[')
-        && words
-            .first()
-            .is_some_and(|word| matches!(*word, "row" | "column"))
-    {
-        return vec![snippet(
-            "gap",
-            14,
-            "gap <n>",
-            "Distance inserted between consecutive row/column members.",
-            "gap ${1:32}]$0",
-        )];
-    }
+    let choices = |tab: usize, fallback: &str, nodes_only: bool, skip: usize| {
+        let mut ids: Vec<_> = names
+            .iter()
+            .filter(|(word, _, _)| !nodes_only || *word != "group")
+            .map(|(_, name, _)| name.as_str())
+            .collect();
+        if ids.is_empty() {
+            return format!("${{{tab}:{fallback}}}");
+        }
+        let rotate = skip.min(ids.len() - 1);
+        ids.rotate_left(rotate);
+        format!("${{{tab}|{}|}}", ids.join(","))
+    };
 
     if words.is_empty() || (words.len() == 1 && !ends_with_space) {
         return vec![
@@ -425,55 +415,131 @@ fn layout_items(text: &str, line: &str, offset: usize, archetype: &str) -> Vec<V
                 14,
                 "place <target> <position>",
                 "Place one declared entity. Coordinates and relative anchors live only here.",
-                "place ${1:target} at (${2:x}, ${3:y})$0",
+                &format!(
+                    "place {} at (${{2:0}}, ${{3:0}})$0",
+                    choices(1, "target", false, 0)
+                ),
             ),
             snippet(
                 "align",
                 14,
                 "align <axis> <members…>",
                 "Align declared nodes on an explicit axis.",
-                "align ${1:top} ${2:first} ${3:other}$0",
+                &format!(
+                    "align ${{1|top,bottom,left,right,center-x,center-y|}} {} {}$0",
+                    choices(2, "first", true, 0),
+                    choices(3, "other", true, 1)
+                ),
             ),
             snippet(
                 "equal-width",
                 14,
                 "equal-width <members…>",
                 "Make declared nodes as wide as their widest member.",
-                "equal-width ${1:first} ${2:other}$0",
+                &format!(
+                    "equal-width {} {}$0",
+                    choices(1, "first", true, 0),
+                    choices(2, "other", true, 1)
+                ),
             ),
             snippet(
                 "equal-height",
                 14,
                 "equal-height <members…>",
                 "Make declared nodes as tall as their tallest member.",
-                "equal-height ${1:first} ${2:other}$0",
+                &format!(
+                    "equal-height {} {}$0",
+                    choices(1, "first", true, 0),
+                    choices(2, "other", true, 1)
+                ),
             ),
             snippet(
                 "row",
                 14,
                 "row <members…> [gap <n>]",
                 "Place members left to right in the written order.",
-                "row ${1:first} ${2:next} [gap ${3:32}]$0",
+                &format!(
+                    "row {} {} gap ${{3:32}}$0",
+                    choices(1, "first", true, 0),
+                    choices(2, "next", true, 1)
+                ),
             ),
             snippet(
                 "column",
                 14,
                 "column <members…> [gap <n>]",
                 "Place members top to bottom in the written order.",
-                "column ${1:first} ${2:next} [gap ${3:32}]$0",
+                &format!(
+                    "column {} {} gap ${{3:32}}$0",
+                    choices(1, "first", true, 0),
+                    choices(2, "next", true, 1)
+                ),
             ),
         ];
     }
 
+    let slot = words.len().saturating_sub(usize::from(!ends_with_space));
+    let gap = || {
+        snippet(
+            "gap",
+            14,
+            "gap <n>",
+            "Space between the placed elements.",
+            "gap ${1:40}$0",
+        )
+    };
+    let align = || {
+        snippet(
+            "align",
+            14,
+            "align <axis>",
+            "Cross-axis alignment against the anchor.",
+            if matches!(words.get(2), Some(&"right-of" | &"left-of")) {
+                "align ${1|center,top,bottom|}$0"
+            } else {
+                "align ${1|center,left,right|}$0"
+            },
+        )
+    };
     match words[0] {
-        "place" if words.len() == 1 || preceding == "place" => entities(false),
-        "place" if words.len() == 2 && ends_with_space => props::PLACEMENTS
+        "place" if slot == 1 => entities(false, &[]),
+        "place" if slot == 2 => props::PLACEMENTS
             .iter()
-            .map(|(name, doc)| completion(name, 14, "position", doc))
+            .map(|(name, doc)| {
+                let insert = if *name == "at" {
+                    "at (${1:0}, ${2:0})$0".to_string()
+                } else {
+                    let anchors: Vec<_> = names
+                        .iter()
+                        .filter(|(_, name, _)| Some(&name.as_str()) != words.get(1))
+                        .map(|(_, name, _)| name.as_str())
+                        .collect();
+                    let anchor = if anchors.is_empty() {
+                        "${1:anchor}".to_string()
+                    } else {
+                        format!("${{1|{}|}}", anchors.join(","))
+                    };
+                    format!("{name} {anchor} gap ${{2:40}}$0")
+                };
+                snippet(name, 14, "position", doc, &insert)
+            })
             .collect(),
-        "place" if is_rel_dir(preceding) => entities(false),
+        "place" if is_rel_dir(preceding) => entities(false, &words[1..2]),
+        "place" if preceding == "at" && words.get(3).is_none() => vec![snippet(
+            "(x, y)",
+            15,
+            "coordinates",
+            "Top-left corner of the element.",
+            "(${1:0}, ${2:0})$0",
+        )],
         "place" if preceding == "align" => props::ALIGNMENTS
             .iter()
+            .filter(|axis| match words.get(2) {
+                Some(&"right-of" | &"left-of") => {
+                    matches!(**axis, "top" | "bottom" | "center" | "middle" | "center-y")
+                }
+                _ => matches!(**axis, "left" | "right" | "center" | "middle" | "center-x"),
+            })
             .map(|axis| {
                 completion(
                     axis,
@@ -483,20 +549,33 @@ fn layout_items(text: &str, line: &str, offset: usize, archetype: &str) -> Vec<V
                 )
             })
             .collect(),
-        "align" if words.len() == 1 || preceding == "align" => {
-            ["top", "bottom", "left", "right", "center-x", "center-y"]
-                .into_iter()
-                .map(|axis| {
-                    completion(
-                        axis,
-                        20,
-                        "axis",
-                        "The edge or centre line shared by the members.",
-                    )
-                })
-                .collect()
+        "place" if words.get(2).is_some_and(|word| is_rel_dir(word)) && slot == 4 => {
+            vec![gap(), align()]
         }
-        "align" | "equal-width" | "equal-height" | "row" | "column" => entities(true),
+        "place" if words.get(4) == Some(&"gap") && slot == 6 => vec![align()],
+        "align" if slot == 1 => ["top", "bottom", "left", "right", "center-x", "center-y"]
+            .into_iter()
+            .map(|axis| {
+                completion(
+                    axis,
+                    20,
+                    "axis",
+                    "The edge or centre line shared by the members.",
+                )
+            })
+            .collect(),
+        "row" | "column" if words.contains(&"gap") => Vec::new(),
+        "align" | "equal-width" | "equal-height" | "row" | "column" => {
+            let mut out = entities(true, &words[1..slot]);
+            if matches!(words[0], "row" | "column") && slot >= 3 {
+                out.push(gap());
+            }
+            out
+        }
         _ => Vec::new(),
     }
 }
+
+#[cfg(test)]
+#[path = "layout_capability_tests.rs"]
+mod layout_capability_tests;

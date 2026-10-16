@@ -28,7 +28,11 @@ left undone. `bgraph watch` beside the editor is the answer meanwhile.
 
 | Where you are | What you get |
 |---|---|
-| start of a line | `type`, `graph`, `style`, `node`, `include`, `component`, `use`, `note`, `legend`, the three constraints, plus node ids |
+| start of a line outside layout | `type`, `graph`, `style`, `node`, `include`, `component`, `use`, `note`, `legend`, plus the genre's item words and node ids |
+| inside `layout { }` | `place`, `align`, `equal-width`, `equal-height`, `row`, `column`; no node properties |
+| after `place` | declared elements in the current scope |
+| after `place api` | absolute or relative placement snippets with numeric defaults |
+| after a relative anchor | `gap` and cross-axis `align` |
 | after `type` | archetype names |
 | after `.` | declared style names |
 | after `extends` | declared style names |
@@ -46,6 +50,19 @@ valid and documented but kept out of the list; and `value` / `bits` appear
 only under the archetype that reads them. Space is not a trigger character —
 a popup on every word boundary is the fastest way to make completion feel
 like an obstacle.
+
+**Layout snippets** use the declared identifiers as choices and numeric
+coordinate defaults (`0, 0`). Tab moves through the fields. Row and column
+snippets insert ordinary `gap 32`, without literal square brackets.
+The completion edit replaces the complete identifier, including hyphens,
+and works in inline blocks and incomplete statements.
+
+**Signature help** describes placements, coordinates, gaps, alignments and
+ordered members as you type, including after `(` and `,` in coordinates.
+It stays silent inside strings and comments.
+
+**Formatting** uses the same formatter as `bgraph fmt`, through Zed's normal
+document-formatting command. A file that cannot parse is left unchanged.
 
 **Hover** — a property's syntax and meaning; a node's label, styles and
 **resolved position and size**; a style's flattened property list.

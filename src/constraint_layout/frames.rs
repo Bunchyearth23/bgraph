@@ -1,6 +1,6 @@
 use super::*;
 use kasuari::Expression;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub(super) fn solve(
     diagram: &Diagram,
@@ -280,25 +280,51 @@ pub(super) fn solve(
         }
     }
     sort_constraints(&mut constraints, diagram);
+    let ranks = dependency_ranks(&constraints, diagram);
     let mut values = BTreeMap::new();
-    let mut first_failure = None;
+    let mut best_conflict = None;
     for component in constraint_components(constraints) {
         let (indices, constraints): (Vec<_>, Vec<_>) = component.into_iter().unzip();
         let mut solver = Solver::new();
-        let mut failing = None;
-        for (index, source) in constraints.iter().enumerate() {
-            if !add_to_solver(&mut solver, source)? {
-                failing = Some(index);
+        // Keep the model in canonical source order for conflict ranking. Only insertion is
+        // scheduled by dependencies so a long chain does not repeatedly merge solved prefixes.
+        let mut execution: Vec<_> = (0..constraints.len()).collect();
+        execution.sort_by_key(|&index| {
+            let source = &constraints[index];
+            (
+                match source.provenance.origin {
+                    ConstraintOrigin::ContainerOrigin => ConstraintOrigin::AbsolutePlacement,
+                    origin => origin,
+                },
+                source.provenance.axis,
+                ranks[source.provenance.node],
+                index,
+            )
+        });
+        let mut failed = false;
+        for index in execution {
+            if !add_to_solver(&mut solver, &constraints[index])? {
+                failed = true;
                 break;
             }
         }
-        if let Some(index) = failing {
-            // Preserve the failure selected by the original global insertion order.
-            if first_failure
-                .as_ref()
-                .is_none_or(|(earliest, _, _)| indices[index] < *earliest)
-            {
-                first_failure = Some((indices[index], constraints, index));
+        if failed {
+            // A failure in scheduled order need not be a failure of the same canonical prefix.
+            let conflict = explain_conflict(&constraints, constraints.len() - 1)?;
+            let mut global_indices: Vec<_> = conflict
+                .iter()
+                .map(|source| {
+                    let local = constraints
+                        .iter()
+                        .position(|candidate| candidate.constraint == source.constraint)
+                        .expect("a conflict retains original constraint handles");
+                    indices[local]
+                })
+                .collect();
+            global_indices.sort_unstable();
+            let rank = (conflict.len(), global_indices);
+            if best_conflict.as_ref().is_none_or(|(best, _)| rank < *best) {
+                best_conflict = Some((rank, conflict));
             }
             continue;
         }
@@ -310,13 +336,12 @@ pub(super) fn solve(
             }
         }
     }
-    if let Some((_, constraints, index)) = first_failure {
-        return Err(conflict_error_with_names(
-            explain_conflict(&constraints, index)?,
-            diagram,
-            &variables,
-            &extra_names,
-        ));
+    if let Some((_, conflict)) = best_conflict {
+        return Err(if extra_names.is_empty() {
+            conflict_error(conflict, diagram, &variables)
+        } else {
+            conflict_error_with_names(conflict, diagram, &variables, &extra_names)
+        });
     }
     let value = |variable| values.get(&variable).copied().unwrap_or(0.0);
     let mut rects = variables
@@ -333,6 +358,55 @@ pub(super) fn solve(
         nodes: rects,
         groups,
     })
+}
+
+fn dependency_ranks(constraints: &[SourcedConstraint], diagram: &Diagram) -> Vec<usize> {
+    let count = diagram.nodes.len() + diagram.groups.len();
+    let mut children = vec![BTreeSet::new(); count];
+    let mut incoming = vec![0usize; count];
+    for source in constraints {
+        if !matches!(
+            source.provenance.origin,
+            ConstraintOrigin::RelativePlacement
+                | ConstraintOrigin::BoundaryAttachment
+                | ConstraintOrigin::ImplicitFlow
+                | ConstraintOrigin::FrameBounds
+        ) {
+            continue;
+        }
+        if let Some(anchor) = source.provenance.anchor {
+            let node = source.provenance.node;
+            if anchor != node && children[anchor].insert(node) {
+                incoming[node] += 1;
+            }
+        }
+    }
+    let mut remaining: BTreeSet<_> = (0..count)
+        .map(|index| (entity_name(diagram, index), index))
+        .collect();
+    let mut ready: BTreeSet<_> = remaining
+        .iter()
+        .copied()
+        .filter(|(_, index)| incoming[*index] == 0)
+        .collect();
+    let mut ranks = vec![usize::MAX; count];
+    for rank in 0..count {
+        // A cycle introduces no artificial origin: break only the scheduling tie by name.
+        let (_, node) = ready
+            .pop_first()
+            .unwrap_or_else(|| *remaining.first().unwrap());
+        remaining.remove(&(entity_name(diagram, node), node));
+        ranks[node] = rank;
+        for &child in &children[node] {
+            if ranks[child] == usize::MAX {
+                incoming[child] -= 1;
+                if incoming[child] == 0 {
+                    ready.insert((entity_name(diagram, child), child));
+                }
+            }
+        }
+    }
+    ranks
 }
 
 fn component_root(parents: &mut BTreeMap<Variable, Variable>, mut variable: Variable) -> Variable {
@@ -416,8 +490,6 @@ fn lower_entity_placement(
                 plan,
                 variables,
                 default_gap: opts.gap,
-                grid: opts.grid,
-                grid_spec: opts.grid_spec,
                 grid_pitch,
                 out: constraints,
             },

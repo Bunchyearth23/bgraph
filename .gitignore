@@ -33,3 +33,7 @@ typst/bgraph.wasm
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+
+# MkDocs output; Python environments already live under /.tools/.
+/site/
+/docs/__pycache__/

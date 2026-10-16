@@ -1,14 +1,17 @@
-//! Deterministic Cassowary node placement and validation of transitional frames.
+//! Deterministic simultaneous Cassowary placement for nodes and content-sized frames.
 
 use anyhow::{Result, anyhow};
 use kasuari::WeightedRelation::*;
-use kasuari::{AddConstraintError, Constraint, Solver, Strength, Variable};
+use kasuari::{AddConstraintError, Constraint, StaticSolver as Solver, Strength, Variable};
 
 use crate::ast::{Align, ConstraintAxis, ConstraintKind, Diagram, Placement, RelDir, Span};
 use crate::layout::Rect;
 use crate::placement::{EffectivePlacement, Entity, PlacementPlan};
 use crate::style::GraphOpts;
 
+#[cfg(test)]
+mod completion_tests;
+mod conflict;
 mod frames;
 
 pub struct SolvedGeometry {
@@ -24,27 +27,8 @@ pub fn solve_declared(
     intrinsic: &[(f64, f64)],
     overhang: &[(f64, f64, f64, f64)],
     opts: &GraphOpts,
-) -> Result<Option<SolvedGeometry>> {
-    if !uses_simultaneous_solver(diagram) {
-        return Ok(None);
-    }
-    if !diagram.groups.is_empty() {
-        return frames::solve(diagram, plan, sizes, intrinsic, overhang, opts).map(Some);
-    }
-    solve_nodes(diagram, plan, sizes, intrinsic, opts).map(|nodes| {
-        nodes.map(|nodes| SolvedGeometry {
-            nodes,
-            groups: Vec::new(),
-        })
-    })
-}
-
-// Keep large graphs on the validated transitional path until their performance gate.
-pub(crate) const MAX_DIRECT_NODES: usize = 512;
-
-/// Readiness may leave attachment cycles to the solver only on this path.
-pub(crate) fn uses_simultaneous_solver(diagram: &Diagram) -> bool {
-    diagram.nodes.len() + diagram.groups.len() <= MAX_DIRECT_NODES
+) -> Result<SolvedGeometry> {
+    frames::solve(diagram, plan, sizes, intrinsic, overhang, opts)
 }
 
 /// Which geometric quantity a lowered relation controls.
@@ -96,7 +80,11 @@ struct SourcedConstraint {
 
 /// False means a required relation is unsatisfiable; engine failures stay errors.
 fn add_to_solver(solver: &mut Solver, sourced: &SourcedConstraint) -> Result<bool> {
-    match solver.add_constraint(sourced.constraint.clone()) {
+    classify_add_result(solver.add_constraint(sourced.constraint.clone()))
+}
+
+fn classify_add_result(result: std::result::Result<(), AddConstraintError>) -> Result<bool> {
+    match result {
         // Kasuari compares constraint identity, so this handle is already in the system.
         Ok(()) | Err(AddConstraintError::DuplicateConstraint) => Ok(true),
         Err(AddConstraintError::UnsatisfiableConstraint) => Ok(false),
@@ -104,6 +92,7 @@ fn add_to_solver(solver: &mut Solver, sourced: &SourcedConstraint) -> Result<boo
     }
 }
 
+#[cfg(test)]
 fn satisfiable(constraints: &[SourcedConstraint]) -> Result<bool> {
     let mut solver = Solver::new();
     for sourced in constraints {
@@ -115,47 +104,10 @@ fn satisfiable(constraints: &[SourcedConstraint]) -> Result<bool> {
 }
 
 fn explain_conflict(all: &[SourcedConstraint], failing: usize) -> Result<Vec<SourcedConstraint>> {
-    let mut conflict: Vec<SourcedConstraint> = all[..=failing].to_vec();
-    if satisfiable(&conflict)? {
-        return Ok(Vec::new());
-    }
-
-    let mut index = 0;
-    while index < conflict.len() {
-        let candidate: Vec<SourcedConstraint> = conflict
-            .iter()
-            .enumerate()
-            .filter_map(|(candidate_index, source)| {
-                if candidate_index == index {
-                    None
-                } else {
-                    Some(source.clone())
-                }
-            })
-            .collect();
-
-        if !satisfiable(&candidate)? {
-            conflict.remove(index);
-        } else {
-            index += 1;
-        }
-    }
-
-    conflict.sort_by_key(|sourced| {
-        (
-            sourced.provenance.span.start,
-            sourced.provenance.span.end,
-            sourced.provenance.origin,
-            sourced.provenance.axis,
-            sourced.provenance.node,
-            sourced.provenance.anchor.unwrap_or(usize::MAX),
-        )
-    });
-
-    Ok(conflict)
+    conflict::minimum(all, failing)
 }
 
-/// A required relation in an irreducible conflict, with its source and equation.
+/// A required relation in a minimum-cardinality conflict, with its source and equation.
 #[derive(Debug, Clone)]
 pub struct ConflictConstraint {
     pub source: ConstraintProvenance,
@@ -291,8 +243,6 @@ struct Lowering<'plan, 'diagram, 'out> {
     plan: &'plan PlacementPlan<'diagram>,
     variables: &'plan [Variables],
     default_gap: f64,
-    grid: Option<(f64, f64)>,
-    grid_spec: Option<crate::style::GridSpec>,
     grid_pitch: (f64, f64),
     out: &'out mut Vec<SourcedConstraint>,
 }
@@ -303,523 +253,6 @@ struct Lowering<'plan, 'diagram, 'out> {
 struct RelativeAlignment {
     declared: Option<Align>,
     overridden_axes: [bool; 2],
-}
-
-/// Solve every currently-lowered node relation in the production Cassowary system.
-///
-/// `None` selects the validated transitional path for frames or large graphs.
-/// Unsupported constructs are never dropped to obtain a partial solution.
-pub fn solve_nodes(
-    diagram: &Diagram,
-    plan: &PlacementPlan<'_>,
-    sizes: &[(f64, f64)],
-    intrinsic: &[(f64, f64)],
-    opts: &GraphOpts,
-) -> Result<Option<Vec<Rect>>> {
-    if !uses_simultaneous_solver(diagram) || !diagram.groups.is_empty() {
-        return Ok(None);
-    }
-
-    let grid_pitch = opts
-        .grid_spec
-        .map(|grid| grid.pitch(sizes))
-        .unwrap_or((1.0, 1.0));
-
-    // Allocate variable ids by name; declaration order only controls implicit flow.
-    let mut order: Vec<usize> = (0..diagram.nodes.len()).collect();
-    order.sort_by_key(|&index| diagram.nodes[index].id.as_str());
-    let mut variables: Vec<_> = order
-        .into_iter()
-        .map(|index| (index, Variables::new()))
-        .collect();
-    variables.sort_by_key(|(index, _)| *index);
-    let variables: Vec<Variables> = variables.into_iter().map(|(_, vars)| vars).collect();
-    let mut constraints: Vec<SourcedConstraint> = Vec::with_capacity(diagram.nodes.len() * 4);
-
-    for (i, ((w, h), vars)) in sizes.iter().zip(&variables).enumerate() {
-        let node_span = diagram.nodes[i].span;
-        lower_size(
-            *vars,
-            i,
-            node_span,
-            intrinsic[i],
-            (*w, *h),
-            &mut constraints,
-        );
-
-        if let Some(boundary) = plan.boundary(i) {
-            lower_boundary_attachment(diagram, i, boundary, &variables, &mut constraints);
-        }
-
-        match plan.node(i, opts.flow) {
-            EffectivePlacement::Boundary(_) => {}
-            EffectivePlacement::Origin => {
-                push(
-                    &mut constraints,
-                    vars.x | EQ(Strength::REQUIRED) | 0.0,
-                    provenance(ConstraintOrigin::ContainerOrigin, Axis::X, i, node_span),
-                );
-                push(
-                    &mut constraints,
-                    vars.y | EQ(Strength::REQUIRED) | 0.0,
-                    provenance(ConstraintOrigin::ContainerOrigin, Axis::Y, i, node_span),
-                );
-            }
-            EffectivePlacement::Declared(placement) => {
-                lower_placement(
-                    placement,
-                    i,
-                    plan.placement_span(Entity::Node(i)),
-                    *vars,
-                    plan.v2_alignment_axes(i),
-                    &mut Lowering {
-                        diagram,
-                        plan,
-                        variables: &variables,
-                        default_gap: opts.gap,
-                        grid: opts.grid,
-                        grid_spec: opts.grid_spec,
-                        grid_pitch,
-                        out: &mut constraints,
-                    },
-                )?;
-            }
-            EffectivePlacement::Flow { dir, anchor } => {
-                lower_relative(
-                    dir,
-                    anchor.as_str(),
-                    None,
-                    RelativeAlignment {
-                        declared: None,
-                        overridden_axes: plan.v2_alignment_axes(i),
-                    },
-                    *vars,
-                    provenance(ConstraintOrigin::ImplicitFlow, Axis::X, i, node_span)
-                        .with_anchor(anchor.span),
-                    &mut Lowering {
-                        diagram,
-                        plan,
-                        variables: &variables,
-                        default_gap: opts.gap,
-                        grid: opts.grid,
-                        grid_spec: opts.grid_spec,
-                        grid_pitch,
-                        out: &mut constraints,
-                    },
-                )?;
-            }
-            EffectivePlacement::Series { dir, anchor, gap } => {
-                lower_relative(
-                    dir,
-                    anchor.as_str(),
-                    gap,
-                    RelativeAlignment {
-                        declared: None,
-                        overridden_axes: plan.v2_alignment_axes(i),
-                    },
-                    *vars,
-                    provenance(
-                        ConstraintOrigin::RelativePlacement,
-                        Axis::X,
-                        i,
-                        plan.placement_span(Entity::Node(i)),
-                    )
-                    .with_anchor(anchor.span),
-                    &mut Lowering {
-                        diagram,
-                        plan,
-                        variables: &variables,
-                        default_gap: opts.gap,
-                        grid: opts.grid,
-                        grid_spec: opts.grid_spec,
-                        grid_pitch,
-                        out: &mut constraints,
-                    },
-                )?;
-            }
-        }
-    }
-
-    lower_size_equalities(plan, &variables, &mut constraints);
-
-    for constraint_ref in plan.constraints() {
-        let constraint = constraint_ref.declaration();
-        if constraint.kind != ConstraintKind::AlignGroup {
-            continue;
-        }
-        let members = plan.constraint_members(constraint_ref);
-        let Some((&lead, rest)) = members.split_first() else {
-            continue;
-        };
-        let target = variables[lead];
-        let Some(lead_member) = constraint.members.first() else {
-            continue;
-        };
-        for node in rest {
-            let source = provenance(
-                ConstraintOrigin::AlignmentConstraint,
-                match constraint.axis {
-                    ConstraintAxis::Horizontal => Axis::X,
-                    ConstraintAxis::Vertical => Axis::Y,
-                    ConstraintAxis::Inferred => return Ok(None),
-                },
-                *node,
-                constraint.span,
-            )
-            .with_anchor(lead_member.span)
-            .with_anchor_index(lead);
-            match constraint.axis {
-                ConstraintAxis::Horizontal => lower_horizontal_alignment(
-                    variables[*node],
-                    target,
-                    constraint.align,
-                    source,
-                    &mut constraints,
-                ),
-                ConstraintAxis::Vertical => lower_vertical_alignment(
-                    variables[*node],
-                    target,
-                    constraint.align,
-                    source,
-                    &mut constraints,
-                ),
-                ConstraintAxis::Inferred => unreachable!(),
-            }
-        }
-    }
-
-    sort_constraints(&mut constraints, diagram);
-
-    let mut solver = Solver::new();
-    for (index, sourced) in constraints.iter().enumerate() {
-        if !add_to_solver(&mut solver, sourced)? {
-            let conflict = explain_conflict(&constraints, index)?;
-            return Err(conflict_error(conflict, diagram, &variables));
-        }
-    }
-
-    Ok(Some(
-        variables
-            .iter()
-            .map(|vars| Rect {
-                x: solver.get_value(vars.x),
-                y: solver.get_value(vars.y),
-                w: solver.get_value(vars.w),
-                h: solver.get_value(vars.h),
-            })
-            .collect(),
-    ))
-}
-
-/// Verify the frame contract with the same Cassowary vocabulary used for
-/// nodes. Group bounds are still measured by the historical fixpoint (their
-/// width is the bounds of their contents), but containment and the resulting
-/// translations are now expressed as required constraints rather than being
-/// an unchecked renderer-side assumption. This is the safe first step toward
-/// lowering frames fully: once frame sizing moves into the IR, these measured
-/// equalities are the only lines that need to disappear.
-pub fn validate_frames(
-    diagram: &Diagram,
-    plan: &PlacementPlan<'_>,
-    nodes: &[Option<Rect>],
-    groups: &[Option<Rect>],
-    frame_translations: &[(f64, f64)],
-    opts: &GraphOpts,
-) -> Result<()> {
-    if diagram.groups.is_empty() {
-        return Ok(());
-    }
-    let sizes: Vec<_> = nodes
-        .iter()
-        .flatten()
-        .map(|rect| (rect.w, rect.h))
-        .collect();
-    let variables: Vec<Variables> = (0..diagram.nodes.len() + diagram.groups.len())
-        .map(|_| Variables::new())
-        .collect();
-    let entity_vars = |entity: Entity| match entity {
-        Entity::Node(i) => variables[i],
-        Entity::Group(i) => variables[diagram.nodes.len() + i],
-    };
-    let entity_rect = |entity: Entity| match entity {
-        Entity::Node(i) => nodes.get(i).and_then(|r| *r),
-        Entity::Group(i) => groups.get(i).and_then(|r| *r),
-    };
-    let mut constraints = Vec::new();
-    for entity in (0..diagram.nodes.len())
-        .map(Entity::Node)
-        .chain((0..diagram.groups.len()).map(Entity::Group))
-    {
-        let Some(rect) = entity_rect(entity) else {
-            return Err(anyhow!("frame lowering received an unresolved entity"));
-        };
-        let vars = entity_vars(entity);
-        push(
-            &mut constraints,
-            vars.x | EQ(Strength::REQUIRED) | rect.x,
-            provenance(
-                ConstraintOrigin::ContainerOrigin,
-                Axis::X,
-                entity_index(entity, diagram),
-                plan.placement_span(entity),
-            ),
-        );
-        push(
-            &mut constraints,
-            vars.y | EQ(Strength::REQUIRED) | rect.y,
-            provenance(
-                ConstraintOrigin::ContainerOrigin,
-                Axis::Y,
-                entity_index(entity, diagram),
-                plan.placement_span(entity),
-            ),
-        );
-        push(
-            &mut constraints,
-            vars.w | EQ(Strength::REQUIRED) | rect.w,
-            provenance(
-                ConstraintOrigin::MeasuredSize,
-                Axis::Width,
-                entity_index(entity, diagram),
-                match entity {
-                    Entity::Node(i) => diagram.nodes[i].span,
-                    Entity::Group(i) => diagram.groups[i].span,
-                },
-            ),
-        );
-        push(
-            &mut constraints,
-            vars.h | EQ(Strength::REQUIRED) | rect.h,
-            provenance(
-                ConstraintOrigin::MeasuredSize,
-                Axis::Height,
-                entity_index(entity, diagram),
-                match entity {
-                    Entity::Node(i) => diagram.nodes[i].span,
-                    Entity::Group(i) => diagram.groups[i].span,
-                },
-            ),
-        );
-    }
-    for (group_index, group) in diagram.groups.iter().enumerate() {
-        let frame = entity_vars(Entity::Group(group_index));
-        if let Some(placement) = plan.declared_group_placement(group_index) {
-            let source = provenance(
-                match placement {
-                    Placement::At { .. } => ConstraintOrigin::AbsolutePlacement,
-                    Placement::Cell { .. } => ConstraintOrigin::GridPlacement,
-                    Placement::Rel { .. } => ConstraintOrigin::RelativePlacement,
-                },
-                Axis::X,
-                diagram.nodes.len() + group_index,
-                plan.placement_span(Entity::Group(group_index)),
-            );
-            match crate::layout::resolve_grid_placement(placement, opts, &sizes) {
-                Placement::At { x, y } => {
-                    let mut offset = (0.0, 0.0);
-                    let mut owner = plan.owner().get(&Entity::Group(group_index)).copied();
-                    while let Some(group) = owner {
-                        offset.0 += frame_translations[group].0;
-                        offset.1 += frame_translations[group].1;
-                        owner = plan.owner().get(&Entity::Group(group)).copied();
-                    }
-                    push(
-                        &mut constraints,
-                        frame.x | EQ(Strength::REQUIRED) | (x + offset.0),
-                        source.with_axis(Axis::X),
-                    );
-                    push(
-                        &mut constraints,
-                        frame.y | EQ(Strength::REQUIRED) | (y + offset.1),
-                        source.with_axis(Axis::Y),
-                    );
-                }
-                Placement::Cell { .. } => unreachable!("resolved cells are absolute"),
-                Placement::Rel {
-                    dir,
-                    anchor,
-                    gap,
-                    align,
-                } => {
-                    let Some(target) = plan.index().get(anchor.as_str()).copied() else {
-                        continue;
-                    };
-                    let source = source
-                        .with_anchor(anchor.span)
-                        .with_anchor_index(entity_index(target, diagram));
-                    let target = entity_vars(target);
-                    let gap =
-                        crate::layout::grid_distance(opts, gap.unwrap_or(opts.gap), dir, &sizes);
-                    let align = align.unwrap_or(Align::Center);
-                    match dir {
-                        RelDir::RightOf => {
-                            push(
-                                &mut constraints,
-                                frame.x | EQ(Strength::REQUIRED) | (target.x + target.w + gap),
-                                source.with_axis(Axis::X),
-                            );
-                            lower_vertical_alignment(
-                                frame,
-                                target,
-                                align,
-                                source,
-                                &mut constraints,
-                            );
-                        }
-                        RelDir::LeftOf => {
-                            push(
-                                &mut constraints,
-                                (frame.x + frame.w + gap) | EQ(Strength::REQUIRED) | target.x,
-                                source.with_axis(Axis::X),
-                            );
-                            lower_vertical_alignment(
-                                frame,
-                                target,
-                                align,
-                                source,
-                                &mut constraints,
-                            );
-                        }
-                        RelDir::Below => {
-                            push(
-                                &mut constraints,
-                                frame.y | EQ(Strength::REQUIRED) | (target.y + target.h + gap),
-                                source.with_axis(Axis::Y),
-                            );
-                            lower_horizontal_alignment(
-                                frame,
-                                target,
-                                align,
-                                source,
-                                &mut constraints,
-                            );
-                        }
-                        RelDir::Above => {
-                            push(
-                                &mut constraints,
-                                (frame.y + frame.h + gap) | EQ(Strength::REQUIRED) | target.y,
-                                source.with_axis(Axis::Y),
-                            );
-                            lower_horizontal_alignment(
-                                frame,
-                                target,
-                                align,
-                                source,
-                                &mut constraints,
-                            );
-                        }
-                    }
-                }
-            }
-        }
-        for member in &group.members {
-            let Some(entity) = plan.index().get(member.as_str()).copied() else {
-                continue;
-            };
-            let child = entity_vars(entity);
-            let span = diagram.groups[group_index].span;
-            let source = provenance(
-                ConstraintOrigin::ContainerOrigin,
-                Axis::X,
-                diagram.nodes.len() + group_index,
-                span,
-            );
-            push(
-                &mut constraints,
-                frame.x | LE(Strength::REQUIRED) | child.x,
-                source,
-            );
-            push(
-                &mut constraints,
-                frame.y | LE(Strength::REQUIRED) | child.y,
-                source.with_axis(Axis::Y),
-            );
-            push(
-                &mut constraints,
-                (frame.x + frame.w) | GE(Strength::REQUIRED) | (child.x + child.w),
-                source.with_axis(Axis::X),
-            );
-            push(
-                &mut constraints,
-                (frame.y + frame.h) | GE(Strength::REQUIRED) | (child.y + child.h),
-                source.with_axis(Axis::Y),
-            );
-        }
-    }
-    for constraint in plan.constraints().map(|item| item.declaration()) {
-        if constraint.kind != ConstraintKind::AlignGroup {
-            continue;
-        }
-        let Some(lead) = constraint
-            .members
-            .first()
-            .and_then(|member| plan.index().get(member.as_str()))
-            .copied()
-        else {
-            continue;
-        };
-        for member in constraint.members.iter().skip(1) {
-            let Some(entity) = plan.index().get(member.as_str()).copied() else {
-                continue;
-            };
-            let source = provenance(
-                ConstraintOrigin::AlignmentConstraint,
-                Axis::X,
-                entity_index(entity, diagram),
-                constraint.span,
-            )
-            .with_anchor(constraint.members[0].span)
-            .with_anchor_index(entity_index(lead, diagram));
-            match constraint.axis {
-                ConstraintAxis::Horizontal => lower_horizontal_alignment(
-                    entity_vars(entity),
-                    entity_vars(lead),
-                    constraint.align,
-                    source,
-                    &mut constraints,
-                ),
-                ConstraintAxis::Vertical => lower_vertical_alignment(
-                    entity_vars(entity),
-                    entity_vars(lead),
-                    constraint.align,
-                    source,
-                    &mut constraints,
-                ),
-                ConstraintAxis::Inferred => {}
-            }
-        }
-    }
-    sort_constraints(&mut constraints, diagram);
-
-    let mut solver = Solver::new();
-    for (index, sourced) in constraints.iter().enumerate() {
-        if !add_to_solver(&mut solver, sourced)? {
-            let conflict = explain_conflict(&constraints, index)?;
-            return Err(conflict_error(conflict, diagram, &variables));
-        }
-    }
-    for entity in (0..diagram.nodes.len())
-        .map(Entity::Node)
-        .chain((0..diagram.groups.len()).map(Entity::Group))
-    {
-        let vars = entity_vars(entity);
-        let Some(rect) = entity_rect(entity) else {
-            continue;
-        };
-        let values = [
-            (solver.get_value(vars.x), rect.x),
-            (solver.get_value(vars.y), rect.y),
-            (solver.get_value(vars.w), rect.w),
-            (solver.get_value(vars.h), rect.h),
-        ];
-        if values
-            .iter()
-            .any(|(actual, expected)| (actual - expected).abs() > 1e-7)
-        {
-            return Err(anyhow!("Kasuari frame lowering changed measured geometry"));
-        }
-    }
-    Ok(())
 }
 
 fn entity_index(entity: Entity, diagram: &Diagram) -> usize {
@@ -918,68 +351,6 @@ fn lower_size_equalities(
             );
         }
     }
-}
-
-fn lower_placement(
-    placement: &Placement,
-    node: usize,
-    node_span: Span,
-    vars: Variables,
-    overridden_axes: [bool; 2],
-    lowering: &mut Lowering<'_, '_, '_>,
-) -> Result<()> {
-    let origin = match placement {
-        Placement::Cell { .. } => ConstraintOrigin::GridPlacement,
-        Placement::At { .. } => ConstraintOrigin::AbsolutePlacement,
-        Placement::Rel { .. } => ConstraintOrigin::RelativePlacement,
-    };
-    let resolved = match (lowering.grid_spec, placement) {
-        (Some(_), Placement::At { x, y }) => Placement::At {
-            x: x * lowering.grid_pitch.0,
-            y: y * lowering.grid_pitch.1,
-        },
-        (Some(_), Placement::Cell { col, row }) => Placement::At {
-            x: col * lowering.grid_pitch.0,
-            y: row * lowering.grid_pitch.1,
-        },
-        _ => placement.resolved(lowering.grid),
-    };
-    match resolved {
-        Placement::At { x, y } => {
-            push(
-                lowering.out,
-                vars.x | EQ(Strength::REQUIRED) | x,
-                provenance(origin, Axis::X, node, node_span),
-            );
-            push(
-                lowering.out,
-                vars.y | EQ(Strength::REQUIRED) | y,
-                provenance(origin, Axis::Y, node, node_span),
-            );
-        }
-        Placement::Rel {
-            dir,
-            anchor,
-            gap,
-            align,
-        } => lower_relative(
-            dir,
-            anchor.as_str(),
-            gap,
-            RelativeAlignment {
-                declared: align,
-                overridden_axes,
-            },
-            vars,
-            provenance(origin, Axis::X, node, node_span).with_anchor(anchor.span),
-            lowering,
-        )?,
-        // `Placement::resolved` above removes every cell.
-        Placement::Cell { .. } => {
-            return Err(anyhow!("a grid cell reached the Cassowary lowering"));
-        }
-    }
-    Ok(())
 }
 
 fn lower_relative(
@@ -1477,30 +848,32 @@ mod tests {
     }
 
     #[test]
-    fn large_graph_fallback_still_reports_an_ignored_required_alignment() {
+    fn large_graphs_reject_a_contradictory_required_alignment() {
         let mut source = String::from("node a\nnode b\n");
-        for index in 2..=MAX_DIRECT_NODES {
+        for index in 2..=512 {
             source.push_str(&format!("node n{index}\n"));
         }
         source.push_str("layout {\n place a at (0, 0)\n place b at (0, 80)\n align top a b\n}");
         let diagram = crate::parser::parse(&source).unwrap();
-        let layout = crate::layout::solve(&diagram).unwrap();
-        let diagnostics = crate::check::after_layout(&diagram, &layout);
+        let error = crate::layout::solve(&diagram).err().unwrap();
+        let diagnostics = crate::check::layout_error(&diagram, &error);
         assert!(
             diagnostics
                 .iter()
                 .any(|diag| diag.severity == crate::check::Severity::Error
-                    && diag.message.contains("required alignment of `b`")),
+                    && diag
+                        .message
+                        .contains("required layout constraints conflict")),
             "{diagnostics:?}"
         );
     }
 
     #[test]
-    fn large_graph_fallback_retains_nested_frame_local_absolute_origins() {
+    fn large_graphs_retain_nested_frame_local_absolute_origins() {
         let mut source = String::from(
             "group outer {\n padding: 10\n group inner {\n padding: 5\n node a { size: 20 20 }\n layout { place a at (100, 0) }\n }\n layout { place inner at (50, 40) }\n}\nlayout { place outer at (200, 100) }\n",
         );
-        for index in 0..MAX_DIRECT_NODES {
+        for index in 0..512 {
             source.push_str(&format!("node filler{index} {{ size: 1 1 }}\n"));
         }
         let diagram = crate::parser::parse(&source).unwrap();

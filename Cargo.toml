@@ -133,7 +133,7 @@ png = ["dep:resvg", "dep:tiny-skia"]
 # has no dependency beyond the `clap` already here, and `clap_mangen` brings
 # one small crate. Both are binary-only, so the library a caller embeds is
 # untouched — and `--no-default-features`, which CI builds, still resolves to
-# the five this crate promises.
+# the six this crate promises.
 completions = ["cli", "dep:clap_complete", "dep:clap_mangen"]
 
 # The two binaries. Optional so a *library* consumer — and the wasm build in
@@ -161,6 +161,9 @@ clap = { version = "4.6.4", features = ["derive"], optional = true }
 pest = "2.8.8"
 pest_derive = "2.8.8"
 serde_json = "1.0"
+# Identical transcendental geometry on native and wasm runtimes (`D-045`).
+# Disable architecture/intrinsic alternatives even if another dependency enables them.
+libm = { version = "=0.2.16", default-features = false, features = ["force-soft-floats"] }
 # The deterministic local fork is the declared-layout core (`W-153`).  It has
 # no transitive dependencies and is built on every library surface, including
 # `--no-default-features` and wasm.

@@ -19,10 +19,12 @@ pub(super) fn capabilities() -> Value {
                 "resolveProvider": false
             },
             "hoverProvider": true,
-            "signatureHelpProvider": { "triggerCharacters": [" "], "retriggerCharacters": [" "] },
+            "signatureHelpProvider": { "triggerCharacters": [" ", "(", ","], "retriggerCharacters": [" ", "(", ","] },
+            "documentFormattingProvider": true,
             "colorProvider": true,
             "documentHighlightProvider": true,
             "definitionProvider": true,
+            "referencesProvider": true,
             "documentSymbolProvider": true,
         },
         "serverInfo": {
