@@ -1,0 +1,3 @@
+include "includes/invalid.bd"
+include "includes/component.bd"
+node root { shape: unknown_root }

@@ -62,6 +62,13 @@ pub fn explain(diagram: &Diagram, layout: &Layout, id: &str) -> Result<String> {
     out.push_str("\nplacement\n");
     let placement = PlacementPlan::new(diagram);
     match placement.node(index, opts.flow) {
+        EffectivePlacement::Boundary(boundary) => {
+            out.push_str(&format!(
+                "  boundary on `{}` — declared by `attach`; center at {} of its bottom edge\n",
+                diagram.nodes[boundary.host].id.as_str(),
+                round(boundary.along),
+            ));
+        }
         EffectivePlacement::Declared(Placement::At { x, y }) => {
             out.push_str(&format!(
                 "  at ({}, {})  — declared\n",
@@ -207,51 +214,38 @@ pub fn explain(diagram: &Diagram, layout: &Layout, id: &str) -> Result<String> {
 ///
 /// Re-run rather than recorded: the registry resolves in one pass, so this
 /// walks the same layers again and attributes a field to the last one that
-/// changed it. Doing it any other way would mean the resolver kept a trail
+/// declares it. Doing it any other way would mean the resolver kept a trail
 /// nothing else needs.
 fn paint(diagram: &Diagram, node: &crate::ast::NodeDecl, id: &str) -> Result<String> {
     let registry = Registry::build(&diagram.styles)?;
     let def = crate::check::archetype_of(diagram);
 
-    let mut current = Style::default();
     let mut source: Vec<(&'static str, String)> = Vec::new();
-    let note = |current: &Style, before: &Style, from: String, out: &mut Vec<_>| {
-        for (name, now, was) in [
-            ("fill", &current.fill, &before.fill),
-            ("stroke", &current.stroke, &before.stroke),
-            ("font colour", &current.font_color, &before.font_color),
+    let note = |layer: &Style, from: String, out: &mut Vec<_>| {
+        for (name, value) in [
+            ("fill", &layer.fill),
+            ("stroke", &layer.stroke),
+            ("font colour", &layer.font_color),
         ] {
-            if now != was && now.is_some() {
+            if let Some(value) = value {
                 out.retain(|(field, _): &(&str, String)| *field != name);
-                out.push((name, format!("{}  — from {from}", now.clone().unwrap())));
+                out.push((name, format!("{value}  — from {from}")));
             }
         }
     };
 
     let item_word = def.style_word(node.keyword.as_str());
-    let mut layers: Vec<(String, Option<&Style>)> = Vec::new();
-    if item_word != "node" {
-        layers.push(("`style node`".to_string(), registry.get("node")));
+    for (name, layer) in registry.implicit_layers(item_word) {
+        note(layer, format!("`style {name}`"), &mut source);
     }
-    layers.push((format!("`style {item_word}`"), registry.get(item_word)));
-    layers.extend(
-        node.classes
-            .iter()
-            .map(|c| (format!("`.{}`", c.as_str()), registry.get(c.as_str()))),
-    );
-
-    for (from, layer) in layers {
-        let Some(layer) = layer else { continue };
-        let before = current.clone();
-        current.overlay(layer);
-        note(&current, &before, from, &mut source);
+    for class in &node.classes {
+        if let Some(layer) = registry.get(class.as_str()) {
+            note(layer, format!("`.{}`", class.as_str()), &mut source);
+        }
     }
 
-    let before = current.clone();
-    current.overlay(&crate::style::layer_from_props(&node.props_for(def))?);
     note(
-        &current,
-        &before,
+        &crate::style::layer_from_props(&node.props_for(def))?,
         format!("`{id}`'s own block"),
         &mut source,
     );
@@ -317,5 +311,49 @@ fn round(v: f64) -> String {
         format!("{}", v as i64)
     } else {
         format!("{v:.1}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(feature = "bpmn")]
+    fn paint_attributes_equal_overrides_to_the_last_declaring_layer() {
+        let diagram = crate::parser::parse(
+            "type bpmn\n\
+             style node { fill: #123456 font-color: #234567 }\n\
+             style event { fill: #123456 stroke: #345678 }\n\
+             style emphasis { stroke: #345678 }\n\
+             event e \"Event\" start plain .emphasis { fill: #123456 }\n",
+        )
+        .unwrap();
+        let paint = paint(&diagram, &diagram.nodes[0], "e").unwrap();
+        assert!(paint.contains("#123456  — from `e`'s own block"), "{paint}");
+        assert!(paint.contains("#345678  — from `.emphasis`"), "{paint}");
+        assert!(paint.contains("#234567  — from `style node`"), "{paint}");
+    }
+
+    #[test]
+    #[cfg(feature = "xy")]
+    fn alternate_chart_words_use_the_same_theme_in_render_and_explain() {
+        for word in ["series", "scatter", "node"] {
+            let target = if word == "node" { "series" } else { word };
+            let source = format!(
+                "type xy\nstyle node {{ font-color: #234567 }}\n\
+                 style {target} {{ fill: #123456 }}\n{word} a \"A\" 0 10 1 20\n"
+            );
+            let diagram = crate::parser::parse(&source).unwrap();
+            let layout = crate::layout::solve(&diagram).unwrap();
+            let svg = crate::render_svg::render(&layout);
+            assert!(
+                svg.contains("#123456"),
+                "{word}: the theme reaches the drawing"
+            );
+            let paint = paint(&diagram, &diagram.nodes[0], "a").unwrap();
+            assert!(paint.contains(&format!("from `style {target}`")), "{paint}");
+            assert!(paint.contains("from `style node`"), "{paint}");
+        }
     }
 }

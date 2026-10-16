@@ -26,34 +26,65 @@ pub(crate) fn path_of(uri: &str) -> Option<std::path::PathBuf> {
 }
 
 pub(crate) fn diagnostics_for(text: &str, path: Option<&std::path::Path>) -> Vec<Value> {
-    let composed = path
-        .filter(|_| text.contains("include"))
-        .and_then(|path| crate::compose::load_text(path, text).ok());
-
-    let Some(composed) = composed else {
+    let Some(path) = path else {
         return diagnostics(text);
     };
-
+    let Ok(composed) = crate::analyze_file_source(path, text) else {
+        return diagnostics(text);
+    };
+    let entry = path
+        .canonicalize()
+        .or_else(|_| std::path::absolute(path))
+        .unwrap_or_else(|_| path.to_path_buf());
     let index = LineIndex::new(text);
-    let diags = crate::analyze_diagram(&composed.diagram).1;
-
     let mut out = Vec::new();
-    for diag in diags {
-        let (owner, _, _) = composed.map.locate(diag.span.start);
-        if owner != path.expect("a path was needed to compose") {
-            continue;
-        }
+    for diag in composed.analysis.diagnostics {
+        let (owner, line, column) = composed.map.locate(diag.span.start);
         let base = composed.map.base_of(diag.span.start);
         let local = crate::ast::Span {
             start: diag.span.start.saturating_sub(base),
             end: diag.span.end.saturating_sub(base),
         };
-        out.push(json!({
-            "range": index.range(local),
+        let (range, message, related) = if owner == entry {
+            (index.range(local), diag.message, None)
+        } else if let Some(include) = composed.map.include_span(&entry, diag.span.start) {
+            let child = LineIndex::new(composed.map.source_of(diag.span.start));
+            let uri: String = owner
+                .to_string_lossy()
+                .bytes()
+                .map(|byte| {
+                    if byte.is_ascii_alphanumeric() || b"/-._~:".contains(&byte) {
+                        (byte as char).to_string()
+                    } else {
+                        format!("%{byte:02X}")
+                    }
+                })
+                .collect();
+            let message = format!(
+                "{}:{}:{}: {}",
+                owner.display(),
+                line + 1,
+                column + 1,
+                diag.message
+            );
+            let related = json!([{
+                "location": { "uri": format!("file://{uri}"), "range": child.range(local) },
+                "message": diag.message,
+            }]);
+            (index.range(include), message, Some(related))
+        } else {
+            continue;
+        };
+        let mut diagnostic = json!({
+            "range": range,
             "severity": if diag.severity == Severity::Error { 1 } else { 2 },
             "source": "bgraph",
-            "message": diag.message,
-        }));
+            "message": message,
+        });
+        if let Some(related) = related {
+            diagnostic["relatedInformation"] = related;
+        }
+        out.push(diagnostic);
     }
 
     for (span, message) in crate::template::lint(text) {

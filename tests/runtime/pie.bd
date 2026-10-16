@@ -1,0 +1,4 @@
+type pie
+slice organic "Organic" 48
+slice direct "Direct" 32
+slice referral "Referral" 20

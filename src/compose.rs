@@ -39,9 +39,25 @@ pub struct SourceMap {
     pub text: String,
     /// Each file's starting offset, in the order they were laid down.
     files: Vec<(usize, PathBuf)>,
+    includes: Vec<(usize, usize, Span)>,
 }
 
 impl SourceMap {
+    /// Find the entry-file include leading to a diagnostic's owning file.
+    pub(crate) fn include_span(&self, entry: &Path, offset: usize) -> Option<Span> {
+        let root = self.files.iter().rev().find(|(_, path)| path == entry)?.0;
+        let mut child = self.base_of(offset);
+        while let Some((_, parent, span)) =
+            self.includes.iter().find(|(target, _, _)| *target == child)
+        {
+            if *parent == root {
+                return Some(*span);
+            }
+            child = *parent;
+        }
+        None
+    }
+
     /// The file, line and column a byte offset falls in. Lines and columns are
     /// zero-based, as [`crate::lsp::LineIndex`] reports them.
     pub fn locate(&self, offset: usize) -> (&Path, usize, usize) {
@@ -92,11 +108,13 @@ pub struct Composed {
     pub diagram: Diagram,
     /// What takes a span in that diagram back to the file it was written in.
     pub map: SourceMap,
+    /// Syntax and composition errors, with spans into the same source map.
+    pub diagnostics: Vec<crate::check::Diag>,
 }
 
 /// Load `path`, resolving its includes.
 pub fn load(path: &Path) -> Result<Composed> {
-    compose(path, None)
+    strict(compose(path, None)?)
 }
 
 /// The same, with the entry file's text supplied rather than read.
@@ -107,10 +125,50 @@ pub fn load(path: &Path) -> Result<Composed> {
 /// are still read from disk, which is correct — those are not being edited in
 /// this buffer.
 pub fn load_text(path: &Path, source: &str) -> Result<Composed> {
-    compose(path, Some(source))
+    strict(compose(path, Some(source))?)
 }
 
-fn compose(path: &Path, entry: Option<&str>) -> Result<Composed> {
+#[derive(Debug)]
+struct CompositionError {
+    map: SourceMap,
+    diagnostics: Vec<crate::check::Diag>,
+}
+
+impl std::fmt::Display for CompositionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, diagnostic) in self.diagnostics.iter().enumerate() {
+            let (path, line, column) = self.map.locate(diagnostic.span.start);
+            if i > 0 {
+                writeln!(f)?;
+            }
+            write!(
+                f,
+                "{}:{}:{}: {}",
+                path.display(),
+                line + 1,
+                column + 1,
+                diagnostic.message
+            )?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for CompositionError {}
+
+fn strict(composed: Composed) -> Result<Composed> {
+    if composed.diagnostics.is_empty() {
+        Ok(composed)
+    } else {
+        Err(CompositionError {
+            map: composed.map,
+            diagnostics: composed.diagnostics,
+        }
+        .into())
+    }
+}
+
+pub(crate) fn compose(path: &Path, entry: Option<&str>) -> Result<Composed> {
     let mut state = State {
         diagram: Diagram::default(),
         text: String::new(),
@@ -119,6 +177,8 @@ fn compose(path: &Path, entry: Option<&str>) -> Result<Composed> {
         // rather than only the second.
         origin: HashMap::new(),
         chain: Vec::new(),
+        diagnostics: Vec::new(),
+        includes: Vec::new(),
     };
     state.absorb(path, None, entry)?;
 
@@ -127,7 +187,9 @@ fn compose(path: &Path, entry: Option<&str>) -> Result<Composed> {
         map: SourceMap {
             text: state.text,
             files: state.files,
+            includes: state.includes,
         },
+        diagnostics: state.diagnostics,
     })
 }
 
@@ -137,12 +199,21 @@ struct State {
     files: Vec<(usize, PathBuf)>,
     origin: HashMap<String, PathBuf>,
     chain: Vec<PathBuf>,
+    diagnostics: Vec<crate::check::Diag>,
+    includes: Vec<(usize, usize, Span)>,
 }
 
 impl State {
     fn absorb(&mut self, path: &Path, prefix: Option<&str>, entry: Option<&str>) -> Result<()> {
         let path = path
             .canonicalize()
+            .or_else(|error| {
+                if entry.is_some() {
+                    std::path::absolute(path)
+                } else {
+                    Err(error)
+                }
+            })
             .with_context(|| format!("cannot open {}", path.display()))?;
 
         if self.chain.contains(&path) {
@@ -157,8 +228,16 @@ impl State {
             None => std::fs::read_to_string(&path)
                 .with_context(|| format!("cannot read {}", path.display()))?,
         };
-        let mut diagram = crate::parser::parse(&source)
-            .map_err(|e| anyhow::anyhow!("{}: {}", path.display(), e.message))?;
+        let (diagram, syntax) = crate::parser::parse_recovering(&source);
+        let mut local: Vec<crate::check::Diag> = syntax
+            .into_iter()
+            .map(|error| crate::check::Diag {
+                severity: crate::check::Severity::Error,
+                message: error.message,
+                span: error.span,
+            })
+            .collect();
+        let mut diagram = diagram.unwrap_or_default();
 
         // A `.bds` is styles and nothing else. Checked here rather than in
         // `check`, because by the time `check` runs the file boundary is gone.
@@ -177,11 +256,16 @@ impl State {
                 None
             };
             if let Some(what) = stray {
-                bail!(
-                    "{} is a `.bds`, which holds `style` declarations only — \
-                     it declares {what}. Rename it `.bd` if it is a diagram",
-                    path.display()
-                );
+                local.push(crate::check::Diag {
+                    severity: crate::check::Severity::Error,
+                    span: diagram.nodes.first().map(|node| node.span)
+                        .or_else(|| diagram.edges.first().map(|edge| edge.span))
+                        .or_else(|| diagram.groups.first().map(|group| group.span))
+                        .or_else(|| diagram.archetype.as_ref().map(|name| name.span))
+                        .or(diagram.graph_span)
+                        .unwrap_or_default(),
+                    message: format!("{} is a `.bds`, which holds `style` declarations only — it declares {what}. Rename it `.bd` if it is a diagram", path.display()),
+                });
             }
         }
 
@@ -191,6 +275,7 @@ impl State {
         // offsets are computed in.
         let includes = std::mem::take(&mut diagram.includes);
         self.chain.push(path.clone());
+        let mut child_links = Vec::new();
         for include in &includes {
             let target = path
                 .parent()
@@ -207,37 +292,90 @@ impl State {
             // Only the entry file's text is supplied; everything it pulls in
             // comes from disk, which is right — those are not being edited in
             // the buffer this was called for.
-            self.absorb(&target, nested.as_deref(), None)
-                .with_context(|| format!("included from {}", path.display()))?;
+            match self.absorb(&target, nested.as_deref(), None) {
+                Ok(()) => {
+                    let child_base = self
+                        .files
+                        .last()
+                        .expect("a readable include has a source map entry")
+                        .0;
+                    child_links.push((child_base, include.span));
+                }
+                Err(error) => local.push(crate::check::Diag {
+                    severity: crate::check::Severity::Error,
+                    span: include.span,
+                    message: format!("{error:#}"),
+                }),
+            }
         }
         self.chain.pop();
 
         let base = self.text.len();
+        self.includes.extend(
+            child_links
+                .into_iter()
+                .map(|(child, span)| (child, base, span)),
+        );
         self.files.push((base, path.clone()));
         self.text.push_str(&source);
         // A newline between files, or the last statement of one and the first
         // of the next would run together in a rendered diagnostic.
         self.text.push('\n');
 
-        expand(&mut diagram, &path)?;
-        read_data(&mut diagram, &path)?;
+        local.extend(expand(&mut diagram));
+        if let Err(error) = read_data(&mut diagram, &path) {
+            local.push(crate::check::Diag {
+                severity: crate::check::Severity::Error,
+                span: diagram
+                    .archetype_props
+                    .iter()
+                    .find(|prop| prop.name == "from")
+                    .map(|prop| prop.span)
+                    .unwrap_or_default(),
+                message: format!("{error:#}"),
+            });
+        }
+        for mut diagnostic in local {
+            diagnostic.span.start += base;
+            diagnostic.span.end += base;
+            self.diagnostics.push(diagnostic);
+        }
         shift(&mut diagram, base);
         if let Some(prefix) = prefix {
             qualify(&mut diagram, prefix);
         }
-        self.merge(diagram, &path)?;
+        self.merge(diagram, &path);
         Ok(())
     }
 
-    fn merge(&mut self, other: Diagram, from: &Path) -> Result<()> {
+    fn merge(&mut self, other: Diagram, from: &Path) {
         for name in declared(&other) {
             if let Some(first) = self.origin.get(&name) {
-                bail!(
-                    "`{name}` is declared in both {} and {} — give one of the \
-                     includes a name with `as`, or rename it",
-                    first.display(),
-                    from.display()
-                );
+                let span = other
+                    .nodes
+                    .iter()
+                    .find(|node| node.id.as_str() == name)
+                    .map(|node| node.id.span)
+                    .or_else(|| {
+                        other
+                            .groups
+                            .iter()
+                            .find(|group| group.id.as_str() == name)
+                            .map(|group| group.id.span)
+                    })
+                    .or_else(|| {
+                        other
+                            .styles
+                            .iter()
+                            .find(|style| format!("style {}", style.name.as_str()) == name)
+                            .map(|style| style.name.span)
+                    })
+                    .unwrap_or_default();
+                self.diagnostics.push(crate::check::Diag {
+                    severity: crate::check::Severity::Error,
+                    span,
+                    message: format!("`{name}` is declared in both {} and {} — give one of the includes a name with `as`, or rename it", first.display(), from.display()),
+                });
             }
             self.origin.insert(name, from.to_path_buf());
         }
@@ -281,7 +419,6 @@ impl State {
         }
         d.groups.extend(groups);
         d.edges.extend(other.edges);
-        Ok(())
     }
 }
 
@@ -407,6 +544,20 @@ fn read_data(diagram: &mut Diagram, _from: &Path) -> Result<()> {
     Ok(())
 }
 
+#[derive(Debug)]
+struct ComponentError {
+    span: Span,
+    message: String,
+}
+
+impl std::fmt::Display for ComponentError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for ComponentError {}
+
 /// Place every `use`, and drop the `component` declarations that fed them.
 ///
 /// A component is an include of a file you did not have to make. So this is
@@ -417,114 +568,132 @@ fn read_data(diagram: &mut Diagram, _from: &Path) -> Result<()> {
 /// Spans inside an instance point at the `use` that placed it rather than at
 /// the component's own text: the component is written once and placed many
 /// times, so a diagnostic about *this* instance belongs where the instance is.
-fn expand(diagram: &mut Diagram, from: &Path) -> Result<()> {
+pub(crate) fn expand(diagram: &mut Diagram) -> Vec<crate::check::Diag> {
     let components = std::mem::take(&mut diagram.components);
     let uses = std::mem::take(&mut diagram.uses);
-    if uses.is_empty() {
-        return Ok(());
-    }
+    uses.iter()
+        .filter_map(|placing| {
+            expand_one(diagram, &components, placing)
+                .err()
+                .map(|error| crate::check::Diag {
+                    severity: crate::check::Severity::Error,
+                    span: error
+                        .downcast_ref::<ComponentError>()
+                        .map(|context| context.span)
+                        .unwrap_or(placing.span),
+                    message: format!("{error:#}"),
+                })
+        })
+        .collect()
+}
 
-    for placing in &uses {
-        let Some(component) = components
-            .iter()
-            .find(|c| c.name.as_str() == placing.component.as_str())
-        else {
-            let known: Vec<&str> = components.iter().map(|c| c.name.as_str()).collect();
-            bail!(
-                "{}: unknown component `{}`{}",
-                from.display(),
+fn expand_one(
+    diagram: &mut Diagram,
+    components: &[crate::ast::ComponentDecl],
+    placing: &crate::ast::UseDecl,
+) -> Result<()> {
+    let Some(component) = components
+        .iter()
+        .find(|c| c.name.as_str() == placing.component.as_str())
+    else {
+        let known: Vec<&str> = components.iter().map(|c| c.name.as_str()).collect();
+        return Err(ComponentError {
+            span: placing.span,
+            message: format!(
+                "unknown component `{}`{}",
                 placing.component.as_str(),
                 if known.is_empty() {
                     String::new()
                 } else {
                     format!(" — this file declares: {}", known.join(", "))
                 }
-            );
-        };
-
-        let mut values = crate::template::Bindings::new();
-        for binding in &placing.bindings {
-            // Every value written after the key, joined the way the language
-            // reads a list — so `size: 120 60` reaches the hole as `120 60`.
-            // A single string binds as text, so the engine escapes it for
-            // wherever the hole sits — inside a label it is escaped for a
-            // string, in a value position it is quoted. Anything else binds
-            // as written, joined the way the language reads a list, so
-            // `size: 120 60` reaches the hole as `120 60`.
-            let value = match binding.values.as_slice() {
-                [crate::ast::Value::Str(text)] => crate::template::Value::Text(text.clone()),
-                values => crate::template::Value::Raw(
-                    values.iter().map(written).collect::<Vec<_>>().join(" "),
-                ),
-            };
-            values.insert(binding.name.clone(), value);
+            ),
         }
+        .into());
+    };
 
-        let filled = crate::template::Template::parse(&component.body)
-            .and_then(|t| t.fill(&values))
-            .with_context(|| {
-                format!(
-                    "{}: placing component `{}` as `{}`",
-                    from.display(),
-                    component.name.as_str(),
-                    placing.prefix.as_str()
-                )
-            })?;
+    let mut values = crate::template::Bindings::new();
+    for binding in &placing.bindings {
+        // Every value written after the key, joined the way the language
+        // reads a list — so `size: 120 60` reaches the hole as `120 60`.
+        // A single string binds as text, so the engine escapes it for
+        // wherever the hole sits — inside a label it is escaped for a
+        // string, in a value position it is quoted. Anything else binds
+        // as written, joined the way the language reads a list, so
+        // `size: 120 60` reaches the hole as `120 60`.
+        let value = match binding.values.as_slice() {
+            [crate::ast::Value::Str(text)] => crate::template::Value::Text(text.clone()),
+            values => crate::template::Value::Raw(
+                values.iter().map(written).collect::<Vec<_>>().join(" "),
+            ),
+        };
+        values.insert(binding.name.clone(), value);
+    }
 
-        let mut instance = crate::parser::parse(&filled).map_err(|e| {
-            anyhow::anyhow!(
-                "{}: component `{}` does not parse once `{}`'s bindings are filled: {}",
-                from.display(),
+    let filled = crate::template::Template::parse(&component.body)
+        .and_then(|t| t.fill(&values))
+        .with_context(|| ComponentError {
+            span: placing.span,
+            message: format!(
+                "placing component `{}` as `{}`",
                 component.name.as_str(),
-                placing.prefix.as_str(),
-                e.message
-            )
+                placing.prefix.as_str()
+            ),
         })?;
 
-        // Every span in the instance points at the `use`. The instance has no
-        // text of its own in any file, and a span into the component's body
-        // would send a reader to a line that describes every instance rather
-        // than the one that is wrong.
-        pin(&mut instance, placing.span);
-        qualify(&mut instance, placing.prefix.as_str());
+    let mut instance = crate::parser::parse(&filled).map_err(|e| ComponentError {
+        span: placing.span,
+        message: format!(
+            "component `{}` does not parse once `{}`'s bindings are filled: {}",
+            component.name.as_str(),
+            placing.prefix.as_str(),
+            e.message
+        ),
+    })?;
 
-        // The instance is wrapped in a frame named after it. That is what
-        // makes an instance *placeable*: a group is already anchorable,
-        // already sized by what it holds, and already moves its subtree — so
-        // `use service as jobs right-of web` needs no placement vocabulary of
-        // its own, and `web` names the instance while `web.app` names a box
-        // inside it.
-        let members: Vec<Spanned<String>> = instance
-            .nodes
-            .iter()
-            .map(|n| n.id.clone())
-            .chain(instance.groups.iter().map(|g| g.id.clone()))
-            .collect();
+    // Every span in the instance points at the `use`. The instance has no
+    // text of its own in any file, and a span into the component's body
+    // would send a reader to a line that describes every instance rather
+    // than the one that is wrong.
+    pin(&mut instance, placing.span);
+    qualify(&mut instance, placing.prefix.as_str());
 
-        let base = diagram.edges.len();
-        let mut groups = instance.groups;
-        for group in &mut groups {
-            for member in &mut group.edge_members {
-                *member += base;
-            }
+    // The instance is wrapped in a frame named after it. That is what
+    // makes an instance *placeable*: a group is already anchorable,
+    // already sized by what it holds, and already moves its subtree — so
+    // `use service as jobs right-of web` needs no placement vocabulary of
+    // its own, and `web` names the instance while `web.app` names a box
+    // inside it.
+    let members: Vec<Spanned<String>> = instance
+        .nodes
+        .iter()
+        .map(|n| n.id.clone())
+        .chain(instance.groups.iter().map(|g| g.id.clone()))
+        .collect();
+
+    let base = diagram.edges.len();
+    let mut groups = instance.groups;
+    for group in &mut groups {
+        for member in &mut group.edge_members {
+            *member += base;
         }
-        diagram.groups.extend(groups);
-        diagram.edges.extend(instance.edges);
-        diagram.nodes.extend(instance.nodes);
-        diagram.styles.extend(instance.styles);
-        diagram.layouts.extend(instance.layouts);
-
-        diagram.groups.push(crate::ast::GroupDecl {
-            activates: false,
-            id: placing.prefix.clone(),
-            label: None,
-            classes: Vec::new(),
-            props: Vec::new(),
-            members,
-            edge_members: Vec::new(),
-            span: placing.span,
-        });
     }
+    diagram.groups.extend(groups);
+    diagram.edges.extend(instance.edges);
+    diagram.nodes.extend(instance.nodes);
+    diagram.styles.extend(instance.styles);
+    diagram.layouts.extend(instance.layouts);
+
+    diagram.groups.push(crate::ast::GroupDecl {
+        activates: false,
+        id: placing.prefix.clone(),
+        label: None,
+        classes: Vec::new(),
+        props: Vec::new(),
+        members,
+        edge_members: Vec::new(),
+        span: placing.span,
+    });
 
     Ok(())
 }

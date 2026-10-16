@@ -64,53 +64,99 @@ pub const EVENT: f64 = 40.0;
 /// A gateway's diamond, across. Fixed for the same reason as [`EVENT`].
 pub const GATE: f64 = 48.0;
 
-/// Move every `boundary` event onto the edge of the task it names.
-///
-/// This is placement, and it is declared placement (`D-001`): the author says
-/// which box the event belongs to, and the rule for where on that box is fixed
-/// rather than solved. Several on one task spread along the bottom edge in the
-/// order they were written, so the picture follows the file. `label-offset`
-/// moves the caption of one that lands awkwardly.
-pub fn attach_boundaries(nodes: &mut [PlacedNode]) {
-    // Which events want which host, in declaration order.
-    let mut wanted: Vec<(usize, usize)> = Vec::new();
-    for (i, node) in nodes.iter().enumerate() {
-        let Some(host) = node.style.attach.as_deref() else {
+/// Resolve boundary relations before geometry; styles and inline properties share one cascade.
+pub(crate) fn boundary_attachments(
+    diagram: &crate::ast::Diagram,
+) -> Vec<Option<crate::placement::BoundaryAttachment>> {
+    let mut out = vec![None; diagram.nodes.len()];
+    if !diagram
+        .archetype
+        .as_ref()
+        .is_some_and(|kind| kind.as_str() == "bpmn")
+    {
+        return out;
+    }
+    let Some(def) = crate::props::ARCHETYPES
+        .iter()
+        .find(|def| def.name == "bpmn")
+    else {
+        return out;
+    };
+    let Ok(registry) = crate::style::Registry::build(&diagram.styles) else {
+        return out;
+    };
+    let mut wanted = Vec::new();
+    for (event, node) in diagram.nodes.iter().enumerate() {
+        let props = node.props_for(def);
+        let implicit = def.style_word(node.keyword.as_str());
+        let Ok(style) = registry.resolve(
+            crate::style::Style::node_defaults(),
+            implicit,
+            &node.classes,
+            &props,
+        ) else {
             continue;
         };
-        if let Some(h) = nodes.iter().position(|n| n.id == host) {
-            wanted.push((h, i));
+        if style.stage.as_deref() != Some("boundary") {
+            continue;
         }
-    }
-
-    let hosts: Vec<usize> = {
-        let mut seen: Vec<usize> = Vec::new();
-        for (h, _) in &wanted {
-            if !seen.contains(h) {
-                seen.push(*h);
+        let Some(host) = style.attach.as_deref().and_then(|name| {
+            diagram
+                .nodes
+                .iter()
+                .position(|node| node.id.as_str() == name)
+        }) else {
+            continue;
+        };
+        let mut span = node.id.span;
+        for name in registry
+            .implicit_layers(implicit)
+            .map(|(name, _)| name)
+            .chain(node.classes.iter().map(|class| class.as_str()))
+        {
+            let mut lineage = Vec::new();
+            let mut cursor = Some(name);
+            while let Some(name) = cursor {
+                let Some(declaration) = diagram
+                    .styles
+                    .iter()
+                    .find(|declaration| declaration.name.as_str() == name)
+                else {
+                    break;
+                };
+                lineage.push(declaration);
+                cursor = declaration.extends.as_ref().map(|name| name.as_str());
+            }
+            for declaration in lineage.into_iter().rev() {
+                if let Some(prop) = declaration
+                    .props
+                    .iter()
+                    .rev()
+                    .find(|prop| prop.name == "attach")
+                {
+                    span = prop.span;
+                }
             }
         }
-        seen
-    };
-
-    for host in hosts {
-        let mine: Vec<usize> = wanted
-            .iter()
-            .filter(|(h, _)| *h == host)
-            .map(|(_, e)| *e)
-            .collect();
-        let r = nodes[host].rect;
-        let n = mine.len() as f64;
-        for (k, event) in mine.into_iter().enumerate() {
-            let along = (k as f64 + 1.0) / (n + 1.0);
-            let size = nodes[event].rect;
-            nodes[event].rect = Rect {
-                x: r.x + r.w * along - size.w / 2.0,
-                y: r.bottom() - size.h / 2.0,
-                ..size
-            };
+        if let Some(prop) = props.iter().rev().find(|prop| prop.name == "attach") {
+            span = prop.span;
         }
+        wanted.push((event, host, span));
     }
+    for (event, host, span) in &wanted {
+        let count = wanted.iter().filter(|(_, other, _)| other == host).count();
+        let order = wanted
+            .iter()
+            .take_while(|(other, _, _)| other != event)
+            .filter(|(_, other, _)| other == host)
+            .count();
+        out[*event] = Some(crate::placement::BoundaryAttachment {
+            host: *host,
+            along: (order + 1) as f64 / (count + 1) as f64,
+            span: *span,
+        });
+    }
+    out
 }
 
 /// The glyphs, the rings and the captions, for a whole diagram.

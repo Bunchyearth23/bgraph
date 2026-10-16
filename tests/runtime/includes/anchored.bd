@@ -1,0 +1,2 @@
+node a
+layout { place a at (0, 0) }

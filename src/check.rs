@@ -50,6 +50,86 @@ impl Diag {
     }
 }
 
+/// Turn a solver failure into the same source diagnostics on every surface.
+pub fn layout_error(diagram: &Diagram, error: &anyhow::Error) -> Vec<Diag> {
+    if let Some(error) = error.downcast_ref::<GeometryDiagnostics>() {
+        return error.0.clone();
+    }
+    if let Some(conflict) = error.downcast_ref::<crate::constraint_layout::ConstraintConflict>() {
+        let message = conflict.to_string();
+        let mut spans: Vec<Span> = conflict
+            .constraints
+            .iter()
+            .map(|constraint| constraint.source.span)
+            .collect();
+        spans.sort_by_key(|span| (span.start, span.end));
+        spans.dedup();
+        return spans
+            .into_iter()
+            .map(|span| Diag::error(span, message.clone()))
+            .collect();
+    }
+    vec![Diag::error(
+        diagram.graph_span.unwrap_or_default(),
+        error.to_string(),
+    )]
+}
+
+#[derive(Debug)]
+pub(crate) struct GeometryDiagnostics(pub Vec<Diag>);
+
+impl std::fmt::Display for GeometryDiagnostics {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (index, diagnostic) in self.0.iter().enumerate() {
+            if index > 0 {
+                write!(f, "; ")?;
+            }
+            write!(f, "{}", diagnostic.message)?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for GeometryDiagnostics {}
+
+pub(crate) fn frame_geometry(
+    diagram: &Diagram,
+    nodes: &[Option<crate::layout::Rect>],
+    groups: &[Option<crate::layout::Rect>],
+    overhang: &[(f64, f64, f64, f64)],
+) -> Vec<Diag> {
+    let plan = crate::placement::PlacementPlan::new(diagram);
+    let mut diagnostics = Vec::new();
+    for (index, group) in diagram.groups.iter().enumerate() {
+        let members: Vec<_> = group
+            .members
+            .iter()
+            .filter_map(|member| plan.index().get(member.as_str()).copied())
+            .collect();
+        let Some(measured) =
+            crate::layout::measure_frame(diagram, index, &members, nodes, groups, overhang)
+        else {
+            continue;
+        };
+        let Some(actual) = groups[index] else {
+            continue;
+        };
+        let expected = measured.frame;
+        if [
+            (actual.x, expected.x),
+            (actual.y, expected.y),
+            (actual.w, expected.w),
+            (actual.h, expected.h),
+        ]
+        .iter()
+        .any(|(actual, expected)| (actual - expected).abs() > 1e-7)
+        {
+            diagnostics.push(Diag::error(group.span, format!("frame `{}` cannot retain the exact bounds of its contents: expected ({}, {}) size {}×{}, found ({}, {}) size {}×{}; adjust the conflicting placements or alignments", group.id.as_str(), expected.x, expected.y, expected.w, expected.h, actual.x, actual.y, actual.w, actual.h)));
+        }
+    }
+    diagnostics
+}
+
 /// Every problem in a diagram, not just the first.
 ///
 /// [`crate::render_source`] stops at the first [`Severity::Error`]; an editor
@@ -220,6 +300,7 @@ fn check_archetype(diagram: &Diagram, out: &mut Vec<Diag>) -> &'static props::Ar
 /// solver would be the beginning of a second validator.
 pub fn after_layout(diagram: &Diagram, layout: &crate::layout::Layout) -> Vec<Diag> {
     let mut out = Vec::new();
+    check_final_placements(diagram, layout, &mut out);
     let routed = crate::render_svg::route_all(layout);
 
     // A frame is a containment contract: every direct member must remain
@@ -355,11 +436,10 @@ pub fn after_layout(diagram: &Diagram, layout: &crate::layout::Layout) -> Vec<Di
     // opaque boxes covering one another is nearly always a relation the author
     // forgot to write. This is a warning, never a repair: choosing a side on
     // which to separate them would recreate auto-layout (`D-049`). Chart and
-    // BPMN geometry is semantic, including legitimate boundary overlaps, so
-    // only ordinary declared-layout genres opt in here.
+    // Boundary events deliberately straddle their own host; every other pair
+    // obeys the same overlap contract as the other declared-layout genres.
     let def = archetype_of(diagram);
     if def.layout_capability() == props::LayoutCapability::Declared
-        && def.name != "bpmn"
         && !diagram.layouts.is_empty()
         // A few archetypes use the declared placement vocabulary but lower
         // their records into anonymous drawing segments. An empty synthetic
@@ -372,8 +452,18 @@ pub fn after_layout(diagram: &Diagram, layout: &crate::layout::Layout) -> Vec<Di
             .zip(&diagram.nodes)
             .all(|(placed, declared)| placed.id == declared.id.as_str())
     {
+        let placement = crate::placement::PlacementPlan::new(diagram);
         for (left_index, left) in layout.nodes.iter().enumerate() {
             for (right_index, right) in layout.nodes.iter().enumerate().skip(left_index + 1) {
+                if placement
+                    .boundary(left_index)
+                    .is_some_and(|boundary| boundary.host == right_index)
+                    || placement
+                        .boundary(right_index)
+                        .is_some_and(|boundary| boundary.host == left_index)
+                {
+                    continue;
+                }
                 let overlaps = left.rect.x < right.rect.right()
                     && left.rect.right() > right.rect.x
                     && left.rect.y < right.rect.bottom()
@@ -406,6 +496,163 @@ pub fn after_layout(diagram: &Diagram, layout: &crate::layout::Layout) -> Vec<Di
     }
 
     out
+}
+
+fn check_final_placements(diagram: &Diagram, layout: &crate::layout::Layout, out: &mut Vec<Diag>) {
+    use crate::placement::{EffectivePlacement, Entity, PlacementPlan};
+
+    // Managed drawings do not have one fixed box per declaration.
+    if archetype_of(diagram).layout_capability() != props::LayoutCapability::Declared
+        || layout.nodes.len() != diagram.nodes.len()
+        || !layout
+            .nodes
+            .iter()
+            .zip(&diagram.nodes)
+            .all(|(placed, declared)| placed.id == declared.id.as_str())
+    {
+        return;
+    }
+    let plan = PlacementPlan::new(diagram);
+    let sizes: Vec<_> = layout
+        .nodes
+        .iter()
+        .map(|node| (node.rect.w, node.rect.h))
+        .collect();
+    let pitch = layout
+        .opts
+        .grid_spec
+        .map(|grid| grid.pitch(&sizes))
+        .unwrap_or((1.0, 1.0));
+    let rects: HashMap<_, _> = layout
+        .nodes
+        .iter()
+        .map(|node| (node.id.as_str(), node.rect))
+        .chain(
+            layout
+                .groups
+                .iter()
+                .map(|group| (group.id.as_str(), group.rect)),
+        )
+        .collect();
+    for (index, node) in layout.nodes.iter().enumerate() {
+        if let Some(boundary) = plan.boundary(index) {
+            let host = layout.nodes[boundary.host].rect;
+            let expected = (host.x + host.w * boundary.along, host.bottom());
+            if (node.rect.cx() - expected.0).abs() > 1e-7
+                || (node.rect.cy() - expected.1).abs() > 1e-7
+            {
+                out.push(Diag::error(boundary.span, format!(
+                    "boundary attachment of `{}` to `{}` no longer holds: its center requires ({}, {}), found ({}, {}); adjust the conflicting placements or alignments",
+                    node.id, layout.nodes[boundary.host].id, expected.0, expected.1,
+                    node.rect.cx(), node.rect.cy(),
+                )));
+            }
+        }
+        let mut check = |axis: &str, actual: f64, expected: f64| {
+            if (actual - expected).abs() > 1e-7 {
+                out.push(Diag::error(plan.placement_span(Entity::Node(index)), format!(
+                    "declared placement of `{}` no longer holds: {axis} requires {expected}, found {actual}; adjust the conflicting placements or alignments",
+                    node.id,
+                )));
+            }
+        };
+        let relative = match plan.node(index, layout.opts.flow) {
+            EffectivePlacement::Boundary(_) => None,
+            EffectivePlacement::Declared(placement) => match placement {
+                Placement::Rel {
+                    dir,
+                    anchor,
+                    gap,
+                    align,
+                } => Some((*dir, anchor.as_str(), *gap, *align)),
+                placement if plan.placed_unit(Entity::Node(index)).is_none() => {
+                    let resolved = if layout.opts.grid_spec.is_some() {
+                        match placement {
+                            Placement::At { x, y } | Placement::Cell { col: x, row: y } => {
+                                Placement::At {
+                                    x: x * pitch.0,
+                                    y: y * pitch.1,
+                                }
+                            }
+                            other => other.clone(),
+                        }
+                    } else {
+                        placement.resolved(layout.opts.grid)
+                    };
+                    if let Placement::At { x, y } = resolved {
+                        check("x", node.rect.x, x);
+                        check("y", node.rect.y, y);
+                    }
+                    None
+                }
+                _ => None,
+            },
+            EffectivePlacement::Flow { dir, anchor } => Some((dir, anchor.as_str(), None, None)),
+            EffectivePlacement::Series { dir, anchor, gap } => {
+                Some((dir, anchor.as_str(), gap, None))
+            }
+            EffectivePlacement::Origin => None,
+        };
+        let Some((dir, anchor, gap, align)) = relative else {
+            continue;
+        };
+        let Some(target) = rects.get(anchor).copied() else {
+            continue;
+        };
+        let axes = plan.v2_alignment_axes(index);
+        let gap = gap.unwrap_or(layout.opts.gap);
+        match dir {
+            RelDir::RightOf => check("x", node.rect.x, target.right() + gap * pitch.0),
+            RelDir::LeftOf => check("x", node.rect.right(), target.x - gap * pitch.0),
+            RelDir::Below => check("y", node.rect.y, target.bottom() + gap * pitch.1),
+            RelDir::Above => check("y", node.rect.bottom(), target.y - gap * pitch.1),
+        }
+        let horizontal = matches!(dir, RelDir::RightOf | RelDir::LeftOf);
+        if align.is_some() || !axes[usize::from(horizontal)] {
+            let (actual, expected) = match (horizontal, align.unwrap_or(Align::Center)) {
+                (true, Align::Start) => (node.rect.y, target.y),
+                (true, Align::Center) => (node.rect.cy(), target.cy()),
+                (true, Align::End) => (node.rect.bottom(), target.bottom()),
+                (false, Align::Start) => (node.rect.x, target.x),
+                (false, Align::Center) => (node.rect.cx(), target.cx()),
+                (false, Align::End) => (node.rect.right(), target.right()),
+            };
+            check(
+                if horizontal {
+                    "y alignment"
+                } else {
+                    "x alignment"
+                },
+                actual,
+                expected,
+            );
+        }
+    }
+    for constraint in plan.constraints().map(|item| item.declaration()) {
+        if constraint.kind != ConstraintKind::AlignGroup {
+            continue;
+        }
+        let mut members = constraint
+            .members
+            .iter()
+            .filter_map(|member| rects.get(member.as_str()).map(|rect| (member, rect)));
+        let Some((_, lead)) = members.next() else {
+            continue;
+        };
+        let coordinate = |rect: &crate::layout::Rect| match (constraint.axis, constraint.align) {
+            (ConstraintAxis::Horizontal, Align::Start) => rect.x,
+            (ConstraintAxis::Horizontal, Align::Center) => rect.cx(),
+            (ConstraintAxis::Horizontal, Align::End) => rect.right(),
+            (_, Align::Start) => rect.y,
+            (_, Align::Center) => rect.cy(),
+            (_, Align::End) => rect.bottom(),
+        };
+        for (member, rect) in members {
+            if (coordinate(rect) - coordinate(lead)).abs() > 1e-7 {
+                out.push(Diag::error(constraint.span, format!("required alignment of `{}` no longer holds; adjust the conflicting placements or alignments", member.as_str())));
+            }
+        }
+    }
 }
 
 /// Whether a segment touches a rectangle: either end inside it, or the segment
@@ -740,13 +987,6 @@ fn anchor_names(diagram: &Diagram) -> HashSet<&str> {
 /// member must be reported before the solver sees the document.
 fn check_constraints(diagram: &Diagram, out: &mut Vec<Diag>) {
     let nodes: HashSet<&str> = diagram.nodes.iter().map(|node| node.id.as_str()).collect();
-    let node_index: HashMap<&str, usize> = diagram
-        .nodes
-        .iter()
-        .enumerate()
-        .map(|(index, node)| (node.id.as_str(), index))
-        .collect();
-    let placement = crate::placement::PlacementPlan::new(diagram);
     let groups: HashMap<&str, &GroupDecl> = diagram
         .groups
         .iter()
@@ -767,31 +1007,17 @@ fn check_constraints(diagram: &Diagram, out: &mut Vec<Diag>) {
                 ConstraintKind::SameWidth => "equal-width",
                 ConstraintKind::SameHeight => "equal-height",
             };
-            check_constraint(
-                diagram,
-                constraint,
-                name,
-                scope,
-                &nodes,
-                &groups,
-                &node_index,
-                &placement,
-                out,
-            );
+            check_constraint(constraint, name, scope, &nodes, &groups, out);
         }
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn check_constraint(
-    diagram: &Diagram,
     constraint: &ConstraintDecl,
     name: &str,
     scope: Option<&GroupDecl>,
     nodes: &HashSet<&str>,
     groups: &HashMap<&str, &GroupDecl>,
-    node_index: &HashMap<&str, usize>,
-    placement: &crate::placement::PlacementPlan<'_>,
     out: &mut Vec<Diag>,
 ) {
     let mut seen = HashSet::new();
@@ -826,27 +1052,6 @@ fn check_constraint(
                     "`{}` is outside the local `layout` block of group `{}`",
                     member.as_str(),
                     group.id.as_str()
-                ),
-            ));
-        }
-    }
-
-    if constraint.kind != ConstraintKind::AlignGroup {
-        return;
-    }
-    for member in constraint.members.iter().skip(1) {
-        let Some(&index) = node_index.get(member.as_str()) else {
-            continue;
-        };
-        if matches!(
-            placement.declared_placement(index),
-            Some(Placement::At { .. } | Placement::Cell { .. })
-        ) {
-            out.push(Diag::warn(
-                diagram.nodes[index].span,
-                format!(
-                    "`{name}` leaves `{}` at its explicit `at` position",
-                    diagram.nodes[index].id.as_str()
                 ),
             ));
         }
@@ -1288,7 +1493,8 @@ fn check_graph(diagram: &Diagram, out: &mut Vec<Diag>) {
 fn check_cycles(diagram: &Diagram, out: &mut Vec<Diag>) {
     use crate::placement::Entity;
 
-    let unresolved = crate::placement::PlacementPlan::new(diagram).unresolved();
+    let plan = crate::placement::PlacementPlan::new(diagram);
+    let unresolved = plan.unresolved();
     if unresolved.is_empty() {
         return;
     }
@@ -1299,15 +1505,26 @@ fn check_cycles(diagram: &Diagram, out: &mut Vec<Diag>) {
             Entity::Group(g) => diagram.groups[*g].id.as_str(),
         })
         .collect();
+    let mut message = format!("anchor cycle between: {}", names.join(", "));
+    if !crate::constraint_layout::uses_simultaneous_solver(diagram)
+        && unresolved.iter().any(|entity| {
+            matches!(entity, Entity::Node(i) if matches!(
+                plan.node(*i, crate::ast::RelDir::RightOf),
+                crate::placement::EffectivePlacement::Boundary(_)
+            ))
+        })
+    {
+        message.push_str(&format!(
+            "; boundary attachments require an acyclic placement order above {} nodes and groups",
+            crate::constraint_layout::MAX_DIRECT_NODES
+        ));
+    }
     for entity in unresolved {
         let span = match entity {
             Entity::Node(i) => diagram.nodes[i].id.span,
             Entity::Group(g) => diagram.groups[g].id.span,
         };
-        out.push(Diag::error(
-            span,
-            format!("anchor cycle between: {}", names.join(", ")),
-        ));
+        out.push(Diag::error(span, message.clone()));
     }
 }
 
@@ -2235,30 +2452,23 @@ fn check_bpmn(diagram: &Diagram, out: &mut Vec<Diag>) {
         }
     }
 
+    let styles = resolved_nodes(diagram, crate::style::Style::node_defaults());
     let word = |name: &str| -> Option<&'static str> {
         diagram
             .nodes
             .iter()
-            .find(|n| n.id.as_str() == name)
-            .map(element)
+            .position(|node| node.id.as_str() == name)
+            .map(|index| match crate::bpmn::element_of(&styles[index]) {
+                crate::bpmn::Element::Task => "task",
+                crate::bpmn::Element::Event => "event",
+                crate::bpmn::Element::Gateway => "gateway",
+                crate::bpmn::Element::Data => "data",
+            })
     };
 
-    for node in &diagram.nodes {
-        // `props_for` folds the positional values in, so `event x "…" boundary
-        // timer` is read the same way as the long form. It builds a `Vec`, so
-        // the word is taken by value rather than borrowed out of it.
-        let props = node.props_for(archetype_of(diagram));
-        let word_of = |prop: &str| -> Option<String> {
-            props
-                .iter()
-                .find(|p| p.name == prop)
-                .and_then(|p| p.values.first())
-                .and_then(|v| v.as_word())
-                .map(String::from)
-        };
-        let stage = word_of("stage");
-        let stage = stage.as_deref();
-        let attach = word_of("attach");
+    for (node, style) in diagram.nodes.iter().zip(&styles) {
+        let stage = style.stage.as_deref();
+        let attach = style.attach.as_deref();
 
         if stage == Some("boundary") && attach.is_none() {
             out.push(Diag::error(
@@ -2270,8 +2480,8 @@ fn check_bpmn(diagram: &Diagram, out: &mut Vec<Diag>) {
                 ),
             ));
         }
-        if let Some(host) = &attach {
-            if stage.is_some() && stage != Some("boundary") {
+        if let Some(host) = attach {
+            if stage != Some("boundary") {
                 out.push(Diag::warn(
                     node.id.span,
                     format!(
@@ -2312,13 +2522,9 @@ fn check_bpmn(diagram: &Diagram, out: &mut Vec<Diag>) {
         *into.entry(edge.to.as_str()).or_default() += 1;
     }
 
-    for node in &diagram.nodes {
+    for (node, style) in diagram.nodes.iter().zip(&styles) {
         let id = node.id.as_str();
-        let props = node.props_for(archetype_of(diagram));
-        let stage = props
-            .iter()
-            .find(|p| p.name == "stage")
-            .and_then(|p| p.values.first().and_then(|v| v.as_word()));
+        let stage = style.stage.as_deref();
         let (a, b) = (
             into.get(id).copied().unwrap_or(0),
             outof.get(id).copied().unwrap_or(0),
@@ -3386,17 +3592,22 @@ fn distance(a: &str, b: &str) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{check_layout_capability, Diag, Severity};
+    use super::{Diag, Severity, check_layout_capability};
     use crate::{ast, props};
 
     #[test]
     fn layout_capability_matrix_is_exhaustive() {
         for def in props::ARCHETYPES {
-            let mut diagram = ast::Diagram::default();
-            diagram.archetype = Some(ast::Spanned {
-                value: def.name.to_string(),
-                span: ast::Span { start: 0, end: def.name.len() },
-            });
+            let mut diagram = ast::Diagram {
+                archetype: Some(ast::Spanned {
+                    value: def.name.to_string(),
+                    span: ast::Span {
+                        start: 0,
+                        end: def.name.len(),
+                    },
+                }),
+                ..Default::default()
+            };
             diagram.layouts.push(ast::LayoutDecl {
                 scope: None,
                 statements: Vec::new(),
@@ -3415,9 +3626,7 @@ mod tests {
                 assert_eq!(out.len(), 1, "one diagnostic for {0}", def.name);
                 assert_eq!(out[0].severity, Severity::Error);
                 assert!(
-                    out[0]
-                        .message
-                        .contains("manages its own geometry"),
+                    out[0].message.contains("manages its own geometry"),
                     "unexpected diagnostic for {0}: {1}",
                     def.name,
                     out[0].message

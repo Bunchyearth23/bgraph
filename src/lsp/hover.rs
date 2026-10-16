@@ -171,6 +171,22 @@ pub(super) fn describe_style(text: &str, name: &str) -> Option<String> {
     if let Some(parent) = &style.extends {
         out.push_str(&format!(" extends `{}`", parent.as_str()));
     }
+    let def = crate::check::archetype_of(&diagram);
+    match props::theme_target(def, name) {
+        Some(props::ThemeTarget::Global(target)) => {
+            out.push_str(&format!("\n\n**theme** — {}", target.doc));
+        }
+        Some(props::ThemeTarget::Item(word)) => {
+            out.push_str(&format!(
+                "\n\n**theme** — Applied automatically to every `{word}` in `type {}` \
+                 after `style node`, before classes and inline properties.",
+                def.name
+            ));
+        }
+        None => out.push_str(&format!(
+            "\n\n**class** — Applied where `.{name}` is written."
+        )),
+    }
     out.push_str("\n\n```\n");
     for property in &style.props {
         out.push_str(&format!("{}\n", text_of(text, property.span).trim()));

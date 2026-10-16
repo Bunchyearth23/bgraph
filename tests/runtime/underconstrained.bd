@@ -1,0 +1,9 @@
+node anchor "Anchor" { size: 80 40 }
+node lead "Lead" { size: 80 40 }
+node tail "Tail" { size: 80 40 }
+layout {
+  place anchor at (10, 100)
+  place lead right-of anchor gap 20
+  place tail right-of lead gap 20
+  align top tail lead
+}

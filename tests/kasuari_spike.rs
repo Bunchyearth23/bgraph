@@ -57,13 +57,66 @@ fn underconstrained_values() -> [f64; 5] {
 }
 
 #[test]
-fn the_spike_records_kasuaris_underconstrained_boundary() {
+fn the_fork_pins_the_underconstrained_choice() {
     let values = underconstrained_values();
-    let allowed = [[75.0, 0.0, 0.0, 0.0, 75.0], [75.0, 0.0, 50.0, 50.0, 75.0]];
-    assert!(
-        allowed.contains(&values),
-        "Kasuari produced an undocumented third solution: {values:?}"
-    );
+    assert_eq!(values, [75.0, 0.0, 0.0, 0.0, 75.0]);
+}
+
+#[test]
+fn lowered_underconstrained_geometry_is_stable_across_processes() {
+    const CHILD: &str = "BGRAPH_LAYOUT_DETERMINISM_CHILD";
+    const MARKER: &str = "BGRAPH_LAYOUT_SVG=";
+    let source = include_str!("runtime/underconstrained.bd");
+    let analysis = bgraph::analyze_source(source);
+    assert!(!analysis.has_errors(), "{:?}", analysis.diagnostics);
+    let layout = analysis.layout.expect("declared geometry");
+    for name in ["lead", "tail"] {
+        let node = layout.nodes.iter().find(|node| node.id == name).unwrap();
+        assert_eq!(
+            node.rect.y, 0.0,
+            "the unanchored y component has a canonical origin"
+        );
+    }
+    let svg = bgraph::render_svg::render(&layout);
+    if std::env::var_os(CHILD).is_some() {
+        println!("{MARKER}{svg}");
+        return;
+    }
+
+    let executable = std::env::current_exe().expect("integration-test executable");
+    for _ in 0..32 {
+        let output = Command::new(&executable)
+            .args([
+                "--exact",
+                "lowered_underconstrained_geometry_is_stable_across_processes",
+                "--nocapture",
+            ])
+            .env(CHILD, "1")
+            .output()
+            .expect("the lowered-geometry child probe runs");
+        assert!(output.status.success(), "child failed: {output:?}");
+        let stdout = String::from_utf8(output.stdout).expect("UTF-8 test output");
+        let actual = stdout
+            .lines()
+            .find_map(|line| line.strip_prefix(MARKER))
+            .unwrap_or_else(|| panic!("child emitted no SVG: {stdout}"));
+        assert_eq!(actual, svg, "lowered geometry drifted between processes");
+    }
+}
+
+#[test]
+fn fractional_placement_is_not_snapped_before_rendering() {
+    let source = include_str!("runtime/fractional.bd");
+    let analysis = bgraph::analyze_source(source);
+    assert!(!analysis.has_errors(), "{:?}", analysis.diagnostics);
+    let layout = analysis.layout.expect("fractional geometry");
+    let rect = |id: &str| layout.nodes.iter().find(|node| node.id == id).unwrap().rect;
+    let (a, b, c) = (rect("a"), rect("b"), rect("c"));
+    assert_eq!((a.x, a.y), (-12.005, 7.995));
+    assert!((b.x - a.right() - 13.333).abs() < 1e-9);
+    assert!((c.y - b.bottom() - 0.001).abs() < 1e-9);
+    assert!((b.y - a.y).abs() < 1e-9);
+    assert!((c.right() - b.right()).abs() < 1e-9);
 }
 
 #[test]
@@ -74,10 +127,12 @@ fn the_cassowary_shadow_is_stable_on_layout_permutations() {
         "place c below b",
         "equal-width a b",
     ];
-    let source = |order: &[&str]| format!(
-        "node a {{ size: 80 40 }}\nnode b {{ size: 60 20 }}\nnode c {{ size: 30 30 }}\nlayout {{\n {}\n{}\n{}\n{}\n}}",
-        order[0], order[1], order[2], order[3]
-    );
+    let source = |order: &[&str]| {
+        format!(
+            "node a {{ size: 80 40 }}\nnode b {{ size: 60 20 }}\nnode c {{ size: 30 30 }}\nlayout {{\n {}\n{}\n{}\n{}\n}}",
+            order[0], order[1], order[2], order[3]
+        )
+    };
     let permutations = permute(statements);
     let expected = bgraph::render_source(&source(&statements))
         .unwrap_or_else(|error| panic!("baseline is rejected: {error:#}"));

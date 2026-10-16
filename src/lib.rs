@@ -182,7 +182,13 @@ compile_error!("the test suite covers every archetype — run it with default fe
 #[cfg(test)]
 mod tests;
 
-use anyhow::Result;
+#[cfg(test)]
+mod analysis_tests;
+
+#[cfg(test)]
+mod multifile_analysis_tests;
+
+use anyhow::{Context, Result};
 
 pub use template::{Bindings, Template, Value};
 
@@ -208,6 +214,22 @@ impl SourceAnalysis {
             .iter()
             .any(|diag| diag.severity == check::Severity::Error)
     }
+
+    /// Consume an analysis, returning its layout or all fatal diagnostics.
+    pub fn into_layout(self) -> Result<layout::Layout> {
+        let errors: Vec<_> = self
+            .diagnostics
+            .iter()
+            .filter(|diag| diag.severity == check::Severity::Error)
+            .map(|diag| diag.message.as_str())
+            .collect();
+        if !errors.is_empty() {
+            anyhow::bail!("{}", errors.join("\n"));
+        }
+        self.layout.ok_or_else(|| {
+            anyhow::anyhow!("diagram did not produce a layout after successful checks")
+        })
+    }
 }
 
 /// Parse with recovery, run [`check`], then run geometry-aware diagnostics when
@@ -215,7 +237,7 @@ impl SourceAnalysis {
 ///
 /// This is the full pipeline used by all public analysis surfaces.
 pub fn analyze_source(source: &str) -> SourceAnalysis {
-    let (diagram, syntax) = parser::parse_recovering(source);
+    let (mut diagram, syntax) = parser::parse_recovering(source);
     let mut diagnostics: Vec<check::Diag> = syntax
         .into_iter()
         .map(|err| check::Diag {
@@ -225,11 +247,35 @@ pub fn analyze_source(source: &str) -> SourceAnalysis {
         })
         .collect();
 
-    let (layout, extra) = diagram
-        .as_ref()
-        .map_or_else(|| (None, Vec::new()), analyze_diagram);
+    let mut composition_failed = false;
+    if let Some(diagram) = diagram.as_mut() {
+        if let Some(include) = diagram.includes.first() {
+            diagnostics.push(check::Diag {
+                severity: check::Severity::Error,
+                span: include.span,
+                message: format!(
+                    "`include \"{}\"` needs a file to resolve it against, and \
+                     `render_source` is given text — use `bgraph::render_file`",
+                    include.path.as_str()
+                ),
+            });
+            composition_failed = true;
+        } else {
+            let expansion = compose::expand(diagram);
+            composition_failed = !expansion.is_empty();
+            diagnostics.extend(expansion);
+        }
+    }
+    let (layout, extra) = if composition_failed {
+        (None, Vec::new())
+    } else {
+        diagram
+            .as_ref()
+            .map_or_else(|| (None, Vec::new()), analyze_diagram)
+    };
 
     diagnostics.extend(extra);
+    diagnostics.sort_by_key(|diag| (diag.span.start, diag.span.end));
     SourceAnalysis {
         diagram,
         layout,
@@ -240,13 +286,110 @@ pub fn analyze_source(source: &str) -> SourceAnalysis {
 /// Run `check` and geometry diagnostics on an already parsed diagram.
 pub fn analyze_diagram(diagram: &ast::Diagram) -> (Option<layout::Layout>, Vec<check::Diag>) {
     let mut diagnostics = check::check(diagram);
-    let layout = if let Ok(layout) = layout::solve(diagram) {
-        diagnostics.extend(check::after_layout(diagram, &layout));
-        Some(layout)
-    } else {
+    let layout = if diagnostics
+        .iter()
+        .any(|diag| diag.severity == check::Severity::Error)
+    {
         None
+    } else {
+        match layout::solve(diagram) {
+            Ok(layout) => {
+                diagnostics.extend(check::after_layout(diagram, &layout));
+                Some(layout)
+            }
+            Err(error) => {
+                diagnostics.extend(check::layout_error(diagram, &error));
+                None
+            }
+        }
     };
+    diagnostics.sort_by_key(|diag| (diag.span.start, diag.span.end));
     (layout, diagnostics)
+}
+
+/// Analysis of a file and its includes, with diagnostic source locations.
+#[doc(hidden)]
+pub struct FileAnalysis {
+    /// The shared syntax, semantic and geometry analysis.
+    pub analysis: SourceAnalysis,
+    /// Source ownership for every diagnostic span.
+    pub map: compose::SourceMap,
+}
+
+impl FileAnalysis {
+    /// Return the layout or every fatal diagnostic with its owning file.
+    pub fn into_layout(self) -> Result<layout::Layout> {
+        let errors: Vec<_> = self
+            .analysis
+            .diagnostics
+            .iter()
+            .filter(|diag| diag.severity == check::Severity::Error)
+            .map(|diag| {
+                let (path, line, column) = self.map.locate(diag.span.start);
+                format!(
+                    "{}:{}:{}: {}",
+                    path.display(),
+                    line + 1,
+                    column + 1,
+                    diag.message
+                )
+            })
+            .collect();
+        if !errors.is_empty() {
+            anyhow::bail!("{}", errors.join("\n"));
+        }
+        self.analysis.into_layout()
+    }
+}
+
+/// Analyze source using a file base, preserving diagnostics from every include.
+#[doc(hidden)]
+pub fn analyze_file_source(path: &std::path::Path, source: &str) -> Result<FileAnalysis> {
+    analyze_file_source_with_theme(path, source, None)
+}
+
+/// Analyze a file source after applying a CLI theme, through the same stages.
+#[doc(hidden)]
+pub fn analyze_file_source_with_theme(
+    path: &std::path::Path,
+    source: &str,
+    theme: Option<&str>,
+) -> Result<FileAnalysis> {
+    let mut composed = compose::compose(path, Some(source))?;
+    if let Some(theme) = theme {
+        themes::apply(&mut composed.diagram, theme)?;
+    }
+    let (layout, mut diagnostics) = analyze_diagram(&composed.diagram);
+    diagnostics.extend(composed.diagnostics);
+    diagnostics.sort_by_key(|diag| (diag.span.start, diag.span.end));
+    Ok(FileAnalysis {
+        analysis: SourceAnalysis {
+            diagram: Some(composed.diagram),
+            layout,
+            diagnostics,
+        },
+        map: composed.map,
+    })
+}
+
+/// Analyze a file and all readable included sources.
+#[doc(hidden)]
+pub fn analyze_file(path: &std::path::Path) -> Result<FileAnalysis> {
+    let source =
+        std::fs::read_to_string(path).with_context(|| format!("cannot read {}", path.display()))?;
+    analyze_file_source(path, &source)
+}
+
+/// Resolve an already parsed diagram through the common analysis pipeline.
+#[doc(hidden)]
+pub fn analyzed_layout(diagram: &ast::Diagram) -> Result<layout::Layout> {
+    let (layout, diagnostics) = analyze_diagram(diagram);
+    SourceAnalysis {
+        diagram: None,
+        layout,
+        diagnostics,
+    }
+    .into_layout()
 }
 
 /// Source text to SVG, the whole rite in one call.
@@ -257,28 +400,11 @@ pub fn analyze_diagram(diagram: &ast::Diagram) -> (Option<layout::Layout>, Vec<c
 ///
 /// # Errors
 ///
-/// Returns the first problem found — a syntax error carrying the byte range it
-/// points at, or a check failure naming the item at fault. Use [`check::check`]
-/// to collect *every* problem instead of the first, which is what the language
-/// server does.
+/// Returns the fatal syntax, validation or geometry diagnostics. Use
+/// [`analyze_source`] to inspect their spans and nonfatal warnings too.
 pub fn render_source(source: &str) -> Result<String> {
-    let diagram = parser::parse_diagram(source)?;
-    render_diagram(diagram)
-}
-
-fn render_diagram(diagram: ast::Diagram) -> Result<String> {
-    // No filesystem here, and deliberately: this function is the semver
-    // surface and the wasm build rests on it, so it cannot start opening
-    // files because a statement asked it to (`D-029`). It says which call
-    // does rather than failing vaguely.
-    if let Some(first) = diagram.includes.first() {
-        anyhow::bail!(
-            "`include \"{}\"` needs a file to resolve it against, and \
-             `render_source` is given text — use `bgraph::render_file`",
-            first.path.as_str()
-        );
-    }
-    let layout = layout::solve(&diagram)?;
+    let analysis = analyze_source(source);
+    let layout = analysis.into_layout()?;
     Ok(render_svg::render(&layout))
 }
 
@@ -289,12 +415,10 @@ fn render_diagram(diagram: ast::Diagram) -> Result<String> {
 ///
 /// # Errors
 ///
-/// The first problem found, as [`render_source`] does — plus the ones only a
-/// set of files can have: a circular include, or a name declared in two of
-/// them with no `as` to separate them.
+/// Reports fatal diagnostics with their owning file and position, including
+/// circular includes and names declared in two files without separate prefixes.
 pub fn render_file(path: &std::path::Path) -> Result<String> {
-    let composed = compose::load(path)?;
-    let layout = layout::solve(&composed.diagram)?;
+    let layout = analyze_file(path)?.into_layout()?;
     Ok(render_svg::render(&layout))
 }
 
@@ -307,7 +431,6 @@ pub fn render_file(path: &std::path::Path) -> Result<String> {
 /// question.
 #[cfg(feature = "pdf")]
 pub fn render_source_pdf(source: &str) -> Result<Vec<u8>> {
-    let diagram = parser::parse_diagram(source)?;
-    let layout = layout::solve(&diagram)?;
+    let layout = analyze_source(source).into_layout()?;
     Ok(render_pdf::render(&layout))
 }

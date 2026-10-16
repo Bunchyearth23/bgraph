@@ -1,0 +1,15 @@
+graph { grid: 4 3 20 30 }
+node anchor { size: 100 60 }
+group relative {
+  padding: 0
+  node a { size: 100 60 }
+}
+group absolute {
+  padding: 0
+  node b { size: 100 60 }
+}
+layout {
+  place anchor at (0, 0)
+  place relative right-of anchor gap 1
+  place absolute at (2, 1)
+}

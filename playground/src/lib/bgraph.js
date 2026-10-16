@@ -57,7 +57,7 @@ export function render(text) {
   return withSource(text, (p, n) => api.bgraph_render(p, n))
 }
 
-/// Every diagnostic, errors and warnings alike, with one-based positions.
+/// Every diagnostic with one-based lines and UTF-16 columns, like JS offsets.
 ///
 /// A file can render *and* have four warnings, which is why this is not folded
 /// into `render`.

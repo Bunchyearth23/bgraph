@@ -150,8 +150,8 @@ const TEXT_PROPS: &[&str] = &[
     "font-weight",
 ];
 
-/// The themes every genre honours. A genre adds one more: its own item word,
-/// so `style slice` themes a pie and `style device` a rack.
+/// The themes every genre honours. Each declaration word adds its own target,
+/// so `style slice` themes a pie and `style event` themes BPMN events.
 pub const THEME_STYLES: &[ThemeStyle] = &[
     ThemeStyle {
         name: "node",

@@ -1,10 +1,10 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser as ClapParser, Subcommand};
 
-use bgraph::{layout, parser, render_svg, watch};
+use bgraph::{parser, render_svg, watch};
 
 #[derive(ClapParser, Debug)]
 #[command(
@@ -211,8 +211,8 @@ fn write_layout(inputs: &[PathBuf], check: bool) -> Result<i32> {
             continue;
         }
 
-        let before = render_svg::render(&layout::solve(&diagram)?);
-        let after = render_svg::render(&layout::solve(&parser::parse_diagram(&filled)?)?);
+        let before = render_svg::render(&bgraph::analyzed_layout(&diagram)?);
+        let after = render_svg::render(&bgraph::analyzed_layout(&parser::parse_diagram(&filled)?)?);
         if before != after {
             bail!(
                 "{} would draw differently after `layout`, so nothing was written —                  this is a bug in bgraph, not in the file",
@@ -253,9 +253,9 @@ fn write_layout(inputs: &[PathBuf], check: bool) -> Result<i32> {
 /// this is a set difference on the solved geometry rather than an image
 /// comparison, and it stays vector and deterministic.
 fn diff_files(before: &std::path::Path, after: &std::path::Path, output: &PathBuf) -> Result<i32> {
-    let old = layout::solve(&bgraph::compose::load(before)?.diagram)
+    let old = bgraph::analyzed_layout(&bgraph::compose::load(before)?.diagram)
         .with_context(|| format!("in {}", before.display()))?;
-    let new = layout::solve(&bgraph::compose::load(after)?.diagram)
+    let new = bgraph::analyzed_layout(&bgraph::compose::load(after)?.diagram)
         .with_context(|| format!("in {}", after.display()))?;
 
     let picture = bgraph::diff::compare(&old, &new);
@@ -428,7 +428,7 @@ fn run() -> Result<i32> {
         Some(Command::Layout { inputs, check }) => return write_layout(&inputs, check),
         Some(Command::Explain { input, name }) => {
             let composed = bgraph::compose::load(&input)?;
-            let solved = layout::solve(&composed.diagram)?;
+            let solved = bgraph::analyzed_layout(&composed.diagram)?;
             print!(
                 "{}",
                 bgraph::explain::explain(&composed.diagram, &solved, &name)?
@@ -472,7 +472,13 @@ fn run() -> Result<i32> {
         fs::read_to_string(&input).with_context(|| format!("cannot read {}", input.display()))?;
 
     // A file with holes is a template; one without renders exactly as before.
-    let template = bgraph::Template::parse(&source)?;
+    let template = match bgraph::Template::parse(&source) {
+        Ok(template) => template,
+        Err(error) => {
+            bgraph::analyze_file_source(&input, &source)?.into_layout()?;
+            return Err(error);
+        }
+    };
     if !template.holes().is_empty()
         || !cli.set.is_empty()
         || cli.data.is_some()
@@ -555,14 +561,8 @@ fn run() -> Result<i32> {
         return Ok(0);
     }
 
-    // Through the composer rather than the parser, so `include` resolves
-    // against the file that wrote it. A file with no includes takes exactly
-    // the same path and comes out the same.
-    let mut composed = bgraph::compose::load(&input)?;
-    if let Some(theme) = &cli.theme {
-        bgraph::themes::apply(&mut composed.diagram, theme)?;
-    }
-    let mut layout = layout::solve(&composed.diagram)?;
+    let mut layout = bgraph::analyze_file_source_with_theme(&input, &source, cli.theme.as_deref())?
+        .into_layout()?;
     if let Some(path) = &cli.embed_font {
         let whole = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
         // Only the glyphs the diagram draws. The text is gathered from the
@@ -663,30 +663,23 @@ fn run() -> Result<i32> {
     Ok(0)
 }
 
-/// The same report, for a diagram spread over several files.
-///
-/// Recovery is not attempted here: it works by cutting one text into
-/// statements, and there is no one text once files are merged. A composed
-/// diagram that parses at all is checked in full, which is the case that
-/// matters — a syntax error in an included file was already reported by name
-/// when the composer refused to load it.
+/// Report diagnostics using the owning file for every recovered source span.
 fn report_composed(
     input: &std::path::Path,
-    composed: &bgraph::compose::Composed,
+    composed: &bgraph::FileAnalysis,
     ci: bool,
     json_output: bool,
 ) -> Result<i32> {
     use bgraph::check::Severity;
     use bgraph::report;
 
-    let mut diagnostics = bgraph::analyze_diagram(&composed.diagram).1;
-    diagnostics.sort_by_key(|d| (d.span.start, d.span.end));
+    let diagnostics = &composed.analysis.diagnostics;
 
     let (rich, colour) = report::decorate(ci);
     let mut errors = 0;
 
     let mut machine = Vec::new();
-    for diag in &diagnostics {
+    for diag in diagnostics {
         // Through the map, so a problem in an included file is reported
         // against *that* file at *its* line — the whole reason the composer
         // keeps one.
@@ -721,85 +714,9 @@ fn report_composed(
 
 /// Prints every diagnostic in `file:line:col: severity: message` form so it
 /// drops straight into an editor's error list.
-fn check_file(input: &PathBuf, ci: bool, json_output: bool) -> Result<i32> {
-    use bgraph::check::Severity;
-    use bgraph::lsp::LineIndex;
-    use bgraph::report;
-
-    let source =
-        fs::read_to_string(input).with_context(|| format!("cannot read {}", input.display()))?;
-    let index = LineIndex::new(&source);
-
-    // Composed first, so a diagram spread over several files is checked as
-    // the one diagram it is. When that fails — a circular include, a name in
-    // two files — there is nothing to check yet, so the failure is the report.
-    match bgraph::compose::load(input) {
-        Ok(composed) => {
-            if !composed.diagram.includes.is_empty() || composed.map.text != source {
-                return report_composed(input, &composed, ci, json_output);
-            }
-        }
-        Err(err) => {
-            if json_output {
-                println!(
-                    "{}",
-                    serde_json::to_string_pretty(&vec![serde_json::json!({
-                        "file": input.display().to_string(),
-                        "line": null,
-                        "column": null,
-                        "severity": "error",
-                        "message": format!("{err:#}"),
-                    })])?
-                );
-            } else {
-                eprintln!("error: {err:#}");
-            }
-            return Ok(1);
-        }
-    }
-
-    // Every mistake, not the first: a person fixing a file wants the list,
-    // and a build log that stops at line 3 hides what is on line 40.
-    let mut diagnostics = bgraph::analyze_source(&source).diagnostics;
-
-    diagnostics.sort_by_key(|diag| (diag.span.start, diag.span.end));
-
-    let (rich, colour) = report::decorate(ci);
-    let path = input.display().to_string();
-
-    let mut errors = 0;
-    let mut machine = Vec::new();
-    for diag in &diagnostics {
-        let (line, col) = index.line_col(diag.span.start);
-        if diag.severity == Severity::Error {
-            errors += 1;
-        }
-        if json_output {
-            machine.push(serde_json::json!({
-                "file": path,
-                "line": line + 1,
-                "column": col + 1,
-                "severity": if diag.severity == Severity::Error { "error" } else { "warning" },
-                "message": diag.message,
-            }));
-        } else if rich {
-            // A blank line between them, or two diagnostics from adjacent
-            // lines read as one five-line block.
-            println!(
-                "{}\n",
-                report::rich(&path, &source, line, col, diag, colour)
-            );
-        } else {
-            println!("{}", report::flat(&path, line, col, diag));
-        }
-    }
-
-    if json_output {
-        println!("{}", serde_json::to_string_pretty(&machine)?);
-    } else if diagnostics.is_empty() {
-        println!("{}: no problems found", input.display());
-    }
-    Ok(i32::from(errors > 0))
+fn check_file(input: &Path, ci: bool, json_output: bool) -> Result<i32> {
+    let analysis = bgraph::analyze_file(input)?;
+    report_composed(input, &analysis, ci, json_output)
 }
 
 #[cfg(test)]

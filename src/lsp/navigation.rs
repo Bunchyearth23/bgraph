@@ -1,7 +1,7 @@
 use serde_json::{Value, json};
 
-use crate::{ast::Span, props};
 use crate::ast;
+use crate::{ast::Span, props};
 
 use super::{LineIndex, declaration_span, declared_archetype, is_ident_char, item_words, word_at};
 
@@ -26,12 +26,12 @@ pub(super) fn definition(text: &str, index: &LineIndex, offset: usize, uri: &str
             // For declaration words, prefer the first related layout mention when
             // available: declaration and layout are now navigable in both
             // directions.
-            if target.contains(offset) {
-                if let Some(related) =
-                    diagram.as_ref().and_then(|diagram| layout_mention(diagram, &word))
-                {
-                    return json!({ "uri": uri, "range": index.range(related) });
-                }
+            if target.contains(offset)
+                && let Some(related) = diagram
+                    .as_ref()
+                    .and_then(|diagram| layout_mention(diagram, &word))
+            {
+                return json!({ "uri": uri, "range": index.range(related) });
             }
             return json!({ "uri": uri, "range": index.range(target) });
         }
@@ -43,7 +43,9 @@ fn layout_mention(diagram: &ast::Diagram, name: &str) -> Option<Span> {
     for layout in &diagram.layouts {
         for stmt in &layout.statements {
             let span = match stmt {
-                ast::LayoutStmt::Place { target, placement, .. } => {
+                ast::LayoutStmt::Place {
+                    target, placement, ..
+                } => {
                     if target.as_str() == name {
                         Some(target.span)
                     } else if let ast::Placement::Rel { anchor, .. } = placement
@@ -54,13 +56,11 @@ fn layout_mention(diagram: &ast::Diagram, name: &str) -> Option<Span> {
                         None
                     }
                 }
-                ast::LayoutStmt::Constraint { constraint } => {
-                    constraint
-                        .members
-                        .iter()
-                        .find(|member| member.as_str() == name)
-                        .map(|member| member.span)
-                }
+                ast::LayoutStmt::Constraint { constraint } => constraint
+                    .members
+                    .iter()
+                    .find(|member| member.as_str() == name)
+                    .map(|member| member.span),
                 ast::LayoutStmt::Series { members, .. } => members
                     .iter()
                     .find(|member| member.as_str() == name)

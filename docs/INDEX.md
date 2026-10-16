@@ -25,56 +25,14 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**Aucune question n'est ouverte; deux chantiers sont en construction.** `D-042`
-choisit Cassowary comme cœur du futur placement, `D-043` un bloc `layout` séparé
-comme forme canonique du DSL et `D-050` fait de Kasuari le candidat du prototype,
-sous gate déterministe et multiplateforme. `W-153` doit d'abord rendre le modèle actuel cohérent et observable, puis `W-154`
-unifier la langue et sa migration. Trois risques rendent ce travail nécessaire : des passes tardives
-peuvent invalider une relation déjà résolue (`X-019`), et les commandes/interfaces ne
-partagent pas toutes la même interprétation du placement (`X-020`), tandis que plusieurs
-formes de surface expriment les mêmes concepts sans règle canonique (`X-021`). Rien n'est bloqué.
-Le reste de cette section décrit l'état atteint avant cette réouverture. `D-033`
-and `D-034` are carried out in full: an edge's attachment, its stops and its
-shape are all the author's now, and the route between them is still the
-engine's. A second
-reading of every `bgraph init <genre>` on 2026-08-11 found eight more faults —
-`W-117` … `W-122` — including two the first pass had made worse rather than
-better, which is the argument for looking at the picture every time rather than
-at the diff. `examples/`
-is gone — `bgraph init` made it redundant — and `W-116` is what made the crate
-build without it. The twelve
-faults the author found by rendering every `bgraph init <genre>` on 2026-08-11
-are all answered — nine chantiers, `W-107` … `W-115`, all landed the same day.
-That sweep was from the author rendering every `bgraph init <genre>` on
-2026-08-11 and saying what he saw. Nothing is blocked. The licence question closed on 2026-08-11 — `D-032` says
-proprietary, and says it as a decision rather than a silence, because the four
-built-and-unpublished chantiers will make somebody ask again. Thirty-nine ideas
-were triaged on 2026-08-10 — `I-023` … `I-061` —
-and the audience was settled: *first right for its author, then distributable*,
-which is the order that survives.
-Twenty-nine genres plus `free` ship, both editors have an extension, and the
-library renders SVG and PDF. (The table in `props.rs` has thirty `ArchetypeDef`
-entries, one of them `free`; `bpmn` was the twenty-ninth genre, on 2026-08-11.) The parked ideas were
-reviewed on 2026-08-10 and every one of them moved: what was worth building
-became a work item, what was not was discarded, and the one language question
-the review raised was answered the same day (`D-023`). The one idea left parked
-— `I-021`, BPMN — was parked because nobody had chosen which part of the
-notation is the useful part; that was chosen on 2026-08-11, and it is `W-102`.
-
-The thirty-nine ideas raised on 2026-08-10 are all settled: **thirty built**
-(`W-071` … `W-100`), nine refused with a reason. The two that were still a
-decision rather than a piece of work were both taken on 2026-08-11: the licence
-(`D-032`) and BPMN's scope (`I-021`, which became `W-102` and landed the same
-day). Two open risks were given a chantier at the same time and both were
-retired — `X-004` by `W-105` and `X-008` by `W-104`. What `W-105` could not
-reach is `X-018`, written down rather than left as a gap somebody rediscovers.
-
-The step this list expected to be a language decision was not one. `W-102`'s
-boundary events looked like they needed an anchor on a box's *perimeter*, which
-`D-001` has no vocabulary for; on building it, an `attach` property naming the
-host turned out to be enough, and it is declared placement like every other —
-the author says which box, and the rule for where on it is fixed rather than
-solved.
+**État enregistré : sept chantiers en construction, deux planifiés, cinq risques ouverts;
+aucune question ouverte ni chantier bloqué.** `W-153` et `W-154` portent le placement
+Cassowary et le DSL v2 canonique (`D-042` … `D-050`). Les preuves restantes sont suivies
+par `W-155` (parité des surfaces), `W-156` (déterminisme), `W-157` (conflits),
+`W-160` (gate runtime et hôtes éditeurs vérifiés) et `W-164` (themes multi-formes).
+`W-158` (inspecteur de provenance) et `W-159` (matrice des capacités) restent planifiés.
+Pour reprendre, lire l'entrée du chantier et son risque associé ci-dessous; les travaux
+livrés et les décisions historiques sont conservés dans **Settled**.
 
 ### Questions
 
@@ -83,50 +41,44 @@ solved.
 
 ### Work planned
 
-**The author rendered every `bgraph init <genre>` and reported twelve faults on
-2026-08-11.** They were nine chantiers, not twelve, because three of the reports
-were one defect and two more were another — and only one was a failure rather
-than a drawing that is merely wrong to look at. All nine landed the same day. `W-113`
-looked like it needed a decision first — a label wider than its gap seemed to
-force a choice between clipping text and letting the engine move a box — and it
-did not: the example declared too small a gap, and the engine's part is to
-**say so**, which is what `D-001` has always implied.
+Chantiers en construction et planifiés; les états sont ceux explicitement enregistrés.
 
-Three more were opened the same day, from a design the author asked for after
-looking at the BPMN example and finding he could place every box and still not
-control a single line. `D-033` records the decision they carry out.
+Travail parallèle du 2026-10-16 : voir `.agent/analysis/parallel-work-validation.md`.
+La dernière continuation apporte compilation et mesures; les suites fonctionnelles
+restent celles du passage précédent. Collision historique conservée :
+`W-164` désigne ici les styles et, dans **Work landed**, l’export sans sources; aucun id renuméroté.
 
 | id | state | title | notes |
 |---|---|---|---|
-| `W-153` | building | Fiabiliser le placement déclaré avant d'en étendre le langage | Lancé par l'auteur le 2026-08-24. Premier jalon : `PlacementPlan` centralise désormais noms, conteneurs, frères implicites, membres de contraintes et unités de translation pour `check`, solve, `explain` et `layout`; les faux cycles inter-groupes et les cycles de frame absents de `check` sont couverts. Les contraintes ne sont plus des no-op silencieux : membres inconnus, doublons et groupes sont refusés; un `at` explicite reste immobile et `check` explique l'interaction avec `align-group`. `explain` affiche maintenant la relation exacte (`top` sur y, `left` sur x) et ne confond plus les axes; ses alignements relatifs sont aussi nommés selon leur axe réel. La référence et le survol du mot-clé portent la même règle. Le fork Kasuari 0.4.12 passe natif, no-default, wasm navigateur, WASI et Typst. Le fork local minimal conserve l'API et remplace les collections parcourues du tableau par des collections ordonnées; le probe sous-contraint est stable sur 32 processus natifs et 100 instances wasm, avec la même solution. Deuxième jalon : Cassowary est désormais le solveur de production de tout diagramme sans frame dont les relations sont abaissables (`at`, grille, quatre directions, gap, alignement v2, flow implicite et séries); le chemin historique n'est conservé que pour les frames, les formes legacy ambiguës et les grands graphes avant leur benchmark. Chaque équation retenue conserve son origine, son axe, le nœud/anchor et les spans DSL : le prochain solveur pourra enfin expliquer un conflit au lieu de regarder des rectangles après coup. Les archetypes portent désormais une capacité explicite : ceux qui gèrent leur géométrie refusent un bloc `layout`, au lieu de l'ignorer. Les égalités de taille transitives sont déjà résolues par composante, indépendamment de l'ordre des déclarations. Les superpositions de boîtes v2 sont maintenant diagnostiquées sans déplacement automatique; BPMN et les surfaces d'archetypes qui n'exposent pas une boîte nommée par déclaration restent explicitement exemptés. Le contrôle post-layout vérifie désormais containment et ancrage des frames avec des contraintes Cassowary requises; la mesure des bounds est isolée dans `FrameMeasure` avant la phase de translation. Le chemin wasm ajoute aussi les diagnostics dépendant de la géométrie, comme le LSP, et la preview affiche les mêmes diagnostics post-layout dans son panneau d'avertissements. |
-| `W-154` | building | Unifier le DSL autour d'un noyau canonique, sans compatibilité V1 | Lancé par l'auteur le 2026-08-24, en conception conjointe avec `W-153`; les déclarations disent ce qui existe et un bloc `layout` scoped porte toutes les relations. La V2 est désormais la seule syntaxe publique : placements inline et contraintes globales V1 sont refusés, les exemples, docs, complétions, composants et tests utilisent les blocs `layout`. `fmt --migrate` ne convertit pas les placements : il reste réservé aux migrations indépendantes de propriétés comme `opacity`. `bgraph layout` n'émet aucune clause inline; l'outline, le hover, `explain` et la complétion relient les déclarations à leurs relations V2. Le nettoyage du code de migration et du rendu legacy est livré (e95d5b4). Les productions V1 de contraintes globales, les productions de placements inline, les champs AST associés et le parseur de test historique sont maintenant supprimés; les tests de taille utilisent `equal-width`. |
-| `W-155` | building | API d'analyse commune pour CLI, LSP, wasm, preview et Typst | Éteint `X-020`. Construire `analyze_source` comme pipeline unique parse → check → layout → after_layout → diagnostics, puis faire consommer le résultat par chaque surface avec une fixture de parité commune. Typst utilise désormais `analyze_source` pour aligner `bgraph_typst_render` avec les surfaces analytiques. |
-| `W-156` | building | Déterminisme Cassowary multiplateforme | Éteint `X-022`. Fixer l'ordre canonique des entités, variables, contraintes, stays et arrondis; ajouter les tests de permutations, répétitions natives, wasm et Typst avec comparaison SVG. |
-| `W-157` | building | Diagnostics de conflits avec provenance complète | Éteint `X-023`. Conserver spans, axe, relation, valeur, entité et ancre dans chaque contrainte; extraire le plus petit ensemble contradictoire et sérialiser le même diagnostic partout. |
+| `W-153` | building | Fiabiliser le placement déclaré avant d'en étendre le langage | Cassowary résout nœuds, frames et attaches BPMN jusqu'à 512 entités. Frames partitionnées en composantes indépendantes; déplacement BPMN tardif supprimé, dépendants pris en compte aussi dans le fallback acyclique. Cycles d'attache laissés au solveur simultané, refus explicite >512. Restent grandes composantes, seuil et validation fonctionnelle des nouvelles branches. Preuves : `.agent/analysis/parallel-work-validation.md`. |
+| `W-154` | building | Unifier le DSL autour d'un noyau canonique, sans compatibilité V1 | DSL public V2 uniquement. Convertisseurs V1 des tests (`canonical_source` / `split_inline_placement`) supprimés; fixtures littérales, constantes et dynamiques ainsi que fallback du playground utilisent les blocs `layout`, sauf rejets explicites V1. Aucune migration de placement via `fmt --migrate`. Preuves : `.agent/analysis/parallel-work-validation.md`. |
+| `W-155` | building | API d'analyse commune pour CLI, LSP, wasm, preview et Typst | Analyse commune des rendus bibliothèque/CLI, LSP, wasm, Typst et preview. FileAnalysis conserve source map et diagnostics après erreurs de parsing/composition; includes imbriqués, absents ou répétés et composants couverts. Le LSP relaie au bon include avec relatedInformation vers l'enfant et efface les erreurs corrigées. Contrats Unicode documentés; huit tests multifichiers et quatre fixtures runtime. Preuves : `.agent/analysis/parallel-work-validation.md`. |
+| `W-156` | building | Déterminisme Cassowary multiplateforme | Ordre canonique conservé dans les partitions, y compris sélection du premier conflit global; fractions conservées avant sérialisation. Les preuves de 32 processus et parité SVG des 30 archétypes datent du passage précédent. Builds croisés Linux ARM64 et Windows x64/ARM64 actuels; restent runtime natif Windows/macOS/ARM et reconfirmation après partitionnement/BPMN. Preuves : `.agent/analysis/parallel-work-validation.md`. |
+| `W-157` | building | Diagnostics de conflits avec provenance complète | Provenance des équations, tailles transitives et attaches BPMN conservée. Seule UnsatisfiableConstraint devient conflit source; doublon du même handle idempotent et erreurs internes Kasuari propagées typées, aussi pendant minimisation/partitions. Minimal par inclusion, sans cardinalité minimum garantie; bornes non linéaires des frames diagnostiquées séparément. Compilé, sans nouvelle exécution de tests. Preuves : `.agent/analysis/parallel-work-validation.md`. |
 | `W-158` | planned | Inspecteur de provenance dans preview et LSP | Éteint `X-025`. Ajouter mode debug preview (bounds, ancres, parents, relations X/Y, conflits) et navigation bidirectionnelle déclaration ↔ bloc `layout` dans le LSP. |
 | `W-159` | planned | Classification de capacité des archetypes | Éteint `X-026`. Ajouter `Declared`, `ArchetypeManaged` et `Hybrid` à `ArchetypeDef`, puis dériver validation, complétion, documentation et solveur d'une matrice exhaustive testée. |
-| `W-160` | building | Gate runtime wasm, Typst et surfaces sans dépendances | Éteint `X-028`. Les surfaces non-extension sont passées en gate: CLI, LSP, preview et wasm/Typst sur `no-default`, cible navigateur (`wasm32-unknown-unknown`) et WASI (`wasm32-wasip1`) avec diagnostics de placement/groupes/Conflits. Reste à exécuter la variante “extensions” avant bascule du solveur. |
-| `W-164` | building | Cible de style canonique pour les archétypes multi-formes | Unifier renderer, check, LSP et `explain`; BPMN `task`, `event`, `gateway` et `data` doivent être des themes effectives. Rapport : `.agent/analysis/style-archetype-analysis.md`. |
+| `W-160` | building | Gate runtime wasm, Typst et surfaces sans dépendances | Gates runtime/éditeurs du passage précédent conservés. Matrice CI de builds natifs Linux/macOS/Windows et build bpmn seul ajoutés. Compilation locale actuelle : binaires hôte, Linux ARM64, Windows x64/ARM64, lib no-default/bpmn seul, navigateur wasm, WASI, Typst; check toutes cibles/features. Aucun nouveau test exécuté; CI distante et UI non revendiquées. Preuves : `.agent/analysis/parallel-work-validation.md`. |
+| `W-164` | building | Cible de style canonique pour les archétypes multi-formes | Résolution/explain partagent les couches implicites; provenance des overrides de même valeur corrigée et hover thème/classe explicite. Matrice validation/complétion/hover des formes BPMN et XY; quinze tests thèmes et deux explain passent, référence régénérée. Analyse initiale : `.agent/analysis/style-archetype-analysis.md`; preuves actuelles : `.agent/analysis/parallel-work-validation.md`. |
 
 ### Risks
 
-Known ways this goes wrong. `X-004` and `X-008` were retired on 2026-08-11 by `W-105` and `W-104`; `X-018` is what `W-105` left behind, recorded rather than left unstated. The rest carry no chantier, because none has been worth the cost yet — and `X-005` never will, being narrowed as far as it goes.
+Risques ouverts et résiduels; les entrées indiquent les chantiers associés et les preuves encore attendues.
 
 | id | state | title | notes |
 |---|---|---|---|
-| `X-019` | open | Une passe tardive peut invalider une position déjà résolue | Deux contradictions retirées : `align-group` ne déplace plus un `at`/cell explicite, et `top`/`bottom` (axe y), `left`/`right` (axe x) ne dépendent plus de la géométrie déjà résolue; `check` rend aussi les membres invalides visibles. `center`/`middle`, dont la v1 ne porte pas l'axe, restent provisoirement inférés jusqu'au bloc `layout` v2. Restent la propagation aux dépendants, le recalcul des groupes, l'ordre des contraintes de taille et l'événement BPMN `boundary` rattaché après placement. Le layout final doit encore être vérifié contre les relations déclarées. |
-| `X-020` | open | Les interfaces ne partagent pas une sémantique unique du placement | Premier écart supprimé dans `W-153` : solveur, cycle-check, `explain` et commande `layout` consomment désormais le même `PlacementPlan` scoped, et `check` voit aussi les cycles impliquant un groupe. Le wasm et la preview exécutent maintenant aussi `after_layout`; `W-155` porte la preuve de parité sur les cas de groupes et les surfaces intrinsèques. |
-| `X-021` | open | Étendre le placement sans unifier le DSL multiplie les chemins concurrents | Les contraintes globales V1, les placements inline et leurs synonymes sont supprimés du vocabulaire public, des grammaires, de l'AST et des tests de production. Le risque de chemins concurrents est réduit; il reste à maintenir la discipline d'un seul bloc `layout` lors des prochaines extensions. |
-| `X-022` | open | Une solution Cassowary sous-contrainte peut être correcte mais instable | `D-045` impose un déterminisme strict et multiplateforme. Le Kasuari stock a donné deux solutions sur 200 processus (101/99); le fork local ordonne désormais tableau, variables, edits et changements. Le même probe donne une seule solution sur 32 processus natifs et 100 instances wasm, identique entre les deux. Restent ordre canonique des contraintes, origine, stays, arithmétique/arrondi de frontière et tests du vrai IR permutés et cross-target; `W-156` porte ces preuves d'intégration. |
-| `X-023` | open | Un solveur plus puissant peut rendre les contradictions moins compréhensibles | `D-046` fait du diagnostic complet un contrat : plus petit ensemble conflictuel, toutes les lignes source, valeurs exigées et pistes de correction, identiques dans CLI, LSP, wasm et preview. Chaque contrainte abaissée doit donc conserver spans et formulation source; `W-157` porte l'extraction et la sérialisation de ce conflit minimal. |
+| `X-019` | open | Une passe tardive peut invalider une position déjà résolue | Attaches BPMN intégrées au solveur, plus de déplacement tardif; contrôle final des positions/alignements actif sur BPMN. Le fallback place les événements avant leurs dépendants mais conserve ses contraintes d'ordre et refuse les cycles d'attache >512. Restent ce chemin transitionnel et validation fonctionnelle des nouvelles branches. W-153; preuves : `.agent/analysis/parallel-work-validation.md`. |
+| `X-020` | mitigated | Les interfaces ne partagent pas une sémantique unique du placement | Analyse et diagnostics partagés entre surfaces; récupération des erreurs multifichiers avec source map et relatedInformation LSP. Parité runtime et hôtes VS Code/Zed réels vérifiés, avec contrats Unicode explicites. W-155/W-160; preuves : `.agent/analysis/parallel-work-validation.md`. |
+| `X-021` | mitigated | Étendre le placement sans unifier le DSL multiplie les chemins concurrents | La V1 est retirée des deux grammaires et de l’AST; le convertisseur caché dans les tests est maintenant supprimé, avec migration des fixtures vers V2. Maintenir un seul bloc `layout` lors des prochaines extensions. W-154; preuves : `.agent/analysis/parallel-work-validation.md`. |
+| `X-022` | open | Une solution Cassowary sous-contrainte peut être correcte mais instable | Fork et partitions ordonnés; premier conflit sélectionné selon l'ordre global initial. Preuves runtime du passage précédent à reconfirmer après partitionnement/BPMN. Les builds croisés passent; ils ne prouvent pas le déterminisme des runtimes natifs Windows/macOS/ARM. W-156; portée : `.agent/analysis/parallel-work-validation.md`. |
+| `X-023` | open | Un solveur plus puissant peut rendre les contradictions moins compréhensibles | Équations, spans et chaînes de tailles conservés; les erreurs internes ne deviennent plus des conflits source. Le noyau reste minimal par inclusion, sans minimum de cardinalité garanti; contradictions non linéaires de frame signalées séparément. Nouvelles branches compilées, sans nouvelle preuve runtime. W-157; preuves : `.agent/analysis/parallel-work-validation.md`. |
 | `X-024` | retired | La migration v1 → v2 peut préserver le parse et changer le dessin | Retiré par la décision de ne fournir aucune migration V1→V2 : les fichiers V1 sont refusés, sans tentative de réécriture. |
 | `X-025` | open | Séparer le layout peut éloigner une boîte de la raison de sa position | `D-047` refuse de traiter cela comme de la documentation : blocks scoped dans les groupes, navigation bidirectionnelle déclaration ↔ layout, hover de provenance, outline, `explain` et surbrillance preview sont le minimum livrable de la v2; `W-158` porte la preuve de l'écran et des éditeurs. |
 | `X-026` | open | Forcer Cassowary sur les genres intrinsèques détruirait leur géométrie sémantique | `D-048` impose une capacité explicite dans `ArchetypeDef` : `Declared` accepte tout le bloc, `ArchetypeManaged` le refuse, `Hybrid` n'accepte que les guides nommés par son contrat. Aucun placement n'est accepté puis ignoré. `W-159` porte la classification des trente genres et les tests parser/check/LSP correspondants. |
-| `X-027` | open | Cassowary ne choisit ni l'ordre ni la branche d'évitement d'une collision | `D-049` fixe la frontière : le render diagnostique overlap et relations non linéaires, sans déplacement ni branche inventée. L'auteur déclare l'axe/l'ordre; une future commande `arrange` peut proposer un diff DSL séparé et explicite. Le risque reste ouvert jusqu'aux diagnostics, exemptions justifiées et tests prouvant qu'aucune réparation ne fuit dans le solveur. |
-| `X-028` | open | Le nouveau cœur peut casser les surfaces sans dépendances, wasm ou Typst | Le fork local `kasuari-spike` 0.4.12 compile maintenant sous `--no-default-features`, `wasm32-unknown-unknown`, `wasm32-wasip1` et la combinaison exacte du protocole Typst; les scripts wasm/Typst et la matrice CI activent cette feature. Le probe s'exécute aussi dans Node sur le module wasm. Le premier lowering bgraph est intégré en shadow debug et compile dans cette matrice; `W-160` porte le runtime Typst, les migrations de groupes/contraintes et le gate complet de `D-045`. |
+| `X-027` | mitigated | Cassowary ne choisit ni l'ordre ni la branche d'évitement d'une collision | Overlap diagnostiqué sans déplacement, gonflement artificiel des frames refusé. L'exemption générique BPMN est supprimée; seule la paire événement/hôte attaché peut se chevaucher. Les géométries gérées relèvent de W-159/X-026. Preuves runtime antérieures; restriction BPMN actuelle compilée, à reconfirmer fonctionnellement. Preuves : `.agent/analysis/parallel-work-validation.md`. |
+| `X-028` | mitigated | Le nouveau cœur peut casser les surfaces sans dépendances, wasm ou Typst | Preuves runtime et hôtes VS Code/Zed du passage précédent conservées. Nouveaux changements compilés sur surfaces natives croisées, no-default, bpmn seul et wasm/WASI/Typst; suites fonctionnelles et hôtes non relancés après partitionnement/BPMN. W-160; matrice : `.agent/analysis/parallel-work-validation.md`. |
 | `X-029` | retired | Deux liens concurrents ou croisés deviennent illisibles | Retiré par `W-161` le 2026-08-25 : routes droites, courbes et orthogonales séparées quand possible, doublons orthogonaux décalés dans leur canal intérieur, ports indexés validés, ponts de croisement déterministes et suite de 602 tests. |
 | `X-030` | retired | Une grille globale peut contredire les placements relatifs et les routeurs de liens | Retiré par `W-162` le 2026-08-25 : grille bornée, conversion unique des unités, projection des relations et waypoints, bornes vérifiées par `check`, explication de la provenance et parité de build no-default/wasm. |
-| `X-031` | open | Les formes alternatives d'un archétype peuvent être suggérées comme themes sans être résolues ainsi | `style event`/`gateway`/`data` était classé comme theme par la complétion mais seul `def.item` arrivait au renderer; `W-164` aligne la cible, la validation, LSP et `explain`. |
+| `X-031` | mitigated | Les formes alternatives d'un archétype peuvent être suggérées comme themes sans être résolues ainsi | Les mots alternatifs utilisent la cible canonique et les couches implicites sont partagées avec explain; matrice BPMN/XY validation/complétion/hover et provenance des overrides de même valeur vérifiées. Conserver cette couverture lors de l’ajout d’une forme. W-164 styles; preuves : `.agent/analysis/parallel-work-validation.md`. |
 | `X-009` | mitigated | Editor queries can name node types the grammar has dropped | It broke once — `W-029` renamed `node_declaration` and Zed stopped recognising `.bd` entirely. `the_editor_queries_match_the_grammar` compiles every `.scm` against the generated parser, but only when the `tree-sitter` CLI is on PATH. `W-038` did **not** double it: VS Code takes a TextMate grammar, which cannot name a tree-sitter node type at all — it has its own guard instead. |
 | `X-002` | mitigated | The two grammars can drift apart | `W-008` cross-checks them on every `cargo test` — but only when the `tree-sitter` CLI is on PATH; without it the test says SKIPPED and passes. |
 | `X-010` | mitigated | `tree-sitter test`'s summary line counts parses, not expectation matches | It read "failed parses: 0" while seven corpus expectations were stale across the `W-029` rename. `the_grammar_corpus_expectations_still_hold` now asserts the **exit code** on each `cargo test`, but only when the CLI is on PATH. |
@@ -143,7 +95,7 @@ Known ways this goes wrong. `X-004` and `X-008` were retired on 2026-08-11 by `W
 | id | state | date | title | was |
 |---|---|---|---|---|
 | `D-051` | active | 2026-08-25 | **La grille choisit l’unité de placement.** Sans `graph { grid: ... }`, les positions, gaps et offsets sont exprimés en unités libres; avec une grille, ces mêmes valeurs sont exprimées en cases et converties par le solveur selon les dimensions et les gaps déclarés. Une déclaration explicite ne peut pas être déplacée silencieusement par un arrondi ou un changement de mode. | utilisateur |
-| `D-050` | amended | 2026-08-25 | **La compatibilité de toutes les surfaces est un gate du cœur de placement, et le fork Kasuari est ce cœur.** Le fork couvre build natif, `--no-default-features`, wasm, protocole Typst, exécution et déterminisme. L'audit avait reproduit un départage sous-contraint non déterministe dans Kasuari stock; le fork local impose les collections ordonnées avant la bascule. Cassowary est désormais la source de géométrie des relations abaissables sans frame; les frames restent sur le chemin transitionnel jusqu'à leur lowering sans perte. | `Q-016` |
+| `D-050` | amended | 2026-08-25 | **La compatibilité de toutes les surfaces est un gate du cœur de placement, et le fork Kasuari est ce cœur.** Le fork couvre build natif, `--no-default-features`, wasm, protocole Typst, exécution et déterminisme. L'audit avait reproduit un départage sous-contraint non déterministe dans Kasuari stock; le fork local impose les collections ordonnées avant la bascule. Cassowary fournit désormais la géométrie simultanée des nœuds et frames jusqu'à 512 entités; au-delà, le chemin transitionnel est conservé pour sa performance. Les attaches BPMN sont des relations requises du même solveur; le fallback >512 garde un ordre de placement acyclique. Preuves et limites actuelles : `.agent/analysis/parallel-work-validation.md`. | `Q-016` |
 | `D-049` | active | 2026-08-24 | **Les collisions sont diagnostiquées, jamais réparées par le render.** Cassowary ne choisit ni l'ordre ni l'axe de séparation entre deux rectangles; l'auteur fournit la relation manquante. Une éventuelle commande `arrange` reste une transformation explicite qui propose du DSL et un diff, entièrement séparée du solveur de rendu. | `Q-015` |
 | `D-048` | active | 2026-08-24 | **Chaque archetype déclare sa capacité de placement.** `Declared` utilise le bloc `layout` complet et Cassowary; `ArchetypeManaged` refuse ce bloc parce que sa géométrie vient des données; `Hybrid` n'expose que des guides explicitement documentés par le genre. Une relation non supportée est une erreur, jamais un warning suivi d'un no-op. | `Q-014` |
 | `D-047` | active | 2026-08-24 | **L'outillage reliant déclaration et bloc `layout` fait partie du minimum livrable de la v2.** Les blocks sont scoped et peuvent vivre dans les groupes; navigation bidirectionnelle, hover de provenance, outline, `explain` et surbrillance dans la preview doivent relier chaque entité à ses contraintes. La v2 n'est pas considérée utilisable sans cette surface, et aucun placement inline n'est réintroduit comme échappatoire. | `Q-013` |

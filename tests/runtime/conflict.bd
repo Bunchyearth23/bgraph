@@ -1,0 +1,7 @@
+node a "A"
+node b "B"
+layout {
+  place a at (0, 0)
+  place b at (0, 100)
+  align top a b
+}

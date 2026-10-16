@@ -769,6 +769,18 @@ impl Registry {
         self.resolved.get(name)
     }
 
+    /// The common node theme followed by the declaration's own theme.
+    pub(crate) fn implicit_layers<'a>(
+        &'a self,
+        implicit: &'a str,
+    ) -> impl Iterator<Item = (&'a str, &'a Style)> {
+        ["node", implicit]
+            .into_iter()
+            .enumerate()
+            .filter(move |(i, _)| *i != 0 || implicit != "node")
+            .filter_map(|(_, name)| self.get(name).map(|style| (name, style)))
+    }
+
     /// defaults ← implicit theme ← listed classes ← inline props.
     ///
     /// The implicit theme is the archetype's own word (`style slice { … }`),
@@ -783,12 +795,7 @@ impl Registry {
     ) -> Result<Style> {
         let mut style = base;
 
-        if implicit != "node"
-            && let Some(found) = self.get("node")
-        {
-            style.overlay(found);
-        }
-        if let Some(found) = self.get(implicit) {
+        for (_, found) in self.implicit_layers(implicit) {
             style.overlay(found);
         }
         for class in classes {

@@ -1,0 +1,15 @@
+node anchor { size: 20 20 }
+group g {
+ padding: 0
+ node a { size: 20 20 }
+ node b { size: 20 20 }
+ layout {
+ place a at (0, 0)
+ place b at (100, 0)
+ }
+}
+layout {
+ place anchor at (50, 0)
+ place g at (0, 0)
+ align left anchor a
+}

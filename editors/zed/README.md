@@ -16,9 +16,9 @@ suggestion), invalid enum values, self-referencing anchors. Warnings for
 properties that have no effect where they are written.
 
 A file that uses `include` is **composed before it is checked**, against the
-buffer rather than the version on disk — so a name borrowed from another file
-is not underlined, and a mistake belonging to an included file is left for
-that file's own buffer to show.
+buffer rather than the version on disk. Errors in included files are relayed
+at the relevant `include`, with related information pointing to the original
+file and range.
 
 **No Markdown preview.** Zed's extension API has no hook for extending its
 Markdown rendering, so this is a limit of the editor rather than something
@@ -95,12 +95,44 @@ instead:
 `zed --foreground` prints the extension's log, including the error message the
 extension returns when it cannot find the binary.
 
+## Isolated host verification (Linux)
+
+The optional host check runs the real Zed application with Xvfb, a private
+D-Bus session and a temporary profile. It loads a freshly built extension
+component and grammar. The Rust extension resolves an executable `bgraph-lsp`
+wrapper on its isolated `PATH`; no LSP binary setting bypasses that lookup.
+The check compares the language server's actual diagnostics with CLI output
+for valid, overlapping and conflicting placements, nested frames, a conflict
+through two equal-width constraints, and an error after an emoji.
+Diagnostic columns are compared as Unicode scalar counts, matching the CLI.
+The proxy
+records and forwards LSP messages unchanged, including every diagnostic URI
+and range. Screenshots, logs, artifact hashes and `result.json` stay in the
+temporary evidence directory printed by the command.
+
+It needs Zed, Python 3.11+, `xvfb-run`, `dbus-run-session`, ImageMagick `import`,
+the installed Rust `wasm32-wasip2` target and a Tree-sitter WASI compiler.
+With the packaged Clang/WASI sysroot on this Linux installation:
+
+```sh
+cargo build --locked --bins
+CARGO_TARGET_DIR=target/zed-work cargo build --locked --release \
+  --manifest-path editors/zed/Cargo.toml --target wasm32-wasip2
+WASI_SDK_PATH=/usr tree-sitter build --wasm -o /tmp/bgraph-grammar.wasm tree-sitter-bgraph
+python3 tests/runtime/zed-host.py --grammar /tmp/bgraph-grammar.wasm
+```
+
+Set `WASI_SDK_PATH` to your SDK root when using another compiler installation.
+The ordinary runtime gate's `wasm32-wasip1` build checks compilation; this
+separate check loads the component in Zed itself. The helper enables trust
+only inside its disposable profile and never installs into the user's profile.
+
 ## Layout
 
 ```
 editors/zed/
   extension.toml              manifest: grammar pin + language server
-  Cargo.toml                  compiled to wasm32-wasip1 by Zed
+  Cargo.toml                  compiled to a wasm component by Zed
   src/lib.rs                  locates and launches bgraph-lsp
   install.sh                  build, generate, pin
   languages/bgraph/

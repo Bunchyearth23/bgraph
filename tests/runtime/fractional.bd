@@ -1,0 +1,8 @@
+node a "A" { size: 81.125 42.375 }
+node b "B" { size: 81.125 42.375 }
+node c "C" { size: 81.125 42.375 }
+layout {
+  place a at (-12.005, 7.995)
+  place b right-of a gap 13.333 align top
+  place c below b gap 0.001 align right
+}

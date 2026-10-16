@@ -1,0 +1,8 @@
+component service {
+  node app "{{label}}"
+  node db "Database"
+  layout {
+    place db below app gap 30
+  }
+}
+use service as web { label: "API" }

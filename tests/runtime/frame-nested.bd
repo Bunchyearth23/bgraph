@@ -1,0 +1,14 @@
+group outer {
+ padding: 10
+ node a { size: 20 20 }
+ group inner {
+ padding: 5
+ node b { size: 20 20 }
+ layout { place b at (100, 0) }
+ }
+ layout {
+ place a at (0, 0)
+ place inner at (50, 40)
+ }
+}
+layout { place outer at (200, 100) }

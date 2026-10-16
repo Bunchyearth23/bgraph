@@ -1,0 +1,10 @@
+node api "API 🦀"
+node database "Database"
+node cache "Cache"
+api -> database
+layout {
+  place api at (0, 0)
+  row api database cache gap 40
+  equal-width api database cache
+  align top api database cache
+}

@@ -3,144 +3,13 @@ use crate::parser::{MAX_NESTING, parse_diagram};
 use crate::render_svg;
 use crate::style::{Head, Router, Shape};
 
-// The production parser is intentionally V2-only. These tests still contain
-// a few historical fixtures because they exercise geometry rather than the
-// spelling of placement. Rewrite only those fixtures at the test boundary so
-// the compiler and editor never carry a second placement grammar.
-fn canonical_source(source: &str) -> String {
-    let mut out = Vec::new();
-    let mut scopes: Vec<(String, Vec<String>)> = Vec::new();
-    let mut root_layout = Vec::new();
-    for line in source.lines() {
-        let trimmed = line.trim_start();
-        if trimmed.starts_with('}')
-            && let Some((_, relations)) = scopes.pop()
-            && !relations.is_empty()
-        {
-            let indent = &line[..line.len() - trimmed.len()];
-            out.push(format!("{indent}layout {{"));
-            for relation in relations {
-                out.push(format!("{indent}  {relation}"));
-            }
-            out.push(format!("{indent}}}"));
-        }
-
-        let first = trimmed.split_whitespace().next().unwrap_or_default();
-        let is_decl = !matches!(
-            first,
-            "" | "note"
-                | "legend"
-                | "style"
-                | "graph"
-                | "type"
-                | "layout"
-                | "include"
-                | "component"
-                | "use"
-                | "place"
-                | "align"
-                | "row"
-                | "column"
-                | "equal-width"
-                | "equal-height"
-                | "//"
-        ) && !trimmed.contains("->")
-            && !trimmed.contains("<-")
-            && !trimmed.contains("--");
-        if is_decl
-            && !trimmed.contains("layout {")
-            && let Some((clean, target, placement)) = split_inline_placement(line)
-        {
-            if let Some((_, relations)) = scopes.last_mut() {
-                relations.push(format!("place {target} {placement}"));
-            } else {
-                root_layout.push(format!("place {target} {placement}"));
-            }
-            out.push(clean.clone());
-            if trimmed.starts_with("group ") || trimmed.starts_with("activate ") {
-                scopes.push((target, Vec::new()));
-            }
-            continue;
-        }
-
-        out.push(line.to_string());
-        if is_decl
-            && (trimmed.starts_with("group ") || trimmed.starts_with("activate "))
-            && trimmed.contains('{')
-        {
-            let target = trimmed.split_whitespace().nth(1).unwrap_or_default();
-            scopes.push((target.to_string(), Vec::new()));
-        }
-    }
-    while let Some((_, relations)) = scopes.pop() {
-        if !relations.is_empty() {
-            root_layout.extend(relations);
-        }
-    }
-    if !root_layout.is_empty() {
-        out.push("layout {".to_string());
-        out.extend(
-            root_layout
-                .into_iter()
-                .map(|relation| format!("  {relation}")),
-        );
-        out.push("}".to_string());
-    }
-    out.join("\n")
-}
-
-fn split_inline_placement(line: &str) -> Option<(String, String, String)> {
-    let mut quote = false;
-    let mut candidate = None;
-    for (i, c) in line.char_indices() {
-        if c == '"' {
-            quote = !quote;
-        }
-        if quote || i == 0 {
-            continue;
-        }
-        let rest = &line[i..];
-        if [" at ", " right-of ", " left-of ", " below ", " above "]
-            .iter()
-            .any(|needle| rest.starts_with(needle))
-        {
-            candidate = Some(i);
-            break;
-        }
-    }
-    let start = candidate?;
-    let before = line[..start].trim_end();
-    let target = before.split_whitespace().nth(1)?.to_string();
-    let mut placement = line[start..].trim();
-    let mut brace = None;
-    quote = false;
-    for (i, c) in placement.char_indices() {
-        if c == '"' {
-            quote = !quote;
-        } else if c == '{' && !quote {
-            brace = Some(i);
-            break;
-        }
-    }
-    if let Some(i) = brace {
-        placement = placement[..i].trim();
-        Some((
-            format!("{} {}", before, line[start + i..].trim_start()),
-            target,
-            placement.into(),
-        ))
-    } else {
-        Some((before.to_string(), target, placement.into()))
-    }
-}
-
 fn build(source: &str) -> Layout {
-    let diagram = parse_diagram(&canonical_source(source)).expect("source should parse");
+    let diagram = parse_diagram(source).expect("source should parse");
     layout::solve(&diagram).expect("layout should solve")
 }
 
 fn err(source: &str) -> String {
-    let diagram = match parse_diagram(&canonical_source(source)) {
+    let diagram = match parse_diagram(source) {
         Ok(d) => d,
         Err(e) => return format!("{e:#}"),
     };
@@ -151,7 +20,7 @@ fn err(source: &str) -> String {
 }
 
 fn diags(source: &str) -> Vec<crate::check::Diag> {
-    let diagram = parse_diagram(&canonical_source(source)).expect("source should parse");
+    let diagram = parse_diagram(source).expect("source should parse");
     crate::check::check(&diagram)
 }
 
@@ -198,7 +67,12 @@ fn comments_do_not_swallow_hex_colors() {
 
 #[test]
 fn absolute_placement_is_honoured() {
-    let l = build(r#"node a "A" at (100, 50) { size: 80 40 }"#);
+    let l = build(
+        r#"node a "A" { size: 80 40 }
+layout {
+  place a at (100, 50)
+}"#,
+    );
     let r = l.nodes[0].rect;
     assert_eq!((r.x, r.y, r.w, r.h), (100.0, 50.0, 80.0, 40.0));
 }
@@ -254,7 +128,7 @@ fn a_layout_block_aligns_and_equalizes_nodes() {
            node db "Database" { size: 120 60 }
            layout {
              place api at (0, 0)
-             place db right-of api gap 24 align bottom
+             place db right-of api gap 24
              align top api db
              equal-width api db
            }"#,
@@ -355,10 +229,15 @@ fn a_root_layout_places_a_group_and_its_subtree() {
 fn relative_placement_offsets_by_the_gap() {
     let l = build(
         r#"
-        node a "A" at (0, 0) { size: 100 60 }
-        node b "B" right-of a gap 40 { size: 100 60 }
-        node c "C" below a gap 20 align left { size: 100 60 }
-    "#,
+        node a "A" { size: 100 60 }
+        node b "B" { size: 100 60 }
+        node c "C" { size: 100 60 }
+
+layout {
+  place a at (0, 0)
+  place b right-of a gap 40
+  place c below a gap 20 align left
+}"#,
     );
 
     assert_eq!(l.nodes[1].rect.x, 140.0);
@@ -371,11 +250,17 @@ fn relative_placement_offsets_by_the_gap() {
 fn alignment_selects_the_cross_axis_edge() {
     let l = build(
         r#"
-        node a "A" at (0, 0) { size: 100 100 }
-        node top "T" right-of a gap 10 align top { size: 20 20 }
-        node bot "B" right-of a gap 10 align bottom { size: 20 20 }
-        node mid "M" right-of a gap 10 align center { size: 20 20 }
-    "#,
+        node a "A" { size: 100 100 }
+        node top "T" { size: 20 20 }
+        node bot "B" { size: 20 20 }
+        node mid "M" { size: 20 20 }
+
+layout {
+  place a at (0, 0)
+  place top right-of a gap 10 align top
+  place bot right-of a gap 10 align bottom
+  place mid right-of a gap 10 align center
+}"#,
     );
 
     assert_eq!(l.nodes[1].rect.y, 0.0);
@@ -386,8 +271,12 @@ fn alignment_selects_the_cross_axis_edge() {
 #[test]
 fn an_explicit_cross_axis_center_is_accepted() {
     let l = build(
-        r#"node a "A" at (0, 0) { size: 80 40 }
-           node b "B" below a align center-x { size: 40 30 }"#,
+        r#"node a "A" { size: 80 40 }
+           node b "B" { size: 40 30 }
+layout {
+  place a at (0, 0)
+  place b below a align center-x
+}"#,
     );
     assert_eq!(l.nodes[1].rect.x, 20.0);
 }
@@ -396,9 +285,13 @@ fn an_explicit_cross_axis_center_is_accepted() {
 fn forward_references_resolve_across_passes() {
     let l = build(
         r#"
-        node a "A" right-of b gap 10 { size: 50 50 }
-        node b "B" at (0, 0) { size: 50 50 }
-    "#,
+        node a "A" { size: 50 50 }
+        node b "B" { size: 50 50 }
+
+layout {
+  place a right-of b gap 10
+  place b at (0, 0)
+}"#,
     );
     assert_eq!(l.nodes[0].rect.x, 60.0);
 }
@@ -557,9 +450,13 @@ fn viewbox_covers_every_node_plus_padding() {
     let svg = render_svg::render(&build(
         r#"
         graph { padding: 10 }
-        node a at (0, 0) { size: 100 50 }
-        node b at (200, 100) { size: 100 50 }
-    "#,
+        node a { size: 100 50 }
+        node b { size: 100 50 }
+
+layout {
+  place a at (0, 0)
+  place b at (200, 100)
+}"#,
     ));
 
     // 300 wide + 2*10 padding, 150 tall + 2*10 padding
@@ -571,8 +468,11 @@ fn negative_coordinates_are_translated_into_view() {
     let svg = render_svg::render(&build(
         r#"
         graph { padding: 10 }
-        node a at (-100, -100) { size: 50 50 }
-    "#,
+        node a { size: 50 50 }
+
+layout {
+  place a at (-100, -100)
+}"#,
     ));
 
     assert!(svg.contains(r#"viewBox="0 0 70 70""#), "{svg}");
@@ -606,10 +506,14 @@ fn every_shape_emits_geometry() {
 fn straight_edges_stop_at_the_shape_boundary() {
     let l = build(
         r#"
-        node a at (0, 0) { size: 100 100 }
-        node b at (200, 0) { size: 100 100 }
+        node a { size: 100 100 }
+        node b { size: 100 100 }
         a -> b
-    "#,
+
+layout {
+  place a at (0, 0)
+  place b at (200, 0)
+}"#,
     );
     let svg = render_svg::render(&l);
 
@@ -621,10 +525,14 @@ fn straight_edges_stop_at_the_shape_boundary() {
 fn ortho_edges_produce_an_elbow() {
     let l = build(
         r#"
-        node a at (0, 0) { size: 100 100 }
-        node b at (300, 200) { size: 100 100 }
+        node a { size: 100 100 }
+        node b { size: 100 100 }
         a -> b { router: ortho }
-    "#,
+
+layout {
+  place a at (0, 0)
+  place b at (300, 200)
+}"#,
     );
     assert_eq!(l.edges[0].style.router, Some(Router::Ortho));
 
@@ -1035,16 +943,7 @@ fn the_manual_names_every_genre_and_its_word() {
 // ---------------------------------------------------------------------- W-102
 
 #[cfg(feature = "bpmn")]
-const PROCESS: &str = "type bpmn\n\
-    event got \"Got it\" start message\n\
-    task check \"Check\" service right-of got\n\
-    gateway ok \"Ok?\" exclusive right-of check\n\
-    task fix \"Fix\" send below ok\n\
-    data form \"Form\" object below check\n\
-    data book \"Ledger\" store below fix\n\
-    event done \"Done\" end right-of ok\n\
-    got -> check\ncheck -> ok\nok -> done\nok -> fix\nfix -> check\n\
-    check -> form association\n";
+const PROCESS: &str = "type bpmn\nevent got \"Got it\" start message\ntask check \"Check\" service\ngateway ok \"Ok?\" exclusive\ntask fix \"Fix\" send\ndata form \"Form\" object\ndata book \"Ledger\" store\nevent done \"Done\" end\ngot -> check\ncheck -> ok\nok -> done\nok -> fix\nfix -> check\ncheck -> form association\nlayout {\n  place check right-of got\n  place ok right-of check\n  place fix below ok\n  place form below check\n  place book below fix\n  place done right-of ok\n}\n";
 
 #[cfg(feature = "bpmn")]
 #[test]
@@ -1279,7 +1178,7 @@ fn a_process_that_runs_backwards_is_a_warning_and_not_an_error() {
 
 #[cfg(test)]
 fn after(source: &str) -> Vec<String> {
-    let diagram = parse_diagram(&canonical_source(source)).expect("parses");
+    let diagram = parse_diagram(source).expect("parses");
     let solved = layout::solve(&diagram).expect("solves");
     if source.contains("f0") {
         eprintln!(
@@ -1324,10 +1223,7 @@ fn a_class_diagram_can_draw_the_three_relations_it_exists_for() {
     // because the word `triangle` was quietly a third spelling of the solid
     // arrow rather than the hollow head it names everywhere else.
     let l = build(
-        "type class\nclass a \"A\"\nclass b \"B\" right-of a\n\
-         a -> b { head: triangle }\n\
-         a -> b { head: aggregation }\n\
-         a -> b { head: composition }\n",
+        "type class\nclass a \"A\"\nclass b \"B\"\na -> b { head: triangle }\na -> b { head: aggregation }\na -> b { head: composition }\nlayout {\n  place b right-of a\n}\n",
     );
     use crate::style::Head;
     assert_eq!(l.edges[0].style.head, Some(Head::Hollow));
@@ -1345,8 +1241,7 @@ fn a_class_diagram_can_draw_the_three_relations_it_exists_for() {
     // And a mark can be put at the *tail*, which is where UML's diamond
     // belongs: the whole owns the part, not the other way round.
     let tail = build(
-        "type class\nclass a \"A\"\nclass b \"B\" right-of a\n\
-         a -> b { from-head: composition }\n",
+        "type class\nclass a \"A\"\nclass b \"B\"\na -> b { from-head: composition }\nlayout {\n  place b right-of a\n}\n",
     );
     assert_eq!(tail.edges[0].style.from_head, Some(Head::Composed));
 }
@@ -1354,14 +1249,10 @@ fn a_class_diagram_can_draw_the_three_relations_it_exists_for() {
 #[test]
 fn a_bend_rounds_an_elbow_and_a_curve_is_a_polyline_like_everything_else() {
     let square = build(
-        "node a \"A\" at (0, 0) { size: 60 40 }\n\
-         node b \"B\" at (300, 200) { size: 60 40 }\n\
-         a -> b { router: ortho }\n",
+        "node a \"A\" { size: 60 40 }\nnode b \"B\" { size: 60 40 }\na -> b { router: ortho }\nlayout {\n  place a at (0, 0)\n  place b at (300, 200)\n}\n",
     );
     let rounded = build(
-        "node a \"A\" at (0, 0) { size: 60 40 }\n\
-         node b \"B\" at (300, 200) { size: 60 40 }\n\
-         a -> b { router: ortho bend: 16 }\n",
+        "node a \"A\" { size: 60 40 }\nnode b \"B\" { size: 60 40 }\na -> b { router: ortho bend: 16 }\nlayout {\n  place a at (0, 0)\n  place b at (300, 200)\n}\n",
     );
     assert!(
         render_svg::route_all(&rounded)[0].points.len()
@@ -1373,9 +1264,7 @@ fn a_bend_rounds_an_elbow_and_a_curve_is_a_polyline_like_everything_else() {
     // solver, the PDF writer and the JSON export all keep working on the one
     // shape they already understand.
     let curved = build(
-        "node a \"A\" at (0, 0) { size: 60 40 }\n\
-         node b \"B\" at (300, 0) { size: 60 40 }\n\
-         a -> b { router: curved }\n",
+        "node a \"A\" { size: 60 40 }\nnode b \"B\" { size: 60 40 }\na -> b { router: curved }\nlayout {\n  place a at (0, 0)\n  place b at (300, 0)\n}\n",
     );
     let path = &render_svg::route_all(&curved)[0].points;
     assert!(path.len() > 4, "a curve is many points: {}", path.len());
@@ -1422,8 +1311,7 @@ fn a_heading_goes_where_the_file_says() {
     // And it works on a genre that is not a chart, since the whole point is
     // that the question is asked in one place.
     let free = build(
-        "graph { title: \"T\" title-align: center }\n\
-         node a \"A\" at (0, 0)\nnode b \"B\" at (400, 0)\n",
+        "graph { title: \"T\" title-align: center }\nnode a \"A\"\nnode b \"B\"\nlayout {\n  place a at (0, 0)\n  place b at (400, 0)\n}\n",
     );
     let t = free
         .annotations
@@ -1477,16 +1365,7 @@ fn two_ortho_lines_do_not_run_along_each_other() {
     //
     // Three edges, one obstacle they must all get past, and a floor below so
     // the space is genuinely contended.
-    let source = "node a1 \"A1\" at (0, 0) { size: 90 50 }\n\
-                  node a2 \"A2\" at (0, 90) { size: 90 50 }\n\
-                  node a3 \"A3\" at (0, 180) { size: 90 50 }\n\
-                  node wall \"W\" at (220, -60) { size: 90 360 }\n\
-                  node b1 \"B1\" at (440, 0) { size: 90 50 }\n\
-                  node b2 \"B2\" at (440, 90) { size: 90 50 }\n\
-                  node b3 \"B3\" at (440, 180) { size: 90 50 }\n\
-                  node floor \"F\" at (0, 340) { size: 530 40 }\n\
-                  style edge { router: ortho }\n\
-                  a1 -> b1\na2 -> b2\na3 -> b3\n";
+    let source = "node a1 \"A1\" { size: 90 50 }\nnode a2 \"A2\" { size: 90 50 }\nnode a3 \"A3\" { size: 90 50 }\nnode wall \"W\" { size: 90 360 }\nnode b1 \"B1\" { size: 90 50 }\nnode b2 \"B2\" { size: 90 50 }\nnode b3 \"B3\" { size: 90 50 }\nnode floor \"F\" { size: 530 40 }\nstyle edge { router: ortho }\na1 -> b1\na2 -> b2\na3 -> b3\nlayout {\n  place a1 at (0, 0)\n  place a2 at (0, 90)\n  place a3 at (0, 180)\n  place wall at (220, -60)\n  place b1 at (440, 0)\n  place b2 at (440, 90)\n  place b3 at (440, 180)\n  place floor at (0, 340)\n}\n";
     let l = build(source);
     let routes = render_svg::route_all(&l);
 
@@ -1544,9 +1423,7 @@ fn two_lines_between_the_same_pair_do_not_lie_on_each_other() {
     // corridor, and two lines drawn on top of each other are two lines a
     // reader sees as one however they were written.
     let l = build(
-        "node a \"A\" at (0, 0) { size: 60 40 }\n\
-         node b \"B\" at (300, 0) { size: 60 40 }\n\
-         a -> b \"there\"\nb -> a \"back\"\n",
+        "node a \"A\" { size: 60 40 }\nnode b \"B\" { size: 60 40 }\na -> b \"there\"\nb -> a \"back\"\nlayout {\n  place a at (0, 0)\n  place b at (300, 0)\n}\n",
     );
     let routes = render_svg::route_all(&l);
     let mid = |r: &render_svg::Routed| r.points[r.points.len() / 2].1;
@@ -1559,9 +1436,7 @@ fn two_lines_between_the_same_pair_do_not_lie_on_each_other() {
 
     // One line to itself keeps the straight run it always had.
     let alone = build(
-        "node a \"A\" at (0, 0) { size: 60 40 }\n\
-         node b \"B\" at (300, 0) { size: 60 40 }\n\
-         a -> b\n",
+        "node a \"A\" { size: 60 40 }\nnode b \"B\" { size: 60 40 }\na -> b\nlayout {\n  place a at (0, 0)\n  place b at (300, 0)\n}\n",
     );
     assert_eq!(render_svg::route_all(&alone)[0].points.len(), 2);
 }
@@ -1569,10 +1444,7 @@ fn two_lines_between_the_same_pair_do_not_lie_on_each_other() {
 #[test]
 fn duplicate_ortho_lines_get_distinct_interior_channels() {
     let l = build(
-        "node a \"A\" at (0, 0) { size: 60 40 }\n\
-         node b \"B\" at (300, 160) { size: 60 40 }\n\
-         style edge { router: ortho }\n\
-         a -> b\na -> b\n",
+        "node a \"A\" { size: 60 40 }\nnode b \"B\" { size: 60 40 }\nstyle edge { router: ortho }\na -> b\na -> b\nlayout {\n  place a at (0, 0)\n  place b at (300, 160)\n}\n",
     );
     let routes = render_svg::route_all(&l);
     assert_ne!(routes[0].points, routes[1].points);
@@ -1584,10 +1456,7 @@ fn a_line_goes_through_every_place_it_is_told_to() {
     // what lets the list need no separator, since `,` already separates
     // statements.
     let l = build(
-        "node a \"A\" at (0, 0) { size: 80 60 }\n\
-         node b \"B\" at (500, 0) { size: 80 60 }\n\
-         node c \"C\" at (240, 300) { size: 80 60 }\n\
-         a -> b { router: ortho } via (240, 200) (left-of c gap 20)\n",
+        "node a \"A\" { size: 80 60 }\nnode b \"B\" { size: 80 60 }\nnode c \"C\" { size: 80 60 }\na -> b { router: ortho } via (240, 200) (left-of c gap 20)\nlayout {\n  place a at (0, 0)\n  place b at (500, 0)\n  place c at (240, 300)\n}\n",
     );
     let path = &render_svg::route_all(&l)[0].points;
     let near = |p: (f64, f64)| {
@@ -1604,10 +1473,7 @@ fn a_line_goes_through_every_place_it_is_told_to() {
 
     // A grid cell is the third form, and it is free: `at` already reads one.
     let g = build(
-        "graph { grid: 100 50 }\n\
-         node a \"A\" at (0, 0) { size: 40 30 }\n\
-         node b \"B\" at (500, 0) { size: 40 30 }\n\
-         a -> b via (col 3, row 4)\n",
+        "graph { grid: 100 50 }\nnode a \"A\" { size: 40 30 }\nnode b \"B\" { size: 40 30 }\na -> b via (col 3, row 4)\nlayout {\n  place a at (0, 0)\n  place b at (500, 0)\n}\n",
     );
     let path = &render_svg::route_all(&g)[0].points;
     assert!(
@@ -1623,10 +1489,7 @@ fn a_waypoint_is_a_passage_and_the_engine_says_when_it_cannot_be_one() {
     // say when the place he named is inside something — repairing it would
     // move the line he asked for, which is the bargain `X-004` struck.
     let inside = after(
-        "node a \"A\" at (0, 0) { size: 60 40 }\n\
-         node m \"M\" at (200, 0) { size: 100 100 }\n\
-         node b \"B\" at (400, 0) { size: 60 40 }\n\
-         a -> b via (230, 30)\n",
+        "node a \"A\" { size: 60 40 }\nnode m \"M\" { size: 100 100 }\nnode b \"B\" { size: 60 40 }\na -> b via (230, 30)\nlayout {\n  place a at (0, 0)\n  place m at (200, 0)\n  place b at (400, 0)\n}\n",
     );
     assert!(
         inside.iter().any(|m| m.contains("is inside `m`")),
@@ -1635,7 +1498,9 @@ fn a_waypoint_is_a_passage_and_the_engine_says_when_it_cannot_be_one() {
 
     // And an anchor that does not exist is an error, not a line through the
     // origin — the silent no-op `D-005` refuses.
-    let e = err("node a \"A\" at (0, 0)\nnode b \"B\" at (300, 0)\na -> b via (left-of nope)\n");
+    let e = err(
+        "node a \"A\"\nnode b \"B\"\na -> b via (left-of nope)\nlayout {\n  place a at (0, 0)\n  place b at (300, 0)\n}\n",
+    );
     assert!(e.contains("unknown node `nope` in a waypoint"), "{e}");
 }
 
@@ -1645,9 +1510,7 @@ fn an_edge_attaches_where_it_is_told_to() {
     // could say where every box goes and still not stop two heads landing on
     // the same three pixels.
     let l = build(
-        "node a \"A\" at (0, 0) { size: 100 100 }\n\
-         node b \"B\" at (300, 300) { size: 100 100 }\n\
-         a -> b { router: ortho from: bottom to: left }\n",
+        "node a \"A\" { size: 100 100 }\nnode b \"B\" { size: 100 100 }\na -> b { router: ortho from: bottom to: left }\nlayout {\n  place a at (0, 0)\n  place b at (300, 300)\n}\n",
     );
     let path = &render_svg::route_all(&l)[0].points;
     let (a, b) = (l.nodes[0].rect, l.nodes[1].rect);
@@ -1667,9 +1530,7 @@ fn an_edge_attaches_where_it_is_told_to() {
 #[test]
 fn an_edge_can_choose_indexed_ports_on_each_side() {
     let l = build(
-        "node a \"A\" at (0, 0) { size: 100 100 }\n\
-         node b \"B\" at (300, 0) { size: 100 100 }\n\
-         a -> b { from: right 2 of 3 to: left 4 of 4 }\n",
+        "node a \"A\" { size: 100 100 }\nnode b \"B\" { size: 100 100 }\na -> b { from: right 2 of 3 to: left 4 of 4 }\nlayout {\n  place a at (0, 0)\n  place b at (300, 0)\n}\n",
     );
     let path = &render_svg::route_all(&l)[0].points;
     let (a, b) = (l.nodes[0].rect, l.nodes[1].rect);
@@ -1685,10 +1546,7 @@ fn lines_arriving_at_one_side_share_it_instead_of_stacking() {
     // point is what the author reported; two *tails* at one point is the same
     // ambiguity seen from the other end, so both spread.
     let l = build(
-        "node hub \"Hub\" at (400, 0) { size: 120 200 }\n\
-         node p \"P\" at (0, 0) { size: 80 60 }\n\
-         node q \"Q\" at (0, 100) { size: 80 60 }\n\
-         p -> hub\nq -> hub\n",
+        "node hub \"Hub\" { size: 120 200 }\nnode p \"P\" { size: 80 60 }\nnode q \"Q\" { size: 80 60 }\np -> hub\nq -> hub\nlayout {\n  place hub at (400, 0)\n  place p at (0, 0)\n  place q at (0, 100)\n}\n",
     );
     let routes = render_svg::route_all(&l);
     let (first, second) = (
@@ -1704,10 +1562,7 @@ fn lines_arriving_at_one_side_share_it_instead_of_stacking() {
     // head and a tail at one point read perfectly well — so separating them
     // would only bend two lines that were straight.
     let l = build(
-        "node a \"A\" at (0, 0) { size: 80 60 }\n\
-         node m \"M\" at (200, 0) { size: 80 60 }\n\
-         node z \"Z\" at (400, 0) { size: 80 60 }\n\
-         a -> m\nm -> z\n",
+        "node a \"A\" { size: 80 60 }\nnode m \"M\" { size: 80 60 }\nnode z \"Z\" { size: 80 60 }\na -> m\nm -> z\nlayout {\n  place a at (0, 0)\n  place m at (200, 0)\n  place z at (400, 0)\n}\n",
     );
     let routes = render_svg::route_all(&l);
     let into_m = *routes[0].points.last().unwrap();
@@ -1724,10 +1579,7 @@ fn an_attachment_lands_on_the_outline_and_not_on_the_bounding_box() {
     // starts in mid-air — which is what `type network` drew the first time
     // spreading ran.
     let l = build(
-        "node hex \"Hex\" at (0, 0) { size: 200 120 shape: hexagon }\n\
-         node p \"P\" at (400, -80) { size: 80 60 }\n\
-         node q \"Q\" at (400, 80) { size: 80 60 }\n\
-         hex -> p\nhex -> q\n",
+        "node hex \"Hex\" { size: 200 120 shape: hexagon }\nnode p \"P\" { size: 80 60 }\nnode q \"Q\" { size: 80 60 }\nhex -> p\nhex -> q\nlayout {\n  place hex at (0, 0)\n  place p at (400, -80)\n  place q at (400, 80)\n}\n",
     );
     let hexagon = l.nodes[0].rect;
     for route in render_svg::route_all(&l) {
@@ -1752,9 +1604,7 @@ fn a_label_wider_than_its_gap_is_reported_rather_than_repaired() {
     // one — this is the case it cannot escape, and the case that reaches a
     // reader.
     let tight = after(
-        "node a \"A\" at (0, 0) { size: 60 200 }\n\
-         node b \"B\" right-of a gap 20 { size: 60 200 }\n\
-         a -> b \"a rather long transition label\"\n",
+        "node a \"A\" { size: 60 200 }\nnode b \"B\" { size: 60 200 }\na -> b \"a rather long transition label\"\nlayout {\n  place a at (0, 0)\n  place b right-of a gap 20\n}\n",
     );
     assert!(
         tight.iter().any(|m| m.contains("is drawn over")),
@@ -1769,9 +1619,7 @@ fn a_label_wider_than_its_gap_is_reported_rather_than_repaired() {
     // thirty and on none of the other twenty-nine, which is what makes it worth
     // having rather than worth turning off.
     let roomy = after(
-        "node a \"A\" at (0, 0) { size: 60 200 }\n\
-         node b \"B\" right-of a gap 320 { size: 60 200 }\n\
-         a -> b \"a rather long transition label\"\n",
+        "node a \"A\" { size: 60 200 }\nnode b \"B\" { size: 60 200 }\na -> b \"a rather long transition label\"\nlayout {\n  place a at (0, 0)\n  place b right-of a gap 320\n}\n",
     );
     assert_eq!(roomy, Vec::<String>::new());
 }
@@ -1782,8 +1630,7 @@ fn an_ortho_edge_goes_round_the_box_it_used_to_go_through() {
     // — a line drawn straight through `mid` and saying nothing about it — and
     // since `W-105` the router goes over the top instead, so there is nothing
     // left to report. The diagnostic did not become wrong; it became rare.
-    let source = "node a \"A\" at (0, 0)\nnode mid \"in the way\" right-of a gap 40\n\
-                  node b \"B\" right-of mid gap 40\na -> b { router: ortho }";
+    let source = "node a \"A\"\nnode mid \"in the way\"\nnode b \"B\"\na -> b { router: ortho }\nlayout {\n  place a at (0, 0)\n  place mid right-of a gap 40\n  place b right-of mid gap 40\n}";
     assert_eq!(after(source), Vec::<String>::new());
 
     let l = build(source);
@@ -1810,9 +1657,7 @@ fn a_routed_path_is_the_same_every_time_it_is_asked_for() {
     // `HashMap`; the search in `ortho.rs` has integer costs and settles a tie
     // by state index for exactly that reason, and nothing here may reintroduce
     // an unordered container without this failing.
-    let source = "node a \"A\" at (0, 0)\nnode w \"wall\" at (200, -40) { size: 60 200 }\n\
-                  node b \"B\" at (400, 0)\nnode c \"C\" at (400, 300)\n\
-                  a -> b { router: ortho }\na -> c { router: ortho }";
+    let source = "node a \"A\"\nnode w \"wall\" { size: 60 200 }\nnode b \"B\"\nnode c \"C\"\na -> b { router: ortho }\na -> c { router: ortho }\nlayout {\n  place a at (0, 0)\n  place w at (200, -40)\n  place b at (400, 0)\n  place c at (400, 300)\n}";
     let first = render_svg::render(&build(source));
     for _ in 0..8 {
         assert_eq!(render_svg::render(&build(source)), first);
@@ -1820,9 +1665,7 @@ fn a_routed_path_is_the_same_every_time_it_is_asked_for() {
 
     // And the obstacles are read as a set, not a sequence: the same boxes
     // declared in another order give the same line.
-    let swapped = "node a \"A\" at (0, 0)\nnode b \"B\" at (400, 0)\n\
-                   node c \"C\" at (400, 300)\nnode w \"wall\" at (200, -40) { size: 60 200 }\n\
-                   a -> b { router: ortho }\na -> c { router: ortho }";
+    let swapped = "node a \"A\"\nnode b \"B\"\nnode c \"C\"\nnode w \"wall\" { size: 60 200 }\na -> b { router: ortho }\na -> c { router: ortho }\nlayout {\n  place a at (0, 0)\n  place b at (400, 0)\n  place c at (400, 300)\n  place w at (200, -40)\n}";
     let l = build(swapped);
     let path: Vec<_> = render_svg::route_all(&l)[0].points.clone();
     let l0 = build(source);
@@ -1836,13 +1679,18 @@ fn a_route_that_cannot_be_found_keeps_the_elbow_and_says_so() {
     // happens *then*: the old elbow is kept and `check::after_layout` reports
     // the crossing, so the drawing admits it is wrong. Dropping the edge would
     // be a drawing that lies, which is the worse of the two.
-    let mut source = String::from("node a \"A\" at (0, 0)\n");
-    source.push_str("node mid \"in the way\" at (200, 0) { size: 120 60 }\n");
-    source.push_str("node b \"B\" at (500, 0)\n");
+    let mut source = String::from("node a \"A\"\nlayout {\n  place a at (0, 0)\n}\n");
+    source.push_str(
+        "node mid \"in the way\" { size: 120 60 }\nlayout {\n  place mid at (200, 0)\n}\n",
+    );
+    source.push_str("node b \"B\"\nlayout {\n  place b at (500, 0)\n}\n");
     // Well clear of the line from `a` to `b`, so the only box in the way is
     // `mid` and the count is the only thing that changed.
     for i in 0..70 {
-        source.push_str(&format!("node f{i} \"f\" at (0, {})\n", 400 + i * 40));
+        source.push_str(&format!(
+            "node f{i} \"f\"\nlayout {{ place f{i} at (0, {}) }}\n",
+            400 + i * 40
+        ));
     }
     source.push_str("a -> b { router: ortho }\n");
 
@@ -1864,14 +1712,14 @@ fn a_route_that_cannot_be_found_keeps_the_elbow_and_says_so() {
 fn a_clear_ortho_edge_is_silent() {
     // A warning that fired on the ordinary case would be one nobody reads.
     assert!(
-        after("node a \"A\" at (0, 0)\nnode b \"B\" below a gap 90\na -> b { router: ortho }")
+        after("node a \"A\"\nnode b \"B\"\na -> b { router: ortho }\nlayout {\n  place a at (0, 0)\n  place b below a gap 90\n}")
             .is_empty()
     );
 
     // Its own endpoints are not obstacles: an edge leaves one box and enters
     // another by definition.
     assert!(
-        after("node a \"A\" at (0, 0)\nnode b \"B\" right-of a\na -> b { router: ortho }")
+        after("node a \"A\"\nnode b \"B\"\na -> b { router: ortho }\nlayout {\n  place a at (0, 0)\n  place b right-of a\n}")
             .is_empty()
     );
 }
@@ -1881,8 +1729,7 @@ fn a_straight_edge_is_not_asked_about_obstacles() {
     // It is clipped against both shapes and, being straight, crossing a third
     // box is a placement the author chose rather than a router's decision.
     let found = after(
-        "node a \"A\" at (0, 0)\nnode mid \"in the way\" right-of a gap 40\n\
-         node b \"B\" right-of mid gap 40\na -> b",
+        "node a \"A\"\nnode mid \"in the way\"\nnode b \"B\"\na -> b\nlayout {\n  place a at (0, 0)\n  place mid right-of a gap 40\n  place b right-of mid gap 40\n}",
     );
     assert!(found.is_empty(), "{found:?}");
 }
@@ -2891,9 +2738,7 @@ fn a_tree_reports_what_stops_it_being_one() {
 // ---------------------------------------------------------------------- W-045
 
 #[cfg(test)]
-const LOOM: &str = "type harness\n\
-     connector j1 \"J1\" {\n  - 1: +12V\n  - 2: GND\n}\n\
-     connector j2 \"J2\" right-of j1 {\n  - 1: VCC\n  - 2: RETURN\n}\n";
+const LOOM: &str = "type harness\nconnector j1 \"J1\" {\n  - 1: +12V\n  - 2: GND\n}\nconnector j2 \"J2\" {\n  - 1: VCC\n  - 2: RETURN\n}\nlayout {\n  place j2 right-of j1\n}\n";
 
 #[test]
 fn a_wire_lands_on_the_pin_it_names() {
@@ -3031,10 +2876,7 @@ fn a_role_picks_the_outline_and_leaves_the_palette_alone() {
     // environment, tenancy, trust zone — so the archetype chooses the shape
     // and keeps out of the fill.
     let l = build(
-        "type network\n\
-         host r \"R\" router\n\
-         host s \"S\" storage right-of r\n\
-         host c \"C\" cloud right-of s\n",
+        "type network\nhost r \"R\" router\nhost s \"S\" storage\nhost c \"C\" cloud\nlayout {\n  place s right-of r\n  place c right-of s\n}\n",
     );
     assert_eq!(l.nodes[0].style.shape, Some(Shape::Diamond));
     assert_eq!(l.nodes[1].style.shape, Some(Shape::Cylinder));
@@ -3049,8 +2891,7 @@ fn a_role_picks_the_outline_and_leaves_the_palette_alone() {
 fn an_address_is_a_line_of_the_box_and_a_speed_a_line_of_the_link() {
     // Declared and never drawn would be worse than refused.
     let l = build(
-        "type network\nhost a \"A\" server { addr: \"10.0.0.1\" }\n\
-         host b \"B\" server right-of a\na -> b \"trunk\" \"10 GbE\"\n",
+        "type network\nhost a \"A\" server { addr: \"10.0.0.1\" }\nhost b \"B\" server\na -> b \"trunk\" \"10 GbE\"\nlayout {\n  place b right-of a\n}\n",
     );
     assert_eq!(l.nodes[0].lines, vec!["A", "10.0.0.1"]);
     assert_eq!(l.edges[0].label.as_deref(), Some("trunk\n[10 GbE]"));
@@ -3060,8 +2901,7 @@ fn an_address_is_a_line_of_the_box_and_a_speed_a_line_of_the_link() {
 fn an_unreachable_host_is_reported() {
     // Either a mistake or a fact the diagram is failing to state.
     let d = diags(
-        "type network\nhost a \"A\" server\nhost b \"B\" server right-of a\n\
-         host lost \"Lost\" server below a\na -> b\n",
+        "type network\nhost a \"A\" server\nhost b \"B\" server\nhost lost \"Lost\" server\na -> b\nlayout {\n  place b right-of a\n  place lost below a\n}\n",
     );
     assert!(
         d.iter()
@@ -3071,8 +2911,7 @@ fn an_unreachable_host_is_reported() {
 
     // A host inside a segment is attached by being there.
     let d = diags(
-        "type network\ngroup dmz \"DMZ\" {\n  host a \"A\" server\n}\n\
-         host b \"B\" server right-of a\na -> b\n",
+        "type network\ngroup dmz \"DMZ\" {\n  host a \"A\" server\n}\nhost b \"B\" server\na -> b\nlayout {\n  place b right-of a\n}\n",
     );
     assert!(!d.iter().any(|x| x.message.contains("on no link")), "{d:?}");
 }
@@ -4330,9 +4169,12 @@ fn the_tree_sitter_grammar_agrees_with_pest() {
 fn a_self_loop_is_drawn_above_its_node() {
     let l = build(
         r#"
-        node a "A" at (0, 0) { size: 100 60 }
+        node a "A" { size: 100 60 }
         a -> a "retry"
-    "#,
+
+layout {
+  place a at (0, 0)
+}"#,
     );
     let svg = render_svg::render(&l);
 
@@ -4362,13 +4204,19 @@ fn an_edge_label_steps_off_a_line_it_would_sit_on() {
     // midpoint, so the label cannot stay there.
     let l = build(
         r#"
-        node a at (0, 0) { size: 60 60 }
-        node b at (200, 0) { size: 60 60 }
-        node c at (120, -120) { size: 20 20 }
-        node d at (120, 120) { size: 20 20 }
+        node a { size: 60 60 }
+        node b { size: 60 60 }
+        node c { size: 20 20 }
+        node d { size: 20 20 }
         a -> b "on the crossing"
         c -> d
-    "#,
+
+layout {
+  place a at (0, 0)
+  place b at (200, 0)
+  place c at (120, -120)
+  place d at (120, 120)
+}"#,
     );
     let svg = render_svg::render(&l);
 
@@ -4841,8 +4689,12 @@ fn a_group_is_sized_by_its_members() {
         r#"
         group box "Box" {
           padding: 10
-          node a at (0, 0) { size: 50 40 }
-          node b at (100, 60) { size: 50 40 }
+          node a { size: 50 40 }
+          node b { size: 50 40 }
+        layout {
+          place a at (0, 0)
+          place b at (100, 60)
+        }
         }
     "#,
     );
@@ -4858,7 +4710,9 @@ fn a_group_is_sized_by_its_members() {
 
     // Untitled, the band is not reserved: the size is the members plus the
     // padding and nothing else.
-    let bare = build("group box {\n  padding: 10\n  node a at (0, 0) { size: 50 40 }\n}");
+    let bare = build(
+        "group box {\n  padding: 10\n  node a { size: 50 40 }\nlayout {\n  place a at (0, 0)\n}\n}",
+    );
     let r = bare.groups[0].rect;
     assert_eq!((r.x, r.y, r.w, r.h), (-10.0, -10.0, 70.0, 60.0));
 }
@@ -4869,11 +4723,17 @@ fn groups_nest() {
         r#"
         group outer {
           padding: 10
-          node a at (0, 0) { size: 20 20 }
+          node a { size: 20 20 }
           group inner {
             padding: 5
-            node b at (100, 0) { size: 20 20 }
+            node b { size: 20 20 }
+          layout {
+            place b at (100, 0)
           }
+          }
+        layout {
+          place a at (0, 0)
+        }
         }
     "#,
     );
@@ -4900,10 +4760,16 @@ fn a_group_can_be_anchored_to() {
         r#"
         group cluster {
           padding: 10
-          node a at (0, 0) { size: 40 40 }
+          node a { size: 40 40 }
+        layout {
+          place a at (0, 0)
         }
-        node after right-of cluster gap 20 { size: 30 30 }
-    "#,
+        }
+        node after { size: 30 30 }
+
+layout {
+  place after right-of cluster gap 20
+}"#,
     );
 
     // The frame spans -10..50; `after` starts a gap beyond its right edge.
@@ -4915,13 +4781,21 @@ fn a_group_can_be_anchored_to() {
 fn a_placed_group_translates_its_whole_subtree() {
     let l = build(
         r#"
-        node origin at (0, 0) { size: 10 10 }
-        group moved at (200, 100) {
+        node origin { size: 10 10 }
+        group moved {
           padding: 0
-          node a at (0, 0) { size: 40 40 }
-          node b right-of a gap 10 { size: 40 40 }
+          node a { size: 40 40 }
+          node b { size: 40 40 }
+        layout {
+          place a at (0, 0)
+          place b right-of a gap 10
         }
-    "#,
+        }
+
+layout {
+  place origin at (0, 0)
+  place moved at (200, 100)
+}"#,
     );
 
     let frame = l.groups[0].rect;
@@ -4936,13 +4810,16 @@ fn an_unplaced_node_flows_from_its_sibling_not_the_previous_line() {
     let l = build(
         r#"
         graph { gap: 10 }
-        node outside at (0, 0) { size: 20 20 }
+        node outside { size: 20 20 }
         group g {
           padding: 0
           node first { size: 20 20 }
           node second { size: 20 20 }
         }
-    "#,
+
+layout {
+  place outside at (0, 0)
+}"#,
     );
 
     // `first` is the first declaration inside `g`, so it starts the group's
@@ -4955,12 +4832,15 @@ fn an_unplaced_node_flows_from_its_sibling_not_the_previous_line() {
 fn cycle_check_uses_the_same_scoped_flow_as_the_solver() {
     let l = build(
         r#"
-        node outside right-of first { size: 20 20 }
+        node outside { size: 20 20 }
         group g {
           padding: 0
           node first { size: 20 20 }
         }
-    "#,
+
+layout {
+  place outside right-of first
+}"#,
     );
 
     assert_eq!(l.nodes[1].rect.x, 0.0);
@@ -4994,7 +4874,7 @@ fn an_empty_group_says_so() {
 #[test]
 fn a_group_cycle_is_reported() {
     // The frame cannot be placed relative to something it encloses.
-    let diagnostics = diags("group g right-of a {\n node a\n}");
+    let diagnostics = diags("group g {\n node a\n}\nlayout {\n  place g right-of a\n}");
     assert!(
         diagnostics
             .iter()
@@ -5006,7 +4886,7 @@ fn a_group_cycle_is_reported() {
 #[test]
 fn a_group_is_drawn_behind_what_it_encloses() {
     let svg = render_svg::render(&build(
-        "group g \"G\" {\n node a \"A\" at (0,0) { size: 40 40 }\n}",
+        "group g \"G\" {\n node a \"A\" { size: 40 40 }\nlayout {\n  place a at (0,0)\n}\n}",
     ));
     let frame = svg.find("rx=\"10\"").expect("the frame is drawn");
     let node = svg.find("rx=\"8\"").expect("the node is drawn");
@@ -6002,10 +5882,14 @@ fn a_state_machine_keeps_its_declared_placement() {
     let l = build(
         r#"
         type state
-        state a "A" at (0, 0) { size: 60 40 }
-        state b "B" right-of a gap 30 { size: 60 40 }
+        state a "A" { size: 60 40 }
+        state b "B" { size: 60 40 }
         a -> b
-    "#,
+
+layout {
+  place a at (0, 0)
+  place b right-of a gap 30
+}"#,
     );
     assert_eq!(l.nodes[0].rect.x, 0.0);
     assert_eq!(l.nodes[1].rect.x, 90.0);
@@ -6018,13 +5902,18 @@ fn pseudo_states_are_marks_rather_than_boxes() {
         r#"
         type state
         state begin { kind: initial }
-        state s "S" right-of begin
-        state stop { kind: final } right-of s
-        state pick { kind: choice } below s
+        state s "S"
+        state stop { kind: final }
+        state pick { kind: choice }
         begin -> s
         s -> stop
         s -> pick
-    "#,
+
+layout {
+  place s right-of begin
+  place stop right-of s
+  place pick below s
+}"#,
     );
 
     assert_eq!(l.nodes[0].style.shape, Some(Shape::Ellipse));
@@ -6046,13 +5935,18 @@ fn a_guard_reads_in_brackets_after_the_label() {
         r#"
         type state
         state a
-        state b right-of a
+        state b
         a -> b "pay" { guard: "funds cleared" }
-    "#,
+
+layout {
+  place b right-of a
+}"#,
     );
     assert_eq!(l.edges[0].label.as_deref(), Some("pay [funds cleared]"));
 
-    let l = build("type state\nstate a\nstate b right-of a\na -> b { guard: \"ready\" }");
+    let l = build(
+        "type state\nstate a\nstate b\na -> b { guard: \"ready\" }\nlayout {\n  place b right-of a\n}",
+    );
     assert_eq!(l.edges[0].label.as_deref(), Some("[ready]"));
 }
 
@@ -6064,7 +5958,7 @@ fn a_machine_reports_what_cannot_happen() {
     let e = err("type state\nstate stop { kind: final }\nstate s\nstop -> s");
     assert!(e.contains("nothing transitions out of it"), "{e}");
 
-    let d = diags("type state\nstate a\nstate b right-of a\na -> b");
+    let d = diags("type state\nstate a\nstate b\na -> b\nlayout {\n  place b right-of a\n}");
     assert!(
         d.iter().any(|x| x.message.contains("no `kind: initial`")),
         "{d:?}"
@@ -6078,12 +5972,10 @@ fn a_machine_reports_what_cannot_happen() {
 }
 
 #[test]
-fn a_block_and_a_placement_may_come_in_either_order() {
-    // `state stop { kind: final } right-of done` reads as naturally as the
-    // other way round, and `{` cannot be mistaken for a placement keyword.
+fn declarations_and_layout_may_come_in_either_order() {
     for source in [
-        "node a at (0, 0) { fill: #fff }",
-        "node a { fill: #fff } at (0, 0)",
+        "layout { place a at (0, 0) }\nnode a { fill: #fff }",
+        "node a { fill: #fff }\nlayout { place a at (0, 0) }",
     ] {
         let l = build(source);
         assert_eq!(l.nodes[0].rect.x, 0.0, "{source}");
@@ -6097,10 +5989,14 @@ fn a_label_prefers_clipping_a_node_to_leaving_its_edge() {
     // labels three rows away, where they read as belonging to something else.
     let l = build(
         r#"
-        node a "A" at (0, 0) { size: 100 40 }
-        node b "B" at (130, 0) { size: 100 40 }
+        node a "A" { size: 100 40 }
+        node b "B" { size: 100 40 }
         a -> b "a long-ish label"
-    "#,
+
+layout {
+  place a at (0, 0)
+  place b at (130, 0)
+}"#,
     );
 
     let svg = render_svg::render(&l);
@@ -6151,13 +6047,19 @@ fn a_declared_offset_pins_the_edge_label_where_it_says() {
     let crossing = |extra: &str| {
         format!(
             r#"
-            node a at (0, 0) {{ size: 60 60 }}
-            node b at (200, 0) {{ size: 60 60 }}
-            node c at (120, -120) {{ size: 20 20 }}
-            node d at (120, 120) {{ size: 20 20 }}
+            node a {{ size: 60 60 }}
+            node b {{ size: 60 60 }}
+            node c {{ size: 20 20 }}
+            node d {{ size: 20 20 }}
             a -> b "on the crossing" {{ {extra} }}
             c -> d
-        "#
+
+layout {{
+  place a at (0, 0)
+  place b at (200, 0)
+  place c at (120, -120)
+  place d at (120, 120)
+}}"#
         )
     };
 
@@ -6187,13 +6089,19 @@ fn a_moved_edge_label_still_pushes_the_next_one_out_of_the_way() {
     // placement has to see it there and go elsewhere.
     let l = build(
         r#"
-        node a at (0, 0) { size: 40 40 }
-        node b at (240, 0) { size: 40 40 }
-        node c at (0, 100) { size: 40 40 }
-        node d at (240, 100) { size: 40 40 }
+        node a { size: 40 40 }
+        node b { size: 40 40 }
+        node c { size: 40 40 }
+        node d { size: 40 40 }
         a -> b "first" { label-offset: 0 100 }
         c -> d "second"
-    "#,
+
+layout {
+  place a at (0, 0)
+  place b at (240, 0)
+  place c at (0, 100)
+  place d at (240, 100)
+}"#,
     );
 
     let centres = plate_centres(&render_svg::render(&l));
@@ -6215,8 +6123,11 @@ fn a_moved_node_label_takes_the_canvas_with_it() {
         format!(
             r#"
             graph {{ padding: 0 }}
-            node store "PostgreSQL" at (0, 0) {{ size: 60 40 {extra} }}
-        "#
+            node store "PostgreSQL" {{ size: 60 40 {extra} }}
+
+layout {{
+  place store at (0, 0)
+}}"#
         )
     };
 
@@ -6250,10 +6161,14 @@ fn a_label_offset_cascades_like_any_other_property() {
     let l = build(
         r#"
         style nudged { label-offset: 12 -4 }
-        node a "A" .nudged at (0, 0)
-        node b "B" at (200, 0)
+        node a "A" .nudged
+        node b "B"
         a -> b "edge" .nudged
-    "#,
+
+layout {
+  place a at (0, 0)
+  place b at (200, 0)
+}"#,
     );
 
     assert_eq!(l.nodes[0].style.label_offset, Some((12.0, -4.0)));
@@ -6300,7 +6215,7 @@ fn properties_may_still_share_a_line() {
 #[test]
 fn a_negative_number_is_not_a_member() {
     // The space after the marker is what keeps `-40` a coordinate.
-    let l = build("node a at (-40, -20) { size: 10 10 }");
+    let l = build("node a { size: 10 10 }\nlayout {\n  place a at (-40, -20)\n}");
     assert_eq!((l.nodes[0].rect.x, l.nodes[0].rect.y), (-40.0, -20.0));
 }
 
@@ -6391,7 +6306,7 @@ fn durations_carry_their_unit() {
 
 #[test]
 fn a_negative_number_is_not_a_date() {
-    let l = build("node a at (-40, -20) { size: 10 10 }");
+    let l = build("node a { size: 10 10 }\nlayout {\n  place a at (-40, -20)\n}");
     assert_eq!((l.nodes[0].rect.x, l.nodes[0].rect.y), (-40.0, -20.0));
 }
 
@@ -6716,10 +6631,16 @@ fn hostile_corpus() -> Vec<(&'static str, String)> {
         ),
         (
             "anchor cycle",
-            "node a right-of b\nnode b right-of a".into(),
+            "node a\nnode b\nlayout {\n  place a right-of b\n  place b right-of a\n}".into(),
         ),
-        ("self anchor", "node a right-of a".into()),
-        ("unknown anchor", "node a right-of nowhere".into()),
+        (
+            "self anchor",
+            "node a\nlayout {\n  place a right-of a\n}".into(),
+        ),
+        (
+            "unknown anchor",
+            "node a\nlayout {\n  place a right-of nowhere\n}".into(),
+        ),
         ("duplicate ids", "node a\nnode a".into()),
         ("edge to nothing", "a -> b".into()),
         ("negative geometry", "node a { size: -10 -10 }".into()),
@@ -6772,7 +6693,12 @@ fn hostile_corpus() -> Vec<(&'static str, String)> {
     cases.push((
         "chain of anchors",
         std::iter::once("node n0\n".to_string())
-            .chain((1..2_000).map(|i| format!("node n{i} right-of n{}\n", i - 1)))
+            .chain((1..2_000).map(|i| {
+                format!(
+                    "node n{i}\nlayout {{\n  place n{i} right-of n{}\n}}\n",
+                    i - 1
+                )
+            }))
             .collect(),
     ));
     for depth in [MAX_NESTING - 1, MAX_NESTING, MAX_NESTING + 1, 5_000] {
@@ -6999,8 +6925,11 @@ const ER: &str = r#"type er
 entity customer "Customer" {
   - id: uuid
 }
-entity order "Order" right-of customer {
+entity order "Order" {
   - id: uuid
+}
+layout {
+  place order right-of customer
 }
 "#;
 
@@ -7171,7 +7100,7 @@ fn a_block_draws_its_name_technology_and_description_as_separate_lines() {
 fn a_relation_carries_its_protocol_on_its_own_line() {
     // Declared and never drawn would be worse than refused.
     let l = build(
-        "type block\nblock a \"A\"\nblock b \"B\" right-of a\na -> b \"calls\" { tech: \"gRPC\" }",
+        "type block\nblock a \"A\"\nblock b \"B\"\na -> b \"calls\" { tech: \"gRPC\" }\nlayout {\n  place b right-of a\n}",
     );
     assert_eq!(l.edges[0].label.as_deref(), Some("calls\n[gRPC]"));
 }
@@ -7620,11 +7549,11 @@ fn png_snapshot_fixtures() -> [(&'static str, &'static str); 3] {
     [
         (
             "shapes",
-            "node a \"\" at (0, 0) { shape: cylinder size: 100 60 }\nnode b \"\" right-of a { shape: hexagon size: 100 60 }\na -> b { router: ortho }\n",
+            "node a \"\" { shape: cylinder size: 100 60 }\nnode b \"\" { shape: hexagon size: 100 60 }\na -> b { router: ortho }\nlayout {\n  place a at (0, 0)\n  place b right-of a\n}\n",
         ),
         (
             "labels",
-            "node api \"Public API\" at (0, 0) { size: 130 64 }\nnode queue \"Job queue\" right-of api gap 80\napi -> queue \"enqueue request\" { router: ortho }\n",
+            "node api \"Public API\" { size: 130 64 }\nnode queue \"Job queue\"\napi -> queue \"enqueue request\" { router: ortho }\nlayout {\n  place api at (0, 0)\n  place queue right-of api gap 80\n}\n",
         ),
         (
             "charts",
@@ -7954,7 +7883,10 @@ fn the_diagram_title_sits_above_every_box() {
     let l = build(
         r#"graph { title: "Heading" }
            node a "A"
-           node b "B" below a"#,
+           node b "B"
+layout {
+  place b below a
+}"#,
     );
     let top = l.nodes.iter().map(|n| n.rect.y).fold(f64::MAX, f64::min);
     let heading = l
@@ -8245,7 +8177,11 @@ fn one_broken_file_does_not_stop_the_others() {
     // Taking the loop down with it would end the session.
     let dir = scratch("build-broken");
     std::fs::write(dir.join("good.bd"), "node a \"A\"\n").unwrap();
-    std::fs::write(dir.join("bad.bd"), "node a \"A\" right-of ghost\n").unwrap();
+    std::fs::write(
+        dir.join("bad.bd"),
+        "node a \"A\"\nlayout {\n  place a right-of ghost\n}\n",
+    )
+    .unwrap();
 
     let outcome = crate::watch::build_dir(&dir, None, true);
 
@@ -8324,7 +8260,7 @@ fn the_raster_is_the_same_picture_as_the_vector() {
     // One renderer, two encodings. A raster drawn by its own path would be a
     // second renderer, and the two would drift the way a preview and an
     // export always do when they are drawn separately.
-    let l = build("node a \"A\"\nnode b \"B\" right-of a\na -> b");
+    let l = build("node a \"A\"\nnode b \"B\"\na -> b\nlayout {\n  place b right-of a\n}");
     let (_, _, w, h) = crate::render_svg::canvas(&l);
 
     let png = crate::render_png::render(&l, 1.0).expect("a raster");
@@ -8385,9 +8321,9 @@ fn the_json_geometry_is_in_the_same_space_as_the_svg() {
     // The whole reason the export is worth having. Emitting the layout's own
     // untranslated coordinates would hand every consumer the same
     // off-by-a-padding bug to find on their own.
-    let l = build("node a \"A\"\nnode b \"B\" right-of a\na -> b");
+    let l = build("node a \"A\"\nnode b \"B\"\na -> b\nlayout {\n  place b right-of a\n}");
     let (dx, dy, _, _) = crate::render_svg::canvas(&l);
-    let json = geometry("node a \"A\"\nnode b \"B\" right-of a\na -> b");
+    let json = geometry("node a \"A\"\nnode b \"B\"\na -> b\nlayout {\n  place b right-of a\n}");
 
     let node = json["nodes"]
         .as_array()
@@ -8402,8 +8338,9 @@ fn the_json_geometry_is_in_the_same_space_as_the_svg() {
 
 #[test]
 fn the_json_layout_names_residual_label_conflicts() {
-    let json =
-        geometry("node a \"A\" at (0, 0)\nnode b \"B\" right-of a\na -> b \"one\"\nb -> a \"two\"");
+    let json = geometry(
+        "node a \"A\"\nnode b \"B\"\na -> b \"one\"\nb -> a \"two\"\nlayout {\n  place a at (0, 0)\n  place b right-of a\n}",
+    );
     assert!(json["label_conflicts"].is_array(), "{json}");
     for conflict in json["label_conflicts"].as_array().unwrap() {
         assert!(conflict["kind"].is_string(), "{conflict}");
@@ -8417,10 +8354,16 @@ fn every_box_the_author_named_is_addressable() {
     let json = geometry(
         r#"group core "Core" {
              node api "API"
-             node db "DB" below api
+             node db "DB"
+           layout {
+             place db below api
            }
-           node ui "UI" right-of core
-           api -> db"#,
+           }
+           node ui "UI"
+           api -> db
+layout {
+  place ui right-of core
+}"#,
     );
 
     let ids: Vec<&str> = json["nodes"]
@@ -8453,8 +8396,11 @@ fn an_edge_carries_its_elbows_and_not_just_its_ends() {
     // orthogonal edge would be drawing a different diagram.
     let json = geometry(
         r#"node a "A"
-           node b "B" below a
-           a -> b { router: ortho }"#,
+           node b "B"
+           a -> b { router: ortho }
+layout {
+  place b below a
+}"#,
     );
     let points = json["edges"][0]["points"].as_array().unwrap();
     assert!(
@@ -8476,9 +8422,9 @@ fn the_export_declares_its_schema_version() {
 
 #[test]
 fn the_canvas_in_the_export_is_the_canvas_in_the_svg() {
-    let l = build("node a \"A\"\nnode b \"B\" right-of a");
+    let l = build("node a \"A\"\nnode b \"B\"\nlayout {\n  place b right-of a\n}");
     let (_, _, w, h) = crate::render_svg::canvas(&l);
-    let json = geometry("node a \"A\"\nnode b \"B\" right-of a");
+    let json = geometry("node a \"A\"\nnode b \"B\"\nlayout {\n  place b right-of a\n}");
 
     assert_eq!(json["canvas"]["width"].as_f64().unwrap(), w);
     assert_eq!(json["canvas"]["height"].as_f64().unwrap(), h);
@@ -9145,8 +9091,12 @@ fn a_grid_cell_is_an_absolute_position_in_declared_units() {
     // still `at`, which is why it cannot break `D-001`.
     let l = build(
         r#"graph { grid: 160 90 }
-           node a "A" at (col 0, row 0)
-           node b "B" at (col 2, row 1)"#,
+           node a "A"
+           node b "B"
+layout {
+  place a at (col 0, row 0)
+  place b at (col 2, row 1)
+}"#,
     );
     assert_eq!((l.nodes[0].rect.x, l.nodes[0].rect.y), (0.0, 0.0));
     assert_eq!((l.nodes[1].rect.x, l.nodes[1].rect.y), (320.0, 90.0));
@@ -9156,7 +9106,10 @@ fn a_grid_cell_is_an_absolute_position_in_declared_units() {
 fn one_grid_number_is_a_square_cell() {
     let l = build(
         r#"graph { grid: 120 }
-           node a "A" at (col 1, row 1)"#,
+           node a "A"
+layout {
+  place a at (col 1, row 1)
+}"#,
     );
     assert_eq!((l.nodes[0].rect.x, l.nodes[0].rect.y), (120.0, 120.0));
 }
@@ -9165,8 +9118,12 @@ fn one_grid_number_is_a_square_cell() {
 fn bounded_grid_uses_track_gaps_as_placement_units() {
     let l = build(
         r#"graph { grid: 4 3 20 30 }
-           node a "A" at (0, 0) { size: 100 80 }
-           node b "B" at (2, 1) { size: 60 40 }"#,
+           node a "A" { size: 100 80 }
+           node b "B" { size: 60 40 }
+layout {
+  place a at (0, 0)
+  place b at (2, 1)
+}"#,
     );
     // The largest node defines the deterministic track size: 100+20 by
     // 80+30. `at` values are cells in bounded-grid mode.
@@ -9177,8 +9134,12 @@ fn bounded_grid_uses_track_gaps_as_placement_units() {
 fn relative_placement_uses_the_nearest_grid_cell() {
     let l = build(
         r#"graph { grid: 4 3 20 30 }
-           node a "A" at (1, 1) { size: 100 80 }
-           node b "B" right-of a gap 1 { size: 60 40 }"#,
+           node a "A" { size: 100 80 }
+           node b "B" { size: 60 40 }
+layout {
+  place a at (1, 1)
+  place b right-of a gap 1
+}"#,
     );
     assert_eq!((l.nodes[1].rect.x, l.nodes[1].rect.y), (340.0, 130.0));
 }
@@ -9201,7 +9162,10 @@ fn a_box_in_pixels_is_untouched_by_the_grid() {
     // position would be exactly the solver `D-001` refuses.
     let l = build(
         r#"graph { grid: 160 90 }
-           node a "A" at (37, 41)"#,
+           node a "A"
+layout {
+  place a at (37, 41)
+}"#,
     );
     assert_eq!((l.nodes[0].rect.x, l.nodes[0].rect.y), (37.0, 41.0));
 }
@@ -9214,9 +9178,13 @@ fn same_width_resizes_before_placement_so_nothing_overlaps() {
     // how to lay out boxes of a given size.
     let l = build(
         r#"node a "A"
-           node b "A much longer label" right-of a gap 40
-           node c "C" right-of b gap 40
-           layout { equal-width a b c }"#,
+           node b "A much longer label"
+           node c "C"
+           layout { equal-width a b c }
+layout {
+  place b right-of a gap 40
+  place c right-of b gap 40
+}"#,
     );
     let widths: Vec<f64> = l.nodes.iter().map(|n| n.rect.w).collect();
     assert!(
@@ -9239,8 +9207,11 @@ fn the_largest_wins_a_size_constraint() {
     // constraint that makes text unreadable is worse than no constraint.
     let l = build(
         r#"node a "A"
-           node b "A much longer label" below a
-           layout { equal-width a b }"#,
+           node b "A much longer label"
+           layout { equal-width a b }
+layout {
+  place b below a
+}"#,
     );
     assert!(l.nodes[0].rect.w > 100.0, "the short box was not widened");
 }
@@ -9411,10 +9382,14 @@ fn a_note_anchored_to_nothing_is_left_out_rather_than_drawn_at_the_origin() {
 fn a_note_follows_a_box_a_constraint_moved() {
     // Solved last, against the boxes as they finally sit.
     let l = build(
-        r#"node a "A" at (0, 0) { size: 80 40 }
-           node b "B" right-of a gap 120 align bottom { size: 80 80 }
+        r#"node a "A" { size: 80 40 }
+           node b "B" { size: 80 80 }
            layout { align top a b }
-           note "Beside B." right-of b gap 20"#,
+           note "Beside B." right-of b gap 20
+layout {
+  place a at (0, 0)
+  place b right-of a gap 120
+}"#,
     );
     let b = l.nodes[1].rect;
     let note = l
@@ -9481,8 +9456,11 @@ fn a_legend_lists_only_the_classes_that_asked_to_be_in_it() {
            style down    { fill: #fee2e2 stroke: #dc2626 legend: "Down" }
            style plain   { radius: 2 }
            node a "A" .healthy
-           node b "B" .down below a
-           legend right-of a gap 40"#,
+           node b "B" .down
+           legend right-of a gap 40
+layout {
+  place b below a
+}"#,
     );
     let texts: Vec<&str> = l.annotations.iter().map(|a| a.text.as_str()).collect();
     assert!(texts.contains(&"Healthy"), "{texts:?}");
@@ -9740,8 +9718,8 @@ fn diff_of(before: &str, after: &str) -> Layout {
 #[test]
 fn an_added_box_is_green_and_a_removed_one_is_red() {
     let l = diff_of(
-        "node a \"A\"\nnode gone \"Gone\" right-of a",
-        "node a \"A\"\nnode fresh \"Fresh\" right-of a",
+        "node a \"A\"\nnode gone \"Gone\"\nlayout {\n  place gone right-of a\n}",
+        "node a \"A\"\nnode fresh \"Fresh\"\nlayout {\n  place fresh right-of a\n}",
     );
     let fresh = l.nodes.iter().find(|n| n.lines == ["Fresh"]).unwrap();
     let gone = l.nodes.iter().find(|n| n.lines == ["Gone"]).unwrap();
@@ -9755,8 +9733,8 @@ fn a_removed_box_goes_below_rather_than_under_what_replaced_it() {
     // the space, and the two labels then sat on top of each other — the test
     // render read "Qaeuhee". A gutter never collides.
     let l = diff_of(
-        "node a \"A\"\nnode cache \"Cache\" right-of a",
-        "node a \"A\"\nnode queue \"Queue\" right-of a",
+        "node a \"A\"\nnode cache \"Cache\"\nlayout {\n  place cache right-of a\n}",
+        "node a \"A\"\nnode queue \"Queue\"\nlayout {\n  place queue right-of a\n}",
     );
     let queue = l.nodes.iter().find(|n| n.lines == ["Queue"]).unwrap();
     let cache = l.nodes.iter().find(|n| n.lines == ["Cache"]).unwrap();
@@ -9770,8 +9748,8 @@ fn a_removed_box_goes_below_rather_than_under_what_replaced_it() {
 fn a_moved_box_keeps_a_ghost_of_where_it_was() {
     // The pair is what says "moved" — either alone reads as removed or added.
     let l = diff_of(
-        "node a \"A\"\nnode b \"B\" below a gap 40",
-        "node a \"A\"\nnode b \"B\" below a gap 120",
+        "node a \"A\"\nnode b \"B\"\nlayout {\n  place b below a gap 40\n}",
+        "node a \"A\"\nnode b \"B\"\nlayout {\n  place b below a gap 120\n}",
     );
     let b = l.nodes.iter().find(|n| n.lines == ["B"]).unwrap();
     assert_eq!(b.style.stroke.as_deref(), Some("#d97706"));
@@ -9785,7 +9763,7 @@ fn a_moved_box_keeps_a_ghost_of_where_it_was() {
 
 #[test]
 fn an_unchanged_diagram_shows_nothing_but_itself() {
-    let source = "node a \"A\"\nnode b \"B\" right-of a\na -> b";
+    let source = "node a \"A\"\nnode b \"B\"\na -> b\nlayout {\n  place b right-of a\n}";
     let l = diff_of(source, source);
     assert!(
         l.nodes
@@ -9800,8 +9778,8 @@ fn a_box_nudged_by_a_neighbours_label_is_not_called_moved() {
     // Half a pixel, not zero: reporting every fractional shift would make
     // each diff say everything moved, and nobody reads a diff like that.
     let l = diff_of(
-        "node a \"A\"\nnode b \"B\" right-of a",
-        "node a \"A\"\nnode b \"B\" right-of a",
+        "node a \"A\"\nnode b \"B\"\nlayout {\n  place b right-of a\n}",
+        "node a \"A\"\nnode b \"B\"\nlayout {\n  place b right-of a\n}",
     );
     assert!(
         !l.nodes
@@ -10989,8 +10967,8 @@ fn the_server_does_not_underline_a_name_borrowed_from_another_file() {
     assert!(
         alone.iter().any(|d| d["message"]
             .as_str()
-            .is_some_and(|m| m.contains("core.api"))),
-        "the buffer on its own really is invalid, which is the whole point"
+            .is_some_and(|m| m.contains("render_file"))),
+        "text-only analysis must report the missing file context"
     );
 
     let composed = crate::lsp::diagnostics_for(text, Some(&entry));
@@ -11004,8 +10982,7 @@ fn the_server_does_not_underline_a_name_borrowed_from_another_file() {
 
 #[test]
 fn a_problem_in_an_included_file_is_not_reported_against_this_one() {
-    // LSP publishes per document. A diagnostic from another file shown here
-    // would underline the wrong line of the wrong buffer.
+    // The include carries a relay; the child range belongs in relatedInformation.
     let dir = scratch("lsp-include-other");
     std::fs::write(dir.join("core.bd"), "node api \"API\" { fil: #fff }\n").unwrap();
     let entry = dir.join("main.bd");
@@ -11013,11 +10990,33 @@ fn a_problem_in_an_included_file_is_not_reported_against_this_one() {
     std::fs::write(&entry, text).unwrap();
 
     let reported = crate::lsp::diagnostics_for(text, Some(&entry));
+    let relay = reported
+        .iter()
+        .find(|diagnostic| {
+            diagnostic["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("fil"))
+        })
+        .expect("child error stays visible");
+    assert_eq!(relay["range"]["start"]["line"], 0);
+    assert_eq!(relay["range"]["start"]["character"], 0);
+    assert_eq!(
+        relay["range"]["end"]["character"],
+        text.lines().next().unwrap().len()
+    );
+    let child = &relay["relatedInformation"][0];
     assert!(
-        !reported
-            .iter()
-            .any(|d| d["message"].as_str().is_some_and(|m| m.contains("fil"))),
-        "somebody else's mistake was published here: {reported:?}"
+        child["location"]["uri"]
+            .as_str()
+            .unwrap()
+            .ends_with("/core.bd")
+    );
+    assert_eq!(child["location"]["range"]["start"]["line"], 0);
+    assert!(
+        child["location"]["range"]["start"]["character"]
+            .as_u64()
+            .unwrap()
+            > 0
     );
 }
 

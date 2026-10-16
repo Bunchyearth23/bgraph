@@ -53,13 +53,14 @@ disagree.
   so a library or wasm consumer compiles no argument parser) · Errors: `anyhow`
   · LSP wire format: `serde_json`
 - Tree-sitter grammar: `tree-sitter-bgraph/` (JS grammar + generated parser)
-- Zed extension: `editors/zed/`, compiled to `wasm32-wasip1`
+- Zed extension: `editors/zed/`; compilation gate uses `wasm32-wasip1`,
+  the real host check loads a `wasm32-wasip2` component
 - SVG, PDF, the watch server, base64 and the TrueType subsetter are all
   hand-rolled — no dependency for any of them
 - Optional, each behind its own feature: `png` (a rasteriser, `resvg` — the
   only dependency tree in a shipped surface), `completions`, `wasm`, `typst`.
-  The deterministic local Kasuari fork is the declared-layout core; grouped
-  frames use the transitional solver until their bounds are lowered too
+  The deterministic local Kasuari fork solves declared nodes and grouped frames
+  simultaneously up to 512 entities; larger diagrams retain the transitional path
 
 ## Setup commands
 - `cargo build` — builds both `bgraph` and `bgraph-lsp`
@@ -106,7 +107,7 @@ disagree.
 | `src/explain.rs` | Why a box is where it is — needs nothing from the solver |
 | `src/relayout.rs` | `bgraph layout`: inserts into lines, never rewrites them |
 | `src/placement.rs` | Placement IR boundary: entity index, scoped implicit flow and readiness shared by check/solve/explain/layout |
-| `src/constraint_layout.rs` | `W-153` shadow lowering: compares migrated node relations with the deterministic Kasuari fork without owning rendered geometry yet |
+| `src/constraint_layout.rs` | Declared placement lowering and conflict provenance, using the deterministic Kasuari fork; `constraint_layout/frames.rs` handles frame bounds and local origins |
 | `src/report.rs` | The two forms of a diagnostic. The flat one is an interchange format and does not move |
 | `src/init.rs` | `bgraph init <genre>`, generated from the same tables |
 | `src/examples.rs` | **The worked file for every archetype, in the source.** `examples/` is a generated, checked-in gallery; `include_str!` never depends on it, and a test proves each pair matches `init` and the renderer. `docs/goldens.txt` pins what each renders to |
@@ -114,7 +115,7 @@ disagree.
 | `src/docgen.rs` | `docs/reference.md`, generated from the `props.rs` tables |
 | `src/check.rs` | **The validator** — spanned diagnostics, one source of truth |
 | `src/style.rs` | Style cascade, `extends` flattening, `GraphOpts` |
-| `src/layout.rs` | Current anchor solver → absolute `Rect`s; debug spike builds compare migrated relations with Kasuari before render |
+| `src/layout.rs` | Measures nodes, calls the declared constraint solver and assembles absolute geometry; retains a transitional solver above the direct-solver limit |
 | `src/bpmn.rs` | `type bpmn` — the marks inside a shape (event glyph, gateway mark, task marker) and the boundary events that sit on a task's edge. Line segments, never a Unicode glyph: a `✉` is whatever the reader's font says it is |
 | `src/ortho.rs` | `router: ortho` — A\* over a channel grid, so an elbow goes round a box. Integer costs, no hash container: the golden test is byte for byte |
 | `src/render_svg.rs` | Shapes, edge routing, markers, text |

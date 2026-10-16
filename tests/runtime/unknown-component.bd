@@ -1,0 +1,5 @@
+component service {
+  node app "App"
+}
+use service as first
+use missing as second

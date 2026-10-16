@@ -1,0 +1,13 @@
+group backend "Backend" {
+  node api "API"
+  node db "Database"
+  layout {
+    place api at (0, 0)
+    place db below api gap 40
+  }
+}
+node client "Client"
+layout {
+  place backend at (100, 100)
+  place client right-of backend gap 80
+}

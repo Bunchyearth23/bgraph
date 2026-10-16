@@ -482,6 +482,19 @@ instead of silently ignoring it.
 `top` / `bottom` / `center` (or `middle`) for horizontal ones. It defaults
 to `center`.
 
+### Reproducible placement
+
+The same source and bgraph version produce the same geometry and SVG across
+native, browser wasm, WASI and Typst. Variables and relations are ordered
+canonically before solving. Implicit flow and painting still follow declaration
+order, so rearranging declarations can intentionally change the drawing.
+
+Coordinates and gaps retain their fractional precision during layout. The SVG
+writer rounds numbers to hundredths for serialization; it never feeds those
+rounded values back into placement or snaps an explicit coordinate. A layout
+with unanchored degrees of freedom still has a deterministic result. Declare
+an anchor when that position is part of the drawing's meaning.
+
 ### Rows and columns
 
 For a simple ordered run, name the sequence once instead of repeating each
@@ -683,14 +696,19 @@ style store extends service {   // inherits everything above
 node db "Postgres" .store { stroke: #10b981 }   // inline override
 ```
 
-Two style names are **implicit**: `node` and `edge` apply to every node and
-every edge without being referenced. Use them for your theme.
+`style node` and `style edge` apply to every node and edge without being
+referenced. Each archetype's declaration words also name implicit themes:
+`style slice` themes a pie, while BPMN has separate `style task`, `style event`,
+`style gateway` and `style data` targets. The universal `node` synonym takes
+the primary form's theme (`task` in BPMN, `series` in XY).
 
 The cascade, weakest to strongest:
 
 ```
-built-in defaults  →  style node / style edge  →  .classes (in order)  →  inline { }
+built-in defaults  →  style node  →  style <declaration word>  →  .classes (in order)  →  inline { }
 ```
+
+Edges use `style edge` before their classes and inline properties.
 
 An unknown property or an unknown `.class` is a hard error, not a silent
 no-op — a typo surfaces the moment you save.

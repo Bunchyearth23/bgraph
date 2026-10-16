@@ -22,3 +22,18 @@ export.
 
 The doctests in `src/lib.rs` compile the supported direct-render and template
 flows in CI.
+
+Diagnostic position units are explicit at each interface:
+
+| Interface | Line | Column |
+|---|---|---|
+| CLI, preview, playground display, Typst error text | One-based | One-based Unicode scalar values |
+| WebAssembly `bgraph_check` JSON (`line`, `col`) | One-based | One-based UTF-16 code units |
+| LSP ranges, including `relatedInformation` | Zero-based | Zero-based UTF-16 code units |
+
+For a supplementary character such as `🦀`, UTF-16 counts two code units and
+the human displays count one scalar. JavaScript consumers use `col - 1` for
+string offsets. A human column is
+`Array.from(sourceLine.slice(0, col - 1)).length + 1`.
+Combining marks count as separate scalars. Rust `Span.start` and `Span.end`
+remain zero-based UTF-8 byte offsets.

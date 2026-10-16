@@ -94,9 +94,9 @@ pub extern "C" fn bgraph_result_len() -> usize {
 ///
 /// Separate from [`bgraph_render`] because they answer different questions: a
 /// file can render *and* have four warnings, and a page that only knew whether
-/// the render failed could not show them. Positions come out as line and
-/// column, one-based, which is what a reader counts in and what an editor
-/// gutter wants.
+/// the render failed could not show them. Lines and columns are one-based;
+/// columns count UTF-16 code units, matching JavaScript string offsets and
+/// editor coordinates. Human displays convert columns to Unicode scalars.
 ///
 /// # Safety
 ///
@@ -109,7 +109,6 @@ pub unsafe extern "C" fn bgraph_check(pointer: *const u8, len: usize) -> *const 
 
     let mut out = String::from("[");
     if analysis.diagnostics.is_empty() {
-        // Keep the zero-based protocol contract used by the JSON callers.
         out.push(']');
         let mut result = RESULT.lock().unwrap_or_else(|e| e.into_inner());
         *result = out.into_bytes();
@@ -234,17 +233,16 @@ mod typst {
             .collect();
         let status_and_answer = match (errors.as_slice(), analysis.layout.as_ref()) {
             ([], Some(layout)) => (0, crate::render_svg::render(layout)),
-            ([], None) => {
-                (
-                    1,
-                    String::from("error: diagram did not produce a layout after successful checks"),
-                )
-            }
+            ([], None) => (
+                1,
+                String::from("error: diagram did not produce a layout after successful checks"),
+            ),
             (errors, _) => {
                 let mut message = String::from("error:\n");
                 let index = crate::lsp::LineIndex::new(&text);
                 for (i, diag) in errors.iter().enumerate() {
-                    let (line, col) = index.line_col(diag.span.start);
+                    let (line, _) = index.line_col(diag.span.start);
+                    let col = text[index.offset(line, 0)..diag.span.start].chars().count();
                     if i > 0 {
                         message.push('\n');
                     }

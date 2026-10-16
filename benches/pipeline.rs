@@ -57,6 +57,27 @@ fn chart() -> &'static str {
     "type bar { title: \"Monthly revenue\" }\nseries north \"North\" 24 39 31 47 51 64 58 72 81 69 77 90\nseries south \"South\" 18 26 32 40 44 49 55 61 57 66 72 84\n"
 }
 
+fn frames(count: usize, nested: bool) -> String {
+    if nested {
+        (0..count / 50)
+            .map(|chain| {
+                let mut source = (0..50)
+                    .map(|depth| format!("group g{chain}_{depth} {{\n padding: 1\n"))
+                    .collect::<String>();
+                source.push_str(&format!("node a{chain} {{ size: 20 20 }}\n"));
+                source.push_str(&"}\n".repeat(50));
+                source
+            })
+            .collect()
+    } else {
+        (0..count)
+            .map(|index| {
+                format!("group g{index} {{\n padding: 1\n node n{index} {{ size: 20 20 }}\n}}\n")
+            })
+            .collect()
+    }
+}
+
 fn measure(name: &str, source: &str) -> Duration {
     const RUNS: u32 = 10;
     let parse_start = Instant::now();
@@ -128,6 +149,10 @@ fn main() {
         ("ortho", ortho()),
         ("template", template()),
         ("chart", chart().to_string()),
+        ("frames-50", frames(50, false)),
+        ("frames-100", frames(100, false)),
+        ("nested-50", frames(50, true)),
+        ("nested-100", frames(100, true)),
     ];
     let mut totals: Vec<_> = cases
         .iter()

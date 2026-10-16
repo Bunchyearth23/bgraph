@@ -383,6 +383,46 @@ fn an_alternate_archetype_theme_is_offered_only_node_properties() {
     assert!(!labels.contains(&"router"));
 }
 
+#[test]
+fn every_archetype_form_has_matching_theme_completion_and_hover() {
+    let server = Server {
+        docs: HashMap::new(),
+    };
+    for def in props::ARCHETYPES
+        .iter()
+        .filter(|def| !def.alt_items.is_empty())
+    {
+        for word in def.items() {
+            let text = format!("type {}\nstyle {word} {{\n  ", def.name);
+            let offered = server.items_for(&text, "  ", text.len());
+            let labels: Vec<_> = offered.iter().filter_map(|i| i["label"].as_str()).collect();
+            assert!(labels.contains(&"shape"), "{} {word}: {labels:?}", def.name);
+            assert!(
+                !labels.contains(&"router"),
+                "{} {word}: {labels:?}",
+                def.name
+            );
+
+            let text = format!("type {}\nstyle {word} {{ fill: #123456 }}\n", def.name);
+            let hover = hover::describe_style(&text, word).unwrap();
+            assert!(hover.contains("**theme**"), "{hover}");
+            assert!(hover.contains(&format!("every `{word}`")), "{hover}");
+            assert!(hover.contains("before classes and inline"), "{hover}");
+
+            let invalid = format!("type {}\nstyle {word} {{ head: none }}\n", def.name);
+            let diagram = crate::parser::parse(&invalid).unwrap();
+            let diagnostics = crate::check::check(&diagram);
+            assert!(
+                diagnostics.iter().any(|diagnostic| diagnostic
+                    .message
+                    .contains("`head` has no effect on a node")),
+                "{} {word}: {diagnostics:?}",
+                def.name
+            );
+        }
+    }
+}
+
 /// A theme reads a named part of the vocabulary, so offering the rest is
 /// offering the warning `check_styles` is about to write.
 #[test]

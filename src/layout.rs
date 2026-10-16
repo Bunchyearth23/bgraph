@@ -845,6 +845,7 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     // the fact does not push its neighbours along — it lands on top of them.
     // Placement already knows how to lay out boxes of a given size, so the
     // honest order is: decide the sizes, then place.
+    let intrinsic_sizes = sizes.clone();
     constrain_sizes(&placement, &mut sizes);
 
     // What each node's drawing reaches past its own box. Only a caption does
@@ -866,31 +867,40 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
         })
         .collect();
 
-    // Cassowary is now the source of geometry whenever every relation can be
-    // lowered without approximation.  Frames still need their content bounds
-    // before their own translation can be expressed, so those diagrams retain
-    // the established fixpoint until group lowering lands.  This is a
-    // semantic fallback, not a build-flag-dependent second engine.
-    let solved = if let Some(nodes) =
-        crate::constraint_layout::solve_nodes(diagram, &placement, &sizes, &opts)?
-    {
+    // Nodes, frames and local origins share one Cassowary system. Graphs above
+    // its measured size budget keep the validated transitional path.
+    let solved = if let Some(nodes) = crate::constraint_layout::solve_declared(
+        diagram,
+        &placement,
+        &sizes,
+        &intrinsic_sizes,
+        &overhang,
+        &opts,
+    )? {
         Solved {
-            nodes: nodes.into_iter().map(Some).collect(),
-            groups: vec![None; diagram.groups.len()],
+            nodes: nodes.nodes.into_iter().map(Some).collect(),
+            groups: nodes.groups.into_iter().map(Some).collect(),
+            frame_translations: Vec::new(),
         }
     } else {
         let mut solved = place_all(diagram, &placement, &sizes, &overhang, &opts)?;
-        // Legacy alignment and group frames still need the historical pass.
+        // The large-graph fallback is checked against the same final contracts.
         constrain_alignment(&placement, &mut solved);
         crate::constraint_layout::validate_frames(
             diagram,
             &placement,
             &solved.nodes,
             &solved.groups,
+            &solved.frame_translations,
             &opts,
         )?;
         solved
     };
+    let frame_errors =
+        crate::check::frame_geometry(diagram, &solved.nodes, &solved.groups, &overhang);
+    if !frame_errors.is_empty() {
+        return Err(crate::check::GeometryDiagnostics(frame_errors).into());
+    }
     let placed = solved.nodes;
 
     let mut nodes: Vec<PlacedNode> = diagram
@@ -1584,12 +1594,9 @@ pub fn solve(diagram: &Diagram) -> Result<Layout> {
     }
 
     // A BPMN diagram's marks come last, because every one of them is placed
-    // against a box that is already where it is going to be — including the
-    // boundary events, which are moved onto their host's edge first so their
-    // glyphs and captions follow them there.
+    // against boxes already placed by the common solver, including boundaries.
     #[cfg(feature = "bpmn")]
     if process {
-        crate::bpmn::attach_boundaries(&mut nodes);
         let (marks, labels) = crate::bpmn::decorate(&nodes, &captions);
         polylines.extend(marks);
         annotations.extend(labels);
@@ -1684,6 +1691,8 @@ fn offset_from(a: &Rect, dir: RelDir, gap: f64, align: Option<Align>, w: f64, h:
 pub struct Solved {
     pub nodes: Vec<Option<Rect>>,
     pub groups: Vec<Option<Rect>>,
+    /// Incremental translations actually applied by the transitional placer.
+    pub frame_translations: Vec<(f64, f64)>,
 }
 
 /// One fixpoint over both kinds of entity.
@@ -1825,9 +1834,8 @@ fn constrain_alignment(plan: &PlacementPlan<'_>, solved: &mut Solved) {
                 };
 
                 for i in &rects[1..] {
-                    // `at` is a required coordinate. The old late pass
-                    // silently overwrote it, despite the language contract
-                    // saying an explicit position wins over a constraint.
+                    // Preserve required coordinates; final validation reports
+                    // an incompatible alignment instead of moving an `at`.
                     if matches!(
                         plan.declared_placement(*i),
                         Some(Placement::At { .. } | Placement::Cell { .. })
@@ -1858,7 +1866,7 @@ fn constrain_alignment(plan: &PlacementPlan<'_>, solved: &mut Solved) {
     }
 }
 
-fn resolve_grid_placement(
+pub(crate) fn resolve_grid_placement(
     placement: &Placement,
     opts: &GraphOpts,
     sizes: &[(f64, f64)],
@@ -1876,7 +1884,12 @@ fn resolve_grid_placement(
     placement.resolved(opts.grid)
 }
 
-fn grid_distance(opts: &GraphOpts, distance: f64, dir: RelDir, sizes: &[(f64, f64)]) -> f64 {
+pub(crate) fn grid_distance(
+    opts: &GraphOpts,
+    distance: f64,
+    dir: RelDir,
+    sizes: &[(f64, f64)],
+) -> f64 {
     let Some(spec) = opts.grid_spec else {
         return distance;
     };
@@ -1916,6 +1929,7 @@ fn place_all(
     let index = plan.index();
     let mut node_rect: Vec<Option<Rect>> = vec![None; diagram.nodes.len()];
     let mut group_rect: Vec<Option<Rect>> = vec![None; diagram.groups.len()];
+    let mut frame_translations = vec![(0.0, 0.0); diagram.groups.len()];
 
     // Placed means "has coordinates"; settled means "they will not move".
     let mut node_settled = vec![false; diagram.nodes.len()];
@@ -1944,10 +1958,32 @@ fn place_all(
             }
             let (w, h) = sizes[i];
 
+            if let EffectivePlacement::Boundary(boundary) = plan.node(i, opts.flow) {
+                let host = Entity::Node(boundary.host);
+                let together =
+                    unit(Entity::Node(i)).is_some() && unit(Entity::Node(i)) == unit(host);
+                let ready = if together {
+                    rect_of(host, &node_rect, &group_rect).is_some()
+                } else {
+                    settled(host, &node_settled, &group_settled)
+                };
+                if !ready {
+                    continue;
+                }
+            }
+
             // No placement: flow from the previous sibling — the previous
             // declaration inside the same container, not merely the previous
             // line in the file.
             let placement = match plan.node(i, opts.flow) {
+                EffectivePlacement::Boundary(boundary) => {
+                    let host =
+                        node_rect[boundary.host].expect("a ready boundary host has a rectangle");
+                    Some(Placement::At {
+                        x: host.x + host.w * boundary.along - w * 0.5,
+                        y: host.bottom() - h * 0.5,
+                    })
+                }
                 EffectivePlacement::Declared(placement) => {
                     Some(resolve_grid_placement(placement, opts, sizes))
                 }
@@ -2081,7 +2117,7 @@ fn place_all(
                     let moved = offset_from(
                         &anchor_rect,
                         *dir,
-                        gap.unwrap_or(opts.gap),
+                        grid_distance(opts, gap.unwrap_or(opts.gap), *dir, sizes),
                         *align,
                         frame.w,
                         frame.h,
@@ -2093,6 +2129,7 @@ fn place_all(
             if delta != (0.0, 0.0) {
                 translate_subtree(diagram, index, g, delta, &mut node_rect, &mut group_rect);
             }
+            frame_translations[g] = delta;
 
             group_rect[g] = Some(frame);
             group_settled[g] = true;
@@ -2130,18 +2167,17 @@ fn place_all(
     Ok(Solved {
         nodes: node_rect,
         groups: group_rect,
+        frame_translations,
     })
 }
 
-/// Geometry measured before a frame participates in placement. Keeping this
-/// separate from the fixpoint is important: the solver consumes a stable
-/// frame size, while the frame's x/y may still be constrained by an anchor.
+/// The exact content-bounds contract shared by validation and the fallback.
 #[derive(Debug, Clone, Copy)]
-struct FrameMeasure {
-    frame: Rect,
+pub(crate) struct FrameMeasure {
+    pub(crate) frame: Rect,
 }
 
-fn measure_frame(
+pub(crate) fn measure_frame(
     diagram: &Diagram,
     group_index: usize,
     members: &[Entity],
@@ -2280,7 +2316,7 @@ fn bbox(rects: impl Iterator<Item = Rect>) -> Option<Rect> {
     })
 }
 
-fn group_padding(diagram: &Diagram, g: usize) -> f64 {
+pub(crate) fn group_padding(diagram: &Diagram, g: usize) -> f64 {
     diagram.groups[g]
         .props
         .iter()
@@ -2288,4 +2324,121 @@ fn group_padding(diagram: &Diagram, g: usize) -> f64 {
         .and_then(|p| p.values.first())
         .and_then(|v| v.as_num())
         .unwrap_or(18.0)
+}
+
+#[cfg(test)]
+mod frame_solver_tests {
+    use super::*;
+
+    #[test]
+    fn gallery_frame_geometry_matches_the_transitional_solver() {
+        for name in ["free", "state"] {
+            let source = crate::examples::EXAMPLES
+                .iter()
+                .find(|(genre, _)| *genre == name)
+                .unwrap()
+                .1;
+            let diagram = crate::parser::parse(source).unwrap();
+            let actual = solve(&diagram).unwrap();
+            let plan = PlacementPlan::new(&diagram);
+            let sizes: Vec<_> = actual
+                .nodes
+                .iter()
+                .map(|node| (node.rect.w, node.rect.h))
+                .collect();
+            let baseline = place_all(
+                &diagram,
+                &plan,
+                &sizes,
+                &vec![(0.0, 0.0, 0.0, 0.0); sizes.len()],
+                &actual.opts,
+            )
+            .unwrap();
+            let mut largest_delta = 0.0_f64;
+            for (actual, baseline) in actual
+                .nodes
+                .iter()
+                .map(|node| node.rect)
+                .chain(actual.groups.iter().map(|group| group.rect))
+                .zip(
+                    baseline
+                        .nodes
+                        .into_iter()
+                        .chain(baseline.groups)
+                        .map(Option::unwrap),
+                )
+            {
+                for (actual, baseline) in [
+                    (actual.x, baseline.x),
+                    (actual.y, baseline.y),
+                    (actual.w, baseline.w),
+                    (actual.h, baseline.h),
+                ] {
+                    largest_delta = largest_delta.max((actual - baseline).abs());
+                    assert!(
+                        (actual - baseline).abs() < 1e-9,
+                        "{name}: {actual} != {baseline}"
+                    );
+                }
+            }
+            eprintln!("{name}: maximum geometry delta {largest_delta:e}");
+        }
+    }
+
+    #[test]
+    #[ignore = "manual frame solver performance comparison"]
+    fn measure_frame_solver_against_the_transitional_path() {
+        for count in [50, 100] {
+            for nested in [false, true] {
+                let source = if nested {
+                    (0..count / 50)
+                        .map(|chain| {
+                            let mut source = (0..50)
+                                .map(|i| format!("group g{chain}_{i} {{\n padding: 1\n"))
+                                .collect::<String>();
+                            source.push_str(&format!("node a{chain} {{ size: 20 20 }}\n"));
+                            source.push_str(&"}\n".repeat(50));
+                            source
+                        })
+                        .collect::<String>()
+                } else {
+                    (0..count)
+                        .map(|i| {
+                            format!(
+                                "group g{i} {{\n padding: 1\n node n{i} {{ size: 20 20 }}\n}}\n"
+                            )
+                        })
+                        .collect()
+                };
+                let diagram = crate::parser::parse(&source).unwrap();
+                let plan = PlacementPlan::new(&diagram);
+                let sizes = vec![(20.0, 20.0); diagram.nodes.len()];
+                let overhang = vec![(0.0, 0.0, 0.0, 0.0); diagram.nodes.len()];
+                let opts = GraphOpts::default();
+                let started = std::time::Instant::now();
+                let baseline = place_all(&diagram, &plan, &sizes, &overhang, &opts).unwrap();
+                let old_time = started.elapsed();
+                let started = std::time::Instant::now();
+                let actual = crate::constraint_layout::solve_declared(
+                    &diagram, &plan, &sizes, &sizes, &overhang, &opts,
+                )
+                .unwrap()
+                .unwrap();
+                let new_time = started.elapsed();
+                for (actual, baseline) in actual
+                    .groups
+                    .iter()
+                    .zip(baseline.groups.iter().map(|group| group.unwrap()))
+                {
+                    assert_eq!(
+                        (actual.x, actual.y, actual.w, actual.h),
+                        (baseline.x, baseline.y, baseline.w, baseline.h)
+                    );
+                }
+                eprintln!(
+                    "frames={count} nested={nested}: old={old_time:?} cassowary={new_time:?}"
+                );
+            }
+        }
+    }
 }

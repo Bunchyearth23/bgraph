@@ -8,7 +8,8 @@
 use std::collections::HashMap;
 
 use crate::ast::{
-    ConstraintAxis, ConstraintDecl, ConstraintKind, Diagram, LayoutStmt, Placement, RelDir, Spanned,
+    ConstraintAxis, ConstraintDecl, ConstraintKind, Diagram, LayoutStmt, Placement, RelDir, Span,
+    Spanned,
 };
 
 type SeriesPlacement<'a> = (RelDir, &'a Spanned<String>, Option<f64>);
@@ -32,8 +33,18 @@ impl<'a> ConstraintRef<'a> {
     }
 }
 
+/// A boundary event's required position on its task, in declaration order.
+#[derive(Debug, Clone, Copy)]
+pub struct BoundaryAttachment {
+    pub host: usize,
+    pub along: f64,
+    pub span: Span,
+}
+
 /// The effective placement of a node, including the implicit flow rule.
 pub enum EffectivePlacement<'a> {
+    /// A BPMN event is positioned on the bottom edge of its host task.
+    Boundary(BoundaryAttachment),
     /// A placement written on the declaration.
     Declared(&'a Placement),
     /// No placement was written; flow from the previous sibling.
@@ -60,6 +71,8 @@ pub struct PlacementPlan<'a> {
     layout_placement: Vec<Option<&'a Placement>>,
     layout_group_placement: Vec<Option<&'a Placement>>,
     series_placement: Vec<Option<SeriesPlacement<'a>>>,
+    placement_spans: HashMap<Entity, Span>,
+    boundaries: Vec<Option<BoundaryAttachment>>,
 }
 
 impl<'a> PlacementPlan<'a> {
@@ -92,32 +105,48 @@ impl<'a> PlacementPlan<'a> {
         let mut layout_placement = vec![None; diagram.nodes.len()];
         let mut layout_group_placement = vec![None; diagram.groups.len()];
         let mut series_placement = vec![None; diagram.nodes.len()];
+        let mut placement_spans = HashMap::new();
         for layout in &diagram.layouts {
             for statement in &layout.statements {
                 if let LayoutStmt::Place {
-                    target, placement, ..
+                    target,
+                    placement,
+                    span,
                 } = statement
                 {
                     match index.get(target.as_str()).copied() {
-                        Some(Entity::Node(node)) => layout_placement[node] = Some(placement),
+                        Some(Entity::Node(node)) => {
+                            layout_placement[node] = Some(placement);
+                            placement_spans.insert(Entity::Node(node), *span);
+                        }
                         Some(Entity::Group(group)) => {
-                            layout_group_placement[group] = Some(placement)
+                            layout_group_placement[group] = Some(placement);
+                            placement_spans.insert(Entity::Group(group), *span);
                         }
                         None => {}
                     }
                 }
                 if let LayoutStmt::Series {
-                    dir, members, gap, ..
+                    dir,
+                    members,
+                    gap,
+                    span,
                 } = statement
                 {
                     for pair in members.windows(2) {
                         if let Some(Entity::Node(node)) = index.get(pair[1].as_str()).copied() {
                             series_placement[node] = Some((*dir, &pair[0], *gap));
+                            placement_spans.insert(Entity::Node(node), *span);
                         }
                     }
                 }
             }
         }
+
+        #[cfg(feature = "bpmn")]
+        let boundaries = crate::bpmn::boundary_attachments(diagram);
+        #[cfg(not(feature = "bpmn"))]
+        let boundaries = vec![None; diagram.nodes.len()];
 
         Self {
             diagram,
@@ -127,6 +156,8 @@ impl<'a> PlacementPlan<'a> {
             layout_placement,
             layout_group_placement,
             series_placement,
+            placement_spans,
+            boundaries,
         }
     }
 
@@ -166,24 +197,29 @@ impl<'a> PlacementPlan<'a> {
     /// A v2 alignment is applied after ordinary placement, so it owns that
     /// cross-axis coordinate. The Cassowary shadow uses this to avoid keeping
     /// the temporary placement alignment as a competing required equation.
-    pub fn v2_alignment_axis(&self, node: usize) -> Option<ConstraintAxis> {
-        self.constraints()
-            .filter(|constraint| {
-                constraint.declaration().kind == ConstraintKind::AlignGroup
-                    && constraint
-                        .declaration()
-                        .members
-                        .iter()
-                        .skip(1)
-                        .any(|member| {
-                            matches!(
-                                self.index.get(member.as_str()),
-                                Some(Entity::Node(index)) if *index == node
-                            )
-                        })
-            })
-            .map(|constraint| constraint.declaration().axis)
-            .last()
+    pub fn v2_alignment_axes(&self, node: usize) -> [bool; 2] {
+        let mut axes = [false; 2];
+        for constraint in self.constraints().filter(|constraint| {
+            constraint.declaration().kind == ConstraintKind::AlignGroup
+                && constraint
+                    .declaration()
+                    .members
+                    .iter()
+                    .skip(1)
+                    .any(|member| {
+                        matches!(
+                            self.index.get(member.as_str()),
+                            Some(Entity::Node(index)) if *index == node
+                        )
+                    })
+        }) {
+            match constraint.declaration().axis {
+                ConstraintAxis::Horizontal => axes[0] = true,
+                ConstraintAxis::Vertical => axes[1] = true,
+                ConstraintAxis::Inferred => {}
+            }
+        }
+        axes
     }
 
     pub fn owner(&self) -> &HashMap<Entity, usize> {
@@ -194,6 +230,10 @@ impl<'a> PlacementPlan<'a> {
         self.previous_sibling[node]
     }
 
+    pub fn boundary(&self, node: usize) -> Option<BoundaryAttachment> {
+        self.boundaries[node]
+    }
+
     pub fn declared_placement(&self, node: usize) -> Option<&'a Placement> {
         self.layout_placement[node]
     }
@@ -202,11 +242,27 @@ impl<'a> PlacementPlan<'a> {
     /// `column` positions every member after its first anchor just as surely
     /// as `place` does, even though the relation is stored separately.
     pub fn has_source_position(&self, node: usize) -> bool {
-        self.declared_placement(node).is_some() || self.series_placement[node].is_some()
+        self.declared_placement(node).is_some()
+            || self.series_placement[node].is_some()
+            || self.boundary(node).is_some()
     }
 
     pub fn declared_group_placement(&self, group: usize) -> Option<&'a Placement> {
         self.layout_group_placement[group]
+    }
+
+    /// The actual layout statement, rather than the declaration it positions.
+    pub fn placement_span(&self, entity: Entity) -> Span {
+        self.placement_spans
+            .get(&entity)
+            .copied()
+            .unwrap_or_else(|| match entity {
+                Entity::Node(node) => self
+                    .boundary(node)
+                    .map(|boundary| boundary.span)
+                    .unwrap_or(self.diagram.nodes[node].span),
+                Entity::Group(group) => self.diagram.groups[group].span,
+            })
     }
 
     pub fn node(&self, node: usize, flow: RelDir) -> EffectivePlacement<'a> {
@@ -214,6 +270,8 @@ impl<'a> PlacementPlan<'a> {
             EffectivePlacement::Declared(placement)
         } else if let Some((dir, anchor, gap)) = self.series_placement[node] {
             EffectivePlacement::Series { dir, anchor, gap }
+        } else if let Some(boundary) = self.boundary(node) {
+            EffectivePlacement::Boundary(boundary)
         } else if let Some(anchor) = self.implicit_anchor(node) {
             EffectivePlacement::Flow {
                 dir: flow,
@@ -278,6 +336,7 @@ impl<'a> PlacementPlan<'a> {
                     | EffectivePlacement::Series { anchor, .. } => {
                         self.index.get(anchor.as_str()).copied()
                     }
+                    EffectivePlacement::Boundary(boundary) => Some(Entity::Node(boundary.host)),
                     EffectivePlacement::Declared(Placement::At { .. } | Placement::Cell { .. })
                     | EffectivePlacement::Origin => None,
                 };
@@ -343,6 +402,22 @@ impl<'a> PlacementPlan<'a> {
                 return Vec::new();
             }
             if !progress {
+                // Attachments are simultaneous equations, so an event and its
+                // host can form a consistent cycle. This symbolic root adds
+                // no coordinates; only the direct solver may resolve it.
+                if crate::constraint_layout::uses_simultaneous_solver(self.diagram)
+                    && let Some(i) = (0..self.diagram.nodes.len()).find(|&i| {
+                        !node_coordinates[i]
+                            && matches!(
+                                self.node(i, RelDir::RightOf),
+                                EffectivePlacement::Boundary(_)
+                            )
+                    })
+                {
+                    node_coordinates[i] = true;
+                    node_settled[i] = self.placed_unit(Entity::Node(i)).is_none();
+                    continue;
+                }
                 return (0..self.diagram.nodes.len())
                     .filter(|i| !node_coordinates[*i] || !node_settled[*i])
                     .map(Entity::Node)

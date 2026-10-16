@@ -84,9 +84,6 @@ pub(crate) fn render_source(input: &Path, data: Option<&Path>) -> Result<String>
             .with_context(|| format!("cannot read {}", input.display()));
     }
 
-    let source =
-        fs::read_to_string(input).with_context(|| format!("cannot read {}", input.display()))?;
-
     // A template with data is filled first; the error from a bad binding then
     // reaches the page the same way a syntax error does, instead of ending the
     // server.
@@ -98,6 +95,8 @@ pub(crate) fn render_source(input: &Path, data: Option<&Path>) -> Result<String>
     // preview blank for the whole first half of writing a template.
     #[cfg(feature = "json")]
     if let Some(path) = data {
+        let source = fs::read_to_string(input)
+            .with_context(|| format!("cannot read {}", input.display()))?;
         let raw =
             fs::read_to_string(path).with_context(|| format!("cannot read {}", path.display()))?;
         let values = crate::template::Bindings::from_json(&raw)
@@ -106,9 +105,7 @@ pub(crate) fn render_source(input: &Path, data: Option<&Path>) -> Result<String>
     }
     let _ = data;
 
-    let diagram = crate::parser::parse_diagram(&source)?;
-    let layout = crate::layout::solve(&diagram)?;
-    Ok(crate::render_svg::render(&layout))
+    crate::render_file(input)
 }
 
 /// Whether the file is a picture rather than a source. The extension decides,
@@ -137,14 +134,19 @@ fn page(input: &Path, data: Option<&Path>) -> String {
                 .unwrap_or_default();
             ("", svg, diagnostics)
         }
-        Err(err) => (
-            "error",
-            format!(
-                "<pre class=\"err\">{}</pre>",
-                html_escape(&format!("{err:#}"))
-            ),
-            String::new(),
-        ),
+        Err(err) => {
+            let diagnostics = preview_diagnostics(input, data)
+                .map(|items| diagnostics_html(&items))
+                .unwrap_or_default();
+            (
+                "error",
+                format!(
+                    "<pre class=\"err\">{}</pre>",
+                    html_escape(&format!("{err:#}"))
+                ),
+                diagnostics,
+            )
+        }
     };
 
     format!(
@@ -348,8 +350,23 @@ fn preview_diagnostics(input: &Path, data: Option<&Path>) -> Result<Vec<crate::c
     };
     #[cfg(not(feature = "json"))]
     let _ = data;
-    let mut diagnostics = crate::analyze_source(&source).diagnostics;
-    diagnostics.sort_by_key(|diag| (diag.span.start, diag.span.end));
+    let analysis = crate::analyze_file_source(input, &source)?;
+    let diagnostics = analysis
+        .analysis
+        .diagnostics
+        .into_iter()
+        .map(|mut diagnostic| {
+            let (path, line, column) = analysis.map.locate(diagnostic.span.start);
+            diagnostic.message = format!(
+                "{}:{}:{}: {}",
+                path.display(),
+                line + 1,
+                column + 1,
+                diagnostic.message
+            );
+            diagnostic
+        })
+        .collect();
     Ok(diagnostics)
 }
 

@@ -1,0 +1,5 @@
+component service {
+  node inner "Inner"
+}
+use service as first
+use missing as second

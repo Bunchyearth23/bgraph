@@ -9,8 +9,13 @@
 style card { fill: #eef3ff stroke: #2563eb 1.3 radius: 6 }
 
 node ui  "Browser"  .card
-node api "API"      .card right-of ui gap 60
-node db  "Database" .card below api gap 50
+node api "API"      .card
+node db  "Database" .card
+
+layout {
+  place api right-of ui gap 60
+  place db below api gap 50
+}
 
 ui  -> api "HTTPS"
 api -> db  "reads"
@@ -120,6 +125,11 @@ api -> db  "reads"
 
   const errors = $derived(diagnostics.filter((d) => d.severity === 'error').length)
   const warnings = $derived(diagnostics.filter((d) => d.severity === 'warning').length)
+  const lines = $derived(text.split('\n'))
+
+  function humanColumn(diagnostic) {
+    return Array.from((lines[diagnostic.line - 1] ?? '').slice(0, diagnostic.col - 1)).length + 1
+  }
 </script>
 
 <header>
@@ -177,7 +187,7 @@ then reload. `pnpm dev` serves public/ at the site root.
     <ul>
       {#each diagnostics as d, i (i)}
         <li class={d.severity}>
-          <span class="where">{d.line}:{d.col}</span>
+          <span class="where">{d.line}:{humanColumn(d)}</span>
           {d.message}
         </li>
       {/each}

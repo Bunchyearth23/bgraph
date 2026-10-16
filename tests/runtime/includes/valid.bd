@@ -1,0 +1,4 @@
+node child "Child"
+layout {
+  place child at (10, 20)
+}

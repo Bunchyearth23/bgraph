@@ -1,0 +1,6 @@
+include "includes/anchored.bd" as child
+node b
+layout {
+  place b at (0, 80)
+  align top child.a b
+}

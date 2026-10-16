@@ -206,6 +206,26 @@ Worked examples: `bgraph init <genre>` prints a complete file for any of the
 
 ## Build
 
+CI builds both binaries and the library without default features on Linux,
+macOS and Windows. These compilation jobs are separate from runtime parity.
+
+Run `./tests/runtime/gate.sh --extensions` to compare diagnostics and SVG bytes
+across the CLI, LSP, browser wasm, WASI, live preview, Typst and the packaged
+VS Code Markdown renderer, and build the Zed shim. This requires Node 24,
+Typst, `zip`/`unzip`, and Rust's `wasm32-unknown-unknown` and `wasm32-wasip1`
+targets; npm installs the VS Code language client when needed. Omit
+`--extensions` to check the library and compiler runtimes only. The gate also
+builds the library without default features and repeats native processes and
+fresh wasm instances to check deterministic output. It covers 17 focused
+fixtures, SVG parity for all 30 archetypes and four native file-context cases.
+
+`./tests/runtime/vscode-host.sh` additionally activates the extension in a real
+VS Code host and compares its diagnostics with the CLI. It requires VS Code
+and Xvfb and uses a temporary profile. The separate
+[`zed-host.py` check](editors/zed/README.md#isolated-host-verification-linux)
+loads the extension component and grammar in real Zed and compares its LSP
+diagnostics with the CLI, also with an isolated profile.
+
 ```sh
 cargo build --release        # bgraph and bgraph-lsp
 cargo test

@@ -1,0 +1,10 @@
+group g {
+ padding: 10
+ node a { size: 40 30 }
+ layout { place a at (100, 50) }
+}
+node b { size: 20 20 }
+layout {
+ place g at (200, 100)
+ place b right-of a gap 25 align bottom
+}

@@ -125,7 +125,11 @@ pub fn render(layout: &Layout) -> String {
             .map(|(x, y)| format!("{},{}", n(*x), n(*y)))
             .collect();
         let mut line_points = points.clone();
-        trim_marker_stems(&mut line_points, marker_stem(start_head), marker_stem(end_head));
+        trim_marker_stems(
+            &mut line_points,
+            marker_stem(start_head),
+            marker_stem(end_head),
+        );
         let path: Vec<String> = line_points
             .iter()
             .map(|(x, y)| format!("{},{}", n(*x), n(*y)))
@@ -1572,7 +1576,7 @@ fn long_enough(a: (f64, f64), b: (f64, f64)) -> bool {
 ///
 /// This keeps those terminal segments long enough to be numerically stable,
 /// without altering routing decisions elsewhere.
-fn stabilise_marker_tangent(points: &mut Vec<(f64, f64)>) {
+fn stabilise_marker_tangent(points: &mut [(f64, f64)]) {
     if points.len() < 3 {
         return;
     }
