@@ -71,3 +71,12 @@ Clippy all-targets/all-features with `-D warnings`, format check and diff check
 also exited 0. Independent final review accepted alias preservation and the
 reviewed images. This fixes the hosted failures without skipping either test.
 The corrected hosted rerun remains required before W-160 closure.
+
+## Hosted closure
+
+The corrected hosted run `38898281988` at production revision `8630085`
+completed **success**, all 16 jobs green. The actual Test step passes all
+**714 tests**, including both formerly failing font tests and the four PNG
+regressions. No original test is skipped and no PNG threshold was weakened.
+The runtime, five-platform native comparison and performance jobs also pass.
+Final native artifact audit: `native-ci-proof-final.json`. W-160 is landed.

@@ -19,7 +19,7 @@ remains active until every requirement below is proved.
 | W-157 | Minimum-cardinality source conflict, provenance and values, across the whole model; deterministic diagnostics on every surface; internal errors remain typed. | **Landed.** Eight tests including 24 exhaustive seven-equation model oracles; independent proof review; later smaller component selected; exact diagnostic across every runtime. `w157-completion.md`. |
 | W-158 | Visible preview inspector for bounds, anchors, parents, X/Y relations and conflicts; source/geometry selection; LSP declaration↔layout navigation, provenance hover and outline. | **Landed.** 75 LSP / 14 watch / 4 explain tests, actual Chromium six scenarios with reviewed screenshots and zero JS errors; real VS Code navigation/references/hover/outline passes. `w158-completion.md`. |
 | W-159 | Exhaustive Declared/ArchetypeManaged/Hybrid contract in vocabulary; validation, completion, docs/schema and solver dispatch derived once; nothing accepted then ignored. | **Landed.** 9 Declared / 21 Managed / no actual Hybrid. Exhaustive matrix and all 30 final feature configurations pass; complete gallery/runtime proof. `w159-completion.md`. |
-| W-160 | Reproducible no-default/CLI/LSP/browser/WASI/preview/Typst/VSIX gate and actual editor loading; native CI really executed, not merely configured. | **Building.** Real five-platform native CI and aggregate comparison passed. Hosted global check found two font-dependent tests; fixed licensed font, production PNG embedded-font support and alias-preservation regression now pass 6/6 locally. Final full suite and hosted rerun pending. `w160-completion.md`, `w160-font-portability.md`. |
+| W-160 | Reproducible no-default/CLI/LSP/browser/WASI/preview/Typst/VSIX gate and actual editor loading; native CI really executed, not merely configured. | **Landed.** Final hosted run `38898281988` succeeds at `8630085`: all 16 jobs, 714 tests, 22/30/4 runtime gate, five real native targets, strict comparison and performance guard. Licensed fixed-font and embedded-PNG corrections pass without skipped tests. `w160-completion.md`, `w160-font-portability.md`. |
 | W-164 styles | Canonical archetype target for every alternative word, correct cascade and override provenance, editor completion/hover and generated reference. | **Landed.** Six public integrations and four correctly shaped BPMN words verified, 40 paint/override combinations, real LSP theme/provenance, generated reference current. `w164-completion.md`. |
 
 ## Final integrated evidence
@@ -89,21 +89,25 @@ The ARM runner labels for private repositories are supported by the current
 and [GitHub's private-repository ARM availability announcement](https://github.blog/changelog/2026-01-29-arm64-standard-runners-are-now-available-in-private-repositories/).
 These references prove runner availability, not execution of this repository.
 
-## Resume
+## Completion state
 
-The user has authorized the private validation branch. Commit
-`90163b769f8be9a125424eba3ba4694ee4a1e967` was created in the isolated worktree
-`/tmp/bgraph-ci-validation-20261016`, with all 68 changed/new files checked
-byte-for-byte against the validated worktree, and pushed successfully to
-`codex/placement-proof-20261016`. The local main branch and index are untouched.
+All seven original required work items are implemented and proved. W-156 and
+W-160 are now landed from actual native and hosted execution evidence; none
+was dropped or removed from the objective. Final production revision is
+`863008506ed4f2546de7c2b95f9983a4ce26ddbe`, private validation branch
+`codex/placement-proof-20261016`. The local main branch has not been pushed.
 
-GitHub browser authentication completed successfully. Actual run
-[38895893757](https://github.com/Bunchyearth23/bgraph/actions/runs/38895893757)
-is `in_progress` for this exact commit. All five native runner jobs have
-started, including macOS ARM64 and Windows ARM64; eight feature builds are
-already successful. Follow the confirmed live run, download all five native
-artifacts, execute the strict comparison, and inspect every job before closure.
-W-156/W-160 remain in the original scope until these observations complete.
+[Final hosted CI](https://github.com/Bunchyearth23/bgraph/actions/runs/38898281988)
+is **completed / success**, all **16 jobs** green. Global Format, Clippy, Test,
+Performance, grammar-presence and no-default checks each succeeded. It proves
+714 passing tests, runtime 22 fixtures/30 archetypes/four file contexts, all
+five real native runner jobs and the exact aggregate comparison. Downloaded
+final artifacts also pass the same strict local comparator, requiring the
+correct SHA. Independent digest/metadata audit: `native-ci-proof-final.json`.
+
+The historical access blockers and first CI font failure below were resolved;
+they are retained as evidence of the actual path, not outstanding requirements.
+The first run's native proof remains independently valid at its own SHA.
 
 ## Access revalidation after local completion
 
@@ -171,3 +175,42 @@ usvg font database did not load the font already provided by `embed_font`; the
 approved fix makes PNG honor that existing option. Assertions and byte-level
 PNG goldens remain strict. W-160 remains unfinished until corrected hosted CI
 fully succeeds; the failed run is not described as green.
+
+## Corrected hosted run
+
+Commit `863008506ed4f2546de7c2b95f9983a4ce26ddbe` was pushed on the same
+authorized private validation branch. It contains the fixed licensed test font,
+PNG embedded-font loading, alias-preservation regression, reviewed strict PNG
+hashes and the first native proof. Local final validation passed 714 tests,
+Clippy and format checks.
+
+The new actual run
+[38898281988](https://github.com/Bunchyearth23/bgraph/actions/runs/38898281988)
+is confirmed `in_progress` at this exact revision. W-160 remains open until
+all required steps succeed; the original failed run is preserved as history.
+A trailing blank in the copied third-party license was normalized locally for
+the final documentation commit, without changing the license wording or font.
+
+## Final requirement audit
+
+- W-153: single solver source/caller audit; no 512 limit or production fallback;
+  large/nested/attachment-cycle tests, 107 vendor tests, exact overlap oracle;
+  unchanged performance guard now also succeeds remotely.
+- W-156: five actual target runners, 52 raw-bit/SVG/diagnostic/source snapshots,
+  repeated runs and fresh children, downloaded/digest-verified native artifacts;
+  exact aggregate and independent local comparisons succeed.
+- W-157: exact minimum cardinality on full model and all failed components;
+  exhaustive small-model oracle, typed internal error tests and cross-interface
+  fixture; independent algorithm review.
+- W-158: actual Chromium six scenarios and screenshots, real editor hosts,
+  navigation/reference/hover/outline, parents/anchors/conflicts and explain.
+- W-159: single exhaustive metadata strategy for validation, completion, docs,
+  schema and dispatch; 30 feature configurations and complete genre matrix.
+- W-160: all hosted jobs/steps passed, including runtime and performance;
+  original font failures are corrected, not ignored or thresholded away.
+- W-164 styles: default form shapes and paint layers, all override levels,
+  public LSP integrations, generated reference and real Chromium review.
+
+All report paths exist; INDEX contains no remaining planned/building/blocked
+W in the original scope. Completion is supported by source, tests, actual
+editor/browser behavior and hosted artifacts, rather than configuration alone.

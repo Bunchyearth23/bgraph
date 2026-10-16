@@ -142,3 +142,22 @@ Full evidence is in `native-ci-proof.json` and the remote-execution section of
 `w156-native-proof.md`. This supersedes the earlier lack of macOS and Windows
 ARM native execution evidence. The overall workflow remains failed on two
 separate font-dependent tests; complete W-160 CI proof awaits the corrected run.
+
+## Corrected final workflow is successful
+
+The final revision `863008506ed4f2546de7c2b95f9983a4ce26ddbe` passed
+[run 38898281988](https://github.com/Bunchyearth23/bgraph/actions/runs/38898281988)
+with **all 16 jobs successful**. Its five native artifacts were independently
+downloaded, their archive SHA-256 digests verified against GitHub metadata, and
+all 52 cases compared exactly again, including each platform's three local runs
+and three children with three runs each. The semantic snapshot fingerprint is
+unchanged from the first native proof:
+`3c7d8a73b2090d64e3788a07dc68f035ba51ec412371996a06ee92021ea00fb4`.
+The remote aggregate also passed all 18 comparator rejection self-tests.
+The successful full check independently records **714 passed tests, zero failed,
+one ignored**. The former font-dependent failures are therefore superseded by
+actual successful execution, not waived or omitted from the evidence.
+
+Final machine proof: `native-ci-proof-final.json`. The previous JSON is retained
+unchanged for historical provenance. Full final job/artifact IDs, checksums and
+logs are documented in the final CI section of `w156-native-proof.md`.

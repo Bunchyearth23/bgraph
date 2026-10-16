@@ -25,14 +25,13 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**État enregistré : un chantier en construction, aucun planifié, aucun risque ouvert;
-aucune question ouverte ni chantier bloqué.** `W-154` et `W-155` sont
-livrés sur instruction utilisateur. L'objectif explicite « all non blocked W done
-and proven » autorise aussi la clôture vérifiée de `W-153`, `W-157`, `W-158`,
-`W-159` et `W-164` styles. `W-156` est aussi livré après comparaison exacte
-des cinq runners natifs réels. Reste `W-160` : les tests et artefacts natifs
-passent, mais deux tests dépendants des polices système nécessitent un correctif
-et une relance de la CI globale. Accès GitHub et autorisation de push acquis.
+**État enregistré : aucun chantier en construction, planifié ou bloqué;
+aucune question ni risque ouvert.** L'objectif « all non blocked W done and
+proven » est atteint pour les sept chantiers de sa portée : `W-153`, `W-156`,
+`W-157`, `W-158`, `W-159`, `W-160` et `W-164` styles. `W-154` et `W-155`
+avaient déjà été clôturés sur instruction utilisateur.
+CI finale `38898281988` entièrement verte au commit `8630085` : 16 jobs,
+714 tests, cinq runners natifs comparés strictement, runtimes et performance.
 Pour reprendre, lire l'entrée du chantier et son risque associé ci-dessous; les travaux
 livrés et les décisions historiques sont conservés dans **Settled**.
 
@@ -52,7 +51,6 @@ deux lignes distinctes dans **Work landed**; aucun id renuméroté.
 
 | id | state | title | notes |
 |---|---|---|---|
-| `W-160` | building | Gate runtime wasm, Typst et surfaces sans dépendances | Gate final vert : 22 fixtures, 30 archétypes, quatre contextes fichier; CLI/LSP/wasm/WASI/preview/Typst/VSIX. Trente configurations de features, Chromium six scénarios, hôtes réels VS Code et Zed verts. Branche privée `codex/placement-proof-20261016` poussée sur accord utilisateur (`90163b7`); authentification GitHub confirmée; CI `38895893757` : les cinq runners natifs et le comparateur strict passent. Le contrôle global échoue sur deux tests dépendants des polices système; correction avec police de test fixe et prise en compte réelle des fontes embarquées en PNG en cours avant relance. Preuves : `.agent/analysis/w160-completion.md`, bilan intégré. |
 
 ### Risks
 
@@ -69,7 +67,7 @@ Risques ouverts et résiduels; les entrées indiquent les chantiers associés et
 | `X-025` | mitigated | Séparer le layout peut éloigner une boîte de la raison de sa position | W-158 livré : inspecteur visible, ancres/parents/relations/conflits, navigation source ↔ layout, hover, références, outline et explain des cadres. Six scénarios Chromium et inspection réelle VS Code vérifiés. Managed expose sa politique/cascade sans inventer de bounds 1:n. `.agent/analysis/w158-completion.md`. |
 | `X-026` | mitigated | Forcer Cassowary sur les genres intrinsèques détruirait leur géométrie sémantique | W-159 livré : neuf Declared, vingt et un ArchetypeManaged, aucun Hybrid actuel. Contrat unique pour validation/complétion/docs/schema/dispatch; tous les layouts/notes non lus sont refusés. Matrice exhaustive et trente configurations de features vertes. `.agent/analysis/w159-completion.md`. |
 | `X-027` | mitigated | Cassowary ne choisit ni l’ordre ni la branche d’évitement d’une collision | Collisions diagnostiquées sans déplacement et frames artificiellement gonflées refusées. Seule la paire événement/hôte attaché peut se chevaucher. Sweep exact comparé à l’oracle all-pairs; ordre des diagnostics conservé. Suite et gate runtime finaux verts. `.agent/analysis/w153-completion.md`, `.agent/analysis/w160-completion.md`. |
-| `X-028` | mitigated | Le nouveau cœur peut casser les surfaces sans dépendances, wasm ou Typst | Gate final 22 fixtures/30 archétypes/quatre contextes, trente configurations de features et hôtes réels VS Code/Zed verts après math portable. La matrice CI native est prête mais son exécution distante reste requise par W-160. `.agent/analysis/w160-completion.md`. |
+| `X-028` | mitigated | Le nouveau cœur peut casser les surfaces sans dépendances, wasm ou Typst | W-160 livré : CI `38898281988` entièrement verte, 714 tests, gate 22 fixtures/30 archétypes/quatre contextes et cinq runners natifs; hôtes VS Code/Zed et Chromium vérifiés localement. Les deux tests de polices révélés par la première CI ont été corrigés sans skip. `.agent/analysis/w160-completion.md`, `.agent/analysis/w160-font-portability.md`. |
 | `X-029` | retired | Deux liens concurrents ou croisés deviennent illisibles | Retiré par `W-161` le 2026-08-25 : routes droites, courbes et orthogonales séparées quand possible, doublons orthogonaux décalés dans leur canal intérieur, ports indexés validés, ponts de croisement déterministes et suite de 602 tests. |
 | `X-030` | retired | Une grille globale peut contredire les placements relatifs et les routeurs de liens | Retiré par `W-162` le 2026-08-25 : grille bornée, conversion unique des unités, projection des relations et waypoints, bornes vérifiées par `check`, explication de la provenance et parité de build no-default/wasm. |
 | `X-031` | mitigated | Les formes alternatives d’un archétype peuvent être suggérées comme themes sans être résolues ainsi | W-164 styles livré : cibles canoniques, defaults par mot avant cascade, provenance même pour overrides de même valeur. Matrice BPMN/XY render/explain/LSP, six intégrations publiques et preuve Chromium des quatre formes BPMN vertes. `.agent/analysis/w164-completion.md`. |
@@ -89,7 +87,7 @@ Risques ouverts et résiduels; les entrées indiquent les chantiers associés et
 | id | state | date | title | was |
 |---|---|---|---|---|
 | `D-051` | active | 2026-08-25 | **La grille choisit l’unité de placement.** Sans `graph { grid: ... }`, les positions, gaps et offsets sont exprimés en unités libres; avec une grille, ces mêmes valeurs sont exprimées en cases et converties par le solveur selon les dimensions et les gaps déclarés. Une déclaration explicite ne peut pas être déplacée silencieusement par un arrondi ou un changement de mode. | utilisateur |
-| `D-050` | amended | 2026-08-25 | **La compatibilité de toutes les surfaces est un gate du cœur de placement, et le fork Kasuari est ce cœur.** Le fork couvre natif, `--no-default-features`, wasm et Typst. La première bascule conservait un chemin transitionnel au-delà de 512 entités; W-153 le retire le 2026-10-16 après optimisation du solveur add-only, des dépendances et de la validation. Nœuds, frames et attaches BPMN ont désormais un seul solveur sans seuil. Gate local complet vert; CI native distante encore requise par W-156/W-160. `.agent/analysis/all-w-completion.md`. | `Q-016` |
+| `D-050` | amended | 2026-08-25 | **La compatibilité de toutes les surfaces est un gate du cœur de placement, et le fork Kasuari est ce cœur.** Le fork couvre natif, `--no-default-features`, wasm et Typst. La première bascule conservait un chemin transitionnel au-delà de 512 entités; W-153 le retire le 2026-10-16 après optimisation du solveur add-only, des dépendances et de la validation. Nœuds, frames et attaches BPMN ont désormais un seul solveur sans seuil. Gate local et CI distante complets verts : cinq runners natifs, 714 tests et performance à `8630085` (`38898281988`), clôturant W-156/W-160. `.agent/analysis/all-w-completion.md`. | `Q-016` |
 | `D-049` | active | 2026-08-24 | **Les collisions sont diagnostiquées, jamais réparées par le render.** Cassowary ne choisit ni l'ordre ni l'axe de séparation entre deux rectangles; l'auteur fournit la relation manquante. Une éventuelle commande `arrange` reste une transformation explicite qui propose du DSL et un diff, entièrement séparée du solveur de rendu. | `Q-015` |
 | `D-048` | active | 2026-08-24 | **Chaque archetype déclare sa capacité de placement.** `Declared` utilise le bloc `layout` complet et Cassowary; `ArchetypeManaged` refuse ce bloc parce que sa géométrie vient des données; `Hybrid` n'expose que des guides explicitement documentés par le genre. Une relation non supportée est une erreur, jamais un warning suivi d'un no-op. | `Q-014` |
 | `D-047` | active | 2026-08-24 | **L'outillage reliant déclaration et bloc `layout` fait partie du minimum livrable de la v2.** Les blocks sont scoped et peuvent vivre dans les groupes; navigation bidirectionnelle, hover de provenance, outline, `explain` et surbrillance dans la preview doivent relier chaque entité à ses contraintes. La v2 n'est pas considérée utilisable sans cette surface, et aucun placement inline n'est réintroduit comme échappatoire. | `Q-013` |
@@ -141,12 +139,13 @@ not copies.
 
 | id | date | title | commit |
 |---|---|---|---|
-| `W-156` | 2026-10-16 | Déterminisme natif prouvé sur Linux x64/ARM, Windows x64/ARM et macOS ARM : 52 cas strictement identiques, répétitions et archives vérifiées; matrice native CI et comparateur verts. `.agent/analysis/native-ci-proof.json`. | `90163b7` |
-| `W-153` | 2026-10-16 | Solveur déclaré unique sans seuil/fallback, frames et attaches BPMN simultanées, validation exacte et garde 20 000 nœuds verte. Suite intégrée et runtimes verts; objectif utilisateur autorisant la clôture. `.agent/analysis/w153-completion.md`. | non committé |
-| `W-157` | 2026-10-16 | Conflit de cardinalité minimum sur tous les composants, provenance complète et erreurs internes typées; oracle exhaustif, revue indépendante et gate runtime verts. `.agent/analysis/w157-completion.md`. | non committé |
-| `W-158` | 2026-10-16 | Inspecteur preview visible et navigation/provenance LSP; six scénarios Chromium et hôte VS Code réels vérifiés. `.agent/analysis/w158-completion.md`. | non committé |
-| `W-159` | 2026-10-16 | Matrice unique des trente capacités : validation, complétion, documentation et dispatch; trente configurations vertes. `.agent/analysis/w159-completion.md`. | non committé |
-| `W-164` | 2026-10-16 | Styles multi-formes BPMN/XY : cible canonique, defaults par mot sous cascade et provenance fidèle; six intégrations publiques et quatre formes réelles vérifiées. `.agent/analysis/w164-completion.md`. | non committé |
+| `W-160` | 2026-10-16 | Gate runtime et CI distante vérifiés : 16 jobs verts, 714 tests, 22 fixtures/30 archétypes/quatre contextes, cinq runners natifs et performance; fonts PNG fixes et alias préservés. `.agent/analysis/w160-completion.md`; CI `38898281988`. | `8630085` |
+| `W-156` | 2026-10-16 | Déterminisme natif prouvé sur Linux x64/ARM, Windows x64/ARM et macOS ARM : 52 cas strictement identiques, répétitions et archives vérifiées; matrice native CI et comparateur verts. `.agent/analysis/native-ci-proof-final.json`. | `8630085` |
+| `W-153` | 2026-10-16 | Solveur déclaré unique sans seuil/fallback, frames et attaches BPMN simultanées, validation exacte et garde 20 000 nœuds verte. Suite intégrée et runtimes verts; objectif utilisateur autorisant la clôture. `.agent/analysis/w153-completion.md`. | `90163b7` |
+| `W-157` | 2026-10-16 | Conflit de cardinalité minimum sur tous les composants, provenance complète et erreurs internes typées; oracle exhaustif, revue indépendante et gate runtime verts. `.agent/analysis/w157-completion.md`. | `90163b7` |
+| `W-158` | 2026-10-16 | Inspecteur preview visible et navigation/provenance LSP; six scénarios Chromium et hôte VS Code réels vérifiés. `.agent/analysis/w158-completion.md`. | `90163b7` |
+| `W-159` | 2026-10-16 | Matrice unique des trente capacités : validation, complétion, documentation et dispatch; trente configurations vertes. `.agent/analysis/w159-completion.md`. | `90163b7` |
+| `W-164` | 2026-10-16 | Styles multi-formes BPMN/XY : cible canonique, defaults par mot sous cascade et provenance fidèle; six intégrations publiques et quatre formes réelles vérifiées. `.agent/analysis/w164-completion.md`. | `90163b7` |
 | `W-154` | 2026-10-16 | Noyau DSL V2 unifié, sans compatibilité V1 ni convertisseur caché. Rejet du placement V1, migrateur et accord pest/tree-sitter vérifiés; passage à landed demandé par l'utilisateur. Preuves : `.agent/analysis/parallel-work-validation.md`, section clôture. | `5d0320c` |
 | `W-155` | 2026-10-16 | Analyse commune CLI/LSP/wasm/preview/Typst avec source maps, diagnostics multifichiers et contrats Unicode. Quinze tests d'analyse et gate runtime reconfirmés; passage à landed demandé par l'utilisateur. Preuves : `.agent/analysis/parallel-work-validation.md`, section clôture. | `5d0320c` |
 | `W-161` | 2026-08-25 | Lisibilité des liens concurrents et des croisements | `7ce4536` |

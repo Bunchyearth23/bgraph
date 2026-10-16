@@ -195,3 +195,52 @@ in `/tmp/bgraph-ci-check-failure-38895893757.log` and the machine proof.
 W-160's complete CI requirement still needs the subsequent corrected run.
 
 This independent audit used one graft retrieval, approximately 3,623 tokens saved.
+
+## Final successful CI — supersedes the first run's overall failure
+
+The corrected final revision **`863008506ed4f2546de7c2b95f9983a4ce26ddbe`**
+completed successfully in
+[run 38898281988](https://github.com/Bunchyearth23/bgraph/actions/runs/38898281988):
+**all 16 jobs succeeded**, including the previously failing `check` job,
+runtime/extension parity, feature builds, all five native jobs and the
+[exact native aggregate](https://github.com/Bunchyearth23/bgraph/actions/runs/38898281988/job/116965688729).
+
+| Actual runner | Native job ID | Final artifact ID |
+|---|---:|---:|
+| ubuntu-latest | 116963947115 | 12044692194 |
+| ubuntu-24.04-arm | 116963947229 | 12044822136 |
+| windows-latest | 116963947312 | 12044927232 |
+| windows-11-arm | 116963947118 | 12044802793 |
+| macos-latest | 116963947218 | 12045136215 |
+
+The five archives were independently downloaded again by their final artifact
+IDs. Every archive SHA-256 matches GitHub's recorded digest. All documents match
+the new revision, runner/provider metadata, default features and expected native
+OS/architecture. Each repeats three times in process and launches three fresh
+children that each repeat three times. The strict comparator passed again for
+**52 cases**, and the remote aggregate passed its 18 rejection self-tests.
+
+The final snapshots are bit-for-bit semantically identical across all five
+runners **and to the first successful native comparison**: source, SVG,
+unrounded geometry and diagnostic fingerprints are unchanged. The canonical
+snapshot SHA-256 remains
+`3c7d8a73b2090d64e3788a07dc68f035ba51ec412371996a06ee92021ea00fb4`.
+The final `check` job's log independently confirms **693 library tests plus
+21 other tests passed, zero failures and one intentionally ignored measurement**.
+Clippy, formatting, the performance regression guard and no-archetype build
+also completed in that successful job.
+
+**`native-ci-proof-final.json`** records this complete final audit, including
+all 16 job IDs/outcomes, five artifact digests, JSON/source/snapshot checksums
+and test-suite counts. The original `native-ci-proof.json` is retained as the
+first historical native proof with its correctly recorded overall failure.
+
+Final independent audit files:
+
+- `/tmp/bgraph-ci-audit-38898281988/` — separately downloaded original ZIPs and JSONs.
+- `/tmp/bgraph-ci-native-independent-final.log` — strict final comparator, exit 0.
+- `/tmp/bgraph-ci-native-aggregate-38898281988.log` — real remote aggregate log.
+- `/tmp/bgraph-ci-check-success-38898281988.log` — successful full check log.
+
+No code or INDEX was edited during this audit. Final audit graft context:
+one retrieval, approximately 3,623 tokens saved.

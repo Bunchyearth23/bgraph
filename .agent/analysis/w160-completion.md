@@ -56,10 +56,36 @@ a theme hover priority bug (`style node`); its final rerun belongs to W-164.
 The final Windows ARM64 MSVC CLI/LSP cross-build also completed **exit 0**;
 `/tmp/bgraph-goal-windows-arm64-final.log`. No execution is inferred from it.
 
-## Required external proof
+## Hosted CI completed
 
-The five-platform native CI matrix remains unexecuted. No real macOS, Windows ARM,
-or hosted native ARM/Windows run is claimed from QEMU/Wine. GitHub has no
-authenticated host and no macOS host was provided. These required executions
-keep W-160 and the full goal unfinished until actual evidence exists.
-No workflow dispatch, push or publication was performed.
+The user authorized a private validation branch and completed GitHub CLI
+browser authentication. The first run `38895893757` proved all five native
+targets, but its global test step found two environment-dependent font tests.
+Those failures were fixed with licensed fixed-font inputs and real embedded-font
+loading in PNG, preserving other font aliases; six focused regressions and an
+independent review pass. See `w160-font-portability.md`.
+
+Final run [38898281988](https://github.com/Bunchyearth23/bgraph/actions/runs/38898281988)
+at `863008506ed4f2546de7c2b95f9983a4ce26ddbe` is **completed / success**.
+Every one of its **16 jobs** succeeded. The global check's Format, Clippy, Test,
+Performance regression guard, grammar-skip guard and no-archetype build all
+succeeded, with no required step skipped. The Test step proves **714 passed**:
+693 library, one binary, nine solver integrations, one LSP, one native, six
+style integrations and three doctests; one historical measurement remains
+intentionally ignored and has a separately executed performance guard.
+
+The hosted runtime gate proves **22 fixtures**, **30 archetypes** and **four file
+contexts**. All five native runner jobs and the strict aggregate comparison
+pass at this same revision. The actual artifacts were downloaded and the
+comparator rerun locally with the exact `GITHUB_SHA`; it passed all **52 cases**.
+Archive digests, job IDs, repeated-process evidence and native metadata are
+recorded in `native-ci-proof-final.json`.
+
+Hosted guard: 20k connected nodes average **385.76 ms** per complete invocation;
+public `render_source` on 5k nodes **94.73 ms**, with unchanged budgets. Complete
+run data: `/tmp/bgraph-ci-second-progress.json`, `/tmp/bgraph-ci-second-all.log`;
+strict comparison: `/tmp/bgraph-ci-native-comparison-8630085.log`.
+
+No required W-160 validation remains. Code is on the authorized private branch
+`codex/placement-proof-20261016`; no release tag, release or registry publication
+was created. The original local main worktree remains available for review.
