@@ -53,6 +53,7 @@ en points, comme `600x800`.
 ```sh
 bgraph watch architecture.bd
 bgraph watch architecture.bd --port 7879
+bgraph watch architecture.bd --open --port 0
 bgraph watch architecture.svg
 ```
 
@@ -60,6 +61,11 @@ Pour un fichier `.bd`, la preview reconstruit le diagramme à l'enregistrement.
 Pour un SVG, elle affiche l'image existante. Ouvrez l'adresse imprimée par
 la commande. Le viewer propose zoom, déplacement et, pour le source bgraph,
 inspection de la géométrie et du style.
+
+`--open` ouvre le navigateur après démarrage du serveur. `--port 0` choisit
+un port libre et affiche l'adresse utilisée. Si le navigateur ne peut pas
+être lancé, la preview reste accessible à cette adresse. `--open` concerne
+les fichiers `.bd` et `.svg`, pas la génération d'un dossier.
 
 ## Construire tout un dossier
 

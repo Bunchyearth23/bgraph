@@ -766,6 +766,95 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "bpmn")]
+    #[test]
+    fn bpmn_unplaced_frames_keep_local_coordinates_without_false_global_errors() {
+        for genre in ["free", "bpmn"] {
+            let source = format!(
+                "type {genre}\ngroup pool \"Pool\" {{\n width: 600\n node a {{ size: 80 60 }}\n layout {{ place a at (40, 20) }}\n}}"
+            );
+            let analysis = crate::analyze_source(&source);
+            assert!(
+                !analysis.has_errors(),
+                "{genre}: {:?}",
+                analysis.diagnostics
+            );
+            let layout = analysis.layout.unwrap();
+            let node = layout.nodes[0].rect;
+            let frame = layout.groups[0].rect;
+            assert_eq!(frame.w, 600.0);
+            if genre == "bpmn" {
+                assert_eq!((node.x - frame.x, node.y - frame.y), (58.0, 54.0));
+                let diagram = crate::parser::parse(&source).unwrap();
+                let explanation = crate::explain::explain(&diagram, &layout, "pool").unwrap();
+                assert!(explanation.contains("local origin starts after padding and title"));
+            } else {
+                assert_eq!((node.x, node.y), (40.0, 20.0));
+            }
+        }
+    }
+
+    #[cfg(feature = "bpmn")]
+    #[test]
+    fn bpmn_local_origin_contains_taller_centered_members_and_negative_coordinates() {
+        for x in [0.0, -30.0] {
+            let source = format!(
+                "type bpmn\ngroup pool \"Pool\" {{\n event got \"\" start message\n task work \"Work\" service\n layout {{\n place got at ({x}, 0)\n place work right-of got gap 40\n }}\n}}\nlayout {{ place pool at (100, 200) }}\ngot -> work"
+            );
+            let analysis = crate::analyze_source(&source);
+            assert!(
+                !analysis.has_errors(),
+                "{source}: {:?}",
+                analysis.diagnostics
+            );
+            let layout = analysis.layout.unwrap();
+            let event = layout.nodes[0].rect;
+            let task = layout.nodes[1].rect;
+            let frame = layout.groups[0].rect;
+            assert_eq!((frame.x, frame.y), (100.0, 200.0));
+            assert_eq!((event.x, task.y), (118.0, 234.0));
+            assert_eq!(event.cy(), task.cy());
+            assert_eq!(task.x - event.right(), 40.0);
+            assert_eq!(frame.bottom() - task.bottom(), 18.0);
+        }
+    }
+
+    #[cfg(feature = "bpmn")]
+    #[test]
+    fn bpmn_nested_lanes_retain_positive_local_offsets() {
+        let source = "type bpmn\ngroup pool \"Pool\" {\n group lane_a \"A\" {\n task a \"A\" service\n layout { place a at (0, 0) }\n }\n group lane_b \"B\" {\n task b \"B\" service\n layout { place b at (420, 0) }\n }\n layout {\n place lane_a at (0, 0)\n place lane_b at (0, 140)\n }\n}\nlayout { place pool at (100, 200) }";
+        let analysis = crate::analyze_source(source);
+        assert!(!analysis.has_errors(), "{:?}", analysis.diagnostics);
+        let layout = analysis.layout.unwrap();
+        let group = |id: &str| layout.groups.iter().find(|g| g.id == id).unwrap().rect;
+        let a = group("lane_a");
+        let b = group("lane_b");
+        assert_eq!((group("pool").x, group("pool").y), (100.0, 200.0));
+        assert_eq!(a.w, b.w);
+        assert_eq!((a.x, b.x, b.y - a.y), (118.0, 118.0, 140.0));
+        assert_eq!(layout.nodes[1].rect.x - b.x, 438.0);
+    }
+
+    #[cfg(feature = "bpmn")]
+    #[test]
+    fn bpmn_local_origin_does_not_relax_explicit_sizes_or_conflicting_placements() {
+        for body in [
+            "height: 70\ntask a \"A\" service\nlayout { place a at (0, 0) }",
+            "task a \"A\" service\ntask b \"B\" service\nlayout {\n place a at (0, 0)\n place b at (0, 80)\n align top a b\n}",
+        ] {
+            let source = format!("type bpmn\ngroup pool \"Pool\" {{\n{body}\n}}");
+            let analysis = crate::analyze_source(&source);
+            assert!(analysis.has_errors(), "{source}");
+            assert!(
+                analysis.diagnostics.iter().any(|diag| diag
+                    .message
+                    .contains("required layout constraints conflict")),
+                "{:?}",
+                analysis.diagnostics
+            );
+        }
+    }
+
     #[test]
     fn frame_preferences_cannot_enlarge_a_frame_to_hide_a_source_contradiction() {
         let source = "node anchor { size: 20 20 }\ngroup g {\n padding: 0\n node a { size: 20 20 }\n node b { size: 20 20 }\n layout {\n place a at (0, 0)\n place b at (100, 0)\n }\n}\nlayout {\n place anchor at (50, 0)\n place g at (0, 0)\n align left anchor a\n}";

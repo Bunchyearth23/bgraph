@@ -1,0 +1,74 @@
+{
+  "annotations": [],
+  "background": "#ffffff",
+  "canvas": {
+    "height": 604.0,
+    "width": 664.0
+  },
+  "description": null,
+  "edges": [],
+  "groups": [
+    {
+      "description": null,
+      "id": "first",
+      "label": [
+        "Classe"
+      ],
+      "rect": {
+        "h": 260.0,
+        "w": 600.0,
+        "x": 32.0,
+        "y": 32.0
+      }
+    },
+    {
+      "description": null,
+      "id": "second",
+      "label": [
+        "Inline"
+      ],
+      "rect": {
+        "h": 260.0,
+        "w": 600.0,
+        "x": 32.0,
+        "y": 312.0
+      }
+    }
+  ],
+  "guides": [],
+  "label_conflicts": [],
+  "nodes": [
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "a",
+      "label": [
+        "A"
+      ],
+      "rect": {
+        "h": 60.0,
+        "w": 118.0,
+        "x": 50.0,
+        "y": 66.0
+      },
+      "stroke": "#1f2937"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "b",
+      "label": [
+        "B"
+      ],
+      "rect": {
+        "h": 60.0,
+        "w": 118.0,
+        "x": 50.0,
+        "y": 346.0
+      },
+      "stroke": "#1f2937"
+    }
+  ],
+  "title": null,
+  "version": 1
+}

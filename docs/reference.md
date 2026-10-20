@@ -30,6 +30,7 @@ bgraph diagram.bd --theme dark      # a named palette under the file's own style
 bgraph watch diagram.bd             # show it, and reload when it changes
 bgraph watch diagram.svg            # …a picture works too; the extension decides
 bgraph watch diagram.bd --port 9000
+bgraph watch diagram.bd --open --port 0  # open the browser on a free port
 bgraph watch docs/diagrams          # a directory: build every .bd as it changes
 bgraph watch docs/diagrams --once   # …once, non-zero on failure — a build step
 bgraph check diagram.bd             # diagnostics only; non-zero on error
@@ -56,6 +57,11 @@ The watch page reloads on every save and reports parse and layout errors in
 place, so a broken file never costs you the preview. Scroll to zoom, drag to
 pan, `f` to fit, `0` for actual size — and the view survives the reload, or
 zooming while editing would be pointless.
+
+For a single `.bd` or `.svg` file, `--open` launches the default browser after
+the server has bound its port. `--port 0` lets the OS choose a free port; the
+actual address is printed. If the browser cannot be opened, the server stays
+available at that address. `--open` is not supported for directory builds.
 
 ## The five statements
 
@@ -242,6 +248,9 @@ BPMN event and gateway captions choose a nearby position clear of flows,
 nodes and other labels. Their measured footprints also contribute to relative
 gaps and containing frames. Explicit `at` coordinates and alignments still
 refer to visible shapes. A declared `label-offset` pins the caption.
+`label-position: top|right|bottom|left` pins the side of an external BPMN
+event or gateway caption; `label-offset` then adjusts that position. Other
+elements reject `label-position` rather than ignoring it.
 Edge labels also avoid annotations and group titles and can slide along
 their segment. Avoidance is bounded; remaining collisions produce diagnostics
 rather than silently moving declared nodes.
@@ -1725,6 +1734,7 @@ On a `task` — these are its own, and are not offered elsewhere:
 
 | Property | Where | Syntax | Meaning |
 |---|---|---|---|
+| `label-position` | node | `label-position: <top\|right\|bottom\|left>` | Pin an external BPMN event or gateway caption to this side. Without it, the side is chosen automatically. label-offset adds a manual adjustment. |
 | `kind` | node | `kind: <plain\|user\|service\|script\|manual\|send\|receive\|rule\|subprocess>` | What kind of task it is, drawn as a marker in the corner of the box. The default for `task` and its `node` synonym is `plain`. `subprocess` takes the `+` instead, and an *expanded* subprocess is a `group`. Usually written positionally — `task check "Check credit" service`. |
 | `stage` | node | `stage: <start\|intermediate\|end\|boundary>` | Where the event sits: a thin ring starts, a thick one ends, a double ring is intermediate. An `event` without a stage is `intermediate`, with a `plain` trigger. `boundary` is the exception — it is not a place in the flow but a place on a task, so it needs `attach`. |
 | `trigger` | node | `trigger: <plain\|message\|timer\|error\|signal\|escalation\|conditional\|terminate>` | What makes the event happen, drawn inside the ring. Written second, after the stage — `event due "Overdue" boundary timer`. |

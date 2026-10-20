@@ -1,0 +1,90 @@
+{
+  "annotations": [],
+  "background": "#ffffff",
+  "canvas": {
+    "height": 395.6,
+    "width": 664.0
+  },
+  "description": null,
+  "edges": [],
+  "groups": [
+    {
+      "description": null,
+      "id": "pool",
+      "label": [
+        "Pool"
+      ],
+      "rect": {
+        "h": 331.6,
+        "w": 600.0,
+        "x": 32.0,
+        "y": 32.0
+      }
+    },
+    {
+      "description": null,
+      "id": "lane_a",
+      "label": [
+        "Petite voie"
+      ],
+      "rect": {
+        "h": 112.0,
+        "w": 564.0,
+        "x": 50.0,
+        "y": 66.0
+      }
+    },
+    {
+      "description": null,
+      "id": "lane_b",
+      "label": [
+        "Grande voie"
+      ],
+      "rect": {
+        "h": 155.60000000000002,
+        "w": 564.0,
+        "x": 50.0,
+        "y": 190.0
+      }
+    }
+  ],
+  "guides": [],
+  "label_conflicts": [],
+  "nodes": [
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "a",
+      "label": [
+        "A"
+      ],
+      "rect": {
+        "h": 60.0,
+        "w": 118.0,
+        "x": 68.0,
+        "y": 100.0
+      },
+      "stroke": "#1f2937"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "b",
+      "label": [
+        "Une étiquette sur",
+        "deux lignes",
+        "avec une largeur",
+        "imposée"
+      ],
+      "rect": {
+        "h": 103.60000000000001,
+        "w": 160.0,
+        "x": 68.0,
+        "y": 224.0
+      },
+      "stroke": "#1f2937"
+    }
+  ],
+  "title": null,
+  "version": 1
+}

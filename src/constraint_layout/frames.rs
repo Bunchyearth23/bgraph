@@ -99,16 +99,26 @@ pub(super) fn solve(
                 diagram.nodes.len() + group,
                 diagram.groups[group].span,
             );
-            push(
-                &mut constraints,
-                (*tx + offset.0) | EQ(Strength::REQUIRED) | (vars.x + padding),
-                source,
-            );
-            push(
-                &mut constraints,
-                (*ty + offset.1) | EQ(Strength::REQUIRED) | (vars.y + padding + title),
-                source.with_axis(Axis::Y),
-            );
+            for (origin, inset, source) in [
+                (*tx + offset.0, vars.x + padding, source),
+                (
+                    *ty + offset.1,
+                    vars.y + padding + title,
+                    source.with_axis(Axis::Y),
+                ),
+            ] {
+                // Keep positive local offsets; negative extents can move the origin inward.
+                push(
+                    &mut constraints,
+                    origin.clone() | GE(Strength::REQUIRED) | inset.clone(),
+                    source,
+                );
+                push(
+                    &mut constraints,
+                    origin | EQ(Strength::STRONG) | inset,
+                    source,
+                );
+            }
         }
     }
     for (node, (&vars, &size)) in variables.iter().zip(sizes).enumerate() {

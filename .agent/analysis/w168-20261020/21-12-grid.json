@@ -1,0 +1,215 @@
+{
+  "annotations": [
+    {
+      "color": "#111827",
+      "size": 11.9,
+      "text": "E",
+      "x": 508.0,
+      "y": 333.9
+    },
+    {
+      "color": "#0b0b0b",
+      "size": 16.0,
+      "text": "grid",
+      "x": 32.0,
+      "y": 48.0
+    }
+  ],
+  "background": "#ffffff",
+  "canvas": {
+    "height": 694.0,
+    "width": 942.0
+  },
+  "description": null,
+  "edges": [
+    {
+      "from": "a",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          244.0,
+          182.0
+        ],
+        [
+          698.0,
+          182.0
+        ]
+      ],
+      "to": "b"
+    },
+    {
+      "from": "e",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          528.0,
+          296.0
+        ],
+        [
+          682.0,
+          296.0
+        ],
+        [
+          682.0,
+          318.0
+        ],
+        [
+          698.0,
+          318.0
+        ]
+      ],
+      "to": "c"
+    },
+    {
+      "from": "d",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          786.0,
+          560.0
+        ],
+        [
+          786.0,
+          360.0
+        ]
+      ],
+      "to": "c"
+    }
+  ],
+  "groups": [
+    {
+      "description": null,
+      "id": "p",
+      "label": [
+        "P"
+      ],
+      "rect": {
+        "h": 324.0,
+        "w": 878.0,
+        "x": 32.0,
+        "y": 72.0
+      }
+    },
+    {
+      "description": null,
+      "id": "q",
+      "label": [
+        "Q"
+      ],
+      "rect": {
+        "h": 136.0,
+        "w": 842.0000000000001,
+        "x": 49.99999999999994,
+        "y": 526.0
+      }
+    },
+    {
+      "description": null,
+      "id": "l1",
+      "label": [
+        "L1"
+      ],
+      "rect": {
+        "h": 136.0,
+        "w": 842.0,
+        "x": 50.0,
+        "y": 106.0
+      }
+    },
+    {
+      "description": null,
+      "id": "l2",
+      "label": [
+        "L2"
+      ],
+      "rect": {
+        "h": 136.0,
+        "w": 842.0,
+        "x": 50.0,
+        "y": 242.0
+      }
+    }
+  ],
+  "guides": [],
+  "label_conflicts": [],
+  "nodes": [
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "a",
+      "label": [
+        "A"
+      ],
+      "rect": {
+        "h": 84.0,
+        "w": 176.0,
+        "x": 68.0,
+        "y": 140.0
+      },
+      "stroke": "#1f2937"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "b",
+      "label": [
+        "B"
+      ],
+      "rect": {
+        "h": 84.0,
+        "w": 176.0,
+        "x": 698.0,
+        "y": 140.0
+      },
+      "stroke": "#1f2937"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "e",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 488.0,
+        "y": 276.0
+      },
+      "stroke": "#1f2937"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c",
+      "label": [
+        "C"
+      ],
+      "rect": {
+        "h": 84.0,
+        "w": 176.0,
+        "x": 698.0,
+        "y": 276.0
+      },
+      "stroke": "#1f2937"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "d",
+      "label": [
+        "D"
+      ],
+      "rect": {
+        "h": 84.0,
+        "w": 176.0,
+        "x": 698.0,
+        "y": 560.0
+      },
+      "stroke": "#1f2937"
+    }
+  ],
+  "title": "grid",
+  "version": 1
+}

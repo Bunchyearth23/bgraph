@@ -1,0 +1,13 @@
+[
+  {
+    "label": "bgraph: Preview",
+    "command": "bgraph",
+    "args": ["watch", "\"$BGRAPH_PREVIEW_FILE\"", "--open", "--port", "0"],
+    "env": { "BGRAPH_PREVIEW_FILE": "$ZED_FILE" },
+    "cwd": "$ZED_DIRNAME",
+    "save": "current",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "no_focus"
+  }
+]

@@ -1,0 +1,80 @@
+{
+  "grammar_revision": "c36cb529b6839740d06d5e76b57514f2e72de48a",
+  "preview": {
+    "status": "passed",
+    "task": "bgraph: Preview",
+    "shortcut": "ctrl-shift-v",
+    "invocation": {
+      "pid": 1177253,
+      "args": [
+        "watch",
+        "/tmp/bgraph-zed-host-v1uewyc3/project/preview ' $(touch INJECTED) `touch INJECTED` $file.bd",
+        "--open",
+        "--port",
+        "0"
+      ]
+    },
+    "url": "http://127.0.0.1:45471",
+    "saved_buffer": true,
+    "reload": true,
+    "repeat_watcher_count": 1,
+    "shell_injection": false
+  },
+  "sha256": {
+    "component": "85ea59fb1d34bcc52efc526492ed6722bda6921b74db9f8d7468942be2569a81",
+    "grammar": "519cb8388ce1c9530d4d6e5781e3e6074d91916ee87b223290f11aa6c21b98db",
+    "parser": "c2cec58411aa430bfe5eaec99747efdf60918e5c495386c847e65b01355d92b2",
+    "cli": "b0b9a4e7aa537d23dc809f9d449bb85dc4aecaa2bb43cb95246a86bb80c3d967",
+    "server": "3052a71d68cd6d30ffc7d93d947e5f998244af6edb84dc6bccedc73f6f610006",
+    "server_wrapper": "f2ad0fc564481d863e81bdc37b6a2e26fe080e9f9782733a5027386912cf8d46",
+    "preview_cli_wrapper": "cce7cac68689146e6d47328913a34cd522d72abd1a199492602e32963c082095",
+    "preview_task": "29ab87548f9818a6f185ce991523ba6e2a27e3874e1170b073ab62c26069d0a1",
+    "preview_keymap": "28ac1b231c222788827c63d1f65f05005db8b2ff697bb7dd12617e9f8ad3a19a"
+  },
+  "status": "passed",
+  "client": {
+    "name": "Zed",
+    "version": "1.24.3+stable"
+  },
+  "extension_server_launches": [
+    "2026-10-20T13:19:53+02:00 INFO  [lsp] starting language server process. binary path: \"/tmp/bgraph-zed-host-v1uewyc3/bin/bgraph-lsp\", working directory: \"/tmp/bgraph-zed-host-v1uewyc3/project\", args: []"
+  ],
+  "diagnostics": {},
+  "host_evidence_directory": "/tmp/bgraph-zed-host-v1uewyc3",
+  "processes": {
+    "invocations": [
+      {
+        "pid": 1177253,
+        "args": [
+          "watch",
+          "/tmp/bgraph-zed-host-v1uewyc3/project/preview ' $(touch INJECTED) `touch INJECTED` $file.bd",
+          "--open",
+          "--port",
+          "0"
+        ]
+      },
+      {
+        "pid": 1177282,
+        "args": [
+          "watch",
+          "/tmp/bgraph-zed-host-v1uewyc3/project/preview ' $(touch INJECTED) `touch INJECTED` $file.bd",
+          "--open",
+          "--port",
+          "0"
+        ]
+      }
+    ],
+    "active": [
+      {
+        "pid": 1177282,
+        "args": [
+          "watch",
+          "/tmp/bgraph-zed-host-v1uewyc3/project/preview ' $(touch INJECTED) `touch INJECTED` $file.bd",
+          "--open",
+          "--port",
+          "0"
+        ]
+      }
+    ]
+  }
+}

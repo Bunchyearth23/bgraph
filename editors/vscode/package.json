@@ -1,7 +1,7 @@
 {
   "name": "bgraph",
   "displayName": "bgraph",
-  "description": "Syntax highlighting and language server for the bgraph diagram DSL",
+  "description": "Syntax highlighting, live preview and language server for the bgraph diagram DSL",
   "version": "1.0.0",
   "publisher": "bunchyearth23",
   "private": true,
@@ -21,8 +21,36 @@
     "onLanguage:markdown"
   ],
   "main": "./src/extension.js",
+  "scripts": {
+    "test": "node --test test/*.test.cjs"
+  },
   "contributes": {
     "markdown.markdownItPlugins": true,
+    "commands": [
+      {
+        "command": "bgraph.showPreview",
+        "title": "Open Preview",
+        "category": "bgraph",
+        "enablement": "resourceLangId == bgraph"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "bgraph.showPreview",
+        "key": "ctrl+shift+v",
+        "mac": "cmd+shift+v",
+        "when": "editorLangId == bgraph && editorTextFocus"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "bgraph.showPreview",
+          "when": "resourceLangId == bgraph",
+          "group": "navigation"
+        }
+      ]
+    },
     "configurationDefaults": {
       "[bgraph]": {
         "editor.tabSize": 2,

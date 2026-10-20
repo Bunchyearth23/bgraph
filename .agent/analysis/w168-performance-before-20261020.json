@@ -1,0 +1,22 @@
+{
+  "binary_sha256": "a4d0ff3f26ba224aae865d611c6feb309df5d2f8bae510e9be5515d1d1d3d7bf",
+  "source": ".agent/fixtures/bpmn-v1/06-boundary-in-context.bd",
+  "source_sha256": "caa0c50fa665dabf17b05e2b8dcdb42fa9dfa739367eb34819327e41afdb35ae",
+  "runs": [
+    {
+      "exit": 0,
+      "seconds": 0.9174831580021419,
+      "stderr": ""
+    },
+    {
+      "exit": 0,
+      "seconds": 1.9921736679971218,
+      "stderr": ""
+    },
+    {
+      "exit": 0,
+      "seconds": 3.660349343001144,
+      "stderr": ""
+    }
+  ]
+}

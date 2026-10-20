@@ -1,0 +1,90 @@
+[
+  {
+    "name": "tests",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--all-features"
+    ],
+    "exit": 0,
+    "seconds": 38.25
+  },
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 1.43
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--all-targets",
+      "--all-features",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0,
+    "seconds": 3.88
+  },
+  {
+    "name": "minimal",
+    "command": [
+      "cargo",
+      "build",
+      "--locked",
+      "--no-default-features"
+    ],
+    "exit": 0,
+    "seconds": 4.38
+  },
+  {
+    "name": "wasm",
+    "command": [
+      "cargo",
+      "build",
+      "--locked",
+      "--target",
+      "wasm32-unknown-unknown",
+      "--no-default-features",
+      "--features",
+      "wasm,all-archetypes,pdf,json,csv"
+    ],
+    "exit": 0,
+    "seconds": 4.62
+  },
+  {
+    "name": "performance",
+    "command": [
+      "cargo",
+      "bench",
+      "--locked",
+      "--bench",
+      "pipeline",
+      "--",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 45.51
+  },
+  {
+    "name": "docs",
+    "command": [
+      ".tools/docs-venv/bin/python",
+      "-m",
+      "mkdocs",
+      "build",
+      "--strict"
+    ],
+    "exit": 0,
+    "seconds": 1.6
+  }
+]

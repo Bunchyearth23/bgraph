@@ -25,17 +25,31 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**État enregistré : trois chantiers en construction (`W-166`, `W-167`, `W-168`), aucun planifié ou bloqué;
+**État enregistré : cinq chantiers en construction (`W-166` à `W-170`), aucun planifié ou bloqué;
 aucune question ni risque ouvert.** L'objectif « all non blocked W done and
 proven » est atteint pour les sept chantiers de sa portée : `W-153`, `W-156`,
 `W-157`, `W-158`, `W-159`, `W-160` et `W-164` styles. `W-154` et `W-155`
 avaient déjà été clôturés sur instruction utilisateur.
 CI de validation des chantiers `38898281988` verte au commit `8630085` :
 16 jobs, 714 tests, cinq runners natifs, runtimes et performance.
-Dernière CI `38911975982` également terminée avec succès sur `main`,
+Dernière CI consignée `38911975982` également terminée avec succès sur `main`,
 commit `2a556a6` (documentation et corrections LSP incluses).
-Pour reprendre, lire l'entrée du chantier et son risque associé ci-dessous; les travaux
-livrés et les décisions historiques sont conservés dans **Settled**.
+Validation locale intégrée du 2026-10-20 : **745 tests Rust réussis** et
+**six tests JS réussis**, un ancien test de performance manuelle ignoré ;
+Clippy, build minimal, wasm, garde de performance et MkDocs strict verts.
+Le gate des interfaces passe 22 fixtures, 30 genres et quatre contextes de
+fichiers ; previews vérifiées dans les hôtes VS Code et Zed réels.
+Les trois erreurs BPMN sont corrigées ;
+25 reproductions inchangées passent, avec 12 avertissements sur huit cas.
+Reprise : installer les previews (`W-169`/`W-170`) puis les valider côté
+utilisateur ; ouvrir le dossier dans Zed et fusionner l'entrée de keymap.
+Validation utilisateur des rendus et sources complémentaires de `W-166`,
+puis CI sur les changements, toujours attendues. Le binaire corrigé est dans
+`target/release/bgraph` et le VSIX dans `editors/vscode/` ; les installations
+existantes n'ont pas été remplacées. Aucun état parent changé.
+Bilans et preuves : `.agent/analysis/editor-previews-20261020.md` et
+`.agent/analysis/parallel-validation-20261020.md`.
+Les travaux livrés et les décisions historiques sont conservés dans **Settled**.
 
 Documentation utilisateur ajoutée le 2026-10-16 à la demande de l'utilisateur :
 site MkDocs local (`mkdocs.yml`), 12 guides français, trois manuels canoniques
@@ -76,9 +90,11 @@ deux lignes distinctes dans **Work landed**; aucun id renuméroté.
 
 | id | state | title | notes |
 |---|---|---|---|
-| `W-166` | building | Marges extérieures et cadres de séquence sans chevauchement | `margin` CSS (1–4 valeurs et côtés), cascade, validation/complétion, gaps et conteneurs raccordés. Séquences : cadres/titres/activations et participants espacés avant placement, imbrication prise en compte. Neuf genres déclarés et `sequence` ; autres genres refusés explicitement. Builds, Clippy, MkDocs et rendus SVG/PDF/PNG observés ; galerie régénérée. Restent validation utilisateur et exemples des autres genres concernés ; suites non relancées. `.agent/analysis/margins-20261016.md`. |
-| `W-167` | building | Libellés BPMN et textes des liens sans chevauchement | Légendes d'événements/losanges placées selon les routes/textes ; empreintes incluses dans les gaps/cadres. Liens : évitement des annotations/titres et recherche le long du segment. `label-offset` explicite conservé ; collisions résiduelles signalées. Builds, Clippy, MkDocs et rendus SVG/PDF/PNG observés ; trois sorties de galerie régénérées, CLI/LSP locaux installés. Restent validation utilisateur ; suites/CI non relancées. `.agent/analysis/bpmn-labels-20261016.md`. |
-| `W-168` | building | Rapport utilisateur BPMN : dix corrections pour la 1.0.0 | Ordre parent/enfant, dimensions de groupes et largeur des lanes, diagnostics message, départs de bordure et ports hôtes, via orthogonaux, obstacles >60, ports par type de flux, texte à largeur fixe et étiquettes obstacles. Reproductions originales retrouvées et conservées dans `.agent/fixtures/bpmn-v1/`. Détail et preuves : `.agent/analysis/bpmn-v1-20261016.md`. |
+| `W-166` | building | Marges extérieures et cadres de séquence sans chevauchement | Marges CSS pour les neuf genres déclarés et `sequence`, autres genres refusés. Correction du 2026-10-20 : les cadres de séquence réservent aussi les grands libellés et titres implicites. 11 tests ciblés réussis, dont 5 sans fonctionnalités par défaut ; SVG `sequence` inchangé. Restent validation utilisateur, source originale de la capture et exemples des autres genres concernés. `.agent/analysis/w166-validation-20261020.md` ; contrat : `.agent/analysis/margins-20261016.md`. |
+| `W-167` | building | Libellés BPMN et textes des liens sans chevauchement | Évitement local des captions et libellés, offsets explicites conservés, collisions résiduelles signalées. Neuf nouveaux tests ciblés réussis ; deux attentes historiques adaptées au wrapping et à un warning de clearance réel, sans masquer les autres diagnostics. Aucun changement du moteur nécessaire pour ces cas. Reste validation utilisateur, notamment des légendes encore signalées. `.agent/analysis/w167-validation-20261020.md` ; contrat : `.agent/analysis/bpmn-labels-20261016.md`. |
+| `W-168` | building | Rapport utilisateur BPMN : dix corrections pour la 1.0.0 | Origines locales BPMN et routage partagé corrigés ; ports impossibles refusés avant recherche exhaustive. 25 sources inchangées, 75 commandes JSON/SVG/check réussies ; 12 avertissements sur huit cas conservés. Grand processus : médiane CPU release 0,736→0,0796 s après optimisation, sorties identiques. Six nouveaux tests, suite intégrée verte. Restent validation utilisateur et CI distante. `.agent/analysis/w168-validation-20261020.md`, `.agent/analysis/w168-observations-20261020.json`. |
+| `W-169` | building | Preview intégrée des fichiers bgraph dans VS Code | `Ctrl+Shift+V` ouvre un volet wasm actualisé pendant la saisie, y compris les buffers non sauvegardés ou sans nom. Six tests JS, VSIX complet/sans LSP et hôte VS Code réel vérifiés ; erreurs, cycle de vie, Markdown et LSP préservés. Reste installation et validation utilisateur ; `include`/`from:` nécessitent le watcher. `D-054`, `.agent/analysis/editor-previews-20261020.md`. |
+| `W-170` | building | Raccourci de preview navigateur depuis Zed | Tâche native `bgraph: Preview` sauvegardant le fichier, puis `watch --open --port 0` ; raccourci fourni. Cinq tests Rust et hôte Zed réel verts : noms hostiles, URL, reload et une seule instance active à la relance. Reste installation CLI/extension, fusion keymap et validation utilisateur ; ouvrir le dossier comme projet. `D-054`, `.agent/analysis/zed-preview-20261020.md`. |
 
 ### Risks
 
@@ -116,6 +132,7 @@ Risques ouverts et résiduels; les entrées indiquent les chantiers associés et
 |---|---|---|---|---|
 | `D-052` | active | 2026-10-16 | **`margin` réserve l'espace extérieur d'une boîte ou d'un cadre**, avec l'ordre CSS haut/droite/bas/gauche et ses formes à 1–4 valeurs. Les marges s'ajoutent au `gap` et aux limites du conteneur, sans déplacer un `at` ni changer un alignement explicite. Cascade par côté ; valeurs finies positives ou nulles, sans `auto` ni fusion CSS. Support explicite des géométries déclarées et des séquences. | demande utilisateur, `W-166` |
 | `D-053` | active | 2026-10-16 | **Les groupes déclarés ont des dimensions effectives et les lanes BPMN remplissent leur pool.** `width`, `height` et `size` sont requis et peuvent entrer en conflit avec le contenu ; les égalités de taille acceptent les groupes. En BPMN, un groupe contenant exclusivement des groupes constitue une pool de lanes : ses enfants remplissent sa largeur intérieure, padding et marges déduits. Le parent est peint en premier. `style node` reste la couche commune des éléments et cadres ; les styles `task`/`group` permettent de les spécialiser. | rapport utilisateur pour la 1.0.0, `W-168` |
+| `D-054` | active | 2026-10-20 | **Preview adaptée aux capacités de chaque éditeur.** VS Code expose un volet `.bd` avec le renderer wasm déjà embarqué ; Zed lance la preview navigateur existante par une tâche et un raccourci, son API actuelle n'exposant pas de volet personnalisé. Les aperçus Markdown et le LSP restent disponibles ; les limites de composition du wasm sont explicites. | proposition acceptée par l'utilisateur, `W-169`, `W-170` |
 | `D-051` | active | 2026-08-25 | **La grille choisit l’unité de placement.** Sans `graph { grid: ... }`, les positions, gaps et offsets sont exprimés en unités libres; avec une grille, ces mêmes valeurs sont exprimées en cases et converties par le solveur selon les dimensions et les gaps déclarés. Une déclaration explicite ne peut pas être déplacée silencieusement par un arrondi ou un changement de mode. | utilisateur |
 | `D-050` | amended | 2026-08-25 | **La compatibilité de toutes les surfaces est un gate du cœur de placement, et le fork Kasuari est ce cœur.** Le fork couvre natif, `--no-default-features`, wasm et Typst. La première bascule conservait un chemin transitionnel au-delà de 512 entités; W-153 le retire le 2026-10-16 après optimisation du solveur add-only, des dépendances et de la validation. Nœuds, frames et attaches BPMN ont désormais un seul solveur sans seuil. Gate local et CI distante complets verts : cinq runners natifs, 714 tests et performance à `8630085` (`38898281988`), clôturant W-156/W-160. `.agent/analysis/all-w-completion.md`. | `Q-016` |
 | `D-049` | active | 2026-08-24 | **Les collisions sont diagnostiquées, jamais réparées par le render.** Cassowary ne choisit ni l'ordre ni l'axe de séparation entre deux rectangles; l'auteur fournit la relation manquante. Une éventuelle commande `arrange` reste une transformation explicite qui propose du DSL et un diff, entièrement séparée du solveur de rendu. | `Q-015` |

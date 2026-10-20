@@ -38,5 +38,6 @@ if [[ "${1:-}" == --extensions ]]; then
   cp LICENSE "$gate_dir/LICENSE"
   cp "$gate_dir/browser.wasm" "$gate_dir/editors/vscode/bgraph.wasm"
   "$gate_dir/editors/vscode/package.sh"
+  npm --prefix "$gate_dir/editors/vscode" test
 fi
 node tests/runtime/gate.mjs "$gate_dir" "${1:-}"

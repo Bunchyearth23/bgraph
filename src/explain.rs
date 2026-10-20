@@ -393,6 +393,9 @@ fn explain_group(diagram: &Diagram, layout: &Layout, index: usize) -> Result<Str
         }
         None => out.push_str("  no declared frame translation; bounds follow the children\n"),
     }
+    if crate::check::archetype_of(diagram).name == "bpmn" {
+        out.push_str("  local origin starts after padding and title; negative child extents move it inward\n");
+    }
     for relation in inspect::relations(diagram, group.id.as_str()) {
         if !relation.controls || !relation.peers.is_empty() {
             out.push_str(&format!(

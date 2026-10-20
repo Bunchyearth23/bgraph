@@ -5,7 +5,7 @@
 # Zed fetches a tree-sitter grammar from a git repository at a pinned revision,
 # even when that repository is this one on the local disk. So this script:
 #
-#   1. builds and installs `bgraph-lsp` (the extension launches it from PATH),
+#   1. installs `bgraph` and `bgraph-lsp` (preview and diagnostics use PATH),
 #   2. regenerates the tree-sitter parser,
 #   3. commits, if the generated parser is not committed yet,
 #   4. rewrites `repository` and `rev` in extension.toml to point at HEAD.
@@ -22,8 +22,8 @@ cd "$repo"
 
 # ---------------------------------------------------------------- 1. server
 
-echo "==> installing bgraph-lsp"
-cargo install --path . --bin bgraph-lsp --force --quiet
+echo "==> installing bgraph and bgraph-lsp"
+cargo install --path . --bins --force --quiet
 server="$(command -v bgraph-lsp || true)"
 if [ -z "$server" ]; then
   echo "!! bgraph-lsp is not on PATH — add ~/.cargo/bin to it, or set the" >&2

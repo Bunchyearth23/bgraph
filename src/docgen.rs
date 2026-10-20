@@ -441,6 +441,7 @@ bgraph diagram.bd --theme dark      # a named palette under the file's own style
 bgraph watch diagram.bd             # show it, and reload when it changes
 bgraph watch diagram.svg            # …a picture works too; the extension decides
 bgraph watch diagram.bd --port 9000
+bgraph watch diagram.bd --open --port 0  # open the browser on a free port
 bgraph watch docs/diagrams          # a directory: build every .bd as it changes
 bgraph watch docs/diagrams --once   # …once, non-zero on failure — a build step
 bgraph check diagram.bd             # diagnostics only; non-zero on error
@@ -467,6 +468,11 @@ The watch page reloads on every save and reports parse and layout errors in
 place, so a broken file never costs you the preview. Scroll to zoom, drag to
 pan, `f` to fit, `0` for actual size — and the view survives the reload, or
 zooming while editing would be pointless.
+
+For a single `.bd` or `.svg` file, `--open` launches the default browser after
+the server has bound its port. `--port 0` lets the OS choose a free port; the
+actual address is printed. If the browser cannot be opened, the server stays
+available at that address. `--open` is not supported for directory builds.
 
 ## The five statements
 

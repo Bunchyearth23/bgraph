@@ -4781,16 +4781,18 @@ pub fn sequence(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
             )?;
             let margin = crate::spacing::Margins::of(&style);
             let padding = style.padding.unwrap_or(18.0);
-            let band = if group.label.is_some() {
-                style.font_size.unwrap_or(12.0) * 1.3 + padding
-            } else {
-                padding
-            };
+            let title_size = style.font_size.unwrap_or(12.0);
+            let band = title_size * 1.3 + padding;
+            // The first label sits above its wire, beneath the frame's title.
+            let first_label = message_styles[first].font_size.unwrap_or(12.0) / 2.0 + 9.0;
+            let last_label = message_styles[last].font_size.unwrap_or(12.0) / 2.0;
             Ok(Some((
                 first,
                 last,
-                (row * 0.62 + 14.0).max(band + 6.0),
-                (row * 0.42).max(padding),
+                (row * 0.62 + 14.0)
+                    .max(band + 6.0)
+                    .max(title_size * 1.8 + first_label + 4.0),
+                (row * 0.42).max(padding).max(last_label + 4.0),
                 margin,
                 style,
             )))

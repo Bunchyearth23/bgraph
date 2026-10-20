@@ -1,0 +1,204 @@
+{
+  "annotations": [
+    {
+      "color": "#111827",
+      "size": 11.9,
+      "text": "Message reçu",
+      "x": 136.723,
+      "y": 84.03999999999999
+    },
+    {
+      "color": "#111827",
+      "size": 11.9,
+      "text": "Choisir",
+      "x": 351.446,
+      "y": 43.89999999999999
+    },
+    {
+      "color": "#111827",
+      "size": 11.9,
+      "text": "Accepté",
+      "x": 545.96715,
+      "y": 84.03999999999999
+    },
+    {
+      "color": "#111827",
+      "size": 11.9,
+      "text": "Refusé",
+      "x": 543.3194000000001,
+      "y": 204.04
+    }
+  ],
+  "background": "#ffffff",
+  "canvas": {
+    "height": 262.94,
+    "width": 599.4883
+  },
+  "description": null,
+  "edges": [
+    {
+      "from": "sender",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          70.0,
+          184.04
+        ],
+        [
+          70.0,
+          104.03999999999999
+        ]
+      ],
+      "to": "got"
+    },
+    {
+      "from": "got",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          90.0,
+          84.03999999999999
+        ],
+        [
+          327.446,
+          84.03999999999999
+        ]
+      ],
+      "to": "decision"
+    },
+    {
+      "from": "decision",
+      "label": "oui",
+      "label_rect": {
+        "h": 19.6,
+        "w": 26.008000000000003,
+        "x": 446.442,
+        "y": 70.03999999999999
+      },
+      "points": [
+        [
+          369.446,
+          78.03999999999999
+        ],
+        [
+          459.446,
+          78.03999999999999
+        ],
+        [
+          459.446,
+          84.03999999999999
+        ],
+        [
+          475.446,
+          84.03999999999999
+        ]
+      ],
+      "to": "accepted"
+    },
+    {
+      "from": "decision",
+      "label": "non",
+      "label_rect": {
+        "h": 19.6,
+        "w": 30.016000000000002,
+        "x": 444.43800000000005,
+        "y": 137.24
+      },
+      "points": [
+        [
+          369.446,
+          90.03999999999999
+        ],
+        [
+          459.446,
+          90.03999999999999
+        ],
+        [
+          459.446,
+          204.04
+        ],
+        [
+          475.446,
+          204.04
+        ]
+      ],
+      "to": "refused"
+    }
+  ],
+  "groups": [],
+  "guides": [],
+  "label_conflicts": [],
+  "nodes": [
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "got",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 50.0,
+        "y": 64.03999999999999
+      },
+      "stroke": "#1f2937"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "sender",
+      "label": [
+        "Client"
+      ],
+      "rect": {
+        "h": 46.900000000000006,
+        "w": 76.0,
+        "x": 32.0,
+        "y": 184.04
+      },
+      "stroke": "#1f2937"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "decision",
+      "label": [],
+      "rect": {
+        "h": 48.0,
+        "w": 48.0,
+        "x": 327.446,
+        "y": 60.03999999999999
+      },
+      "stroke": "#1f2937"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "accepted",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 475.446,
+        "y": 64.03999999999999
+      },
+      "stroke": "#1f2937"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "refused",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 475.446,
+        "y": 184.04
+      },
+      "stroke": "#1f2937"
+    }
+  ],
+  "title": null,
+  "version": 1
+}

@@ -8,7 +8,7 @@
 # HTTP server and its PDF writer.
 #
 #   ./package.sh              # with the language client, if node_modules is there
-#   ./package.sh --no-server  # highlighting only, no npm needed
+#   ./package.sh --no-server  # highlighting and preview, no npm needed
 #
 # Install the result with:
 #   code --install-extension bgraph-<version>.vsix
@@ -44,25 +44,26 @@ if (( with_server )); then
   if [[ ! -d node_modules/vscode-languageclient ]]; then
     echo "package.sh: vscode-languageclient is still missing." >&2
     echo "            Run \`npm install\` here, or build with --no-server for" >&2
-    echo "            a highlighting-only package." >&2
+    echo "            a package without the language client." >&2
     exit 1
   fi
 fi
 
-# The Markdown preview renders through this rather than through a `bgraph` on
+# Both previews render through this rather than through a `bgraph` on
 # PATH: a preview that only worked for people who had already installed the CLI
 # would miss exactly the readers it is for. Built here so the VSIX is complete;
 # without it the fence quietly falls back to a code block.
-if [[ ! -f bgraph.wasm ]] || [[ ../../src/lib.rs -nt bgraph.wasm ]]; then
-  if rustup target list --installed | grep -qx wasm32-unknown-unknown; then
-    echo "package.sh: building the Markdown preview's renderer…"
-    (cd ../.. && ./playground/build.sh >/dev/null)
-    cp ../../playground/public/bgraph.wasm bgraph.wasm
-  else
-    echo "package.sh: no wasm32-unknown-unknown target — the Markdown preview" >&2
-    echo "            will fall back to code blocks. \`rustup target add" >&2
-    echo "            wasm32-unknown-unknown\` and rerun to include it." >&2
-  fi
+if [[ -f ../../playground/build.sh && -f ../../Cargo.toml ]] \
+  && command -v rustup >/dev/null \
+  && rustup target list --installed | grep -qx wasm32-unknown-unknown; then
+  echo "package.sh: building the preview renderer…"
+  (cd ../.. && ./playground/build.sh >/dev/null)
+  cp ../../playground/public/bgraph.wasm bgraph.wasm
+elif [[ ! -f bgraph.wasm ]]; then
+  echo "package.sh: missing bgraph.wasm — cannot package a working preview." >&2
+  echo "            In the repository, install the wasm32-unknown-unknown target and rerun." >&2
+  echo "            In an exported extension directory, supply the built bgraph.wasm first." >&2
+  exit 1
 fi
 
 staging="$(mktemp -d)"
@@ -70,7 +71,7 @@ trap 'rm -rf "$staging"' EXIT
 mkdir -p "$staging/extension"
 
 cp -r package.json language-configuration.json README.md src syntaxes "$staging/extension/"
-[[ -f bgraph.wasm ]] && cp bgraph.wasm "$staging/extension/"
+cp bgraph.wasm "$staging/extension/"
 (( with_server )) && cp -r node_modules "$staging/extension/"
 cp ../../LICENSE "$staging/extension/LICENSE"
 
@@ -121,5 +122,5 @@ XML
 rm -f "$here/$vsix"
 (cd "$staging" && zip -q -r -X "$here/$vsix" '[Content_Types].xml' extension.vsixmanifest extension)
 
-echo "$vsix — $(du -h "$here/$vsix" | cut -f1)$( (( with_server )) || echo ', highlighting only')"
+echo "$vsix — $(du -h "$here/$vsix" | cut -f1)$( (( with_server )) || echo ', without language client')"
 echo "install with: code --install-extension $here/$vsix"

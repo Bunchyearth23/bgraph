@@ -1,0 +1,63 @@
+{
+  "source": ".agent/fixtures/bpmn-v1/06-boundary-in-context.bd",
+  "results": {
+    "before": {
+      "binary_sha256": "a4d0ff3f26ba224aae865d611c6feb309df5d2f8bae510e9be5515d1d1d3d7bf",
+      "runs": [
+        {
+          "exit": 0,
+          "wall_seconds": 0.7003729470015969,
+          "cpu_seconds": 0.695246,
+          "stderr": ""
+        },
+        {
+          "exit": 0,
+          "wall_seconds": 0.6930999820033321,
+          "cpu_seconds": 0.6874499999999999,
+          "stderr": ""
+        },
+        {
+          "exit": 0,
+          "wall_seconds": 0.8504376189957839,
+          "cpu_seconds": 0.8338130000000001,
+          "stderr": ""
+        },
+        {
+          "exit": 0,
+          "wall_seconds": 0.8727982520067599,
+          "cpu_seconds": 0.864357,
+          "stderr": ""
+        }
+      ]
+    },
+    "local": {
+      "binary_sha256": "f564a2122cf90dda9c5b8719d29cc0bb3b573d61021eb9d2cd964ccb75c2d3f8",
+      "runs": [
+        {
+          "exit": 0,
+          "wall_seconds": 0.5645854530012002,
+          "cpu_seconds": 0.5571550000000001,
+          "stderr": ""
+        },
+        {
+          "exit": 0,
+          "wall_seconds": 0.6926080050034216,
+          "cpu_seconds": 0.68438,
+          "stderr": ""
+        },
+        {
+          "exit": 0,
+          "wall_seconds": 0.6327864129998488,
+          "cpu_seconds": 0.6268099999999999,
+          "stderr": ""
+        },
+        {
+          "exit": 0,
+          "wall_seconds": 0.6277417689998401,
+          "cpu_seconds": 0.6209540000000002,
+          "stderr": ""
+        }
+      ]
+    }
+  }
+}

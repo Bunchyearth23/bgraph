@@ -1,0 +1,82 @@
+{
+  "source": ".agent/fixtures/bpmn-v1/06-boundary-in-context.bd",
+  "source_sha256": "caa0c50fa665dabf17b05e2b8dcdb42fa9dfa739367eb34819327e41afdb35ae",
+  "results": {
+    "before": {
+      "binary": "/tmp/bgraph-w168-before-local-channels",
+      "binary_sha256": "a4d0ff3f26ba224aae865d611c6feb309df5d2f8bae510e9be5515d1d1d3d7bf",
+      "runs": [
+        {
+          "exit": 0,
+          "wall_seconds": 0.9170146219985327,
+          "cpu_seconds": 0.88734,
+          "stderr": ""
+        },
+        {
+          "exit": 0,
+          "wall_seconds": 0.7788675079937093,
+          "cpu_seconds": 0.7658690000000001,
+          "stderr": ""
+        },
+        {
+          "exit": 0,
+          "wall_seconds": 0.7268068789999234,
+          "cpu_seconds": 0.7184260000000002,
+          "stderr": ""
+        },
+        {
+          "exit": 0,
+          "wall_seconds": 0.7167637410020689,
+          "cpu_seconds": 0.7108059999999998,
+          "stderr": ""
+        },
+        {
+          "exit": 0,
+          "wall_seconds": 0.7419655420089839,
+          "cpu_seconds": 0.7358099999999999,
+          "stderr": ""
+        }
+      ],
+      "median_cpu_seconds": 0.7358099999999999,
+      "median_wall_seconds": 0.7419655420089839
+    },
+    "final": {
+      "binary": "/tmp/bgraph-w168-final-release",
+      "binary_sha256": "0d54760435ee9c9f3d2f57a3e435791360137e71e34acec49c3e0e50f0b3d92a",
+      "runs": [
+        {
+          "exit": 0,
+          "wall_seconds": 0.10733084300591145,
+          "cpu_seconds": 0.1029739999999999,
+          "stderr": ""
+        },
+        {
+          "exit": 0,
+          "wall_seconds": 0.08665299300628249,
+          "cpu_seconds": 0.08573900000000001,
+          "stderr": ""
+        },
+        {
+          "exit": 0,
+          "wall_seconds": 0.08076176799659152,
+          "cpu_seconds": 0.0796199999999998,
+          "stderr": ""
+        },
+        {
+          "exit": 0,
+          "wall_seconds": 0.08006370899965987,
+          "cpu_seconds": 0.07480500000000001,
+          "stderr": ""
+        },
+        {
+          "exit": 0,
+          "wall_seconds": 0.07847486299579032,
+          "cpu_seconds": 0.07741100000000056,
+          "stderr": ""
+        }
+      ],
+      "median_cpu_seconds": 0.0796199999999998,
+      "median_wall_seconds": 0.08076176799659152
+    }
+  }
+}

@@ -1,0 +1,8 @@
+[
+  {
+    "context": "Editor && extension == bd",
+    "bindings": {
+      "ctrl-shift-v": ["task::Spawn", { "task_name": "bgraph: Preview" }]
+    }
+  }
+]

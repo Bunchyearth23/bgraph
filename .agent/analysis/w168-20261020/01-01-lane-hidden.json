@@ -1,0 +1,67 @@
+{
+  "annotations": [
+    {
+      "color": "#0b0b0b",
+      "size": 16.0,
+      "text": "lane hidden",
+      "x": 32.0,
+      "y": 48.0
+    }
+  ],
+  "background": "#ffffff",
+  "canvas": {
+    "height": 268.0,
+    "width": 254.0
+  },
+  "description": null,
+  "edges": [],
+  "groups": [
+    {
+      "description": null,
+      "id": "pool",
+      "label": [
+        "Pool"
+      ],
+      "rect": {
+        "h": 164.0,
+        "w": 190.0,
+        "x": 32.0,
+        "y": 72.0
+      }
+    },
+    {
+      "description": null,
+      "id": "lane",
+      "label": [
+        "Lane"
+      ],
+      "rect": {
+        "h": 112.0,
+        "w": 154.0,
+        "x": 50.0,
+        "y": 106.0
+      }
+    }
+  ],
+  "guides": [],
+  "label_conflicts": [],
+  "nodes": [
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "a",
+      "label": [
+        "A"
+      ],
+      "rect": {
+        "h": 60.0,
+        "w": 118.0,
+        "x": 68.0,
+        "y": 140.0
+      },
+      "stroke": "#1f2937"
+    }
+  ],
+  "title": "lane hidden",
+  "version": 1
+}

@@ -1,19 +1,37 @@
 # bgraph for VS Code
 
-Syntax highlighting and the `bgraph` language server for `.bd` files.
+Syntax highlighting, live diagram preview and the `bgraph` language server for `.bd` files.
 
 ## What is in here
 
 | Piece | What it does |
 |---|---|
 | `syntaxes/bgraph.tmLanguage.json` | Highlighting. A TextMate grammar, not tree-sitter — VS Code reads these natively, so nothing has to be compiled or pinned. |
-| `src/extension.js` | Launches `bgraph-lsp` and speaks LSP to it. Everything semantic comes from there. |
+| `src/extension.js` | Launches `bgraph-lsp`, opens diagram previews and renders Markdown fences. |
 | `language-configuration.json` | Comments, brackets, indentation. |
-| `bgraph.wasm` | The renderer, for the Markdown preview. Built by `package.sh`; not committed. |
+| `bgraph.wasm` | The renderer for both previews. Built by `package.sh`; not committed. |
 
 The server is the same binary the Zed extension talks to, and it reuses the
 front half of the compiler — so the editor and `bgraph check` can never
 disagree about what a file means.
+
+## Diagram preview
+
+Open a `.bd` file and press **Ctrl+Shift+V** (**Cmd+Shift+V** on macOS), or
+choose **bgraph: Open Preview** from the command palette or the editor's title
+menu. A preview opens beside the source and updates while you type, including
+unsaved changes. An untitled buffer works too once its language is set to
+`bgraph`. Opening the command again reuses that document's preview; different
+documents have their own panels. Syntax and rendering errors appear in the panel.
+
+The renderer is bundled, so preview needs neither `bgraph` nor `bgraph-lsp` on
+`PATH`. It renders the current buffer only: `include` and `from:` require file
+access and are rejected by this WASM renderer. Use `bgraph watch file.bd` for
+diagrams composed from several files. The LSP still resolves those files for
+diagnostics and navigation.
+
+The shortcut is limited to `bgraph` editors, preserving the Markdown preview's
+shortcut in Markdown files.
 
 ## Diagrams in the Markdown preview
 
@@ -23,20 +41,20 @@ bundled beside the extension, **not** through a `bgraph` on `PATH`: a preview
 that only worked for people who had already installed the CLI would miss
 exactly the readers it is for.
 
-`package.sh` builds that module (it needs `rustup target add
-wasm32-unknown-unknown`). Without it the fence falls back to a code block —
-quietly, because a preview that threw would take the whole document's
-rendering with it. An error *inside* a fence is reported in place.
+`package.sh` builds that module inside the repository (it needs `rustup target
+add wasm32-unknown-unknown`). An exported extension directory can instead
+provide an already-built `bgraph.wasm`; packaging fails if no renderer is
+available. If an installed module is missing or cannot load, a fence falls
+back to a code block. An error *inside* a fence is reported in place.
 
-A file spread over several files works here too: the server resolves
-`include` against the file's own path, so a name borrowed from another file is
-not underlined.
+Markdown fences use the same current-text renderer, so `include` and `from:`
+have the same limitations as the diagram preview.
 
 ## Building a package
 
 ```sh
 ./package.sh              # fetches the language client if needed, bundles it
-./package.sh --no-server  # highlighting only; no npm, no network
+./package.sh --no-server  # highlighting and preview; no npm, no network
 ```
 
 Both write `bgraph-<version>.vsix` beside this file. Install it with:
@@ -51,10 +69,9 @@ project makes for its SVG writer, its HTTP server and its PDF writer. Every
 fact the manifest repeats — name, version, publisher, engine range — is read
 back out of `package.json`, and a test fails if any of them is written twice.
 
-The `--no-server` package still highlights: `src/extension.js` requires the
-language client *inside* `activate`, so a build without `node_modules` says so
-once instead of failing to activate and leaving `.bd` files looking like plain
-text.
+The `--no-server` package still highlights and previews: `src/extension.js`
+requires the language client *inside* `activate`, after registering preview,
+so a build without `node_modules` reports unavailable diagnostics and completion.
 
 ## The server
 
@@ -63,9 +80,12 @@ cargo install --path ../..   # puts `bgraph-lsp` on PATH
 ```
 
 If it is not on `PATH`, point `bgraph.server.path` at it. Without it you get
-highlighting and nothing else — no diagnostics, no completion.
+highlighting and preview, with no diagnostics or completion.
 
 For development, open this directory in VS Code and press F5.
+
+Run `npm test` for preview lifecycle, error handling, Markdown compatibility
+and bundled-renderer checks. Build the package first to provide `bgraph.wasm`.
 
 ## Keeping the grammar honest
 

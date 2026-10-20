@@ -20,8 +20,20 @@ use anyhow::{Context, Result};
 /// this genre of file is written in, and it was the only one without a live
 /// view.
 pub fn serve(input: PathBuf, data: Option<PathBuf>, port: u16) -> Result<()> {
+    serve_with_browser(input, data, port, false)
+}
+
+/// Serve a diagram and optionally open it in the default browser after binding.
+/// A port of zero asks the OS for a free port, which is printed and opened.
+pub fn serve_with_browser(
+    input: PathBuf,
+    data: Option<PathBuf>,
+    port: u16,
+    open: bool,
+) -> Result<()> {
     let listener = TcpListener::bind(("127.0.0.1", port))
         .with_context(|| format!("cannot bind 127.0.0.1:{port}"))?;
+    let url = format!("http://{}", listener.local_addr()?);
 
     if is_svg(&input) {
         println!("bgraph viewing {}", input.display());
@@ -31,7 +43,10 @@ pub fn serve(input: PathBuf, data: Option<PathBuf>, port: u16) -> Result<()> {
             println!("  with data from {}", path.display());
         }
     }
-    println!("  → http://127.0.0.1:{port}");
+    println!("  → {url}");
+    if open {
+        open_browser(url);
+    }
 
     for stream in listener.incoming() {
         match stream {
@@ -45,6 +60,27 @@ pub fn serve(input: PathBuf, data: Option<PathBuf>, port: u16) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn open_browser(url: String) {
+    // Some desktop openers wait for the browser to exit; keep serving meanwhile.
+    std::thread::spawn(move || {
+        #[cfg(target_os = "windows")]
+        let mut command = {
+            let mut command = std::process::Command::new("rundll32");
+            command.arg("url.dll,FileProtocolHandler");
+            command
+        };
+        #[cfg(target_os = "macos")]
+        let mut command = std::process::Command::new("open");
+        #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+        let mut command = std::process::Command::new("xdg-open");
+        match command.arg(&url).status() {
+            Ok(status) if status.success() => {}
+            Ok(status) => eprintln!("cannot open browser ({status}); open {url} manually"),
+            Err(error) => eprintln!("cannot open browser: {error}; open {url} manually"),
+        }
+    });
 }
 
 fn handle(mut stream: TcpStream, input: &Path, data: Option<&Path>) -> Result<()> {

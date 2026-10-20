@@ -20,9 +20,12 @@ buffer rather than the version on disk. Errors in included files are relayed
 at the relevant `include`, with related information pointing to the original
 file and range.
 
-**No Markdown preview.** Zed's extension API has no hook for extending its
-Markdown rendering, so this is a limit of the editor rather than something
-left undone. `bgraph watch` beside the editor is the answer meanwhile.
+**Live preview** — the bundled `bgraph: Preview` task saves the current `.bd`
+file and opens `bgraph watch` in your default browser. Each later save reloads
+the drawing. See [Preview](#preview) to bind it to `Ctrl+Shift+V`.
+
+Zed's extension API does not provide a custom preview pane or a Markdown
+renderer hook, so the preview uses the browser.
 
 **Completion**, context-aware:
 
@@ -83,7 +86,7 @@ not parse, which is exactly when you need them most.
 ./editors/zed/install.sh
 ```
 
-The script installs `bgraph-lsp`, regenerates the tree-sitter parser, commits
+The script installs `bgraph` and `bgraph-lsp`, regenerates the tree-sitter parser, commits
 it if needed, and pins `extension.toml` to the current revision — Zed fetches
 grammars from a git revision even for a local path, so that pin has to be
 real.
@@ -93,6 +96,49 @@ Then, in Zed: `cmd/ctrl-shift-p` → **zed: install dev extension** → pick
 
 Re-run the script after editing `grammar.js`; Zed caches a grammar per
 revision and will not notice otherwise.
+
+## Preview
+
+With the updated extension installed and the updated `bgraph` on `PATH`, open
+the containing folder in Zed, then a saved `.bd` file, and run
+**task: spawn → bgraph: Preview**. On the verified host, language tasks are
+unavailable when opening a file alone without its folder. The task runs
+`bgraph watch <current-file> --open --port 0`: the OS chooses a free local
+port, and the task terminal displays the preview URL. An older CLI needs
+updating before it understands `--open`.
+
+To use `Ctrl+Shift+V`, open **zed: open keymap** and merge the entry from
+[`keymap.json`](keymap.json) into your existing array:
+
+```json
+{
+  "context": "Editor && extension == bd",
+  "bindings": {
+    "ctrl-shift-v": ["task::Spawn", { "task_name": "bgraph: Preview" }]
+  }
+}
+```
+
+The extension supplies the task; Zed leaves the shortcut configuration to
+you. This binding only applies to bgraph editors. The task saves the current
+file before launching; included files use their last saved version.
+
+Keep the browser open while editing, and save to reload. The task reuses its
+terminal and prevents concurrent runs. On the verified Zed host, pressing the
+shortcut again replaces the previous watcher and opens the new preview. Stop
+it with `Ctrl+C` in its terminal when finished. If the browser cannot open,
+the terminal keeps the URL available to open manually.
+
+The bundled task uses the shell syntax shared by Linux/macOS shells (also
+Fish). It passes the filename through an environment variable before expanding
+it inside quotes: Zed versions that concatenate task arguments must preserve
+spaces without interpreting `$()` or backticks in a filename.
+For PowerShell, override the task in **zed: open project tasks** and replace
+the filename argument with `"\"$env:BGRAPH_PREVIEW_FILE\""`. That variant has
+not been verified on a Windows host.
+
+See Zed's [task documentation](https://zed.dev/docs/tasks) for project task
+overrides and custom keybindings.
 
 ## If the server does not start
 
@@ -137,12 +183,19 @@ CARGO_TARGET_DIR=target/zed-work cargo build --locked --release \
   --manifest-path editors/zed/Cargo.toml --target wasm32-wasip2
 WASI_SDK_PATH=/usr tree-sitter build --wasm -o /tmp/bgraph-grammar.wasm tree-sitter-bgraph
 python3 tests/runtime/zed-host.py --grammar /tmp/bgraph-grammar.wasm
+python3 tests/runtime/zed-host.py --grammar /tmp/bgraph-grammar.wasm --preview
 ```
 
 Set `WASI_SDK_PATH` to your SDK root when using another compiler installation.
 The ordinary runtime gate's `wasm32-wasip1` build checks compilation; this
 separate check loads the component in Zed itself. The helper enables trust
 only inside its disposable profile and never installs into the user's profile.
+
+`--preview` additionally needs `xdotool`. It loads the bundled task and the
+keymap snippet into that isolated profile, presses the actual shortcut, and
+checks saving, filename quoting, live reload and the watcher left after a
+repeat. A recording browser opener captures the requested URL without opening
+a browser outside the test session.
 
 ## Layout
 
@@ -158,6 +211,8 @@ editors/zed/
     brackets.scm              bracket matching
     indents.scm               auto-indent inside blocks
     outline.scm               symbol outline
+    tasks.json                save current file and open live browser preview
+  keymap.json                 optional Ctrl+Shift+V entry to merge into user keymap
 ```
 
 These `.scm` files are the canonical queries. Other tree-sitter editors

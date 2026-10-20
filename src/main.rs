@@ -89,8 +89,13 @@ enum Command {
         #[arg(long = "data", value_name = "FILE")]
         data: Option<PathBuf>,
 
+        /// Preview port; zero chooses a free port
         #[arg(short, long, default_value_t = 7878)]
         port: u16,
+
+        /// Open the preview in the default browser (single files only)
+        #[arg(long)]
+        open: bool,
     },
     /// Write the generated reference manual
     Docs {
@@ -331,8 +336,8 @@ fn completions(shell: &str) -> Result<i32> {
 /// them. It is gone (`W-136`): a browser is on every machine this runs on,
 /// it works the same over ssh and on a second screen, and it cost the crate
 /// seventy-eight dependencies and a rasteriser to say the same thing worse.
-fn show_or_serve(input: PathBuf, data: Option<PathBuf>, port: u16) -> Result<i32> {
-    watch::serve(input, data, port)?;
+fn show_or_serve(input: PathBuf, data: Option<PathBuf>, port: u16, open: bool) -> Result<i32> {
+    watch::serve_with_browser(input, data, port, open)?;
     Ok(0)
 }
 
@@ -404,8 +409,12 @@ fn run() -> Result<i32> {
             once,
             data,
             port,
+            open,
         }) => {
             if input.is_dir() {
+                if open {
+                    bail!("`--open` needs a single `.bd` or `.svg` file");
+                }
                 return watch_dir(&input, out.as_deref(), once);
             }
             if once || out.is_some() {
@@ -414,7 +423,7 @@ fn run() -> Result<i32> {
                      for one file use `-o` and `bgraph diagram.bd`"
                 );
             }
-            return show_or_serve(input, data, port);
+            return show_or_serve(input, data, port, open);
         }
         Some(Command::Check { input, ci, json }) => return check_file(&input, ci, json),
         Some(Command::Fmt {

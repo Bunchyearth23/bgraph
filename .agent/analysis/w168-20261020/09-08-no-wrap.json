@@ -1,0 +1,43 @@
+{
+  "annotations": [
+    {
+      "color": "#0b0b0b",
+      "size": 16.0,
+      "text": "no wrap",
+      "x": 32.0,
+      "y": 48.0
+    }
+  ],
+  "background": "#ffffff",
+  "canvas": {
+    "height": 207.60000000000002,
+    "width": 204.0
+  },
+  "description": null,
+  "edges": [],
+  "groups": [],
+  "guides": [],
+  "label_conflicts": [],
+  "nodes": [
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "a",
+      "label": [
+        "Une étiquette",
+        "assez longue",
+        "pour déborder de",
+        "la boîte"
+      ],
+      "rect": {
+        "h": 103.60000000000001,
+        "w": 140.0,
+        "x": 32.0,
+        "y": 72.0
+      },
+      "stroke": "#1f2937"
+    }
+  ],
+  "title": "no wrap",
+  "version": 1
+}

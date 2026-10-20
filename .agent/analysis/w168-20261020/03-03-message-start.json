@@ -1,0 +1,187 @@
+{
+  "annotations": [
+    {
+      "color": "#111827",
+      "size": 11.9,
+      "text": "Reçu",
+      "x": 70.0,
+      "y": 345.9
+    },
+    {
+      "color": "#111827",
+      "size": 11.9,
+      "text": "Répondu",
+      "x": 315.1689,
+      "y": 271.86
+    },
+    {
+      "color": "#0b0b0b",
+      "size": 16.0,
+      "text": "message start",
+      "x": 32.0,
+      "y": 48.0
+    }
+  ],
+  "background": "#ffffff",
+  "canvas": {
+    "height": 388.0,
+    "width": 385.1689
+  },
+  "description": null,
+  "edges": [
+    {
+      "from": "got",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          90.0,
+          308.0
+        ],
+        [
+          130.0,
+          308.0
+        ]
+      ],
+      "to": "work"
+    },
+    {
+      "from": "work",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          248.0,
+          308.0
+        ],
+        [
+          295.1689,
+          308.0
+        ]
+      ],
+      "to": "out"
+    },
+    {
+      "from": "send",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          102.19767441860465,
+          166.0
+        ],
+        [
+          74.42261871987901,
+          288.4951174405336
+        ]
+      ],
+      "to": "got"
+    },
+    {
+      "from": "out",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          299.81153185009714,
+          295.18784781902946
+        ],
+        [
+          144.9596918604651,
+          166.0
+        ]
+      ],
+      "to": "send"
+    }
+  ],
+  "groups": [
+    {
+      "description": null,
+      "id": "a",
+      "label": [
+        "Client"
+      ],
+      "rect": {
+        "h": 112.0,
+        "w": 154.0,
+        "x": 32.0,
+        "y": 72.0
+      }
+    },
+    {
+      "description": null,
+      "id": "b",
+      "label": [
+        "Serveur"
+      ],
+      "rect": {
+        "h": 112.0,
+        "w": 321.1689,
+        "x": 32.0,
+        "y": 244.0
+      }
+    }
+  ],
+  "guides": [],
+  "label_conflicts": [],
+  "nodes": [
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "send",
+      "label": [
+        "Envoyer"
+      ],
+      "rect": {
+        "h": 60.0,
+        "w": 118.0,
+        "x": 50.0,
+        "y": 106.0
+      },
+      "stroke": "#1f2937"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "got",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 50.0,
+        "y": 288.0
+      },
+      "stroke": "#1f2937"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "work",
+      "label": [
+        "Traiter"
+      ],
+      "rect": {
+        "h": 60.0,
+        "w": 118.0,
+        "x": 130.0,
+        "y": 278.0
+      },
+      "stroke": "#1f2937"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "out",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 295.1689,
+        "y": 288.0
+      },
+      "stroke": "#1f2937"
+    }
+  ],
+  "title": "message start",
+  "version": 1
+}

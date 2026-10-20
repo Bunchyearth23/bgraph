@@ -1,0 +1,1056 @@
+[
+  {
+    "complete": false,
+    "nx": 12,
+    "ny": 11,
+    "obstacles": 142,
+    "runs": 0,
+    "all_runs": 3,
+    "seconds": 0.00019267,
+    "start": [
+      860.0,
+      91.0
+    ],
+    "end": [
+      2400.0,
+      91.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 170,
+    "ny": 174,
+    "obstacles": 142,
+    "runs": 3,
+    "all_runs": 3,
+    "seconds": 0.080261114,
+    "start": [
+      860.0,
+      91.0
+    ],
+    "end": [
+      2400.0,
+      91.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 12,
+    "ny": 13,
+    "obstacles": 142,
+    "runs": 1,
+    "all_runs": 4,
+    "seconds": 3.886e-06,
+    "start": [
+      2472.0,
+      91.0
+    ],
+    "end": [
+      2542.0,
+      91.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 170,
+    "ny": 174,
+    "obstacles": 142,
+    "runs": 4,
+    "all_runs": 4,
+    "seconds": 0.00067274,
+    "start": [
+      2472.0,
+      91.0
+    ],
+    "end": [
+      2542.0,
+      91.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 11,
+    "ny": 14,
+    "obstacles": 142,
+    "runs": 2,
+    "all_runs": 13,
+    "seconds": 2.984e-06,
+    "start": [
+      1596.0,
+      519.0
+    ],
+    "end": [
+      1596.0,
+      563.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 171,
+    "ny": 177,
+    "obstacles": 142,
+    "runs": 13,
+    "all_runs": 13,
+    "seconds": 0.000660991,
+    "start": [
+      1596.0,
+      519.0
+    ],
+    "end": [
+      1596.0,
+      563.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 13,
+    "ny": 16,
+    "obstacles": 142,
+    "runs": 1,
+    "all_runs": 18,
+    "seconds": 3.906e-06,
+    "start": [
+      2890.0,
+      749.0
+    ],
+    "end": [
+      2962.0,
+      755.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 175,
+    "ny": 181,
+    "obstacles": 142,
+    "runs": 18,
+    "all_runs": 18,
+    "seconds": 0.000687624,
+    "start": [
+      2890.0,
+      749.0
+    ],
+    "end": [
+      2962.0,
+      755.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 15,
+    "ny": 20,
+    "obstacles": 142,
+    "runs": 4,
+    "all_runs": 21,
+    "seconds": 3.089e-06,
+    "start": [
+      2890.0,
+      761.0
+    ],
+    "end": [
+      2962.0,
+      875.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 177,
+    "ny": 183,
+    "obstacles": 142,
+    "runs": 21,
+    "all_runs": 21,
+    "seconds": 0.000677975,
+    "start": [
+      2890.0,
+      761.0
+    ],
+    "end": [
+      2962.0,
+      875.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 13,
+    "ny": 13,
+    "obstacles": 142,
+    "runs": 0,
+    "all_runs": 43,
+    "seconds": 4.524e-06,
+    "start": [
+      2226.0,
+      1964.0
+    ],
+    "end": [
+      2332.0,
+      2011.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 187,
+    "ny": 198,
+    "obstacles": 142,
+    "runs": 43,
+    "all_runs": 43,
+    "seconds": 0.000830081,
+    "start": [
+      2226.0,
+      1964.0
+    ],
+    "end": [
+      2332.0,
+      2011.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 19,
+    "ny": 19,
+    "obstacles": 142,
+    "runs": 0,
+    "all_runs": 61,
+    "seconds": 4.066e-06,
+    "start": [
+      3066.0,
+      2582.0
+    ],
+    "end": [
+      3382.0,
+      2629.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 193,
+    "ny": 207,
+    "obstacles": 142,
+    "runs": 61,
+    "all_runs": 61,
+    "seconds": 0.000923962,
+    "start": [
+      3066.0,
+      2582.0
+    ],
+    "end": [
+      3382.0,
+      2629.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 12,
+    "ny": 11,
+    "obstacles": 142,
+    "runs": 0,
+    "all_runs": 3,
+    "seconds": 0.000254715,
+    "start": [
+      860.0,
+      91.0
+    ],
+    "end": [
+      2400.0,
+      91.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 169,
+    "ny": 172,
+    "obstacles": 142,
+    "runs": 3,
+    "all_runs": 3,
+    "seconds": 0.079553715,
+    "start": [
+      860.0,
+      91.0
+    ],
+    "end": [
+      2400.0,
+      91.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 12,
+    "ny": 13,
+    "obstacles": 142,
+    "runs": 1,
+    "all_runs": 4,
+    "seconds": 3.441e-06,
+    "start": [
+      2472.0,
+      91.0
+    ],
+    "end": [
+      2542.0,
+      91.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 169,
+    "ny": 172,
+    "obstacles": 142,
+    "runs": 4,
+    "all_runs": 4,
+    "seconds": 8.6284e-05,
+    "start": [
+      2472.0,
+      91.0
+    ],
+    "end": [
+      2542.0,
+      91.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 12,
+    "ny": 15,
+    "obstacles": 142,
+    "runs": 2,
+    "all_runs": 13,
+    "seconds": 3.172e-06,
+    "start": [
+      1596.0,
+      519.0
+    ],
+    "end": [
+      1596.0,
+      563.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 170,
+    "ny": 175,
+    "obstacles": 142,
+    "runs": 13,
+    "all_runs": 13,
+    "seconds": 9.0478e-05,
+    "start": [
+      1596.0,
+      519.0
+    ],
+    "end": [
+      1596.0,
+      563.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 13,
+    "ny": 16,
+    "obstacles": 142,
+    "runs": 1,
+    "all_runs": 18,
+    "seconds": 4.909e-06,
+    "start": [
+      2890.0,
+      749.0
+    ],
+    "end": [
+      2962.0,
+      755.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 174,
+    "ny": 179,
+    "obstacles": 142,
+    "runs": 18,
+    "all_runs": 18,
+    "seconds": 0.000100018,
+    "start": [
+      2890.0,
+      749.0
+    ],
+    "end": [
+      2962.0,
+      755.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 15,
+    "ny": 20,
+    "obstacles": 142,
+    "runs": 4,
+    "all_runs": 21,
+    "seconds": 2.13e-06,
+    "start": [
+      2890.0,
+      761.0
+    ],
+    "end": [
+      2962.0,
+      875.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 176,
+    "ny": 181,
+    "obstacles": 142,
+    "runs": 21,
+    "all_runs": 21,
+    "seconds": 0.000103416,
+    "start": [
+      2890.0,
+      761.0
+    ],
+    "end": [
+      2962.0,
+      875.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 19,
+    "ny": 19,
+    "obstacles": 142,
+    "runs": 0,
+    "all_runs": 61,
+    "seconds": 4.997e-06,
+    "start": [
+      3066.0,
+      2582.0
+    ],
+    "end": [
+      3382.0,
+      2629.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 192,
+    "ny": 205,
+    "obstacles": 142,
+    "runs": 61,
+    "all_runs": 61,
+    "seconds": 0.000395268,
+    "start": [
+      3066.0,
+      2582.0
+    ],
+    "end": [
+      3382.0,
+      2629.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 12,
+    "ny": 11,
+    "obstacles": 142,
+    "runs": 0,
+    "all_runs": 3,
+    "seconds": 0.000191356,
+    "start": [
+      860.0,
+      91.0
+    ],
+    "end": [
+      2400.0,
+      91.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 169,
+    "ny": 172,
+    "obstacles": 142,
+    "runs": 3,
+    "all_runs": 3,
+    "seconds": 0.080602003,
+    "start": [
+      860.0,
+      91.0
+    ],
+    "end": [
+      2400.0,
+      91.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 12,
+    "ny": 13,
+    "obstacles": 142,
+    "runs": 1,
+    "all_runs": 4,
+    "seconds": 3.894e-06,
+    "start": [
+      2472.0,
+      91.0
+    ],
+    "end": [
+      2542.0,
+      91.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 169,
+    "ny": 172,
+    "obstacles": 142,
+    "runs": 4,
+    "all_runs": 4,
+    "seconds": 0.000102743,
+    "start": [
+      2472.0,
+      91.0
+    ],
+    "end": [
+      2542.0,
+      91.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 12,
+    "ny": 15,
+    "obstacles": 142,
+    "runs": 2,
+    "all_runs": 13,
+    "seconds": 2.777e-06,
+    "start": [
+      1596.0,
+      519.0
+    ],
+    "end": [
+      1596.0,
+      563.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 170,
+    "ny": 175,
+    "obstacles": 142,
+    "runs": 13,
+    "all_runs": 13,
+    "seconds": 0.000105777,
+    "start": [
+      1596.0,
+      519.0
+    ],
+    "end": [
+      1596.0,
+      563.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 13,
+    "ny": 16,
+    "obstacles": 142,
+    "runs": 1,
+    "all_runs": 18,
+    "seconds": 3.949e-06,
+    "start": [
+      2890.0,
+      749.0
+    ],
+    "end": [
+      2962.0,
+      755.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 174,
+    "ny": 179,
+    "obstacles": 142,
+    "runs": 18,
+    "all_runs": 18,
+    "seconds": 9.6211e-05,
+    "start": [
+      2890.0,
+      749.0
+    ],
+    "end": [
+      2962.0,
+      755.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 15,
+    "ny": 20,
+    "obstacles": 142,
+    "runs": 4,
+    "all_runs": 21,
+    "seconds": 2.647e-06,
+    "start": [
+      2890.0,
+      761.0
+    ],
+    "end": [
+      2962.0,
+      875.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 176,
+    "ny": 181,
+    "obstacles": 142,
+    "runs": 21,
+    "all_runs": 21,
+    "seconds": 9.7418e-05,
+    "start": [
+      2890.0,
+      761.0
+    ],
+    "end": [
+      2962.0,
+      875.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 19,
+    "ny": 19,
+    "obstacles": 142,
+    "runs": 0,
+    "all_runs": 61,
+    "seconds": 4.564e-06,
+    "start": [
+      3066.0,
+      2582.0
+    ],
+    "end": [
+      3382.0,
+      2629.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 192,
+    "ny": 205,
+    "obstacles": 142,
+    "runs": 61,
+    "all_runs": 61,
+    "seconds": 0.000491763,
+    "start": [
+      3066.0,
+      2582.0
+    ],
+    "end": [
+      3382.0,
+      2629.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 12,
+    "ny": 11,
+    "obstacles": 142,
+    "runs": 0,
+    "all_runs": 3,
+    "seconds": 0.000213917,
+    "start": [
+      860.0,
+      91.0
+    ],
+    "end": [
+      2400.0,
+      91.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 169,
+    "ny": 172,
+    "obstacles": 142,
+    "runs": 3,
+    "all_runs": 3,
+    "seconds": 0.080438289,
+    "start": [
+      860.0,
+      91.0
+    ],
+    "end": [
+      2400.0,
+      91.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 12,
+    "ny": 13,
+    "obstacles": 142,
+    "runs": 1,
+    "all_runs": 4,
+    "seconds": 4.582e-06,
+    "start": [
+      2472.0,
+      91.0
+    ],
+    "end": [
+      2542.0,
+      91.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 169,
+    "ny": 172,
+    "obstacles": 142,
+    "runs": 4,
+    "all_runs": 4,
+    "seconds": 0.000111162,
+    "start": [
+      2472.0,
+      91.0
+    ],
+    "end": [
+      2542.0,
+      91.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 12,
+    "ny": 15,
+    "obstacles": 142,
+    "runs": 2,
+    "all_runs": 13,
+    "seconds": 4.264e-06,
+    "start": [
+      1596.0,
+      519.0
+    ],
+    "end": [
+      1596.0,
+      563.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 170,
+    "ny": 175,
+    "obstacles": 142,
+    "runs": 13,
+    "all_runs": 13,
+    "seconds": 0.000108812,
+    "start": [
+      1596.0,
+      519.0
+    ],
+    "end": [
+      1596.0,
+      563.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 13,
+    "ny": 16,
+    "obstacles": 142,
+    "runs": 1,
+    "all_runs": 18,
+    "seconds": 4.493e-06,
+    "start": [
+      2890.0,
+      749.0
+    ],
+    "end": [
+      2962.0,
+      755.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 174,
+    "ny": 179,
+    "obstacles": 142,
+    "runs": 18,
+    "all_runs": 18,
+    "seconds": 0.000106308,
+    "start": [
+      2890.0,
+      749.0
+    ],
+    "end": [
+      2962.0,
+      755.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 15,
+    "ny": 20,
+    "obstacles": 142,
+    "runs": 4,
+    "all_runs": 21,
+    "seconds": 3.072e-06,
+    "start": [
+      2890.0,
+      761.0
+    ],
+    "end": [
+      2962.0,
+      875.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 176,
+    "ny": 181,
+    "obstacles": 142,
+    "runs": 21,
+    "all_runs": 21,
+    "seconds": 8.3415e-05,
+    "start": [
+      2890.0,
+      761.0
+    ],
+    "end": [
+      2962.0,
+      875.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 19,
+    "ny": 19,
+    "obstacles": 142,
+    "runs": 0,
+    "all_runs": 61,
+    "seconds": 4.186e-06,
+    "start": [
+      3066.0,
+      2582.0
+    ],
+    "end": [
+      3382.0,
+      2629.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 192,
+    "ny": 205,
+    "obstacles": 142,
+    "runs": 61,
+    "all_runs": 61,
+    "seconds": 0.000429153,
+    "start": [
+      3066.0,
+      2582.0
+    ],
+    "end": [
+      3382.0,
+      2629.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 12,
+    "ny": 11,
+    "obstacles": 142,
+    "runs": 0,
+    "all_runs": 3,
+    "seconds": 0.00032604,
+    "start": [
+      860.0,
+      91.0
+    ],
+    "end": [
+      2400.0,
+      91.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 169,
+    "ny": 172,
+    "obstacles": 142,
+    "runs": 3,
+    "all_runs": 3,
+    "seconds": 0.085640559,
+    "start": [
+      860.0,
+      91.0
+    ],
+    "end": [
+      2400.0,
+      91.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 12,
+    "ny": 13,
+    "obstacles": 142,
+    "runs": 1,
+    "all_runs": 4,
+    "seconds": 6.125e-06,
+    "start": [
+      2472.0,
+      91.0
+    ],
+    "end": [
+      2542.0,
+      91.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 169,
+    "ny": 172,
+    "obstacles": 142,
+    "runs": 4,
+    "all_runs": 4,
+    "seconds": 0.000137132,
+    "start": [
+      2472.0,
+      91.0
+    ],
+    "end": [
+      2542.0,
+      91.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 12,
+    "ny": 15,
+    "obstacles": 142,
+    "runs": 2,
+    "all_runs": 13,
+    "seconds": 3.955e-06,
+    "start": [
+      1596.0,
+      519.0
+    ],
+    "end": [
+      1596.0,
+      563.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 170,
+    "ny": 175,
+    "obstacles": 142,
+    "runs": 13,
+    "all_runs": 13,
+    "seconds": 0.000161845,
+    "start": [
+      1596.0,
+      519.0
+    ],
+    "end": [
+      1596.0,
+      563.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 13,
+    "ny": 16,
+    "obstacles": 142,
+    "runs": 1,
+    "all_runs": 18,
+    "seconds": 5.482e-06,
+    "start": [
+      2890.0,
+      749.0
+    ],
+    "end": [
+      2962.0,
+      755.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 174,
+    "ny": 179,
+    "obstacles": 142,
+    "runs": 18,
+    "all_runs": 18,
+    "seconds": 0.000146856,
+    "start": [
+      2890.0,
+      749.0
+    ],
+    "end": [
+      2962.0,
+      755.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 15,
+    "ny": 20,
+    "obstacles": 142,
+    "runs": 4,
+    "all_runs": 21,
+    "seconds": 4.562e-06,
+    "start": [
+      2890.0,
+      761.0
+    ],
+    "end": [
+      2962.0,
+      875.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 176,
+    "ny": 181,
+    "obstacles": 142,
+    "runs": 21,
+    "all_runs": 21,
+    "seconds": 0.000121449,
+    "start": [
+      2890.0,
+      761.0
+    ],
+    "end": [
+      2962.0,
+      875.0
+    ]
+  },
+  {
+    "complete": false,
+    "nx": 19,
+    "ny": 19,
+    "obstacles": 142,
+    "runs": 0,
+    "all_runs": 61,
+    "seconds": 6.184e-06,
+    "start": [
+      3066.0,
+      2582.0
+    ],
+    "end": [
+      3382.0,
+      2629.0
+    ]
+  },
+  {
+    "complete": true,
+    "nx": 192,
+    "ny": 205,
+    "obstacles": 142,
+    "runs": 61,
+    "all_runs": 61,
+    "seconds": 0.00055087,
+    "start": [
+      3066.0,
+      2582.0
+    ],
+    "end": [
+      3382.0,
+      2629.0
+    ]
+  }
+]

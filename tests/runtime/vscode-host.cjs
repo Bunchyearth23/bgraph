@@ -80,6 +80,54 @@ async function inspectDocument(document, name, deadline) {
   console.log(`PASS ${name}: VS Code definition, references, hover and scoped outline`);
 }
 
+async function inspectPreview(documents) {
+  const previews = () => vscode.window.tabGroups.all.flatMap(group => group.tabs)
+    .filter(tab => tab.input instanceof vscode.TabInputWebview
+      && tab.input.viewType.includes('bgraph.preview'));
+  const waitForPreviews = async count => {
+    const deadline = Date.now() + 5_000;
+    while (previews().length !== count && Date.now() < deadline) await pause(25);
+    assert.equal(previews().length, count, 'expected preview tabs');
+  };
+  assert.equal(previews().length, 0, 'preview starts closed');
+  for (const label of ['Unsaved preview A', 'Unsaved preview B']) {
+    const document = await vscode.workspace.openTextDocument({
+      language: 'bgraph', content: `node a "${label}"\n`,
+    });
+    documents.push(document);
+    await vscode.window.showTextDocument(document, { preview: false });
+    await vscode.commands.executeCommand('bgraph.showPreview');
+    const count = documents.filter(doc => doc.isUntitled).length;
+    await waitForPreviews(count);
+    await vscode.commands.executeCommand('bgraph.showPreview');
+    assert.equal(previews().length, count, 'reopening a preview reuses its panel');
+    assert.equal(vscode.window.activeTextEditor?.document.uri.toString(), document.uri.toString(),
+      'preview keeps focus in its source editor');
+
+    const edit = new vscode.WorkspaceEdit();
+    edit.insert(document.uri, document.positionAt(document.getText().length), 'node b "Typed update"\n');
+    assert(await vscode.workspace.applyEdit(edit));
+    await pause(250);
+    assert.equal(previews().length, count, 'typing keeps the same preview open');
+    if (count === 1 && process.env.BGRAPH_RUNTIME_SCREENSHOT) {
+      // The webview paints asynchronously after the extension has sent its HTML.
+      await pause(1_000);
+      const screenshot = spawnSync('import', ['-window', 'root', process.env.BGRAPH_RUNTIME_SCREENSHOT],
+        { timeout: 5_000 });
+      assert.ifError(screenshot.error);
+      assert.equal(screenshot.status, 0, 'preview screenshot');
+    }
+  }
+  for (const tab of previews()) {
+    assert(await vscode.window.tabGroups.close(tab), 'preview closes cleanly');
+  }
+  await waitForPreviews(0);
+  await vscode.commands.executeCommand('bgraph.showPreview');
+  await waitForPreviews(1);
+  assert(await vscode.window.tabGroups.close(previews()[0]));
+  console.log('PASS preview: unsaved buffers, panel reuse, editor focus, typing and reopening');
+}
+
 module.exports.run = async function run() {
   for (const name of ['BGRAPH_RUNTIME_SERVER', 'BGRAPH_RUNTIME_FIXTURES', 'BGRAPH_RUNTIME_CLI']) {
     assert(process.env[name], `${name} must be set`);
@@ -161,6 +209,7 @@ module.exports.run = async function run() {
         await inspectDocument(document, name, Date.now() + 10_000);
       }
     }
+    await inspectPreview(documents);
   } catch (error) {
     if (process.env.BGRAPH_RUNTIME_RESULT) {
       writeFileSync(process.env.BGRAPH_RUNTIME_RESULT, `${error.stack}\n`);
@@ -170,7 +219,8 @@ module.exports.run = async function run() {
     try {
       for (const document of documents) {
         await vscode.window.showTextDocument(document, { preview: false });
-        await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+        await vscode.commands.executeCommand(document.isUntitled
+          ? 'workbench.action.revertAndCloseActiveEditor' : 'workbench.action.closeActiveEditor');
       }
     } finally {
       await configuration.update('server.path', previousPath, vscode.ConfigurationTarget.Global);
@@ -178,6 +228,6 @@ module.exports.run = async function run() {
   }
   if (process.env.BGRAPH_RUNTIME_RESULT) {
     writeFileSync(process.env.BGRAPH_RUNTIME_RESULT,
-      'VS Code host: 7 fixtures passed; 2 inspection scenarios passed\n');
+      'VS Code host: 7 fixtures passed; 2 inspection scenarios passed; preview passed\n');
   }
 };

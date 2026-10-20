@@ -112,6 +112,12 @@ pub(crate) fn route_points(
     if start == end {
         return Some(vec![start]);
     }
+    // A blocked endpoint has no incident step; reject it before exploring the whole grid.
+    if obstacles.iter().any(|rect| {
+        enters(start, start, rect, CLEARANCE - 0.5) || enters(end, end, rect, CLEARANCE - 0.5)
+    }) {
+        return None;
+    }
     let clear = |path: &[(f64, f64)]| {
         path.windows(2).all(|pair| {
             !obstacles
@@ -138,7 +144,7 @@ pub(crate) fn route_points(
         h: 0.0,
     };
     // Local channels keep large processes cheap; every segment is still checked
-    // against all obstacles. Retry with all channels when the local grid fails.
+    // against all obstacles. Retry with all channels when blocked or sharing a run.
     let near = Rect {
         x: start.0.min(end.0) - 64.0,
         y: start.1.min(end.1) - 64.0,
@@ -152,8 +158,9 @@ pub(crate) fn route_points(
             r.x < near.right() && r.right() > near.x && r.y < near.bottom() && r.bottom() > near.y
         })
         .collect();
+    let mut fallback = None;
     for channels in [&local[..], obstacles] {
-        let (mut xs, mut ys) = lines(dot(start), dot(end), channels, &[]);
+        let (mut xs, mut ys) = lines(dot(start), dot(end), channels, used);
         xs.extend([start.0, end.0]);
         ys.extend([start.1, end.1]);
         xs.sort_by(|a, b| order(*a, *b));
@@ -164,17 +171,56 @@ pub(crate) fn route_points(
         let begin = at(&xs, start.0)? + at(&ys, start.1)? * xs.len();
         let finish = at(&xs, end.0)? + at(&ys, end.1)? * xs.len();
         if let Some(path) = search(begin, finish, &xs, &ys, obstacles, used, CLEARANCE - 0.5) {
-            return Some(straighten(
+            let path = straighten(
                 path.iter()
                     .map(|p| (xs[p % xs.len()], ys[p / xs.len()]))
                     .collect(),
-            ));
+            );
+            // A remote box can supply the only clear lane beside a shared local run.
+            if channels.len() == obstacles.len()
+                || path
+                    .windows(2)
+                    .all(|pair| overlap(pair[0], pair[1], used) < EPS)
+            {
+                return Some(path);
+            }
+            fallback = Some(path);
         }
         if local.len() == obstacles.len() {
             break;
         }
     }
-    None
+    fallback
+}
+
+#[cfg(test)]
+#[test]
+fn exact_ports_on_clearance_are_reachable_but_ports_inside_it_are_not() {
+    let obstacle = Rect {
+        x: 10.0,
+        y: 10.0,
+        w: 20.0,
+        h: 20.0,
+    };
+    let clear = (-100.0, 20.0);
+    let boundary = (obstacle.x - (CLEARANCE - 0.5), 20.0);
+    let inside = (boundary.0 + 0.08, boundary.1);
+    for reverse in [false, true] {
+        let endpoints = |point| {
+            if reverse {
+                (point, clear)
+            } else {
+                (clear, point)
+            }
+        };
+        let (start, end) = endpoints(inside);
+        assert!(route_points(start, end, &[obstacle], &[]).is_none());
+        let (start, end) = endpoints(boundary);
+        assert_eq!(
+            route_points(start, end, &[obstacle], &[]),
+            Some(vec![start, end])
+        );
+    }
 }
 
 /// The candidate lines a path may turn on.

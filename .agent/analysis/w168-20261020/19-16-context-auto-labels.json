@@ -1,0 +1,3159 @@
+{
+  "annotations": [
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "Une source",
+      "x": 166.0,
+      "y": 207.2
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "à enregistrer",
+      "x": 166.0,
+      "y": 220.46
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "Pipeline Running",
+      "x": 2530.9204,
+      "y": 207.2
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "(sondage /pipelines)",
+      "x": 2530.9204,
+      "y": 220.46
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "Enregistrement",
+      "x": 2896.0,
+      "y": 207.2
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "relu",
+      "x": 2896.0,
+      "y": 220.46
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "POST /pipelines",
+      "x": 540.1525,
+      "y": 475.2
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "Enregistrée",
+      "x": 530.9033,
+      "y": 689.88
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "POST /pipelines",
+      "x": 796.0,
+      "y": 595.1999999999999
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "/{id}/start",
+      "x": 796.0,
+      "y": 608.4599999999999
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "Valide ?",
+      "x": 1608.5737000000001,
+      "y": 599.2
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "Refus 4xx",
+      "x": 1701.2763,
+      "y": 676.62
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "avec les erreurs",
+      "x": 1701.2763,
+      "y": 689.88
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "DeployAck",
+      "x": 2299.3729,
+      "y": 595.1999999999999
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "Running",
+      "x": 2476.0,
+      "y": 595.1999999999999
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "GET /sounds/{id}/stream",
+      "x": 2686.0,
+      "y": 871.2
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "GET /live/{session}/…",
+      "x": 2686.0,
+      "y": 884.46
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "Profil lu",
+      "x": 2896.0,
+      "y": 875.2
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "d'ici ?",
+      "x": 2896.0,
+      "y": 888.46
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "503",
+      "x": 3316.0,
+      "y": 991.2
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "X-Aspy-Held-By",
+      "x": 3316.0,
+      "y": 1004.46
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "sounds.register",
+      "x": 3692.1364000000003,
+      "y": 991.2
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "Toutes",
+      "x": 166.0,
+      "y": 1251.1999999999998
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "les heures",
+      "x": 166.0,
+      "y": 1264.4599999999998
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "Passe close",
+      "x": 1006.0,
+      "y": 1371.1999999999998
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "workers.sync.request",
+      "x": 528.8203000000001,
+      "y": 1633.1999999999998
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "workers.heartbeat",
+      "x": 845.8153,
+      "y": 1513.1999999999998
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "Toutes",
+      "x": 1216.0,
+      "y": 1513.1999999999998
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "les 60 s",
+      "x": 1216.0,
+      "y": 1526.4599999999998
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "Démarrage",
+      "x": 166.0,
+      "y": 1887.1999999999998
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "du worker",
+      "x": 166.0,
+      "y": 1900.4599999999998
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "Deploy ou Stop",
+      "x": 2003.9152000000001,
+      "y": 1887.1999999999998
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "workers.deploy.{id}",
+      "x": 2003.9152000000001,
+      "y": 1900.4599999999998
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "Toutes",
+      "x": 166.0,
+      "y": 2007.1999999999998
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "les 60 s",
+      "x": 166.0,
+      "y": 2020.4599999999998
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "Périodique",
+      "x": 586.0,
+      "y": 2127.2
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "STREAM_END",
+      "x": 3316.0,
+      "y": 2625.2
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "fichier fermé",
+      "x": 3316.0,
+      "y": 2638.46
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "Fichier",
+      "x": 3946.0,
+      "y": 2625.2
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "catalogué",
+      "x": 3946.0,
+      "y": 2638.46
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "SIGTERM",
+      "x": 3138.2356,
+      "y": 2662.2
+    },
+    {
+      "color": "#111827",
+      "size": 10.2,
+      "text": "Module mort",
+      "x": 2303.3407,
+      "y": 2044.1999999999998
+    },
+    {
+      "color": "#0b0b0b",
+      "size": 16.0,
+      "text": "Audiospy — déployer, capter, enregistrer, relire",
+      "x": 40.0,
+      "y": 56.0
+    }
+  ],
+  "background": "#ffffff",
+  "canvas": {
+    "height": 2824.0,
+    "width": 4112.0
+  },
+  "description": null,
+  "edges": [
+    {
+      "from": "op_need",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          186.0,
+          171.0
+        ],
+        [
+          288.0,
+          171.0
+        ]
+      ],
+      "to": "op_build"
+    },
+    {
+      "from": "op_build",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          464.0,
+          171.0
+        ],
+        [
+          498.0,
+          171.0
+        ]
+      ],
+      "to": "op_save"
+    },
+    {
+      "from": "op_save",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          674.0,
+          171.0
+        ],
+        [
+          708.0,
+          171.0
+        ]
+      ],
+      "to": "op_run"
+    },
+    {
+      "from": "op_run",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          884.0,
+          171.0
+        ],
+        [
+          2456.0,
+          171.0
+        ]
+      ],
+      "to": "op_state"
+    },
+    {
+      "from": "op_state",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          2496.0,
+          171.0
+        ],
+        [
+          2598.0,
+          171.0
+        ]
+      ],
+      "to": "op_play"
+    },
+    {
+      "from": "op_play",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          2774.0,
+          171.0
+        ],
+        [
+          2876.0,
+          171.0
+        ]
+      ],
+      "to": "op_end"
+    },
+    {
+      "from": "c_save",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          586.0,
+          459.0
+        ],
+        [
+          586.0,
+          522.0
+        ]
+      ],
+      "to": "c_persist"
+    },
+    {
+      "from": "c_persist",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          586.0,
+          596.0
+        ],
+        [
+          586.0,
+          659.0
+        ]
+      ],
+      "to": "c_saved"
+    },
+    {
+      "from": "c_req",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          816.0,
+          559.0
+        ],
+        [
+          918.0,
+          559.0
+        ]
+      ],
+      "to": "c_guard"
+    },
+    {
+      "from": "c_guard",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          1094.0,
+          559.0
+        ],
+        [
+          1128.0,
+          559.0
+        ]
+      ],
+      "to": "c_flat"
+    },
+    {
+      "from": "c_flat",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          1304.0,
+          559.0
+        ],
+        [
+          1338.0,
+          559.0
+        ]
+      ],
+      "to": "c_val"
+    },
+    {
+      "from": "c_val",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          1514.0,
+          559.0
+        ],
+        [
+          1612.0,
+          559.0
+        ]
+      ],
+      "to": "c_ok"
+    },
+    {
+      "from": "c_ok",
+      "label": "oui",
+      "label_rect": {
+        "h": 17.0,
+        "w": 23.34,
+        "x": 1697.33,
+        "y": 550.5
+      },
+      "points": [
+        [
+          1660.0,
+          559.0
+        ],
+        [
+          1758.0,
+          559.0
+        ]
+      ],
+      "to": "c_build"
+    },
+    {
+      "from": "c_ok",
+      "label": "non",
+      "label_rect": {
+        "h": 17.0,
+        "w": 26.68,
+        "x": 1622.66,
+        "y": 612.5
+      },
+      "points": [
+        [
+          1636.0,
+          583.0
+        ],
+        [
+          1636.0,
+          659.0
+        ]
+      ],
+      "to": "c_400"
+    },
+    {
+      "from": "c_build",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          1934.0,
+          559.0
+        ],
+        [
+          1968.0,
+          559.0
+        ]
+      ],
+      "to": "c_pub"
+    },
+    {
+      "from": "c_pub",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          2144.0,
+          559.0
+        ],
+        [
+          2246.0,
+          559.0
+        ]
+      ],
+      "to": "c_ack"
+    },
+    {
+      "from": "c_ack",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          2286.0,
+          559.0
+        ],
+        [
+          2456.0,
+          559.0
+        ]
+      ],
+      "to": "c_run"
+    },
+    {
+      "from": "c_get",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          2706.0,
+          835.0
+        ],
+        [
+          2872.0,
+          835.0
+        ]
+      ],
+      "to": "c_own"
+    },
+    {
+      "from": "c_own",
+      "label": "oui",
+      "label_rect": {
+        "h": 17.0,
+        "w": 23.34,
+        "x": 2990.33,
+        "y": 823.5
+      },
+      "points": [
+        [
+          2914.0,
+          829.0
+        ],
+        [
+          3002.0,
+          829.0
+        ],
+        [
+          3002.0,
+          835.0
+        ],
+        [
+          3018.0,
+          835.0
+        ]
+      ],
+      "to": "c_local"
+    },
+    {
+      "from": "c_own",
+      "label": "non",
+      "label_rect": {
+        "h": 17.0,
+        "w": 26.68,
+        "x": 2988.66,
+        "y": 889.5
+      },
+      "points": [
+        [
+          2914.0,
+          841.0
+        ],
+        [
+          3002.0,
+          841.0
+        ],
+        [
+          3002.0,
+          955.0
+        ],
+        [
+          3018.0,
+          955.0
+        ]
+      ],
+      "to": "c_proxy"
+    },
+    {
+      "from": "c_proxy",
+      "label": "worker absent",
+      "label_rect": {
+        "h": 17.0,
+        "w": 72.80000000000001,
+        "x": 3208.6,
+        "y": 946.5
+      },
+      "points": [
+        [
+          3194.0,
+          955.0
+        ],
+        [
+          3296.0,
+          955.0
+        ]
+      ],
+      "to": "c_503"
+    },
+    {
+      "from": "c_reg",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          3756.0,
+          955.0
+        ],
+        [
+          3858.0,
+          955.0
+        ]
+      ],
+      "to": "c_ins"
+    },
+    {
+      "from": "c_tick",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          186.0,
+          1215.0
+        ],
+        [
+          288.0,
+          1215.0
+        ]
+      ],
+      "to": "c_reco"
+    },
+    {
+      "from": "c_reco",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          464.0,
+          1215.0
+        ],
+        [
+          498.0,
+          1215.0
+        ]
+      ],
+      "to": "c_tier"
+    },
+    {
+      "from": "c_tier",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          674.0,
+          1215.0
+        ],
+        [
+          708.0,
+          1215.0
+        ]
+      ],
+      "to": "c_repl"
+    },
+    {
+      "from": "c_repl",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          884.0,
+          1215.0
+        ],
+        [
+          918.0,
+          1215.0
+        ]
+      ],
+      "to": "c_sweep"
+    },
+    {
+      "from": "c_sweep",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          1006.0,
+          1252.0
+        ],
+        [
+          1006.0,
+          1315.0
+        ]
+      ],
+      "to": "c_pdone"
+    },
+    {
+      "from": "c_hb",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          816.0,
+          1477.0
+        ],
+        [
+          918.0,
+          1477.0
+        ]
+      ],
+      "to": "c_hbt"
+    },
+    {
+      "from": "c_sync",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          606.0,
+          1597.0
+        ],
+        [
+          1758.0,
+          1597.0
+        ]
+      ],
+      "to": "c_synct"
+    },
+    {
+      "from": "c_sched",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          1236.0,
+          1477.0
+        ],
+        [
+          1338.0,
+          1477.0
+        ]
+      ],
+      "to": "c_schedt"
+    },
+    {
+      "from": "c_schedt",
+      "label": "start / stop",
+      "label_rect": {
+        "h": 17.0,
+        "w": 56.69,
+        "x": 1292.655,
+        "y": 1415.5
+      },
+      "points": [
+        [
+          1426.0,
+          1440.0
+        ],
+        [
+          1426.0,
+          1424.0
+        ],
+        [
+          1216.0,
+          1424.0
+        ],
+        [
+          1216.0,
+          596.0
+        ]
+      ],
+      "to": "c_flat"
+    },
+    {
+      "from": "w_boot",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          186.0,
+          1851.0
+        ],
+        [
+          288.0,
+          1851.0
+        ]
+      ],
+      "to": "w_rtl"
+    },
+    {
+      "from": "w_rtl",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          464.0,
+          1851.0
+        ],
+        [
+          498.0,
+          1851.0
+        ]
+      ],
+      "to": "w_syncreq"
+    },
+    {
+      "from": "w_syncreq",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          674.0,
+          1851.0
+        ],
+        [
+          2036.0,
+          1851.0
+        ]
+      ],
+      "to": "w_cmd"
+    },
+    {
+      "from": "w_cmd",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          2056.0,
+          1871.0
+        ],
+        [
+          2056.0,
+          1934.0
+        ]
+      ],
+      "to": "w_decl"
+    },
+    {
+      "from": "w_decl",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          2144.0,
+          1971.0
+        ],
+        [
+          2178.0,
+          1971.0
+        ]
+      ],
+      "to": "w_spawn"
+    },
+    {
+      "from": "w_spawn",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          2266.0,
+          1934.0
+        ],
+        [
+          2266.0,
+          1888.0
+        ]
+      ],
+      "to": "w_ack"
+    },
+    {
+      "from": "w_died",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          2266.0,
+          2028.0
+        ],
+        [
+          2266.0,
+          2091.0
+        ],
+        [
+          2388.0,
+          2091.0
+        ]
+      ],
+      "to": "w_relau"
+    },
+    {
+      "from": "w_resync",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          186.0,
+          1971.0
+        ],
+        [
+          288.0,
+          1971.0
+        ]
+      ],
+      "to": "w_resynct"
+    },
+    {
+      "from": "w_hbtick",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          606.0,
+          2091.0
+        ],
+        [
+          708.0,
+          2091.0
+        ]
+      ],
+      "to": "w_hb"
+    },
+    {
+      "from": "r_pub",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          2564.0,
+          2233.0
+        ],
+        [
+          2598.0,
+          2233.0
+        ]
+      ],
+      "to": "r_ring"
+    },
+    {
+      "from": "r_ring",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          2774.0,
+          2233.0
+        ],
+        [
+          2808.0,
+          2233.0
+        ]
+      ],
+      "to": "r_sub"
+    },
+    {
+      "from": "r_sub",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          2984.0,
+          2233.0
+        ],
+        [
+          3018.0,
+          2233.0
+        ]
+      ],
+      "to": "r_ack"
+    },
+    {
+      "from": "r_ring",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          2686.0,
+          2270.0
+        ],
+        [
+          2686.0,
+          2316.0
+        ]
+      ],
+      "to": "r_fetch"
+    },
+    {
+      "from": "m_cap",
+      "label": "via le relais",
+      "label_rect": {
+        "h": 17.0,
+        "w": 60.010000000000005,
+        "x": 2747.545,
+        "y": 2574.333333333333
+      },
+      "points": [
+        [
+          2354.0,
+          2576.6666666666665
+        ],
+        [
+          2792.0,
+          2576.6666666666665
+        ],
+        [
+          2792.0,
+          2589.0
+        ],
+        [
+          2808.0,
+          2589.0
+        ]
+      ],
+      "to": "m_dsp"
+    },
+    {
+      "from": "m_dsp",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          2984.0,
+          2589.0
+        ],
+        [
+          3018.0,
+          2589.0
+        ]
+      ],
+      "to": "m_enc"
+    },
+    {
+      "from": "m_enc",
+      "label": "rotation",
+      "label_rect": {
+        "h": 17.0,
+        "w": 43.35,
+        "x": 3223.325,
+        "y": 2580.5
+      },
+      "points": [
+        [
+          3194.0,
+          2589.0
+        ],
+        [
+          3296.0,
+          2589.0
+        ]
+      ],
+      "to": "m_end"
+    },
+    {
+      "from": "m_end",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          3336.0,
+          2589.0
+        ],
+        [
+          3422.0,
+          2589.0
+        ],
+        [
+          3422.0,
+          2576.6666666666665
+        ],
+        [
+          3438.0,
+          2576.6666666666665
+        ]
+      ],
+      "to": "m_sto"
+    },
+    {
+      "from": "m_sto",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          3614.0,
+          2589.0
+        ],
+        [
+          3648.0,
+          2589.0
+        ]
+      ],
+      "to": "m_reg"
+    },
+    {
+      "from": "m_reg",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          3824.0,
+          2589.0
+        ],
+        [
+          3926.0,
+          2589.0
+        ]
+      ],
+      "to": "m_done"
+    },
+    {
+      "from": "m_term",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          3106.0,
+          2646.0
+        ],
+        [
+          3106.0,
+          2662.0
+        ],
+        [
+          3106.0,
+          2656.0
+        ],
+        [
+          3106.0,
+          2672.0
+        ]
+      ],
+      "to": "m_ship"
+    },
+    {
+      "from": "m_ship",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          3194.0,
+          2709.0
+        ],
+        [
+          3422.0,
+          2709.0
+        ],
+        [
+          3422.0,
+          2601.3333333333335
+        ],
+        [
+          3438.0,
+          2601.3333333333335
+        ]
+      ],
+      "to": "m_sto"
+    },
+    {
+      "from": "m_cap",
+      "label": "média opaque",
+      "label_rect": {
+        "h": 17.0,
+        "w": 73.41000000000001,
+        "x": 2229.295,
+        "y": 2640.5
+      },
+      "points": [
+        [
+          2266.0,
+          2626.0
+        ],
+        [
+          2266.0,
+          2672.0
+        ]
+      ],
+      "to": "m_vid"
+    },
+    {
+      "from": "m_cap",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          2354.0,
+          2601.3333333333335
+        ],
+        [
+          2372.0,
+          2601.3333333333335
+        ],
+        [
+          2372.0,
+          2709.0
+        ],
+        [
+          2388.0,
+          2709.0
+        ]
+      ],
+      "to": "m_hls"
+    },
+    {
+      "from": "op_save",
+      "label": "HTTPS",
+      "label_rect": {
+        "h": 17.0,
+        "w": 42.779999999999994,
+        "x": 564.61,
+        "y": 305.0
+      },
+      "points": [
+        [
+          586.0,
+          208.0
+        ],
+        [
+          586.0,
+          419.0
+        ]
+      ],
+      "to": "c_save"
+    },
+    {
+      "from": "op_run",
+      "label": "HTTPS",
+      "label_rect": {
+        "h": 17.0,
+        "w": 42.779999999999994,
+        "x": 774.61,
+        "y": 431.2
+      },
+      "points": [
+        [
+          796.0,
+          208.0
+        ],
+        [
+          796.0,
+          539.0
+        ]
+      ],
+      "to": "c_req"
+    },
+    {
+      "from": "c_run",
+      "label": "statut",
+      "label_rect": {
+        "h": 17.0,
+        "w": 34.46,
+        "x": 2458.77,
+        "y": 286.9
+      },
+      "points": [
+        [
+          2476.0,
+          539.0
+        ],
+        [
+          2476.0,
+          191.0
+        ]
+      ],
+      "to": "op_state"
+    },
+    {
+      "from": "op_play",
+      "label": "Range",
+      "label_rect": {
+        "h": 17.0,
+        "w": 39.46,
+        "x": 2666.27,
+        "y": 503.0
+      },
+      "points": [
+        [
+          2686.0,
+          208.0
+        ],
+        [
+          2686.0,
+          815.0
+        ]
+      ],
+      "to": "c_get"
+    },
+    {
+      "from": "c_pub",
+      "label": "workers.deploy.{id}",
+      "label_rect": {
+        "h": 17.0,
+        "w": 94.48,
+        "x": 2002.5826088940537,
+        "y": 1205.465374107544
+      },
+      "points": [
+        [
+          2049.675444679663,
+          596.0
+        ],
+        [
+          2049.9697731084443,
+          1831.9307482150882
+        ]
+      ],
+      "to": "w_cmd"
+    },
+    {
+      "from": "w_ack",
+      "label": "workers.deploy.ack",
+      "label_rect": {
+        "h": 17.0,
+        "w": 95.58,
+        "x": 2218.21,
+        "y": 1188.0
+      },
+      "points": [
+        [
+          2266.0,
+          1814.0
+        ],
+        [
+          2266.0,
+          579.0
+        ]
+      ],
+      "to": "c_ack"
+    },
+    {
+      "from": "c_synct",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          1880.0557945541739,
+          1634.0
+        ],
+        [
+          2062.324555320337,
+          1832.0263340389897
+        ]
+      ],
+      "to": "w_cmd"
+    },
+    {
+      "from": "w_syncreq",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          586.0,
+          1814.0
+        ],
+        [
+          586.0,
+          1617.0
+        ]
+      ],
+      "to": "c_sync"
+    },
+    {
+      "from": "w_hb",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          796.0,
+          2054.0
+        ],
+        [
+          796.0,
+          1497.0
+        ]
+      ],
+      "to": "c_hb"
+    },
+    {
+      "from": "w_spawn",
+      "label": "exec relay:…",
+      "label_rect": {
+        "h": 17.0,
+        "w": 63.95000000000002,
+        "x": 2181.225,
+        "y": 2271.5
+      },
+      "points": [
+        [
+          2213.2,
+          2008.0
+        ],
+        [
+          2213.2,
+          2552.0
+        ]
+      ],
+      "to": "m_cap"
+    },
+    {
+      "from": "m_cap",
+      "label": "trames",
+      "label_rect": {
+        "h": 17.0,
+        "w": 40.56,
+        "x": 2363.165952752373,
+        "y": 2409.8417137022425
+      },
+      "points": [
+        [
+          2287.825842696629,
+          2552.0
+        ],
+        [
+          2454.174157303371,
+          2270.0
+        ]
+      ],
+      "to": "r_pub"
+    },
+    {
+      "from": "r_sub",
+      "label": "trames",
+      "label_rect": {
+        "h": 17.0,
+        "w": 40.56,
+        "x": 2875.72,
+        "y": 2458.9
+      },
+      "points": [
+        [
+          2896.0,
+          2270.0
+        ],
+        [
+          2896.0,
+          2552.0
+        ]
+      ],
+      "to": "m_dsp"
+    },
+    {
+      "from": "m_enc",
+      "label": "acquittement",
+      "label_rect": {
+        "h": 17.0,
+        "w": 67.25,
+        "x": 3072.375,
+        "y": 2346.1
+      },
+      "points": [
+        [
+          3106.0,
+          2552.0
+        ],
+        [
+          3106.0,
+          2270.0
+        ]
+      ],
+      "to": "r_ack"
+    },
+    {
+      "from": "m_reg",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          3736.0,
+          2552.0
+        ],
+        [
+          3736.0,
+          975.0
+        ]
+      ],
+      "to": "c_reg"
+    },
+    {
+      "from": "c_persist",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          498.0,
+          559.0
+        ],
+        [
+          254.0,
+          559.0
+        ]
+      ],
+      "to": "d_pg"
+    },
+    {
+      "from": "c_ins",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          3946.0,
+          992.0
+        ],
+        [
+          3946.0,
+          1038.0
+        ]
+      ],
+      "to": "d_pg2"
+    },
+    {
+      "from": "c_local",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          3194.0,
+          835.0
+        ],
+        [
+          3228.0,
+          835.0
+        ]
+      ],
+      "to": "d_med3"
+    },
+    {
+      "from": "c_tier",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          586.0,
+          1252.0
+        ],
+        [
+          766.6666666666666,
+          1298.0
+        ]
+      ],
+      "to": "d_med2"
+    },
+    {
+      "from": "c_sweep",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          1006.0,
+          1252.0
+        ],
+        [
+          825.3333333333334,
+          1298.0
+        ]
+      ],
+      "to": "d_med2"
+    },
+    {
+      "from": "m_sto",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          3526.0,
+          2626.0
+        ],
+        [
+          3648.0,
+          2674.2190476190476
+        ]
+      ],
+      "to": "d_media"
+    },
+    {
+      "from": "m_enc",
+      "label": null,
+      "label_rect": null,
+      "points": [
+        [
+          3080.0,
+          2626.0
+        ],
+        [
+          2978.024096385542,
+          2672.0
+        ]
+      ],
+      "to": "d_spool"
+    }
+  ],
+  "groups": [
+    {
+      "description": null,
+      "id": "op",
+      "label": [
+        "Opérateur — SPA Svelte (navigateur)"
+      ],
+      "rect": {
+        "h": 166.0,
+        "w": 4032.0,
+        "x": 40.0,
+        "y": 80.0
+      }
+    },
+    {
+      "description": null,
+      "id": "core",
+      "label": [
+        "aspy-core — plan de contrôle (:3023 HTTPS · Postgres · hub NATS)"
+      ],
+      "rect": {
+        "h": 1340.0,
+        "w": 4032.0,
+        "x": 40.0,
+        "y": 332.0
+      }
+    },
+    {
+      "description": null,
+      "id": "wk",
+      "label": [
+        "aspy-worker — agent et relais de données (leaf NATS · :3027)"
+      ],
+      "rect": {
+        "h": 684.0,
+        "w": 4032.0,
+        "x": 40.0,
+        "y": 1744.0
+      }
+    },
+    {
+      "description": null,
+      "id": "mod",
+      "label": [
+        "Modules — un processus par nœud de la pipeline"
+      ],
+      "rect": {
+        "h": 286.0,
+        "w": 4032.0,
+        "x": 40.0,
+        "y": 2498.0
+      }
+    },
+    {
+      "description": null,
+      "id": "core_l0",
+      "label": [
+        "API et déploiement"
+      ],
+      "rect": {
+        "h": 345.0,
+        "w": 3988.0,
+        "x": 62.0,
+        "y": 370.0
+      }
+    },
+    {
+      "description": null,
+      "id": "core_l1",
+      "label": [
+        "Catalogue et lecture"
+      ],
+      "rect": {
+        "h": 362.0,
+        "w": 3988.0,
+        "x": 62.0,
+        "y": 766.0
+      }
+    },
+    {
+      "description": null,
+      "id": "core_l2",
+      "label": [
+        "Politique de stockage — une passe à la fois, toutes les heures"
+      ],
+      "rect": {
+        "h": 242.0,
+        "w": 3988.0,
+        "x": 62.0,
+        "y": 1146.0
+      }
+    },
+    {
+      "description": null,
+      "id": "core_l3",
+      "label": [
+        "Supervision"
+      ],
+      "rect": {
+        "h": 242.0,
+        "w": 3988.0,
+        "x": 62.0,
+        "y": 1408.0
+      }
+    },
+    {
+      "description": null,
+      "id": "wk_l0",
+      "label": [
+        "Agent"
+      ],
+      "rect": {
+        "h": 362.0,
+        "w": 3988.0,
+        "x": 62.0,
+        "y": 1782.0
+      }
+    },
+    {
+      "description": null,
+      "id": "wk_l1",
+      "label": [
+        "Relais de données — un par worker"
+      ],
+      "rect": {
+        "h": 242.0,
+        "w": 3988.0,
+        "x": 62.0,
+        "y": 2164.0
+      }
+    }
+  ],
+  "guides": [],
+  "label_conflicts": [],
+  "nodes": [
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "op_need",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 146.0,
+        "y": 151.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "op_build",
+      "label": [
+        "Composer la pipeline",
+        "Workbench (xyflow)"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 288.0,
+        "y": 134.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "op_save",
+      "label": [
+        "Enregistrer",
+        "POST /pipelines"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 498.0,
+        "y": 134.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "op_run",
+      "label": [
+        "Démarrer",
+        "POST /pipelines/{id}/start"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 708.0,
+        "y": 134.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "op_state",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 2456.0,
+        "y": 151.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "op_play",
+      "label": [
+        "Écouter / regarder",
+        "Player · direct HLS"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 2598.0,
+        "y": 134.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "op_end",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 2876.0,
+        "y": 151.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "none",
+      "id": "op_l",
+      "label": [
+        ""
+      ],
+      "rect": {
+        "h": 1.0,
+        "w": 1.0,
+        "x": 78.0,
+        "y": 134.0
+      },
+      "stroke": "none"
+    },
+    {
+      "description": null,
+      "fill": "none",
+      "id": "op_r",
+      "label": [
+        ""
+      ],
+      "rect": {
+        "h": 1.0,
+        "w": 1.0,
+        "x": 4033.0,
+        "y": 134.0
+      },
+      "stroke": "none"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_save",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 566.0,
+        "y": 419.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_persist",
+      "label": [
+        "Persister",
+        "la pipeline"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 498.0,
+        "y": 522.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_saved",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 566.0,
+        "y": 659.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "d_pg",
+      "label": [
+        "PostgreSQL 18",
+        "pipelines · profils"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 78.0,
+        "y": 522.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_req",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 776.0,
+        "y": 539.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_guard",
+      "label": [
+        "Garde d'accès",
+        "(ASPY_AUTH_MODE)"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 918.0,
+        "y": 522.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_flat",
+      "label": [
+        "Aplatir les composites",
+        "(aspy_blocks)"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 1128.0,
+        "y": 522.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_val",
+      "label": [
+        "Valider le graphe",
+        "(deployment_validator)"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 1338.0,
+        "y": 522.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_ok",
+      "label": [],
+      "rect": {
+        "h": 48.0,
+        "w": 48.0,
+        "x": 1612.0,
+        "y": 535.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_400",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 1616.0,
+        "y": 659.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_build",
+      "label": [
+        "Étapes par worker",
+        "arêtes relay:<flux>#<arête>"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 1758.0,
+        "y": 522.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_pub",
+      "label": [
+        "Publier Deploy",
+        "(JetStream)"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 1968.0,
+        "y": 522.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_ack",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 2246.0,
+        "y": 539.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_run",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 2456.0,
+        "y": 539.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "none",
+      "id": "core_l0_l",
+      "label": [
+        ""
+      ],
+      "rect": {
+        "h": 1.0,
+        "w": 1.0,
+        "x": 78.0,
+        "y": 402.0
+      },
+      "stroke": "none"
+    },
+    {
+      "description": null,
+      "fill": "none",
+      "id": "core_l0_r",
+      "label": [
+        ""
+      ],
+      "rect": {
+        "h": 1.0,
+        "w": 1.0,
+        "x": 4033.0,
+        "y": 402.0
+      },
+      "stroke": "none"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_get",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 2666.0,
+        "y": 815.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_own",
+      "label": [],
+      "rect": {
+        "h": 48.0,
+        "w": 48.0,
+        "x": 2872.0,
+        "y": 811.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_local",
+      "label": [
+        "Lire le profil",
+        "206 + Range"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 3018.0,
+        "y": 798.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "d_med3",
+      "label": [
+        "Profils de stockage"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 3228.0,
+        "y": 798.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_proxy",
+      "label": [
+        "Lire via le worker",
+        "détenteur"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 3018.0,
+        "y": 918.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_503",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 3296.0,
+        "y": 935.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_reg",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 3716.0,
+        "y": 935.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_ins",
+      "label": [
+        "Inscrire la ligne sounds",
+        "date dans [2000, now+1h]"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 3858.0,
+        "y": 918.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "d_pg2",
+      "label": [
+        "PostgreSQL 18",
+        "sounds"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 3858.0,
+        "y": 1038.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "none",
+      "id": "core_l1_l",
+      "label": [
+        ""
+      ],
+      "rect": {
+        "h": 1.0,
+        "w": 1.0,
+        "x": 78.0,
+        "y": 798.0
+      },
+      "stroke": "none"
+    },
+    {
+      "description": null,
+      "fill": "none",
+      "id": "core_l1_r",
+      "label": [
+        ""
+      ],
+      "rect": {
+        "h": 1.0,
+        "w": 1.0,
+        "x": 4033.0,
+        "y": 798.0
+      },
+      "stroke": "none"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_tick",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 146.0,
+        "y": 1195.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_reco",
+      "label": [
+        "Reprendre les opérations",
+        "ouvertes (au boot)"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 288.0,
+        "y": 1178.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_tier",
+      "label": [
+        "Tiering",
+        "et rétention"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 498.0,
+        "y": 1178.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_repl",
+      "label": [
+        "Réplication",
+        "et transcodage"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 708.0,
+        "y": 1178.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_sweep",
+      "label": [
+        "Balayer les orphelins",
+        "élaguer sur preuve seule"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 918.0,
+        "y": 1178.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "d_med2",
+      "label": [
+        "Profils de stockage"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 708.0,
+        "y": 1298.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_pdone",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 986.0,
+        "y": 1315.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "none",
+      "id": "core_l2_l",
+      "label": [
+        ""
+      ],
+      "rect": {
+        "h": 1.0,
+        "w": 1.0,
+        "x": 78.0,
+        "y": 1178.0
+      },
+      "stroke": "none"
+    },
+    {
+      "description": null,
+      "fill": "none",
+      "id": "core_l2_r",
+      "label": [
+        ""
+      ],
+      "rect": {
+        "h": 1.0,
+        "w": 1.0,
+        "x": 4033.0,
+        "y": 1178.0
+      },
+      "stroke": "none"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_sync",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 566.0,
+        "y": 1577.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_hb",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 776.0,
+        "y": 1457.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_hbt",
+      "label": [
+        "État des workers,",
+        "stats et épisodes"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 918.0,
+        "y": 1440.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_sched",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 1196.0,
+        "y": 1457.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_schedt",
+      "label": [
+        "Planificateur :",
+        "start / stop par fenêtre"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 1338.0,
+        "y": 1440.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "c_synct",
+      "label": [
+        "Renvoyer au worker",
+        "ses pipelines (Deploy)"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 1758.0,
+        "y": 1560.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "none",
+      "id": "core_l3_l",
+      "label": [
+        ""
+      ],
+      "rect": {
+        "h": 1.0,
+        "w": 1.0,
+        "x": 78.0,
+        "y": 1440.0
+      },
+      "stroke": "none"
+    },
+    {
+      "description": null,
+      "fill": "none",
+      "id": "core_l3_r",
+      "label": [
+        ""
+      ],
+      "rect": {
+        "h": 1.0,
+        "w": 1.0,
+        "x": 4033.0,
+        "y": 1440.0
+      },
+      "stroke": "none"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "w_boot",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 146.0,
+        "y": 1831.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "w_rtl",
+      "label": [
+        "Numéroter les clés RTL",
+        "(avant NATS)"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 288.0,
+        "y": 1814.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "w_syncreq",
+      "label": [
+        "Demander son état",
+        "workers.sync.request"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 498.0,
+        "y": 1814.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "w_cmd",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 2036.0,
+        "y": 1831.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "w_ack",
+      "label": [
+        "Acquitter",
+        "DeployAck"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 2178.0,
+        "y": 1814.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "w_resync",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 146.0,
+        "y": 1951.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "w_resynct",
+      "label": [
+        "Resynchroniser :",
+        "relancer les étapes mortes"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 288.0,
+        "y": 1934.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "w_decl",
+      "label": [
+        "Déclarer flux et arêtes",
+        "au relais"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 1968.0,
+        "y": 1934.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "w_spawn",
+      "label": [
+        "Lancer un processus",
+        "par nœud (groupe)"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 2178.0,
+        "y": 1934.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "w_relau",
+      "label": [
+        "Relancer après 1 → 30 s",
+        "disjoncteur au 8e échec"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 2388.0,
+        "y": 2054.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "w_hbtick",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 566.0,
+        "y": 2071.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "w_hb",
+      "label": [
+        "Battement + stats",
+        "workers.heartbeat"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 708.0,
+        "y": 2054.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "none",
+      "id": "wk_l0_l",
+      "label": [
+        ""
+      ],
+      "rect": {
+        "h": 1.0,
+        "w": 1.0,
+        "x": 78.0,
+        "y": 1814.0
+      },
+      "stroke": "none"
+    },
+    {
+      "description": null,
+      "fill": "none",
+      "id": "wk_l0_r",
+      "label": [
+        ""
+      ],
+      "rect": {
+        "h": 1.0,
+        "w": 1.0,
+        "x": 4033.0,
+        "y": 1814.0
+      },
+      "stroke": "none"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "r_pub",
+      "label": [
+        "Recevoir les trames",
+        "d'une sortie (pub)"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 2388.0,
+        "y": 2196.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "r_ring",
+      "label": [
+        "Anneau par sortie",
+        "borné · numéroté"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 2598.0,
+        "y": 2196.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "r_sub",
+      "label": [
+        "Servir chaque arête",
+        "à son curseur (sub)"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 2808.0,
+        "y": 2196.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "r_ack",
+      "label": [
+        "Avancer le curseur",
+        "à l'acquittement"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 3018.0,
+        "y": 2196.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "r_fetch",
+      "label": [
+        "Arête vers un autre",
+        "worker :",
+        "fetch entre relais"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 2598.0,
+        "y": 2316.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "none",
+      "id": "wk_l1_l",
+      "label": [
+        ""
+      ],
+      "rect": {
+        "h": 1.0,
+        "w": 1.0,
+        "x": 78.0,
+        "y": 2196.0
+      },
+      "stroke": "none"
+    },
+    {
+      "description": null,
+      "fill": "none",
+      "id": "wk_l1_r",
+      "label": [
+        ""
+      ],
+      "rect": {
+        "h": 1.0,
+        "w": 1.0,
+        "x": 4033.0,
+        "y": 2196.0
+      },
+      "stroke": "none"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "m_cap",
+      "label": [
+        "Capture",
+        "network · rtlsdr · alsa",
+        "dvb · decklink · v4l2"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 2178.0,
+        "y": 2552.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "m_dsp",
+      "label": [
+        "Traitement",
+        "selector · fmdemod",
+        "resampler · agc"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 2808.0,
+        "y": 2552.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "m_enc",
+      "label": [
+        "Encodeur",
+        "MP3 · WAV · FLAC"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 3018.0,
+        "y": 2552.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "m_end",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 3296.0,
+        "y": 2569.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "m_sto",
+      "label": [
+        "file_sink",
+        "écrire, téléverser"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 3438.0,
+        "y": 2552.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "m_reg",
+      "label": [
+        "Inscrire le son",
+        "sounds.register"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 3648.0,
+        "y": 2552.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "m_done",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 3926.0,
+        "y": 2569.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "m_vid",
+      "label": [
+        "video_encoder",
+        "coupe sur image clé"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 2178.0,
+        "y": 2672.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "m_hls",
+      "label": [
+        "hls_sink direct",
+        "fenêtre glissante"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 2388.0,
+        "y": 2672.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "d_spool",
+      "label": [
+        "Spool encodeur",
+        "last-emitted"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 2808.0,
+        "y": 2672.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "m_ship",
+      "label": [
+        "Livrer le fichier ouvert",
+        "sortie 143"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 3018.0,
+        "y": 2672.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "d_media",
+      "label": [
+        "Profils de stockage",
+        "local · FTP · SFTP · S3 ·",
+        "SMB"
+      ],
+      "rect": {
+        "h": 74.0,
+        "w": 176.0,
+        "x": 3648.0,
+        "y": 2672.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "none",
+      "id": "mod_l",
+      "label": [
+        ""
+      ],
+      "rect": {
+        "h": 1.0,
+        "w": 1.0,
+        "x": 78.0,
+        "y": 2552.0
+      },
+      "stroke": "none"
+    },
+    {
+      "description": null,
+      "fill": "none",
+      "id": "mod_r",
+      "label": [
+        ""
+      ],
+      "rect": {
+        "h": 1.0,
+        "w": 1.0,
+        "x": 4033.0,
+        "y": 2552.0
+      },
+      "stroke": "none"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "m_term",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 3086.0,
+        "y": 2606.0
+      },
+      "stroke": "#334155"
+    },
+    {
+      "description": null,
+      "fill": "#ffffff",
+      "id": "w_died",
+      "label": [],
+      "rect": {
+        "h": 40.0,
+        "w": 40.0,
+        "x": 2246.0,
+        "y": 1988.0
+      },
+      "stroke": "#334155"
+    }
+  ],
+  "title": "Audiospy — déployer, capter, enregistrer, relire",
+  "version": 1
+}

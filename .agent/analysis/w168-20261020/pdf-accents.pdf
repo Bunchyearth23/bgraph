@@ -1,0 +1,120 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 218 216] /Contents 4 0 R /Resources << /Font << /F1 5 0 R /F2 6 0 R >> /ExtGState << /GSF0 << /Type /ExtGState /ca 0 >> /GSF1000 << /Type /ExtGState /ca 1 >> /GSS1000 << /Type /ExtGState /CA 1 >>  >> >> >>
+endobj
+4 0 obj
+<< /Length 1238 >>
+stream
+/GSF1000 gs
+1 1 1 rg
+0 0 218 216 re f
+[4 3] 0 d
+32 32 154 112 re
+/GSF0 gs
+0 0 0 rg
+/GSS1000 gs
+0.58 0.639 0.722 RG
+1 w
+B
+/GSF1000 gs
+1 1 1 rg
+41 137.04 m
+83.072 137.04 l
+83.072 120.24 l
+41 120.24 l
+h
+f
+/GSF1000 gs
+0.392 0.455 0.545 rg
+BT /F2 12 Tf 44 124.32 Td (\311quipe) Tj ET
+[] 0 d
+50 50 118 60 re
+/GSF1000 gs
+1 1 1 rg
+/GSS1000 gs
+0.122 0.161 0.216 RG
+1.5 w
+B
+/GSF1000 gs
+0.067 0.094 0.153 rg
+BT /F1 14 Tf 79.418 75.24 Td (D\351marrer) Tj ET
+65.36 99.92 m
+65.305 99.362 l
+65.142 98.826 l
+64.878 98.331 l
+64.522 97.898 l
+64.089 97.542 l
+63.594 97.278 l
+63.058 97.115 l
+62.5 97.06 l
+61.942 97.115 l
+61.406 97.278 l
+60.911 97.542 l
+60.478 97.898 l
+60.122 98.331 l
+59.858 98.826 l
+59.695 99.362 l
+59.64 99.92 l
+59.695 100.478 l
+59.858 101.014 l
+60.122 101.509 l
+60.478 101.942 l
+60.911 102.298 l
+61.406 102.562 l
+61.942 102.725 l
+62.5 102.78 l
+63.058 102.725 l
+63.594 102.562 l
+64.089 102.298 l
+64.522 101.942 l
+64.878 101.509 l
+65.142 101.014 l
+65.305 100.478 l
+h
+/GSS1000 gs
+0.122 0.161 0.216 RG
+1.3 w
+S
+57 92 m
+57 94.75 l
+60.3 96.95 l
+64.7 96.95 l
+68 94.75 l
+68 92 l
+/GSS1000 gs
+0.122 0.161 0.216 RG
+1.3 w
+S
+/GSS1000 gs
+0.043 0.043 0.043 RG
+/GSF1000 gs
+0.043 0.043 0.043 rg
+BT /F2 16 Tf 32 168 Td (Op\351rateur \227 d\351ployer) Tj ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000380 00000 n 
+0000001669 00000 n 
+0000001766 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+1868
+%%EOF

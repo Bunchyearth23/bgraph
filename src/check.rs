@@ -719,7 +719,11 @@ fn check_final_placements(diagram: &Diagram, layout: &crate::layout::Layout, out
                     gap,
                     align,
                 } => Some((*dir, anchor.as_str(), *gap, *align)),
-                placement if plan.placed_unit(Entity::Node(index)).is_none() => {
+                placement
+                    if plan.placed_unit(Entity::Node(index)).is_none()
+                        && !(archetype_of(diagram).name == "bpmn"
+                            && plan.owner().contains_key(&Entity::Node(index))) =>
+                {
                     let resolved = if layout.opts.grid_spec.is_some() {
                         match placement {
                             Placement::At { x, y } | Placement::Cell { col: x, row: y } => {

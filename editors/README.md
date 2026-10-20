@@ -48,9 +48,20 @@ Packaged. Build the extension and install it:
 
 ```sh
 cd editors/vscode
-./package.sh                    # or ./package.sh --no-server for highlighting only
-code --install-extension bgraph-1.0.0.vsix
+./package.sh                    # or ./package.sh --no-server for highlighting and preview
+code --install-extension bgraph-1.0.0.vsix --force
 ```
+
+### Preview a .bd file
+
+Press **Ctrl+Shift+V** (**Cmd+Shift+V** on macOS) in a bgraph editor, or run
+**bgraph: Open Preview**. The side pane renders the current buffer as you type,
+including unsaved and untitled documents. The extension reuses one pane per
+document and displays rendering errors in place. Its bundled wasm renderer
+works independently of the language server and CLI.
+
+Sources must be self-contained: the wasm preview does not resolve `include`
+or external `from:` files. Use `bgraph watch file.bd --open` for those.
 
 ### Diagrams in the Markdown preview
 
@@ -63,12 +74,17 @@ than taking the document's rendering down.
 
 ## Zed
 
-Packaged in `editors/zed`. See its own README.
+Packaged in `editors/zed`. The language supplies **bgraph: Preview**, a task
+which saves the current file and runs `bgraph watch` on a free port, opening
+the browser after the server starts. Open the containing folder as a project
+before the `.bd` file so Zed exposes the language task. Saving updates the
+drawing. The `editors/zed/keymap.json` snippet binds **Ctrl+Shift+V** in bgraph editors;
+merge it into your Zed keymap. See the extension's README for setup.
+The task uses Linux/macOS shell syntax; its README describes the PowerShell
+argument override separately.
 
-**No Markdown preview there.** Zed's extension API has no hook for extending
-its Markdown rendering, so this is a limit of the editor rather than a piece
-of work left undone — writing it is not possible today. `bgraph watch` beside
-the editor is the answer meanwhile.
+This preview uses the browser: Zed's extension API does not provide a custom
+preview pane or a hook for rendering bgraph fences in Markdown.
 
 ---
 

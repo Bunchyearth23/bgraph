@@ -31,8 +31,8 @@ l'éditeur pour charger le nouvel exécutable et ses capacités.
 ./editors/zed/install.sh
 ```
 
-Le script installe le serveur et prépare la grammaire. Il peut créer un
-commit des fichiers de grammaire régénérés et actualise la révision épinglée
+Le script installe le CLI et le serveur, puis prépare la grammaire. Il peut
+créer un commit des fichiers de grammaire régénérés et actualise la révision épinglée
 dans le manifeste de l'extension.
 
 Dans Zed, ouvrez la palette des commandes (`Ctrl+Shift+P` ou `Cmd+Shift+P`),
@@ -45,19 +45,34 @@ affiche.
 
 ### Preview et Ctrl+Shift+V
 
-L'extension actuelle apporte le langage et le LSP. Elle n'ajoute pas de
-volet de preview bgraph à Zed, ni de rendu des blocs bgraph dans son
-aperçu Markdown. **`Ctrl+Shift+V` n'ouvre donc pas une preview `.bd` intégrée.**
+L'extension fournit la tâche **bgraph: Preview** pour le fichier `.bd`
+courant. Ouvrez dans Zed le dossier qui contient ce fichier, puis le `.bd` :
+sur l'hôte vérifié, une fenêtre contenant seulement un fichier isolé ne
+propose pas la tâche de langue. La tâche sauvegarde ce fichier, démarre la
+preview sur un port libre et ouvre le navigateur. Lancez-la avec **task: spawn**,
+puis sélectionnez **bgraph: Preview**. Pour lui associer `Ctrl+Shift+V`, ajoutez l'entrée de
+`editors/zed/keymap.json` à votre keymap Zed (**zed: open keymap**).
+Le raccourci est limité aux éditeurs bgraph.
 
-Le flux disponible consiste à garder la preview navigateur à côté de Zed :
+La tâche fournie utilise la syntaxe des shells Linux/macOS. Pour PowerShell,
+le README de l'extension Zed donne l'argument à adapter dans une tâche de
+projet ; cette variante n'a pas été testée dans un hôte Windows.
+
+La commande équivalente est :
 
 ```sh
-bgraph watch architecture.bd
+bgraph watch architecture.bd --open --port 0
 ```
 
-Ouvrez <http://127.0.0.1:7878> et enregistrez vos modifications dans Zed.
-L'API d'extension de Zed n'expose actuellement pas le volet personnalisé
-nécessaire à une preview native de ce type.
+L'adresse choisie est affichée dans le terminal de la tâche. Les sauvegardes
+actualisent le dessin, y compris celles des fichiers inclus ; une inclusion
+non sauvegardée conserve sa version sur disque. Arrêtez la tâche depuis son
+terminal pour fermer le serveur. Relancer une tâche déjà active ne crée pas
+une deuxième instance concurrente.
+
+La preview s'affiche dans le navigateur. L'API d'extension de Zed n'expose
+actuellement pas le volet personnalisé nécessaire à une preview native ;
+l'aperçu Markdown de Zed n'est pas étendu.
 
 ### Le serveur est introuvable
 
@@ -85,13 +100,27 @@ Depuis la racine du dépôt, avec Node/npm, `zip` et la cible Rust wasm :
 ```sh
 rustup target add wasm32-unknown-unknown
 ./editors/vscode/package.sh
-code --install-extension editors/vscode/bgraph-1.0.0.vsix
+code --install-extension editors/vscode/bgraph-1.0.0.vsix --force
 ```
 
 Adaptez le nom du VSIX à la version produite par le script. Si vous avez
 reçu un VSIX déjà construit, installez directement ce fichier.
 Le réglage `bgraph.server.path` permet de préciser le chemin du LSP
 lorsqu'il n'est pas sur le `PATH`.
+
+### Preview directe d'un fichier .bd
+
+Dans un éditeur bgraph, pressez **`Ctrl+Shift+V`** (`Cmd+Shift+V` sur macOS),
+ou lancez **bgraph: Open Preview** depuis la palette. Un volet s'ouvre à côté
+du source et s'actualise pendant la saisie, sans enregistrer le fichier.
+Les buffers bgraph sans nom sont aussi acceptés. Rappeler la commande sur
+le même document réutilise son volet ; chaque document garde sa propre preview.
+Les erreurs de syntaxe ou de rendu s'affichent dans le volet.
+
+Le renderer wasm est fourni dans le VSIX, sans CLI à installer pour cette
+preview. Le LSP reste indépendant. Les sources doivent être autonomes :
+`include` et les fichiers `from:` ne sont pas résolus par ce renderer.
+Pour une preview multifichier, utilisez `bgraph watch fichier.bd --open`.
 
 ### Dessiner dans une page Markdown
 
@@ -108,8 +137,8 @@ a -> b
 
 Ouvrez l'aperçu Markdown de VS Code, par exemple avec `Ctrl+Shift+V`.
 L'extension utilise son module wasm embarqué pour dessiner le diagramme.
-Cette preview concerne les blocs d'un fichier Markdown ; pour travailler
-directement dans un `.bd`, utilisez `bgraph watch`.
+Le raccourci conserve son comportement Markdown dans un fichier `.md` ;
+il n'est associé à la commande bgraph que dans un éditeur bgraph.
 
 Les blocs doivent être autonomes : le rendu wasm ne résout pas les
 `include` et les fichiers `from:`. Les diagnostics LSP d'un vrai fichier

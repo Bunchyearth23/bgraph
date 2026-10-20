@@ -1,0 +1,40 @@
+{
+  "annotations": [
+    {
+      "color": "#0b0b0b",
+      "size": 16.0,
+      "text": "e",
+      "x": 32.0,
+      "y": 48.0
+    }
+  ],
+  "background": "#ffffff",
+  "canvas": {
+    "height": 105.0,
+    "width": 72.896
+  },
+  "description": null,
+  "edges": [],
+  "groups": [],
+  "guides": [],
+  "label_conflicts": [],
+  "nodes": [
+    {
+      "description": null,
+      "fill": "none",
+      "id": "s",
+      "label": [
+        ""
+      ],
+      "rect": {
+        "h": 1.0,
+        "w": 1.0,
+        "x": 32.0,
+        "y": 72.0
+      },
+      "stroke": "none"
+    }
+  ],
+  "title": "e",
+  "version": 1
+}

@@ -2,5 +2,5 @@
 # Text uses tests/fixtures/fonts/DejaVuSans.ttf via the embedded-font path.
 # A snapshot comparison is intentionally exact: threshold = 0 differing bytes.
 shapes a14676b474c3a993
-labels 8ecbbf6662c1541f
+labels 14046175f4ed513d
 charts c7b79283142cd658

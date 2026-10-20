@@ -22,10 +22,84 @@ import tempfile
 import threading
 import time
 import tomllib
+import urllib.request
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = ("declared", "overlap", "conflict", "unicode-error", "frame-nested", "size-chain-conflict")
 ERROR_FIXTURES = ("conflict", "unicode-error", "size-chain-conflict")
+PREVIEW_FILE = os.environ.get("BGRAPH_ZED_PREVIEW_FILE", "preview ' $(touch INJECTED) `touch INJECTED` $file.bd")
+
+
+def preview_check(base, host):
+    """Exercise the language task through its real keybinding, not a copied command."""
+    source = base / "project" / PREVIEW_FILE
+
+    def until(check):
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            value = check()
+            if value:
+                return value
+            assert host.poll() is None, "Zed exited during preview verification"
+            time.sleep(0.1)
+        subprocess.run(["import", "-window", "root", str(base / "preview-failure.png")], timeout=10)
+        raise AssertionError(f"Preview timed out; inspect {base}")
+
+    def keys(*values):
+        subprocess.run(["xdotool", "key", "--clearmodifiers", *values], check=True, timeout=5)
+        time.sleep(0.5)
+
+    def invocations():
+        log = base / "preview-commands.jsonl"
+        if not log.exists():
+            return []
+        return [entry for entry in map(json.loads, log.read_text().splitlines())
+                if entry["args"] and entry["args"][0] == "watch"]
+
+    windows = subprocess.check_output(["xdotool", "search", "--onlyvisible", "--pid", str(host.pid)],
+                                      text=True, timeout=5).splitlines()
+    assert windows, "Zed has no visible window"
+    names = {window: subprocess.check_output(["xdotool", "getwindowname", window],
+                                             text=True, timeout=5).strip() for window in windows}
+    (base / "preview-windows.json").write_text(json.dumps(names, indent=2))
+    [window] = [window for window, name in names.items() if source.name in name]
+    subprocess.run(["xdotool", "windowfocus", "--sync", window], check=True, timeout=5)
+    time.sleep(0.5)
+    # Append an edit that the task must save before invoking the CLI.
+    keys("ctrl+End")
+    subprocess.run(["xdotool", "type", "--clearmodifiers", "--", "// UnsavedForPreview\n"],
+                   check=True, timeout=5)
+    keys("ctrl+shift+v")
+    calls = until(invocations)
+    assert len(calls) == 1, calls
+    assert calls[0]["args"] == ["watch", str(source), "--open", "--port", "0"], calls
+    assert "UnsavedForPreview" in source.read_text(), "task did not save the active buffer"
+    opened = until(lambda: (base / "preview-open.json").read_text()
+                   if (base / "preview-open.json").exists() else None)
+    [url] = json.loads(opened)
+    assert url.startswith("http://127.0.0.1:") and not url.endswith(":0"), url
+
+    def get(path):
+        with urllib.request.urlopen(url + path, timeout=5) as response:
+            return response.read().decode()
+
+    assert "PreviewBefore" in get("/svg"), "browser URL does not serve the selected file"
+    version = get("/version")
+    source.write_text(source.read_text().replace("PreviewBefore", "PreviewAfter"))
+    assert get("/version") != version and "PreviewAfter" in get("/svg"), "save did not refresh preview"
+    keys("ctrl+shift+v")
+    time.sleep(1)
+    calls = invocations()
+    active = [call for call in calls if Path(f"/proc/{call['pid']}/cmdline").exists()
+              and b"bgraph-real" in Path(f"/proc/{call['pid']}/cmdline").read_bytes()]
+    (base / "preview-processes.json").write_text(json.dumps({"invocations": calls, "active": active}, indent=2))
+    assert len(active) == 1, "repeating the preview task left multiple active watchers"
+    assert not (base / "project/INJECTED").exists(), "task interpolated file contents into a shell command"
+    [url] = json.loads((base / "preview-open.json").read_text())
+    assert get("/svg"), "repeating the task stopped its watcher"
+    return {"status": "passed", "task": "bgraph: Preview", "shortcut": "ctrl-shift-v",
+            "invocation": calls[0], "url": url, "saved_buffer": True,
+            "reload": True, "repeat_watcher_count": len(active), "shell_injection": False}
 
 
 def proxy(server, wire):
@@ -83,10 +157,12 @@ def normalize(diagnostics):
 
 def inside(evidence, zed):
     base = Path(evidence)
-    files = [base / "project" / f"{name}.bd" for name in FIXTURES]
+    preview = json.loads((base / "inputs.json").read_text()).get("preview", False)
+    files = [] if preview else [base / "project" / f"{name}.bd" for name in FIXTURES]
     file_by_uri = {file.as_uri(): file for file in files}
+    opened_files = [base / "project", base / "project" / PREVIEW_FILE] if preview else files
     with open(base / "host.stdout", "wb") as stdout, open(base / "host.stderr", "wb") as stderr:
-        host = subprocess.Popen([zed, "--user-data-dir", str(base / "profile"), *map(str, files)],
+        host = subprocess.Popen([zed, "--user-data-dir", str(base / "profile"), *map(str, opened_files)],
                                 stdout=stdout, stderr=stderr)
         try:
             expected = {}
@@ -158,13 +234,16 @@ def inside(evidence, zed):
             failures = [line for line in host_log
                         if "ERROR" in line and any(word in line.lower() for word in ("bgraph", "grammar"))]
             assert not failures, f"Zed failed to load the language: {failures}"
-            subprocess.run(["import", "-window", "root", str(base / "host.png")], check=True, timeout=10)
             result = json.loads((base / "inputs.json").read_text())
+            if preview:
+                result["preview"] = preview_check(base, host)
+            subprocess.run(["import", "-window", "root", str(base / "host.png")], check=True, timeout=10)
             result.update({"status": "passed", "client": initialize["params"]["clientInfo"],
                            "extension_server_launches": launches,
                            "diagnostics": {file_by_uri[uri].stem: value for uri, value in diagnostics.items()}})
             (base / "result.json").write_text(json.dumps(result, indent=2) + "\n")
-            print(f"PASS Zed host: grammar, extension component, real LSP, diagnostics for {', '.join(FIXTURES)}")
+            checked = "preview task, shortcut, saved buffer and live reload" if preview else f"diagnostics for {', '.join(FIXTURES)}"
+            print(f"PASS Zed host: grammar, extension component, real LSP, {checked}")
             print(f"Evidence: {base}")
         finally:
             host.terminate()
@@ -205,10 +284,27 @@ def run(args):
         sys.executable, str(Path(__file__).resolve()), "--proxy",
         str(base / "bin/bgraph-lsp-real"), str(base / "lsp")]) + "\n")
     wrapper.chmod(0o755)
+    if args.preview:
+        (base / "project" / PREVIEW_FILE).write_text('node a "PreviewBefore"\n')
+        shutil.copyfile(package / "keymap.json", base / "profile/config/keymap.json")
+        (base / "bin/bgraph").rename(base / "bin/bgraph-real")
+        preview_wrapper = base / "bin/bgraph"
+        preview_wrapper.write_text("#!/bin/sh\nexec " + shlex.join([
+            sys.executable, str(Path(__file__).resolve()), "--preview-proxy",
+            str(base / "bin/bgraph-real"), str(base / "preview-commands.jsonl")]) + ' "$@"\n')
+        preview_wrapper.chmod(0o755)
+        opener = base / "bin/xdg-open"
+        opener.write_text("#!/bin/sh\nexec " + shlex.join([
+            sys.executable, "-c", "import json,sys; from pathlib import Path; "
+            "Path(sys.argv[1]).write_text(json.dumps(sys.argv[2:]))",
+            str(base / "preview-open.json")]) + ' "$@"\n')
+        opener.chmod(0o755)
     settings = {
         "telemetry": {"diagnostics": False, "metrics": False}, "auto_update": False,
         "session": {"trust_all_worktrees": True}, "auto_install_extensions": {"html": False},
     }
+    if args.preview:
+        settings["terminal"] = {"shell": {"program": "/bin/sh"}}
     (base / "profile/config/settings.json").write_text(json.dumps(settings, indent=2))
     # No service directories: this private bus cannot activate the user's keyring or browser portal.
     dbus = base / "dbus.conf"
@@ -218,7 +314,11 @@ def run(args):
     artifacts = {"component": component, "grammar": Path(args.grammar), "parser": parser,
                  "cli": base / "bin/bgraph", "server": base / "bin/bgraph-lsp-real",
                  "server_wrapper": wrapper}
-    (base / "inputs.json").write_text(json.dumps({"grammar_revision": revision,
+    if args.preview:
+        artifacts.update({"cli": base / "bin/bgraph-real", "preview_cli_wrapper": base / "bin/bgraph",
+                          "preview_task": extension / "languages/bgraph/tasks.json",
+                          "preview_keymap": base / "profile/config/keymap.json"})
+    (base / "inputs.json").write_text(json.dumps({"grammar_revision": revision, "preview": args.preview,
         "sha256": {name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in artifacts.items()}}, indent=2))
     env = os.environ.copy()
     for name in ("WAYLAND_DISPLAY", "GNOME_KEYRING_CONTROL", "SSH_AUTH_SOCK"):
@@ -232,7 +332,7 @@ def run(args):
                "--inside", str(base), str(Path(args.zed).resolve())]
     child = subprocess.Popen(command, env=env, start_new_session=True)
     try:
-        assert child.wait(timeout=65) == 0, f"Zed host failed; inspect {base}"
+        assert child.wait(timeout=110 if args.preview else 65) == 0, f"Zed host failed; inspect {base}"
     finally:
         try:
             os.killpg(child.pid, signal.SIGTERM)
@@ -250,6 +350,11 @@ if __name__ == "__main__":
         proxy(*sys.argv[2:])
     elif len(sys.argv) > 1 and sys.argv[1] == "--inside":
         inside(*sys.argv[2:])
+    elif len(sys.argv) > 1 and sys.argv[1] == "--preview-proxy":
+        real, log, *arguments = sys.argv[2:]
+        with open(log, "a") as output:
+            output.write(json.dumps({"pid": os.getpid(), "args": arguments}) + "\n")
+        os.execv(real, [real, *arguments])
     else:
         parser = argparse.ArgumentParser(description=__doc__)
         parser.add_argument("--zed", default="/usr/lib/zed/zed-editor")
@@ -257,4 +362,6 @@ if __name__ == "__main__":
         parser.add_argument("--server", default=str(ROOT / "target/debug/bgraph-lsp"))
         parser.add_argument("--component", default=str(ROOT / "target/zed-work/wasm32-wasip2/release/zed_bgraph.wasm"))
         parser.add_argument("--grammar", required=True)
+        parser.add_argument("--preview", action="store_true",
+                            help="exercise the bundled preview task, shortcut and watch server")
         run(parser.parse_args())

@@ -4,11 +4,26 @@
 // of the compiler the CLI runs. Highlighting is the TextMate grammar beside
 // this file; VS Code needs no parser of its own for that.
 
-const { workspace, window } = require('vscode');
+const { workspace, window, commands, ViewColumn } = require('vscode');
+const path = require('path');
 
 let client;
+const previews = new Map();
 
-function activate() {
+function activate(context) {
+  context.subscriptions.push(
+    commands.registerCommand('bgraph.showPreview', showPreview),
+    workspace.onDidChangeTextDocument(({ document }) => {
+      const preview = previews.get(document.uri.toString());
+      if (!preview) return;
+      clearTimeout(preview.timer);
+      preview.timer = setTimeout(() => updatePreview(preview), 150);
+    }),
+    workspace.onDidCloseTextDocument((document) => {
+      previews.get(document.uri.toString())?.panel.dispose();
+    }),
+    { dispose: disposePreviews },
+  );
   const command = workspace.getConfiguration('bgraph').get('server.path', 'bgraph-lsp');
 
   // Required inside `activate`, not at the top of the file, so a package built
@@ -21,7 +36,7 @@ function activate() {
     ({ LanguageClient, TransportKind } = require('vscode-languageclient/node'));
   } catch (error) {
     window.showWarningMessage(
-      'bgraph: highlighting only — this build has no language client, so there are no ' +
+      'bgraph: this build has no language client, so there are no ' +
         'diagnostics or completion. Rebuild the package after `npm install`.',
     );
     return;
@@ -51,10 +66,68 @@ function activate() {
 }
 
 function deactivate() {
+  disposePreviews();
   return client ? client.stop() : undefined;
 }
 
 module.exports = { activate, deactivate };
+
+// ----------------------------------------------------------- diagram preview
+
+async function showPreview(uri) {
+  const document = uri ? await workspace.openTextDocument(uri) : window.activeTextEditor?.document;
+  if (!document || document.languageId !== 'bgraph') {
+    window.showInformationMessage('bgraph: open a .bd file to preview it.');
+    return;
+  }
+  const key = document.uri.toString();
+  let preview = previews.get(key);
+  if (preview) {
+    preview.panel.reveal(ViewColumn.Beside, true);
+  } else {
+    const panel = window.createWebviewPanel(
+      'bgraph.preview',
+      `Preview: ${path.basename(document.fileName)}`,
+      { viewColumn: ViewColumn.Beside, preserveFocus: true },
+      { enableScripts: false, localResourceRoots: [] },
+    );
+    preview = { document, panel, timer: undefined };
+    previews.set(key, preview);
+    panel.onDidDispose(() => {
+      clearTimeout(preview.timer);
+      previews.delete(key);
+    });
+  }
+  updatePreview(preview);
+}
+
+function updatePreview(preview) {
+  clearTimeout(preview.timer);
+  let answer;
+  try {
+    const draw = loadRenderer();
+    answer = draw ? draw(preview.document.getText()) :
+      'error: the preview renderer is missing or could not load. Rebuild the extension with package.sh.';
+  } catch (error) {
+    answer = `error: could not render this diagram. ${error.message}`;
+  }
+  const body = answer.startsWith('error:') ?
+    `<pre role="alert">${escapeHtml(answer)}</pre>` : answer;
+  preview.panel.webview.html = `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:;">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>bgraph preview</title>
+<style>
+body { margin: 0; padding: 16px; color: var(--vscode-foreground); background: var(--vscode-editor-background); }
+svg { display: block; max-width: 100%; height: auto; margin: auto; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--vscode-errorForeground); }
+</style></head><body><main aria-label="Diagram preview">${body}</main></body></html>`;
+}
+
+function disposePreviews() {
+  for (const { panel } of previews.values()) panel.dispose();
+}
 
 // ---------------------------------------------------------- markdown preview
 
@@ -76,7 +149,6 @@ function loadRenderer() {
   if (render !== undefined) return render;
   try {
     const fs = require('fs');
-    const path = require('path');
     const bytes = fs.readFileSync(path.join(__dirname, '..', 'bgraph.wasm'));
     const instance = new WebAssembly.Instance(new WebAssembly.Module(bytes), {});
     const api = instance.exports;
@@ -88,12 +160,14 @@ function loadRenderer() {
       const ptr = api.bgraph_alloc(input.length);
       // A fresh view every call: the module's memory may have grown, and a
       // view onto a detached buffer throws rather than reading stale bytes.
-      new Uint8Array(api.memory.buffer, ptr, input.length).set(input);
-      const at = api.bgraph_render(ptr, input.length);
-      const len = api.bgraph_result_len();
-      const answer = decoder.decode(new Uint8Array(api.memory.buffer, at, len));
-      api.bgraph_free(ptr, input.length);
-      return answer;
+      try {
+        new Uint8Array(api.memory.buffer, ptr, input.length).set(input);
+        const at = api.bgraph_render(ptr, input.length);
+        const len = api.bgraph_result_len();
+        return decoder.decode(new Uint8Array(api.memory.buffer, at, len));
+      } finally {
+        api.bgraph_free(ptr, input.length);
+      }
     };
   } catch (err) {
     // No module bundled, or it failed to load. The fence falls back to a code
