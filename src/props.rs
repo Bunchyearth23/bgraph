@@ -1064,9 +1064,10 @@ pub const VENN_ITEM_PROPS: &[PropDef] = &[
         syntax: "shared: <number>",
         doc: "How many things two sets have in common, written on a link \
               between them — `rust -> embedded 30`. With two sets the lens is \
-              solved to that exact area; with three it is labelled but not \
-              solved, because three circles cannot in general be arranged to \
-              honour all seven regions at once.",
+              solved to that exact area. With three, pairwise areas are fitted \
+              when possible; otherwise the arrangement is schematic. The key \
+              names each pair and its total, including any members also in \
+              the third set. Omitted links mean zero shared members.",
     },
 ];
 
@@ -2117,10 +2118,12 @@ pub const ARCHETYPES: &[ArchetypeDef] = &[
         layout: LayoutStrategy::ArchetypeManaged(crate::charts::venn),
         item: "set",
         doc: "Overlapping sets. Two or three of them: with two, the lens is \
-              solved so its **area** is the number you wrote; with three the \
-              overlaps are labelled but arranged rather than solved, because \
-              three circles cannot in general honour all seven regions at \
-              once. Four is refused rather than drawn wrongly.",
+              solved so its **area** is the number you wrote. With three, \
+              pairwise areas are fitted when possible, but the seven regions \
+              are not solved and the areas remain indicative. A color key \
+              identifies each set and its total; a separate key names each \
+              pair's shared count, including members of the third set. \
+              Omitted links mean zero shared members. Four sets are refused.",
         props: VENN_PROPS,
         item_props: VENN_ITEM_PROPS,
         slots: &[Slot {

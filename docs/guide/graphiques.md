@@ -1,74 +1,107 @@
-# Choisir un type de diagramme
+# Choose a diagram type
 
-Un fichier choisit son genre une seule fois, au début, avec `type`.
-Sans cette déclaration, il utilise `free`.
+A file chooses its type once, at the beginning, with `type`.
+Without a type declaration it uses `free`.
+
+To list the types available in your build, then create a packet example:
 
 ```sh
 bgraph init
-bgraph init packet -o entete.bd
+bgraph init packet -o header.bd
 ```
 
-La première commande liste les genres disponibles dans votre binaire.
-La seconde écrit un exemple complet. La [galerie](galerie.md) montre
-les 30 genres de la compilation complète, avec leurs sources téléchargeables.
+`init` writes a complete, working source file. The
+[gallery](galerie.md) shows all 30 types in the full build, with source
+files and rendered images. Start from one of those examples when a type
+is new to you.
 
-## Quel genre pour quel besoin ?
+## Which type should I use?
 
-| Besoin | Genres |
+| I need… | Types to try |
 |---|---|
-| Architecture, services, réseau | `free`, `block`, `network` |
-| Modèles logiciels et données | `class`, `er`, `state`, `requirements` |
-| Processus et interactions | `bpmn`, `sequence`, `journey`, `kanban` |
-| Parts et comparaisons | `pie`, `bar`, `xy`, `radar`, `quadrant`, `treemap` |
-| Flux et intersections | `sankey`, `venn` |
-| Dates et historique | `gantt`, `timeline`, `gitgraph` |
-| Hiérarchies | `orgchart`, `mindmap`, `treeview` |
-| Électronique et infrastructure | `packet`, `bytefield`, `wave`, `harness`, `rack` |
+| Architecture, services or networks | `free`, `block`, `network` |
+| Software or data models | `class`, `er`, `state`, `requirements` |
+| Processes and interactions | `bpmn`, `sequence`, `journey`, `kanban` |
+| Parts of a whole or comparisons | `pie`, `bar`, `xy`, `radar`, `quadrant`, `treemap` |
+| Flows and intersections | `sankey`, `venn` |
+| Dates and history | `gantt`, `timeline`, `gitgraph` |
+| Hierarchies | `orgchart`, `mindmap`, `treeview` |
+| Electronics and infrastructure | `packet`, `bytefield`, `wave`, `harness`, `rack` |
 
-## Un camembert en quelques lignes
+## A pie chart in a few lines
 
 ```bgraph
 type pie {
-  title: "Sources de trafic"
+  title: "Traffic sources"
   donut: 0.55
   labels: percent
 }
 
-slice organic "Recherche" 4820
-slice direct "Accès direct" 2410
-slice referral "Sites référents" 1180
+slice organic "Organic search" 4820
+slice direct "Direct" 2410
+slice referral "Referrals" 1180
 ```
 
-Le nombre après le libellé est la valeur de la part. Le genre calcule la
-géométrie : n'ajoutez pas de `layout`. Les couleurs sont choisies dans la
-palette par défaut, sauf si vous écrivez un `fill`.
-Au-delà de huit catégories, regroupez la fin de la distribution ; consultez
-le réglage `top` dans la [référence de pie](reference.md#type-pie).
+The number after each label is its value. The type calculates the geometry,
+so do not add `layout`. Colors come from the default palette unless you
+declare a `fill`.
 
-## Un paquet binaire
+For more than eight categories, group the tail of the distribution. See
+`top` in [the pie reference](reference.md#type-pie).
+
+## Overlapping sets with a Venn diagram
 
 ```bgraph
-type packet { title: "Petit en-tête" width: 16 }
+type venn { title: "Shared readership" }
 
-field version "Version" 0 3
-field flags "Drapeaux" 4 7
-field length "Longueur" 8 15
+set developers "Developers" 420
+set operations "Operations" 260
+set architects "Architects" 180
+
+developers -> operations 120
+developers -> architects 140
+operations -> architects 70
 ```
 
-Les bornes de bits sont **inclusives** : `0 3` représente quatre bits.
-Les champs sont organisés par le genre, selon la largeur déclarée.
+Each set's number is its **total membership**, including overlaps. Circle
+areas scale with these totals. The letters A, B and C and their colors match
+the set key; long names wrap there instead of covering the circles.
 
-## Deux façons de contrôler la géométrie
+The **Shared members** key names each pair. Here, 120 people belong to both
+Developers and Operations; some may also be Architects. The value does not
+describe a region belonging only to those two sets. An omitted link means
+zero shared members.
 
-| Géométrie | Genres | Votre contrôle |
+With two sets, the overlap area is exact. With three, the renderer fits the
+pairwise areas when the distances allow it, then falls back to a schematic
+arrangement otherwise. The warning and the drawing both say that three-set
+areas are indicative: the seven individual regions are not solved. Four or
+more sets are rejected. See [the Venn reference](reference.md#type-venn).
+
+## A binary packet
+
+```bgraph
+type packet { title: "Small header" width: 16 }
+
+field version "Version" 0 3
+field flags "Flags" 4 7
+field length "Length" 8 15
+```
+
+Bit boundaries are **inclusive**: `0 3` represents four bits.
+The type arranges the fields according to the declared row width.
+
+## Two ways to control positions
+
+| Geometry | Types | What you control |
 |---|---|---|
-| Déclarée | `free`, `class`, `block`, `er`, `state`, `harness`, `bpmn`, `network`, `requirements` | Positions et relations dans `layout` |
-| Calculée par le genre | Les 21 autres | Données, ordre et réglages du genre |
+| Declared placement | `free`, `class`, `block`, `er`, `state`, `harness`, `bpmn`, `network`, `requirements` | Positions and relationships in `layout` |
+| Calculated by the type | The other 21 types | Data, written order and type settings |
 
-Un genre à géométrie calculée refuse les blocs `layout` et les `note`.
-Les styles restent communs aux deux familles, mais une propriété sans effet
-pour un genre produit un diagnostic.
+A type with calculated geometry rejects `layout` blocks and `note`
+declarations. Styles are shared by both families, but a property with no
+effect for the chosen type produces a diagnostic.
 
-Chaque genre dispose de son vocabulaire : `slice`, `field`, `task`, `host`…
-Le mot `node` reste un synonyme universel. Pour commencer, gardez les mots et
-la forme des données de l'exemple fourni par `bgraph init`.
+Each type has its own declaration words, such as `slice`, `field`, `task`
+or `host`. `node` remains a universal synonym. For your first attempt,
+keep the words and data form used by `bgraph init`.

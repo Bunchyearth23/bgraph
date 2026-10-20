@@ -1,11 +1,11 @@
-// RAPPORT A4 — jamais une présentation. `bunchy-theme.with()` sans `presentation: true`
-// est le mode document. Ne jamais ajouter `presentation: true`.
+// A4 report, always in document mode. bunchy-theme.with() omits presentation: true.
+// Do not enable presentation mode in this manual.
 //
-// Public : quelqu'un qui va écrire des fichiers .bd. Il doit pouvoir CONSTRUIRE.
-// La référence exhaustive des propriétés reste générée ; ce document est le
-// manuel qui apprend à s'en servir.
+// Audience: someone learning to write .bd files and build diagrams.
+// The exhaustive property reference is generated separately; this manual
+// teaches how to use the language.
 //
-// Compilation : ./compile.sh docs/manual.typ
+// Build: ./compile.sh docs/manual.typ
 
 #import "btyp/btyp.typ": *
 
@@ -27,7 +27,7 @@
   title: "bgraph",
   subtitle: "A diagram language where you decide the layout",
   author: "Bunchyearth23",
-  date: "12 August 2026 · version 1.3",
+  date: "20 October 2026 · bgraph 1.0.0",
 )
 #v(1fr)
 #pagebreak(weak: true)
@@ -91,11 +91,53 @@ positions.
 
 // ══════════════════════════════════════════════════════════════════════════════
 #pagebreak(weak: true)
-#slide(title: "The five statements")[
+#slide(title: "Your first file")[
 
-That is the whole grammar. Statements end at a newline; `;` and `,` also
-separate. Comments are `//` — `#` is reserved for hex colours, and the two
-cannot coexist.
+Install the supplied package for your operating system, put its executable
+folder on PATH and open a new terminal. The pair is `bgraph` and `bgraph-lsp`
+(`.exe` on Windows). Rust and Node.js are unnecessary for a built package.
+If building from the repository, install Rust 1.88 or newer, then run
+`cargo install --locked --path . --bins` from the folder containing Cargo.toml.
+
+Check the installation with `bgraph --version`. Commands go in a terminal;
+diagram source goes in a plain text editor.
+
+Create a working folder and save this complete source as `architecture.bd`:
+
+```
+node browser "Browser"
+node api "API"
+layout {
+  place browser at (0, 0)
+  place api right-of browser gap 60
+}
+browser -> api "HTTPS"
+```
+
+In a terminal opened in that folder, run:
+
+```
+bgraph check architecture.bd
+bgraph architecture.bd -o architecture.svg
+bgraph watch architecture.bd --open --port 0
+```
+
+You should see Browser on the left, API on the right and an arrow between
+them. The .bd file is editable source; the .svg file is a generated image.
+Open the SVG in a browser to view the static export.
+
+Leave the watch command running. Change a label in the source and save:
+the browser preview updates. If the browser does not open, copy the printed
+URL. Ctrl+C in the terminal stops the watcher. Render again to refresh an
+export; use architecture.pdf after -o for a PDF.
+]
+
+#pagebreak(weak: true)
+#slide(title: "Declarations and layout")[
+
+The core declarations say what exists; a separate `layout` block says where
+elements go. Statements end at a newline; `;` and `,` also separate them.
+Comments are `//`; `#` is reserved for hexadecimal colors.
 
 #two-col(
   [
@@ -103,9 +145,10 @@ cannot coexist.
 type <archetype> { … }
 graph { … }
 style <name> [extends <name>] { … }
-group <id> ["<label>"] [.class] [<where>] { … }
-<word> <id> ["<label>"] <data…> [.class] [<where>] { … }
+group <id> ["<label>"] [.class] { … }
+<word> <id> ["<label>"] <data…> [.class] { … }
 <id> <arrow> <id> ["<label>"] <data…> { … }
+layout { place <id> <position> }
 ```
 
 #v(0.4em)
@@ -120,6 +163,7 @@ group <id> ["<label>"] [.class] [<where>] { … }
   [`group`], [A container, sized by what it holds.],
   [item], [A box, a slice, a field — the archetype decides the word.],
   [edge], [A link. `->`, `-->`, `..>`, `<->`, `--`, `..`],
+  [`layout`], [Positions and geometric relationships.],
 )
   ],
   [
@@ -128,8 +172,12 @@ graph { background: #f8fafc }
 
 style box { fill: #eef3ff stroke: #2563eb 1.5 }
 
-node a "Alpha" .box at (0, 0)
-node b "Beta"  .box right-of a gap 60
+node a "Alpha" .box
+node b "Beta"  .box
+layout {
+  place a at (0, 0)
+  place b right-of a gap 60
+}
 
 a -> b "carries"
 ```
@@ -159,10 +207,16 @@ idiomatic one.
 #v(0.3em)
 
 ```
-node a "a"                    at (0, 0)
-node b "right-of a"           right-of a gap 44
-node c "below a gap 30"       below a gap 30
-node d "right-of b align top" right-of b gap 44 align top
+node a "a"
+node b "right-of a"
+node c "below a gap 30"
+node d "right-of b align top"
+layout {
+  place a at (0, 0)
+  place b right-of a gap 44
+  place c below a gap 30
+  place d right-of b gap 44 align top
+}
 ```
 
 #v(0.5em)
@@ -184,9 +238,9 @@ node d "right-of b align top" right-of b gap 44 align top
 `align` takes `left` / `right` / `center` for a vertical placement and
 `top` / `bottom` / `center` for a horizontal one. It defaults to `center`.
 
-*Anchors may point forward.* The solver runs repeated passes, so anchoring to
-something declared further down works. A genuine loop is reported by name:
-`anchor cycle between: a, b`.
+*Anchors may point forward.* You may refer to an element declared later in
+the file. Incompatible placement requirements produce a diagnostic naming
+the source constraints.
 
 *A box with no placement* flows from the previous one, using the graph's `flow`
 and `gap`. The first lands at the origin — which makes a quick sketch as terse
@@ -196,10 +250,11 @@ as anything that places for you.
 
 #v(0.5em)
 
-#callout(kind: "warn", title: "A group is sized by its members, never the reverse")[
-Give a group a placement and it translates everything inside it, once its
-members have landed. Sizing a group first and fitting members into it would be
-auto-layout by another name.
+#callout(kind: "info", title: "Groups contain their members")[
+A group follows its contents unless you require a width or height.
+Moving the group moves its subtree. A required size must fit its contents;
+otherwise the constraints conflict. In BPMN, child lanes fill their pool's
+inner width after padding and margins.
 ]
 ]
 
@@ -330,7 +385,8 @@ label.
 ```
 slice organic "Organic search" 4820      // type pie
 field sport   "Source port"    0 15      // type packet
-node  a       "A"              at (0, 0) // type free
+node  a       "A"                       // type free
+layout { place a at (0, 0) }            // type free only
 ```
 
 An archetype may also declare a *second* word, when the same picture can be
@@ -494,7 +550,8 @@ series amer "AMER" 200 210 265 280
 ```
 type bytefield { title: "ELF64 header" width: 16 cell: 30 34 ruler: on }
 
-field ident "e_ident" .magic 0 15      // sixteen bytes, one whole row
+style magic { fill: #dbeafe stroke: #2563eb 1.5 }
+field ident "e_ident" 0 15 .magic      // sixteen bytes, one whole row
 field etype "e_type"              16 17
 ```
 
@@ -588,6 +645,7 @@ type orgchart { row: 74 spacing: 20 }
 position cto  "CTO"
 position plat "Platform"
 position sig  "DSP"
+position k8s  "Kubernetes"
 
 cto -> plat
 cto -> sig
@@ -698,11 +756,13 @@ and the prefixing that makes one safe makes the other safe too.
 ```
 component service {
   node app "{{label}}"
-  node db  "Database" below app gap 34
+  node db  "Database"
+  layout { place db below app gap 34 }
 }
 
-use service as web
-use service as jobs right-of web gap 90 { label: "Jobs" }
+use service as web { label: "Web" }
+use service as jobs { label: "Jobs" }
+layout { place jobs right-of web gap 90 }
 ```
 
 The body goes through the same template engine a file with holes does, so a
@@ -738,7 +798,7 @@ bgraph diagram.bd -o diagram.pdf
 bgraph diagram.bd -o diagram.png
 bgraph diagram.bd -o diagram.json
 bgraph diagram.bd -o big.pdf --page a4
-bgraph watch diagram.bd
+bgraph watch diagram.bd --open --port 0
 bgraph watch docs/diagrams
 bgraph check diagram.bd
 bgraph diff old.bd new.bd
@@ -845,6 +905,11 @@ layout errors in place so a broken file never costs you the preview. Scroll to
 zoom, drag to pan, `f` to fit, `0` for actual size. The view survives the
 reload, or zooming while editing would be pointless.
 
+Use `bgraph watch diagram.bd --open --port 0` to open the browser on a free
+local port. Keep its terminal running and save the source to update it.
+Press Ctrl+C in that terminal to stop. A static SVG export is refreshed by
+rendering again, independently of the live preview.
+
 `watch --data q3.json` previews a *filled* template, re-reading the data on
 every request — so editing the numbers reloads too. Without data it draws the
 shape, holes and all, which is what you are editing before the data exists.
@@ -872,6 +937,15 @@ outline.
   [Zed], [tree-sitter grammar], [yes],
   [VS Code], [TextMate grammar], [yes],
 )
+
+VS Code also supplies a current-text preview pane: press Ctrl+Shift+V
+(Cmd+Shift+V on macOS). It updates while typing, including unsaved changes.
+Its bundled renderer takes self-contained text; use the browser watcher for
+includes or external data files.
+
+Zed supplies a browser-preview task. Open the containing folder as a project,
+then run *task: spawn → bgraph: Preview*. Add the supplied keymap entry to
+use Ctrl+Shift+V. The task saves before launch and reloads on later saves.
 
 #v(0.3em)
 

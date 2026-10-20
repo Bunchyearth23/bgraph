@@ -13,11 +13,12 @@ def on_files(files, config, **kwargs):
         files.append(File.generated(config, name, abs_src_path=str(ROOT / "docs" / name)))
 
     gallery = [
-        "# Galerie des 30 types\n",
-        "Chaque aperçu et son fichier `.bd` proviennent de la galerie du dépôt. "
-        "Téléchargez une source, puis lancez `bgraph watch fichier.bd` pour la modifier. "
-        "Vous pouvez aussi recréer chaque exemple avec `bgraph init <type>`.\n",
-        "[Comment choisir un type ?](graphiques.md)\n",
+        "# Gallery of all 30 types\n",
+        "Each preview and its `.bd` source come from the repository gallery. "
+        "Download a source file, then run `bgraph watch example.bd --open --port 0` "
+        "to preview it while editing. You can also create each example with "
+        "`bgraph init <type> -o example.bd`.\n",
+        "[How do I choose a type?](graphiques.md) · [Your first diagram](demarrage.md)\n",
     ]
     for source in sorted((ROOT / "examples").glob("*.bd")):
         image = source.with_suffix(".svg")
@@ -27,8 +28,8 @@ def on_files(files, config, **kwargs):
             files.append(File.generated(config, f"examples/{asset.name}", abs_src_path=str(asset)))
         gallery.append(
             f"## {source.stem}\n\n"
-            f"![Exemple {source.stem}](examples/{image.name}){{ loading=lazy }}\n\n"
-            f"[Source .bd](examples/{source.name}) · [Image SVG](examples/{image.name})\n"
+            f"![{source.stem} example](examples/{image.name}){{ loading=lazy }}\n\n"
+            f"[Download .bd source](examples/{source.name}) · [View SVG](examples/{image.name})\n"
         )
     files.append(File.generated(config, "galerie.md", content="\n".join(gallery)))
     return files
@@ -39,10 +40,12 @@ def on_page_markdown(markdown, page, **kwargs):
         return markdown
     # These manuals also render on GitHub, where their repository links differ.
     links = {
-        "[`../README.md`](../README.md)": "[accueil](index.md)",
+        "[`../README.md`](../README.md)": "[Home](index.md)",
+        "(guide/demarrage.md)": "(demarrage.md)",
+        "(guide/editeurs.md)": "(editeurs.md)",
         "(../editors/zed)": "(editeurs.md#zed)",
         "(../editors/vscode)": "(editeurs.md#vs-code)",
-        "(../editors/README.md)": "(editeurs.md#autres-editeurs)",
+        "(../editors/README.md)": "(editeurs.md#other-editors)",
         "(../src/syntax.pest)": "(https://github.com/Bunchyearth23/bgraph/blob/main/src/syntax.pest)",
         "(../tree-sitter-bgraph)": "(https://github.com/Bunchyearth23/bgraph/tree/main/tree-sitter-bgraph)",
     }

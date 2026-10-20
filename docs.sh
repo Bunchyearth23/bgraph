@@ -12,18 +12,18 @@ case "$docs_command" in
   serve|build) ;;
   -h|--help|help)
     cat <<'EOF'
-Usage : ./docs.sh [serve|build] [options MkDocs]
+Usage: ./docs.sh [serve|build] [MkDocs options]
 
-  ./docs.sh                         Lance le site sur http://127.0.0.1:8000
+  ./docs.sh                         Serve the site at http://127.0.0.1:8000
   ./docs.sh serve --dev-addr 127.0.0.1:8001
-  ./docs.sh build                   Construit le site statique dans site/
+  ./docs.sh build                   Build the static site in site/
 
-L'environnement Python et les dépendances sont préparés automatiquement.
+The Python environment and dependencies are prepared automatically.
 EOF
     exit 0
     ;;
   *)
-    echo "Commande inconnue : $docs_command. Utilisez ./docs.sh --help." >&2
+    echo "Unknown command: $docs_command. Use ./docs.sh --help." >&2
     exit 2
     ;;
 esac

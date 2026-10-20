@@ -1,46 +1,51 @@
-# Rust, navigateur et Typst
+# Rust, browser and Typst integrations
 
-## Utiliser bgraph depuis Rust
+For a first diagram, use [the command-line tutorial](demarrage.md).
+This page is for embedding bgraph in another program or document workflow.
 
-Le projet n'est pas publié sur crates.io. Avec un accès au dépôt, ajoutez
-une dépendance de chemin dans votre `Cargo.toml` :
+## Call bgraph from Rust
+
+The project is not published on crates.io. With repository access, add a
+path dependency to your application's `Cargo.toml`:
 
 ```toml
 [dependencies]
-bgraph = { path = "/chemin/vers/bgraph", default-features = false }
+bgraph = { path = "/path/to/bgraph", default-features = false }
 ```
 
-Sans features supplémentaires, la bibliothèque conserve le genre `free`.
-Activez les genres dont vous avez besoin, par exemple
-`features = ["pie", "packet"]`, ou `all-archetypes` pour l'ensemble.
-La feature `pdf` ajoute les fonctions de sortie PDF.
+Replace the path with your local checkout. Without additional features,
+the library includes `free`. Enable specific types with
+`features = ["pie", "packet"]`, or use `all-archetypes` for every type.
+The `pdf` feature enables PDF functions.
+
+A complete SVG-rendering program:
 
 ```rust
 fn main() {
     let source = r#"
-        node a "Départ"
-        node b "Arrivée"
+        node a "Start"
+        node b "Finish"
         layout { place b right-of a gap 48 }
         a -> b
     "#;
-    let svg = bgraph::render_source(source).expect("diagramme valide");
-    std::fs::write("diagramme.svg", svg).expect("écriture du SVG");
+    let svg = bgraph::render_source(source).expect("valid diagram");
+    std::fs::write("diagram.svg", svg).expect("write SVG");
 }
 ```
 
-`render_source` prend du texte autonome et ne lit pas de fichiers.
-Pour résoudre des inclusions, utilisez :
+`render_source` takes self-contained text and does not read files.
+In a function returning a compatible `Result`, resolve includes with:
 
 ```rust
 let svg = bgraph::render_file(std::path::Path::new("architecture.bd"))?;
 ```
 
-La [page API](API.md) précise les fonctions stables, les diagnostics et les
-surfaces d'inspection qui ne font pas partie de la promesse de compatibilité.
+The [API contract](API.md) describes supported functions, diagnostic units
+and inspection surfaces that are outside the compatibility promise.
 
-## Essayer le playground dans un navigateur
+## Run the browser playground locally
 
-Depuis le dépôt, avec Rust, Node et pnpm :
+From the repository, with Rust, Node.js and pnpm installed:
 
 ```sh
 rustup target add wasm32-unknown-unknown
@@ -50,38 +55,39 @@ pnpm install
 pnpm dev
 ```
 
-Ouvrez l'adresse annoncée par Vite. Vous disposez d'un éditeur de source,
-du rendu SVG et des diagnostics. Le menu des genres propose les exemples
-du compilateur.
+The build script requires Bash. Open the address printed by Vite.
+The playground has a source editor, SVG output, diagnostics and a menu of
+worked examples supplied by the compiler.
 
-`include` et `from:` ne sont pas disponibles dans ce contexte : la page
-ne possède pas de répertoire source sur disque. Pour ces usages,
-générez le SVG avec le CLI.
+`include` and external `from:` files are unavailable: the page has no
+source directory on disk. Use the CLI to generate their SVG instead.
 
-## Insérer une image dans Typst
+## Insert an image into Typst
 
-La méthode la plus directe consiste à générer un SVG :
+The simplest integration is an ordinary SVG export:
 
 ```sh
 bgraph architecture.bd -o architecture.svg
 ```
 
-Dans le document Typst, dans le même dossier que l'image :
+In a Typst document beside the image:
 
 ```typst
 #image("architecture.svg", width: 80%)
 ```
 
-## Générer pendant la compilation Typst
+Regenerate the image whenever its source changes.
 
-Pour utiliser le plugin local, préparez son module depuis le dépôt :
+## Render while Typst compiles
+
+To prepare the local plugin from the repository:
 
 ```sh
 rustup target add wasm32-unknown-unknown
 ./typst/build.sh
 ```
 
-Dans un document situé à la racine du dépôt :
+In a document at the repository root:
 
 ```typst
 #import "typst/bgraph.typ": bg-diagram-file
@@ -89,10 +95,12 @@ Dans un document situé à la racine du dépôt :
 #bg-diagram-file(path("architecture.bd"), width: 80%)
 ```
 
-Adaptez le chemin de l'import si votre document est ailleurs.
-Le `path("architecture.bd")` doit être créé dans le document appelant pour
-conserver son répertoire. Un diagramme invalide fait échouer la compilation
-Typst avec le message du compilateur bgraph.
+Adjust the import if your document lives elsewhere. Create
+`path("architecture.bd")` in the calling document so its directory is
+preserved. An invalid diagram fails the Typst compilation with bgraph's
+diagnostic.
 
-Le plugin attend un source autonome. Pour des inclusions ou du CSV externe,
-utilisez la génération SVG préalable.
+The plugin takes self-contained source. Generate an SVG beforehand for
+includes or external CSV data. The
+[Typst package README](https://github.com/Bunchyearth23/bgraph/blob/main/typst/README.md)
+also describes installing the local package.

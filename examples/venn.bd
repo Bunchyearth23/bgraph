@@ -1,17 +1,19 @@
 // Overlapping sets. Two or three of them: with two, the lens is solved so
-// its **area** is the number you wrote; with three the overlaps are labelled
-// but arranged rather than solved, because three circles cannot in general
-// honour all seven regions at once. Four is refused rather than drawn
-// wrongly.
+// its **area** is the number you wrote. With three, pairwise areas are
+// fitted when possible, but the seven regions are not solved and the areas
+// remain indicative. A color key identifies each set and its total; a
+// separate key names each pair's shared count, including members of the
+// third set. Omitted links mean zero shared members. Four sets are refused.
 //
 // set <id> ["label"] <count>
 // <id> -> <id> ["label"] <shared>
 //
 // Every setting this genre takes is in docs/reference.md, under its name.
 
-// Three sets. With two the lens is *solved* to the number written; with three
-// the overlaps are labelled but arranged, and `check` says so — three circles
-// cannot honour all seven regions at once (W-053).
+// Two sets have an exact lens area. Three sets fit the pairwise areas when
+// possible, but remain indicative: the seven regions are not solved.
+// A/B/C identify the sets. The key lists totals and named pairwise overlaps;
+// a pair's total includes members also in the third set. Omitted links mean 0.
 //
 // **On a white surface on purpose**, and one of only two examples that is
 // (`Q-006`). A Venn is read through its overlaps, which are translucent fills

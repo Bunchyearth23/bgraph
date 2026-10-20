@@ -1,16 +1,16 @@
-site_name: bgraph — guide utilisateur
-site_description: Créer, placer, styliser et exporter des diagrammes avec bgraph.
+site_name: bgraph — User Guide
+site_description: Learn to create, preview, style and export diagrams with bgraph, starting from your first file.
 docs_dir: docs/guide
 site_dir: site
 strict: true
 theme:
   name: readthedocs
-  locale: fr
+  locale: en
   highlightjs: false
   navigation_depth: 3
 plugins:
   - search:
-      lang: [fr, en]
+      lang: [en]
 hooks:
   - docs/site_hooks.py
 watch:
@@ -32,23 +32,23 @@ validation:
     anchors: warn
     unrecognized_links: warn
 nav:
-  - Accueil: index.md
-  - Premiers pas:
-      - Installer bgraph: installation.md
-      - Créer son premier diagramme: demarrage.md
-  - Dessiner:
-      - Placer les éléments: placement.md
-      - Styles et couleurs: styles.md
-      - Choisir un type de diagramme: graphiques.md
-      - Galerie des 30 types: galerie.md
-  - Utiliser au quotidien:
-      - Commandes et exports: commandes.md
-      - Zed et VS Code: editeurs.md
-      - Fichiers, composants et données: composition.md
-      - Rust, navigateur et Typst: integrations.md
-      - Résoudre un problème: depannage.md
-  - Référence:
-      - Langage complet (anglais): language.md
-      - Propriétés et types (générée, anglais): reference.md
-      - API Rust (anglais): API.md
-  - Maintenir cette documentation: documentation.md
+  - Home: index.md
+  - Get started:
+      - Install bgraph: installation.md
+      - Your first diagram: demarrage.md
+      - Set up your editor: editeurs.md
+  - Draw:
+      - Placement and groups: placement.md
+      - Styles and colors: styles.md
+      - Choose a diagram type: graphiques.md
+      - Gallery of all 30 types: galerie.md
+  - Everyday use:
+      - Commands and exports: commandes.md
+      - Files, components and data: composition.md
+      - Rust, browser and Typst: integrations.md
+      - Troubleshooting: depannage.md
+  - Reference:
+      - Language manual: language.md
+      - Generated property and type reference: reference.md
+      - Rust API: API.md
+  - Maintain this documentation: documentation.md

@@ -1,0 +1,187 @@
+{
+  "work": "W-171",
+  "date": "2026-10-20",
+  "base_commit": "87c75360b076567758657447c4ea08bd83e8faab",
+  "status": "validated for the documentation and Venn commit; user installations unchanged; Git records delivery",
+  "rust": {
+    "command": "cargo test --locked --all-features",
+    "passed": 751,
+    "failed": 0,
+    "ignored": 1,
+    "suites": 12,
+    "new_regressions": 6
+  },
+  "checks": {
+    "clippy_all_targets_all_features_deny_warnings": true,
+    "fmt": true,
+    "no_default_features_with_venn": true,
+    "strict_mkdocs": true,
+    "diff_check": true
+  },
+  "runtime": {
+    "fixtures": 22,
+    "gallery_archetypes": 30,
+    "file_contexts": 4,
+    "extensions": true,
+    "js_tests": 6,
+    "release_cli_packaged_wasm_fixture_matches": 10
+  },
+  "export_matrix": [
+    {
+      "name": "contained",
+      "formats": [
+        "svg",
+        "png",
+        "pdf",
+        "json"
+      ],
+      "svg_xml": true,
+      "png": true,
+      "finite_json": true,
+      "pdfinfo": true
+    },
+    {
+      "name": "dark",
+      "formats": [
+        "svg",
+        "png",
+        "pdf",
+        "json"
+      ],
+      "svg_xml": true,
+      "png": true,
+      "finite_json": true,
+      "pdfinfo": true
+    },
+    {
+      "name": "disjoint",
+      "formats": [
+        "svg",
+        "png",
+        "pdf",
+        "json"
+      ],
+      "svg_xml": true,
+      "png": true,
+      "finite_json": true,
+      "pdfinfo": true
+    },
+    {
+      "name": "empty",
+      "formats": [
+        "svg",
+        "png",
+        "pdf",
+        "json"
+      ],
+      "svg_xml": true,
+      "png": true,
+      "finite_json": true,
+      "pdfinfo": true
+    },
+    {
+      "name": "example",
+      "formats": [
+        "svg",
+        "png",
+        "pdf",
+        "json"
+      ],
+      "svg_xml": true,
+      "png": true,
+      "finite_json": true,
+      "pdfinfo": true
+    },
+    {
+      "name": "identical",
+      "formats": [
+        "svg",
+        "png",
+        "pdf",
+        "json"
+      ],
+      "svg_xml": true,
+      "png": true,
+      "finite_json": true,
+      "pdfinfo": true
+    },
+    {
+      "name": "long-names",
+      "formats": [
+        "svg",
+        "png",
+        "pdf",
+        "json"
+      ],
+      "svg_xml": true,
+      "png": true,
+      "finite_json": true,
+      "pdfinfo": true
+    },
+    {
+      "name": "schematic",
+      "formats": [
+        "svg",
+        "png",
+        "pdf",
+        "json"
+      ],
+      "svg_xml": true,
+      "png": true,
+      "finite_json": true,
+      "pdfinfo": true
+    },
+    {
+      "name": "two-partial",
+      "formats": [
+        "svg",
+        "png",
+        "pdf",
+        "json"
+      ],
+      "svg_xml": true,
+      "png": true,
+      "finite_json": true,
+      "pdfinfo": true
+    },
+    {
+      "name": "unequal",
+      "formats": [
+        "svg",
+        "png",
+        "pdf",
+        "json"
+      ],
+      "svg_xml": true,
+      "png": true,
+      "finite_json": true,
+      "pdfinfo": true
+    }
+  ],
+  "visual_review": [
+    "before PNG",
+    "final example PNG",
+    "10-fixture PNG contact sheet with final long-name review",
+    "embedded-font PDF"
+  ],
+  "golden": "venn be043a9c49825e07",
+  "trail_check": {
+    "exit_code": 1,
+    "matches": 20,
+    "resolution": "Reviewed as lexical false positives in documentation and INDEX; no Venn source conflict. See report and the existing learning-checker vocabulary lesson."
+  },
+  "limitations": [
+    "Three-set regions remain indicative; infeasible pair distances use the documented schematic fallback.",
+    "A tiny or empty circle may keep its letter only in the key.",
+    "Default PDF fonts are substituted by the viewer; the visually reviewed PDF explicitly embeds DejaVu Sans.",
+    "Validation did not reinstall user binaries/extensions, rerun GUI hosts or run remote CI; commit/push delivery was subsequently requested and is recorded by Git."
+  ],
+  "sha256": {
+    "examples/venn.bd": "d73a94b58d8cf0c41958f99419e39c9c5d311fb57d57ad1a9536120f8842ea96",
+    "examples/venn.svg": "dc88f96f7c1f7e766289aff9172d09a00ad50bb59fa7d995c669f2c8f36d3b86",
+    "target/release/bgraph": "82ab6c31ac50f8ad3a12ddc8e6db4b115bf88365cca1e9dda6bc460c37192f57",
+    "editors/vscode/bgraph.wasm": "490850da6623c2330daf2cb8531c8dea180923c984eb48714eea25d3efa56aa9",
+    "editors/vscode/bgraph-1.0.0.vsix": "fb8c292d7abe49e573ebf60ee127eb1b78569f38d12f24d6a28defd679abd046",
+    ".agent/analysis/venn-after-20261020.png": "7613cb3d5e2c8a1148f3f01b4104aa9d41fb2ee57ca9a32688c6cf525d325a5f"
+  }
+}

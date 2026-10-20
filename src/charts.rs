@@ -1139,9 +1139,9 @@ fn distance_for(a: f64, b: f64, want: f64) -> f64 {
 /// With **two** sets the lens is solved so its area is the number written —
 /// a Venn diagram whose overlap is drawn by eye is a chart that lies about the
 /// one thing it exists to show. With **three** the overlaps are labelled but
-/// arranged rather than solved, because three circles cannot in general be
-/// placed to honour all seven regions at once; saying so is better than
-/// pretending. Four is refused in `check`.
+/// fitted where possible, with a schematic fallback when the three distances
+/// cannot form a triangle. Pair totals are named in a key: without a triple
+/// count they do not describe exclusive regions. Four is refused in `check`.
 #[cfg(feature = "venn")]
 pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<Layout> {
     use std::collections::HashMap;
@@ -1209,44 +1209,48 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         }
     }
 
+    let radii: Vec<f64> = sets.iter().map(|(_, _, c, _, _)| radius(*c)).collect();
     let scale = biggest * biggest / largest * std::f64::consts::PI;
+    let distance = |a, b| {
+        distance_for(
+            radii[a],
+            radii[b],
+            shared.get(&(a, b)).copied().unwrap_or(0.0) * scale,
+        )
+    };
     let centres: Vec<(f64, f64)> = match sets.len() {
         0 | 1 => vec![(0.0, 0.0)],
-        2 => {
-            let (ra, rb) = (radius(sets[0].2), radius(sets[1].2));
-            let want = shared.get(&(0, 1)).copied().unwrap_or(0.0) * scale;
-            let d = distance_for(ra, rb, want);
-            vec![(0.0, 0.0), (d, 0.0)]
-        }
+        2 => vec![(0.0, 0.0), (distance(0, 1), 0.0)],
         _ => {
-            // Three on an equilateral triangle. The radius is set by the
-            // *tightest* pair, not the largest circle: three points at 120°
-            // sit √3·R apart, so R has to be under (rᵢ + rⱼ)/√3 for every pair
-            // or the smallest two never meet — which is a Venn diagram with no
-            // intersections in it. Arranged, not solved; the docs say so.
-            let radii: Vec<f64> = sets.iter().map(|(_, _, c, _, _)| radius(*c)).collect();
-            let tightest = (0..radii.len())
-                .flat_map(|i| ((i + 1)..radii.len()).map(move |j| (i, j)))
-                .map(|(i, j)| radii[i] + radii[j])
-                .fold(f64::MAX, f64::min);
-            let d = tightest / 3.0_f64.sqrt() * 0.72;
-            (0..sets.len())
-                .map(|i| {
-                    let a = -std::f64::consts::FRAC_PI_2
-                        + i as f64 * std::f64::consts::TAU / sets.len() as f64;
-                    (d * crate::math::cos(a), d * crate::math::sin(a))
-                })
-                .collect()
+            let (ab, ac, bc) = (distance(0, 1), distance(0, 2), distance(1, 2));
+            if ab <= ac + bc && ac <= ab + bc && bc <= ab + ac && ab > 1e-8 {
+                let x = (ab * ab + ac * ac - bc * bc) / (2.0 * ab);
+                let y = (ac * ac - x * x).max(0.0).sqrt();
+                vec![(0.0, 0.0), (ab, 0.0), (x, y)]
+            } else if ab < 1e-8 && (ac - bc).abs() < 1e-8 {
+                vec![(0.0, 0.0), (0.0, 0.0), (0.0, ac)]
+            } else {
+                // shortcut: incompatible pair distances remain schematic; exact
+                // three-way regions need data and geometry the DSL does not have.
+                let tightest = (radii[0] + radii[1])
+                    .min(radii[0] + radii[2])
+                    .min(radii[1] + radii[2]);
+                let d = tightest / 3.0_f64.sqrt() * 0.72;
+                (0..3)
+                    .map(|i| {
+                        let a =
+                            -std::f64::consts::FRAC_PI_2 + i as f64 * std::f64::consts::TAU / 3.0;
+                        (d * crate::math::cos(a), d * crate::math::sin(a))
+                    })
+                    .collect()
+            }
         }
     };
 
-    let title_h = if title.is_some() {
-        // Two and a half lines, not two: at two the heading sat on the top
-        // gridline and read as part of the chart rather than above it.
-        TITLE_SIZE * 2.5
-    } else {
-        0.0
-    };
+    let chrome = chrome_of(registry, &theme);
+    let title_h = title
+        .as_ref()
+        .map_or(0.0, |_| chrome.heading_at(TITLE_SIZE) * 2.5);
     let min_x = centres
         .iter()
         .zip(&sets)
@@ -1257,9 +1261,27 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
         .zip(&sets)
         .map(|((_, y), (_, _, c, _, _))| y - radius(*c))
         .fold(f64::MAX, f64::min);
+    let max_x = centres
+        .iter()
+        .zip(&radii)
+        .map(|((x, _), r)| x + r)
+        .fold(f64::MIN, f64::max);
 
     let mut nodes = Vec::new();
     let mut annotations = Vec::new();
+    let mut polylines = Vec::new();
+    let font = base.font_size.unwrap_or(13.0);
+    let label = |text, x, y, size, anchor| Annotation {
+        text,
+        x,
+        y,
+        size,
+        anchor,
+        color: ink(&base, &theme),
+        weight: "600".into(),
+        family: family(&base),
+        title: false,
+    };
 
     if let Some(title) = title {
         annotations.push(Annotation {
@@ -1267,30 +1289,21 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
             x: 0.0,
             y: TITLE_SIZE,
             anchor: Anchor::Start,
-            size: chrome_of(registry, &theme).heading_at(TITLE_SIZE),
-            color: chrome_of(registry, &theme).heading,
-            weight: chrome_of(registry, &theme).heading_bold(),
-            family: chrome_of(registry, &theme).heading_font(&family(&base)),
+            size: chrome.heading_at(TITLE_SIZE),
+            color: chrome.heading.clone(),
+            weight: chrome.heading_bold(),
+            family: chrome.heading_font(&family(&base)),
             title: true,
         });
     }
 
     let place = |i: usize| -> (f64, f64) {
         let (x, y) = centres.get(i).copied().unwrap_or((0.0, 0.0));
-        (x - min_x, y - min_y + title_h + 18.0)
+        (x - min_x, y - min_y + title_h)
     };
 
-    // The middle of the arrangement, which is what "outward" is measured from.
-    let hub = {
-        let n = sets.len().max(1) as f64;
-        let (sx, sy) = (0..sets.len())
-            .map(place)
-            .fold((0.0, 0.0), |(ax, ay), (x, y)| (ax + x, ay + y));
-        (sx / n, sy / n)
-    };
-
-    for (i, (_, name, count, colour, style)) in sets.iter().enumerate() {
-        let r = radius(*count);
+    for (i, (_, _, _, colour, style)) in sets.iter().enumerate() {
+        let r = radii[i];
         let (cx, cy) = place(i);
         let (opaque, _) = crate::render_svg::split_alpha(colour);
         nodes.push(PlacedNode {
@@ -1310,60 +1323,176 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
                 ..style.clone()
             },
         });
-
-        // The name sits **outside its circle, on the side facing away from the
-        // pile**. Straight above was the first answer and it only works for one
-        // circle: with three arranged on a triangle, the top of the lower-left
-        // circle is inside the upper one, so its name landed in somebody else's
-        // set — which is where a reader looks for an overlap count. The
-        // direction away from the arrangement's centre is the one direction
-        // guaranteed to be clear of every other circle (`W-114`).
-        let (dx, dy) = (cx - hub.0, cy - hub.1);
-        let away = crate::math::hypot(dx, dy);
-        let (ux, uy) = if away < 1.0 {
-            (0.0, -1.0)
-        } else {
-            (dx / away, dy / away)
-        };
-        annotations.push(Annotation {
-            text: format!("{name}  {}", trim_number(*count)),
-            x: cx + ux * (r + 14.0),
-            y: cy + uy * (r + 14.0),
-            anchor: if ux < -0.3 {
-                Anchor::End
-            } else if ux > 0.3 {
-                Anchor::Start
-            } else {
-                Anchor::Middle
-            },
-            size: 12.0,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
-            title: false,
-        });
     }
 
-    // The shared count goes in the lens, on the line between the two centres.
-    for ((a, b), n) in &shared {
-        let (ax, ay) = place(*a);
-        let (bx, by) = place(*b);
-        annotations.push(Annotation {
-            text: trim_number(*n),
-            x: (ax + bx) / 2.0,
-            y: (ay + by) / 2.0 + 4.0,
-            anchor: Anchor::Middle,
-            size: 12.0,
-            color: ink(&base, &theme),
-            weight: "600".into(),
-            family: family(&base),
-            title: false,
+    // Prefer a set's exclusive region; containment and coincident circles
+    // still get separate keys. A tiny circle keeps its key in the legend.
+    let mut marked: Vec<(f64, f64)> = Vec::new();
+    for (i, r) in radii.iter().enumerate() {
+        let (cx, cy) = place(i);
+        let size = font + 3.0;
+        let mut best = None;
+        for exclusive in [true, false] {
+            let mut clearance = size;
+            for row in -16..=16 {
+                for col in -16..=16 {
+                    let (x, y) = (
+                        cx + r * f64::from(col) / 16.0,
+                        cy + r * f64::from(row) / 16.0,
+                    );
+                    let mut room = r - crate::math::hypot(x - cx, y - cy);
+                    for (j, other) in radii.iter().enumerate().filter(|(j, _)| *j != i) {
+                        let (ox, oy) = place(j);
+                        let gap = crate::math::hypot(x - ox, y - oy) - other;
+                        room = room.min(if exclusive { gap } else { gap.abs() });
+                    }
+                    for (mx, my) in &marked {
+                        room = room.min(crate::math::hypot(x - mx, y - my) - size);
+                    }
+                    if room > clearance {
+                        clearance = room;
+                        best = Some((x, y));
+                    }
+                }
+            }
+            if best.is_some() {
+                break;
+            }
+        }
+        if let Some((x, y)) = best {
+            marked.push((x, y));
+            annotations.push(label(
+                ((b'A' + i as u8) as char).to_string(),
+                x,
+                y,
+                size,
+                Anchor::Middle,
+            ));
+        }
+    }
+
+    let legend_x = (max_x - min_x).max(160.0) + 36.0;
+    let names: Vec<Vec<String>> = sets
+        .iter()
+        .map(|(_, name, _, _, _)| crate::layout::wrap(name, 24))
+        .collect();
+    let name_width = names
+        .iter()
+        .zip(&sets)
+        .map(|(lines, (_, _, _, _, s))| text_width(lines, s.font_size.unwrap_or(font)))
+        .fold(0.0_f64, f64::max);
+    let count_width = sets
+        .iter()
+        .map(|(_, _, n, _, s)| text_width(&[trim_number(*n)], s.font_size.unwrap_or(font)))
+        .fold(0.0_f64, f64::max);
+    let row_font = sets
+        .iter()
+        .map(|(_, _, _, _, s)| s.font_size.unwrap_or(font))
+        .fold(font, f64::max);
+    let name_x = legend_x + font * 2.8;
+    let content_width = (name_x - legend_x + name_width).max(text_width(&["A and B".into()], font));
+    let value_x = legend_x + (content_width + row_font * 1.5 + 6.0 + count_width).max(220.0);
+    let mut y = title_h + font;
+    annotations.push(label("Set totals".into(), legend_x, y, font, Anchor::Start));
+    let mut row_top = y + font * 1.3 + 3.0;
+    for (i, ((_, _, count, colour, style), lines)) in sets.iter().zip(&names).enumerate() {
+        let size = style.font_size.unwrap_or(font);
+        let step = size * 1.5 + 6.0;
+        let half = font * 0.8;
+        let half_h = (size * 1.2 + 6.0).max(half * 2.0 + 3.0) / 2.0;
+        y = row_top + half_h;
+        polylines.push(Polyline {
+            points: vec![
+                (legend_x, y - half),
+                (legend_x + half * 2.0, y - half),
+                (legend_x + half * 2.0, y + half),
+                (legend_x, y + half),
+            ],
+            closed: true,
+            fill: nodes[i].style.fill.clone(),
+            stroke: Some(colour.clone()),
+            width: 1.5,
+            head: None,
+            dash: None,
+            over: false,
         });
+        annotations.push(label(
+            ((b'A' + i as u8) as char).to_string(),
+            legend_x + half,
+            y,
+            font,
+            Anchor::Middle,
+        ));
+        for (line, text) in lines.iter().enumerate() {
+            let mut a = label(
+                text.clone(),
+                name_x,
+                y + line as f64 * step,
+                size,
+                Anchor::Start,
+            );
+            a.color = ink(style, &theme);
+            a.family = family(style);
+            a.weight = style.font_weight.clone().unwrap_or_else(|| "500".into());
+            annotations.push(a);
+        }
+        let mut a = label(trim_number(*count), value_x, y, size, Anchor::End);
+        a.color = ink(style, &theme);
+        a.family = family(style);
+        annotations.push(a);
+        row_top = y + step * lines.len().saturating_sub(1) as f64 + half_h + font * 0.7;
+    }
+
+    y = row_top + font * 1.5;
+    annotations.push(label(
+        "Shared members".into(),
+        legend_x,
+        y,
+        font,
+        Anchor::Start,
+    ));
+    y += font * 2.0;
+    // Pair totals include the triple intersection, so putting a bare number
+    // in an exclusive lens would give it a meaning the input never supplied.
+    for a in 0..sets.len() {
+        for b in (a + 1)..sets.len() {
+            annotations.push(label(
+                format!(
+                    "{} and {}",
+                    (b'A' + a as u8) as char,
+                    (b'A' + b as u8) as char
+                ),
+                legend_x,
+                y,
+                font,
+                Anchor::Start,
+            ));
+            annotations.push(label(
+                trim_number(shared.get(&(a, b)).copied().unwrap_or(0.0)),
+                value_x,
+                y,
+                font,
+                Anchor::End,
+            ));
+            y += font * 2.0;
+        }
+    }
+    if sets.len() == 3 {
+        for text in [
+            "Pair totals include the third set.",
+            "Three-set areas are indicative.",
+        ] {
+            y += font * 1.2 + 6.0;
+            let mut a = label(text.into(), legend_x, y, font * 0.85, Anchor::Start);
+            a.color = theme.muted.clone();
+            a.weight = "400".into();
+            annotations.push(a);
+        }
     }
 
     Ok(Layout {
         guides: Vec::new(),
-        polylines: Vec::new(),
+        polylines,
         groups: Vec::new(),
         nodes,
         edges: Vec::new(),

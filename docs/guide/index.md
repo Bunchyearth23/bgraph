@@ -1,56 +1,88 @@
-# Des diagrammes que vous maîtrisez
+# Turn text into a diagram
 
-**bgraph transforme un fichier texte `.bd` en diagramme SVG, PDF ou PNG.**
-Vous décrivez les éléments, leurs liens et leurs styles. Pour les schémas
-d'architecture, vous déclarez aussi leur placement ; pour les graphiques,
-les données déterminent la géométrie.
+**bgraph turns a plain text file into a diagram you can view, print or share.**
+You write the boxes, labels, connections and colors in a file ending in
+`.bd`. bgraph reads that file and produces an image.
 
-![Architecture avec groupes et services](examples/free.svg)
+For an architecture or process diagram, you choose where the elements go.
+For a chart, such as a pie chart, you provide the data and bgraph calculates
+the positions. You can work in an ordinary text editor; you do not need to
+write a program or use a drawing application.
 
-## Commencer en trois commandes
+![An application diagram with services and groups](examples/free.svg)
 
-Une fois [bgraph installé](installation.md) :
+## New to bgraph? Follow these three steps
+
+1. **[Install bgraph](installation.md).** Choose a supplied package or build
+   from source, then check that the command works.
+2. **[Create your first diagram](demarrage.md).** Copy a complete example,
+   make an image and change it while the preview is open.
+3. **[Set up your editor](editeurs.md).** Optional extensions add suggestions,
+   error highlighting and a preview shortcut in VS Code or Zed.
+
+The first tutorial assumes no knowledge of the bgraph language. Read it
+before the full language manual or property reference.
+
+## What are these files and tools?
+
+| Name | Meaning |
+|---|---|
+| `architecture.bd` | Your editable diagram source: an ordinary text file |
+| `architecture.svg` | A generated image, viewable in a browser and scalable without blurring |
+| `architecture.pdf` | A generated document for printing or sharing |
+| `bgraph` | The command that checks a source file, renders it or starts a browser preview |
+| `bgraph-lsp` | An optional helper that gives your editor suggestions and diagnostics |
+| `.bds` | A reusable file containing styles; you can ignore it for your first diagram |
+
+Changing an SVG does not update the `.bd` file. Keep editing the source and
+generate the image again when you want an updated export.
+
+## Already installed? Try a complete example
+
+Open a terminal in a folder where you can create files:
 
 ```sh
 bgraph init free -o architecture.bd
 bgraph architecture.bd -o architecture.svg
-bgraph watch architecture.bd
+bgraph watch architecture.bd --open --port 0
 ```
 
-Ouvrez l'adresse indiquée, par défaut **<http://127.0.0.1:7878>**.
-Modifiez le fichier et enregistrez : la preview se recharge.
+The first command creates a worked example. The second creates an image.
+The third opens a browser preview on a free local port; leave its terminal
+running and save changes in your editor to update the drawing. Press
+`Ctrl+C` in that terminal to stop the preview.
 
-**[Créer son premier diagramme →](demarrage.md)**
+To start with a shorter example and understand every line, follow
+[Your first diagram](demarrage.md).
 
-## Trouver le bon guide
+## Find the next guide
 
-| Je veux… | Aller à |
+| I want to… | Read |
 |---|---|
-| Installer les outils | [Installation](installation.md) |
-| Comprendre `node`, les flèches et `layout` | [Premier diagramme](demarrage.md) |
-| Aligner des boîtes, créer une rangée ou un groupe | [Placement](placement.md) |
-| Choisir les couleurs et partager une palette | [Styles](styles.md) |
-| Faire un camembert, un schéma réseau, un Gantt… | [Types de diagrammes](graphiques.md) |
-| Partir d'un exemple complet | [Galerie des 30 types](galerie.md) |
-| Exporter ou automatiser le rendu | [Commandes](commandes.md) |
-| Travailler dans Zed ou VS Code | [Éditeurs](editeurs.md) |
-| Générer un diagramme depuis des données | [Composition et données](composition.md) |
-| Trouver une propriété précise | [Référence générée](reference.md) |
+| Put boxes next to each other, align them or make groups | [Placement](placement.md) |
+| Change colors, shapes, fonts and spacing | [Styles and colors](styles.md) |
+| Pick a chart or a specialized notation | [Diagram types](graphiques.md) |
+| See a complete source and image for every type | [Gallery of all 30 types](galerie.md) |
+| Export images or automate rendering | [Commands and exports](commandes.md) |
+| Use VS Code or Zed | [Editors](editeurs.md) |
+| Share styles, combine files or load data | [Files, components and data](composition.md) |
+| Call bgraph from Rust, a browser or Typst | [Integrations](integrations.md) |
+| Fix an error or a preview problem | [Troubleshooting](depannage.md) |
+| Look up an exact property | [Generated reference](reference.md) |
 
-## Deux autres exemples
+## Other things you can draw
 
-### Des données : `pie`
+### A chart from data
 
-![Sources de trafic en anneau](examples/pie.svg){ .overview-image }
+![Traffic sources as a donut chart](examples/pie.svg){ .overview-image }
 
-Créez ce fichier avec `bgraph init pie -o trafic.bd`.
+Create the complete example with `bgraph init pie -o traffic.bd`.
 
-### Un processus : `bpmn`
+### A business process
 
-![Processus BPMN](examples/bpmn.svg){ .overview-image }
+![A BPMN process diagram](examples/bpmn.svg){ .overview-image }
 
-Créez ce fichier avec `bgraph init bpmn -o processus.bd`.
+Create the complete example with `bgraph init bpmn -o process.bd`.
 
-Les guides de ce site sont en français. La référence exhaustive, le tour
-complet du langage et le contrat d'API restent en anglais, dans leur version
-maintenue par le projet.
+The full build includes **29 specialized diagram types plus `free`**.
+Use `bgraph init` to list the types available in your particular build.

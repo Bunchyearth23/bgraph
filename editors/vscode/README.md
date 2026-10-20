@@ -2,6 +2,17 @@
 
 Syntax highlighting, live diagram preview and the `bgraph` language server for `.bd` files.
 
+## Start using the extension
+
+If you received a `.vsix`, open VS Code's Extensions view, choose **Install
+from VSIX…** from its `…` menu, and select that file. Open a `.bd` file and
+press **Ctrl+Shift+V** (**Cmd+Shift+V** on macOS) to preview it.
+
+The preview renderer is bundled. For completion and diagnostics, install
+`bgraph-lsp` separately and restart VS Code. New to the language? Follow
+[Your first diagram](../../docs/guide/demarrage.md) and the
+[step-by-step editor setup](../../docs/guide/editeurs.md#vs-code).
+
 ## What is in here
 
 | Piece | What it does |
@@ -60,7 +71,7 @@ have the same limitations as the diagram preview.
 Both write `bgraph-<version>.vsix` beside this file. Install it with:
 
 ```sh
-code --install-extension bgraph-1.0.0.vsix
+code --install-extension bgraph-1.0.0.vsix --force
 ```
 
 A VSIX is a zip with an OPC content-types part and a manifest, so `package.sh`
@@ -76,7 +87,7 @@ so a build without `node_modules` reports unavailable diagnostics and completion
 ## The server
 
 ```sh
-cargo install --path ../..   # puts `bgraph-lsp` on PATH
+cargo install --locked --path ../.. --bins --force
 ```
 
 If it is not on `PATH`, point `bgraph.server.path` at it. Without it you get

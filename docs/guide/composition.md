@@ -1,130 +1,152 @@
-# Fichiers, composants et données
+# Files, components and data
 
-## Partager des styles
+Start with a single `.bd` file. When several diagrams share a style or data
+source, the features below help avoid copying the same content.
 
-Créez `maison.bds` :
+All commands on this page use the command-line renderer, which can read
+files. Keep the example files together in one working folder.
+
+## Share styles
+
+Create `house.bds`:
 
 ```text
 style service { fill: #dbeafe stroke: #2563eb 1.5 radius: 8 }
 ```
 
-Puis `application.bd`, dans le même dossier :
+Then create `application.bd` in the same folder:
 
 ```text
-include "maison.bds"
+include "house.bds"
 
 node api "API" .service
-node jobs "Traitements" .service
+node jobs "Background jobs" .service
 layout { place jobs below api gap 40 }
 api -> jobs
 ```
+
+Render it:
 
 ```sh
 bgraph application.bd -o application.svg
 ```
 
-Les chemins sont relatifs au fichier qui écrit l'`include`.
-Une inclusion cyclique ou un nom déclaré deux fois produit une erreur.
-Un fichier `.bds` ne contient que des styles ; un `.bd` peut contenir
-un diagramme complet.
+An `include` path is relative to the file containing that statement.
+A circular include or a duplicate declaration produces an error.
+A `.bds` file contains styles only; a `.bd` file can contain a full diagram.
 
-## Inclure un diagramme sous un préfixe
+## Include a diagram under a prefix
 
-Pour inclure le fichier précédent depuis `ensemble.bd` :
+To include the previous diagram from `system.bd`:
 
 ```text
+include "house.bds"
 include "application.bd" as backend
 
-node ui "Interface"
+node ui "User interface"
 layout { place ui above backend.api gap 48 }
 ui -> backend.api
 ```
 
-`backend.api` désigne le nœud `api` du fichier inclus. Ses références internes
-sont préfixées elles aussi. Le préfixe évite les collisions entre diagrammes.
+Render with `bgraph system.bd -o system.svg`.
+`backend.api` refers to `api` in the included file. Node references receive
+the same prefix, which avoids identifier collisions between diagrams.
+Keep `house.bds` included at the top level too: this makes the shared
+`.service` class available when the application is included under a prefix.
 
-## Réutiliser un composant
+## Reuse a component
+
+A component is a reusable diagram fragment. Save this complete example as
+`components.bd`:
 
 ```bgraph
 component service {
   node app "{{label}}"
-  node db "Base"
+  node db "Database"
   layout { place db below app gap 32 }
   app -> db
 }
 
 use service as web { label: "Web" }
-use service as jobs { label: "Traitements" }
+use service as jobs { label: "Background jobs" }
 
 layout {
   place web at (0, 0)
   place jobs right-of web gap 80
 }
 
-web.app -> jobs.app "déclenche"
+web.app -> jobs.app "triggers"
 ```
 
-Chaque instance est un cadre que vous pouvez placer. Les paramètres sont
-substitués par le moteur de templates, avec l'échappement adapté au contexte.
+Render it with `bgraph components.bd -o components.svg`.
+Each instance is a frame you can place. Parameters are substituted by the
+template engine with escaping appropriate to their context.
 
-## Remplir un template
+## Fill a template
 
-Créez `trafic.bd` :
+A template contains holes such as `{{year}}`, filled from supplied values.
+Create `traffic.bd`:
 
 ```text
-type pie { title: "Trafic {{year}}" }
-slice organic "Recherche" {{organic}}
+type pie { title: "Traffic in {{year}}" }
+slice organic "Organic search" {{organic}}
 slice direct "Direct" {{direct}}
-slice referral "Référents" {{referral}}
+slice referral "Referrals" {{referral}}
 ```
+
+Supply values on the command line:
 
 ```sh
-bgraph trafic.bd -o trafic.svg --set year=2026 --set organic=4820 --set direct=2410 --set referral=1180
+bgraph traffic.bd -o traffic.svg --set year=2026 --set organic=4820 --set direct=2410 --set referral=1180
 ```
 
-Pour relire les mêmes valeurs depuis un objet JSON, créez `trafic.json` :
+Or create `traffic.json`:
 
 ```json
 {"year": 2026, "organic": 4820, "direct": 2410, "referral": 1180}
 ```
 
+Then render or inspect the filled source:
+
 ```sh
-bgraph trafic.bd --data trafic.json -o trafic.svg
-bgraph trafic.bd --data trafic.json --emit
-bgraph watch trafic.bd --data trafic.json
+bgraph traffic.bd --data traffic.json -o traffic.svg
+bgraph traffic.bd --data traffic.json --emit
+bgraph watch traffic.bd --data traffic.json --open --port 0
 ```
 
-`--emit` affiche le source rempli. `watch --data` recharge aussi les données
-lorsqu'elles changent. Un paramètre manquant donne une erreur nommant le trou
-à remplir.
+`--emit` prints the filled source. `watch --data` reloads changed data as
+well as the diagram. A missing value produces an error naming the hole.
 
-## Alimenter un genre depuis un CSV
+## Load chart data from CSV
 
-Pour un camembert, créez `ventes.csv` :
+For a pie chart, create `sales.csv`:
 
 ```csv
 name,value
-Recherche,4820
+Organic search,4820
 Direct,2410
-Référents,1180
+Referrals,1180
 ```
 
-Puis `ventes.bd`, dans le même dossier :
+Create `sales.bd` in the same folder:
 
 ```text
-type pie { title: "Ventes" from: "ventes.csv" }
+type pie { title: "Sales" from: "sales.csv" }
 ```
+
+Render it:
 
 ```sh
-bgraph ventes.bd -o ventes.svg
+bgraph sales.bd -o sales.svg
 ```
 
-Les colonnes requises dépendent du genre ; consultez sa section dans la
-[référence](reference.md). Pour des templates qui répètent une ligne par
-enregistrement, consultez `--rows` dans `bgraph --help` et la
-[syntaxe des répétitions](reference.md#repetition).
+Required columns depend on the type; look up its section in the
+[reference](reference.md). To repeat a template line for each record,
+see `--rows` in `bgraph --help` and
+[the repetition syntax](reference.md#repetition).
 
-!!! note "Fichiers et rendu embarqué"
-    `include` et `from:` demandent un chemin sur disque. Utilisez le CLI ou
-    `render_file` en Rust. Le rendu texte autonome dans le navigateur ou le
-    plugin Typst ne dispose pas de ce contexte de fichiers.
+!!! note "Embedded rendering and files"
+    `include` and `from:` require a disk path. Use the CLI or Rust's
+    `render_file`. The current-text renderer in the browser, VS Code pane
+    and Typst plugin has no filesystem context. For a composed diagram in
+    a document, generate its SVG with the CLI first.

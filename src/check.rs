@@ -2524,9 +2524,9 @@ fn check_venn(diagram: &Diagram, out: &mut Vec<Diag>) {
     } else if count == 3 {
         out.push(Diag::warn(
             where_,
-            "with three sets the overlaps are labelled but not solved: three circles \
-             cannot in general honour all seven regions at once, so the areas are \
-             indicative and the numbers are what to read"
+            "with three sets pairwise areas are fitted when possible, but the seven \
+             regions are not solved: the areas are indicative and the named pair \
+             totals include members of the third set"
                 .to_string(),
         ));
     }

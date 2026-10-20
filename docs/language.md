@@ -1,8 +1,14 @@
 # The bgraph language
 
-A diagram is a plain text file. Five kinds of statement: `type`, `graph`,
-`style`, `node`, and edges. Statements are separated by newlines (`;` and `,`
-also work). Comments start with `//` — `#` is reserved for hex colors.
+A diagram is a plain text file. If you are new to bgraph, start with
+[Your first diagram](guide/demarrage.md) for installation prerequisites,
+an explained example and a live preview.
+
+The core statements declare a `type`, `graph` settings, `style` definitions,
+`node` elements and edges. A `layout` block describes their positions.
+Further statements support groups, composition and annotations.
+Statements are separated by newlines (`;` and `,` also work).
+Comments start with `//` — `#` is reserved for hex colors.
 
 ```bgraph
 graph { background: #0b1120 }
@@ -85,10 +91,9 @@ cannot become a statement. A component's holes belong to the component, not to
 the file: they are bound by each `use`, and a file with a component is not
 thereby a template.
 
-**An instance is a frame.** That is what makes it placeable: a group is
-already anchorable and already sized by what it holds, so `use service as jobs
-right-of web` needs no placement vocabulary of its own. `web` names the
-instance; `web.app` names a box inside it.
+**An instance is a frame.** That makes it placeable through the same `layout`
+instructions as a group, for example `place jobs right-of web gap 90`.
+`web` names the instance; `web.app` names a box inside it.
 
 Deliberately no conditionals and no loops. Past that it is a macro system, and
 a much larger promise than this makes — the library fills a table for the

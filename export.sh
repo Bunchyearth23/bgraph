@@ -235,18 +235,59 @@ INSTALL_PS1
 cat > "$output/README.md" <<EOF
 # bgraph $version — local export
 
-This directory contains compiled artefacts only; no project source is included.
+This directory contains compiled artifacts only; no project source is included.
+You can draw and export diagrams without installing Rust or Node.js.
+
+## Choose your command-line tools
 
 - Linux: linux-x86_64/bin/bgraph and bgraph-lsp
 - Windows x86_64: windows-x86_64/bin/bgraph.exe and bgraph-lsp.exe
 - Windows ARM64: windows-aarch64/bin/bgraph.exe and bgraph-lsp.exe
-- VS Code: install vscode/bgraph-$version.vsix
-- Zed: run zed/install.sh, then install the local extension from zed/
-- Windows Zed: run zed/install.ps1, then install the local extension from zed/
-- Typst: copy typst/ to ~/.local/share/typst/packages/local/bgraph/$version/
 
-The LSP binary is intentionally separate. Configure its absolute path in the
-editor when it is not on PATH.
+Keep the matching pair of executables together. Add their bin folder to your
+user PATH and open a new terminal. Check with:
+
+    bgraph --version
+
+You should see bgraph followed by its version. If it is not found, run the
+executable from its own folder: ./bgraph on Linux or .\bgraph.exe in Windows
+PowerShell. Linux files may need: chmod +x bgraph bgraph-lsp.
+
+## Make a first diagram
+
+Open a terminal in a new working folder where you can keep your files:
+
+    bgraph init free -o architecture.bd
+    bgraph check architecture.bd
+    bgraph architecture.bd -o architecture.svg
+    bgraph watch architecture.bd --open --port 0
+
+Open architecture.bd in a plain text editor. It is the editable source.
+architecture.svg is the generated image, viewable in a browser. The last
+command opens a live browser preview; leave its terminal running and save
+source changes to update the drawing. If the browser does not open, use the
+printed URL. Press Ctrl+C in that terminal to stop the preview.
+
+Render again to refresh an exported image. Use architecture.pdf after -o
+for PDF output. Run bgraph init to list other available diagram types.
+
+## Optional editor support
+
+- VS Code: choose Install from VSIX in the Extensions menu and select
+  vscode/bgraph-$version.vsix. Open a .bd file and press Ctrl+Shift+V
+  (Cmd+Shift+V on macOS). The pane updates while typing, without saving.
+- Zed: run zed/install.sh (Linux) or zed/install.ps1 (Windows), then use
+  zed: install dev extension and select zed/. Open the diagram's containing
+  folder as a project, then run task: spawn -> bgraph: Preview.
+  See zed/README.md for the shortcut entry and shell-specific setup.
+- Typst: copy typst/ to ~/.local/share/typst/packages/local/bgraph/$version/.
+  See typst/README.md for usage.
+
+The language-server binary bgraph-lsp supplies editor suggestions and errors.
+Configure its absolute path in the editor when it is not on PATH. VS Code's
+preview can work without it, but the Zed browser task requires bgraph.
+The VS Code pane cannot read include or external from: files; use the browser
+watcher for diagrams composed from several files. Read LICENSE for usage terms.
 EOF
 
 echo

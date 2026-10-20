@@ -1,5 +1,9 @@
 # Editors
 
+For a first installation, follow [the beginner editor guide](../docs/guide/editeurs.md).
+It covers local packages, previews and language-server paths for VS Code and
+Zed. The configurations below also cover Neovim, Helix and Emacs.
+
 `bgraph-lsp` is a language server speaking LSP over stdin and stdout. It works
 with any editor that speaks the protocol; two are packaged here, and the rest
 need a few lines of configuration.
@@ -33,7 +37,8 @@ fall behind the language.
 
 ## First, put the server on `PATH`
 
-Every editor below assumes it can run `bgraph-lsp`.
+Completion and diagnostics require `bgraph-lsp`. VS Code's bundled preview
+works independently of the server.
 
 ```sh
 cargo build --release

@@ -1,6 +1,9 @@
-# Styles et couleurs
+# Styles and colors
 
-## Créer un style réutilisable
+A style lets you reuse appearance settings. Start by applying one to a box;
+you can add shared palettes and themes later.
+
+## Create a reusable style
 
 ```bgraph
 style service {
@@ -16,48 +19,49 @@ style store extends service {
 }
 
 node api "API" .service
-node db "Base" .store { stroke: #059669 2 }
+node db "Database" .store { stroke: #059669 2 }
 layout { place db right-of api gap 60 }
 api -> db
 ```
 
-`fill` est le fond. `stroke` associe une couleur et, facultativement,
-une épaisseur. `font` associe une taille et une couleur de texte.
-`extends` hérite d'un style ; le bloc placé sur l'élément a la priorité.
+`fill` is the background color. `stroke` combines a line color with an
+optional thickness. `font` combines the text size and color.
+`extends` inherits another style. A block written directly on an element
+takes precedence over its named styles.
 
-## Lire la cascade
+## Understand the cascade
 
-Du plus général au plus spécifique pour un élément :
+For an element, settings are applied from general to specific:
 
-1. Valeurs par défaut et thème choisi en ligne de commande.
-2. `style node`, appliqué à tous les éléments.
-3. Style du mot de déclaration, par exemple `style slice` ou `style task`.
-4. Classes `.classe`, dans leur ordre d'application.
-5. Propriétés écrites directement sur l'élément, dans `{ … }`.
+1. Built-in defaults and the command-line theme.
+2. `style node`, common to all elements.
+3. The declaration word's style, such as `style slice` or `style task`.
+4. Named classes such as `.service`, in their written order.
+5. Properties written directly on the element inside `{ … }`.
 
-`style edge` joue le rôle de base pour les liens. Un style nommé arbitrairement,
-comme `style service`, s'applique là où sa classe `.service` est utilisée.
+`style edge` is the base for connections. An arbitrary named style such as
+`service` applies where the class `.service` is used.
 
-## Régler tous les éléments ou les liens
+## Style all boxes or connections
 
 ```bgraph
 style node { fill: #f1f5f9 stroke: #334155 1 font: 14 #0f172a }
 style edge { stroke: #64748b 1.5 router: ortho }
 
-node a "Départ"
-node b "Arrivée"
+node a "Start"
+node b "Finish"
 layout { place b right-of a gap 60 }
-a -> b "requête"
+a -> b "request"
 ```
 
-Les formes usuelles sont `rect`, `stadium`, `ellipse`, `diamond`,
-`hexagon` et `cylinder`. Le routage `ortho` cherche un passage à angles droits
-autour des boîtes ; `straight` trace un lien direct.
+Common shapes include `rect`, `stadium`, `ellipse`, `diamond`,
+`hexagon` and `cylinder`. The `ortho` router looks for a right-angle route
+around boxes; `straight` draws a direct connection.
 
-## Marges extérieures
+## Add space around an element
 
-`padding` réserve de l'espace **dans** la boîte. `margin` réserve de l'espace
-**autour** de la boîte ou du cadre, avec l'ordre des côtés de CSS :
+`padding` reserves room **inside** a box. `margin` reserves room **outside**
+a box or frame, using the CSS side order:
 
 ```text
 margin: 16
@@ -67,15 +71,15 @@ margin: 8 16 12 20
 margin-top: 24
 ```
 
-Ces formes correspondent à : tous les côtés ; vertical / horizontal ; haut /
-horizontal / bas ; haut / droite / bas / gauche. Les côtés individuels
-(`margin-top`, `margin-right`, `margin-bottom`, `margin-left`) se combinent
-avec les styles, `extends` et les propriétés écrites sur l'élément.
+The forms mean: all sides; vertical/horizontal; top/horizontal/bottom;
+top/right/bottom/left. Individual sides (`margin-top`, `margin-right`,
+`margin-bottom`, `margin-left`) combine through named styles, `extends`
+and direct properties.
 
 ```bgraph
 style node { margin: 8 16 }
 node api "API"
-node db "Base"
+node db "Database"
 layout {
   place api at (0, 0)
   place db right-of api gap 40
@@ -83,74 +87,79 @@ layout {
 api -> db
 ```
 
-Ici, l'espace entre les bords vaut **72** : 16 de marge à droite de `api`,
-40 de `gap`, puis 16 à gauche de `db`. Les dimensions visibles des boîtes
-ne changent pas. Un groupe englobe aussi les marges de ses enfants.
-Les coordonnées absolues et les alignements explicites restent attachés aux
-bords visibles ; une marge ne déplace pas un `at` imposé.
+Here the border-to-border gap is **72**: API's right margin of 16, the gap
+of 40 and Database's left margin of 16. Visible box sizes do not change.
+A group also contains its children's margins.
 
-Pour une séquence :
+Absolute coordinates and explicit alignments refer to visible borders;
+a margin does not move a required `at` position.
+
+For a sequence diagram, styles can include:
 
 ```text
 style participant { margin-bottom: 12 }
 style group { margin: 16 8 }
 ```
 
-Le calcul réserve la place des titres de cadres, des marges et des messages
-avant de dessiner les lignes de vie. Cela évite qu'un premier cadre touche
-les participants et garde les cadres imbriqués séparés.
+Sequence layout reserves room for frame titles, margins and messages before
+drawing lifelines. This keeps the first frame clear of the participants and
+separates nested frames.
 
-Les marges sont disponibles dans les neuf genres à placement déclaré et
-dans `sequence`. Les autres genres les refusent explicitement. Les valeurs
-sont des distances finies positives ou nulles ; `auto`, les valeurs négatives
-et la fusion des marges CSS ne sont pas pris en charge. Les suffixes d'unité
-restent indicatifs : `50%` vaut 50 unités, sans calcul de pourcentage relatif.
+Margins are available in the nine declared-placement types and in
+`sequence`. Other types reject them. Values must be finite, nonnegative
+distances. `auto`, negative margins and CSS margin collapsing are not
+supported. Unit suffixes are currently descriptive: `50%` means 50 drawing
+units, without a relative percentage calculation.
 
-## Appliquer un thème
+## Apply a theme
 
 ```sh
-bgraph architecture.bd --theme light -o clair.svg
-bgraph architecture.bd --theme dark -o sombre.svg
-bgraph architecture.bd --theme print -o impression.pdf
+bgraph architecture.bd --theme light -o light.svg
+bgraph architecture.bd --theme dark -o dark.svg
+bgraph architecture.bd --theme print -o print.pdf
 ```
 
-Un thème passe sous les styles du fichier. Si votre source fixe déjà le fond
-et toutes les couleurs, ces valeurs continuent à gagner. Pour laisser le thème
-choisir le fond, omettez `background` dans votre source.
+A theme is applied underneath the file's own settings. Colors already
+declared in the source keep their precedence. To let a theme choose the
+background, omit `background` from your source.
 
-Sans thème ni fond déclaré, le fond est blanc. Pour exporter un fond transparent :
+Without a theme or a declared background, the background is white.
+For a transparent export:
 
-```text
+```bgraph
 graph { background: none }
+node a "Transparent background"
 ```
 
-Pour un fond partiellement transparent, ajoutez l'alpha à la couleur :
+For a partially transparent background:
 
 ```bgraph
 graph { background: #ffffff80 }
+node a "Partly transparent background"
 ```
 
-Le format est `#RRGGBBAA` : les deux derniers chiffres contrôlent l'opacité
-du fond, indépendamment des formes et des textes.
+The format is `#RRGGBBAA`: the last two digits control background opacity
+independently of shapes and text.
 
-| Alpha | Opacité approximative |
+| Alpha | Approximate opacity |
 |---|---|
-| `00` | 0 % — transparent |
-| `40` | 25 % |
-| `80` | 50 % |
-| `bf` | 75 % |
-| `ff` | 100 % — opaque |
+| `00` | 0% — transparent |
+| `40` | 25% |
+| `80` | 50% |
+| `bf` | 75% |
+| `ff` | 100% — opaque |
 
-Cela fonctionne dans les exports SVG, PDF et PNG. La preview affiche un damier
-derrière le fond pour rendre sa transparence visible. Le format court `#RGBA`
-est également accepté, par exemple `#fff8` (environ 53 % d'opacité).
+This works in SVG, PDF and PNG output. The browser preview shows a
+checkerboard behind the background so transparency is visible.
+The short `#RGBA` form is also accepted, for example `#fff8`
+(about 53% opacity).
 
-## Partager une palette
+## Share a palette
 
-Placez les déclarations `style` dans un fichier `maison.bds`, puis ajoutez
-`include "maison.bds"` dans vos diagrammes. Un `.bds` contient uniquement
-des styles. Voir [composer plusieurs fichiers](composition.md).
+Put your `style` declarations in `house.bds`, then add
+`include "house.bds"` to your diagrams. A `.bds` file contains styles only.
+See [Files, components and data](composition.md).
 
-Pour toutes les propriétés et leurs valeurs acceptées, utilisez la
-[référence générée](reference.md#property-reference). `bgraph explain fichier.bd id`
-permet de retrouver quelle couche a fourni une valeur.
+Use the [generated property reference](reference.md#property-reference)
+for every accepted setting. `bgraph explain file.bd id` shows which style
+layer supplied each value.

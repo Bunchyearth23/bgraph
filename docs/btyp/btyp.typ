@@ -1,30 +1,30 @@
-// ── btyp — thème Typst de Bunchy ─────────────────────────────────────────────
-// Un seul thème, deux corps : A4 (document) et Présentation (16:9 / 4:3),
-// commutables par le booléen `presentation` de .with(...). Chaque primitive se
-// plie au mode : slide() coule en sections en A4, devient une page pleine en
-// présentation.
+// btyp — Bunchy's Typst theme
+// One theme, two formats: A4 documents and 16:9 / 4:3 presentations.
+// The presentation argument to .with(...) selects the mode. Each primitive
+// adapts to it: slide() becomes a section in A4 and a full page
+// in presentation mode.
 //
 //   #show: bunchy-theme.with(presentation: true)   → deck 16:9
-//   #show: bunchy-theme.with()                      → document A4
+//   #show: bunchy-theme.with()                      -> A4 document
 //   #show: bunchy-theme.with(presentation: true, paper: "presentation-4-3")
-//   #show: bunchy-theme.with(paper: "us-letter")    → autre papier, mode doc
+//   #show: bunchy-theme.with(paper: "us-letter")    -> document on another paper size
 
 #let font-regular = "Archivo"
-// Pile de repli explicite : seule la variante *Regular* de JetBrainsMono NFM est
-// installée ici. Les tokens gras/italiques de la coloration syntaxique tombaient
-// donc en silence sur DejaVu Sans Mono — visible dans `pdffonts`. Liberation Mono,
-// qui a ses quatre variantes, reprend la main avant ce repli par défaut.
+// Explicit font fallback: only the Regular JetBrainsMono NFM face is
+// installed here. Bold/italic syntax tokens otherwise silently fell back
+// to DejaVu Sans Mono, as pdffonts revealed. Liberation Mono provides all
+// four variants and is tried before that default fallback.
 #let font-code = ("JetBrainsMono NFM", "JetBrainsMono NF", "Liberation Mono")
 
-// ── Palette — jetons centralisés (changez `accent` pour reskinner tout) ───────
+// Palette — centralized tokens; change accent to reskin the theme
 #let accent = rgb("#2563eb")
 #let ink    = rgb("#1a1a1a")
 #let muted  = rgb("#8a8a8a")
 #let faint  = rgb("#f0f0f0")
 
-// Jetons sémantiques — extraits de callout() pour être réutilisables ailleurs
-// (badge, dtable, diagrammes Mermaid…). Sémantique stable dans tout le corpus :
-// ok = ce qui tient · warn = la nuance, à mesurer · danger = ce qui casse.
+// Semantic tokens extracted from callout() for reuse by badges, tables
+// and diagrams. Their meaning is consistent throughout the documents:
+// ok = established; warn = qualification or measurement; danger = failure.
 #let ok-ink      = rgb("#1b8a3a")
 #let ok-bg       = rgb("#ecf8ef")
 #let warn-ink    = rgb("#c77700")
@@ -33,11 +33,11 @@
 #let danger-bg   = rgb("#fdeded")
 #let accent-bg   = rgb("#eef3ff")
 
-// ── État interne — le mode de rendu, lu par toutes les primitives ─────────────
+// Internal rendering mode, read by every primitive
 #let _mode  = state("btyp-pres", false)
 #let _title = state("btyp-title", none)
 
-// ── Le thème ──────────────────────────────────────────────────────────────────
+// Theme
 #let bunchy-theme(body, presentation: false, paper: auto) = {
   let pres = presentation
   let fmt = if paper != auto { lower(paper) } else if pres { "presentation-16-9" } else { "a4" }
@@ -68,17 +68,17 @@
   set list(spacing: if pres { 0.9em } else { 0.55em }, marker: text(fill: accent)[•])
   set enum(spacing: if pres { 0.9em } else { 0.55em })
 
-  // Hiérarchie de titres
+  // Heading hierarchy
   set heading(numbering: none)
   show heading.where(level: 1): set text(size: if pres { 30pt } else { 17pt }, weight: 800, fill: ink)
   show heading.where(level: 2): set text(size: if pres { 24pt } else { 13pt }, weight: 700, fill: accent)
   show heading.where(level: 3): set text(size: if pres { 19pt } else { 11.5pt }, weight: 700, fill: ink)
   show heading: it => { it; v(if pres { 0.3em } else { 0.2em }) }
 
-  // Légendes de figure
+  // Figure captions
   show figure.caption: set text(size: if pres { 15pt } else { 9pt }, fill: muted)
 
-  // Blocs de code (conservé, rendu adaptatif)
+  // Code blocks with mode-dependent rendering
   show raw.where(block: true): it => {
     set text(font: font-code, size: if pres { 15pt } else { 9pt })
     block(
@@ -87,17 +87,17 @@
       radius: 4pt,
       width: 100%,
       stroke: 0.5pt + muted,
-      // Pas d'étiquette quand le bloc n'a pas de langue : un pseudo-code ou un
-      // schéma d'algorithme n'est pas du « Language: none ».
+      // An unlabelled block may be pseudocode or an algorithm sketch;
+      // do not add a misleading Language: none label.
       if it.lang == none { it } else {
         text(font: font-regular, size: if pres { 11pt } else { 8pt }, fill: muted)[_\/\/ Language: #it.lang _] + it
       },
     )
   }
-  // Code en ligne — la police mono DOIT être posée ici aussi : sans elle, Typst
-  // retombe sur son mono par défaut (DejaVu Sans Mono), qui n'a rien à voir avec
-  // le reste du document et se trahit dans `pdffonts`. Le 0.92em compense la
-  // chasse de JetBrains, plus large que celle d'Archivo à taille égale.
+  // Set the inline monospace face here as well; otherwise Typst uses
+  // DejaVu Sans Mono, unlike the rest of the document. The 0.92em scale
+  // compensates for JetBrains being wider than Archivo at the same
+  // nominal size.
   show raw.where(block: false): it => box(
     fill: faint, inset: (x: 3pt, y: 0pt), outset: (y: 3pt), radius: 2pt,
     text(font: font-code, size: 0.92em, it),
@@ -107,10 +107,10 @@
   body
 }
 
-// ── line-sep — filet horizontal (conservé) ────────────────────────────────────
+// line-sep — horizontal rule
 #let line-sep() = line(length: 100%, stroke: 0.5pt + muted)
 
-// ── cover — page/slide de titre ───────────────────────────────────────────────
+// cover — document or presentation title page
 #let cover(title: none, subtitle: none, author: none, date: none) = {
   _title.update(title)
   context {
@@ -139,7 +139,7 @@
   }
 }
 
-// ── section — intercalaire (page pleine en présentation, titre §1 en A4) ──────
+// section — full presentation divider or numbered A4 heading
 #let section(name) = context {
   if _mode.get() {
     page(header: none, footer: none)[
@@ -158,7 +158,7 @@
   }
 }
 
-// ── slide — l'unité de contenu (page en présentation, section qui coule en A4) ─
+// slide — one content unit, a presentation page or flowing A4 section
 #let slide(body, title: none) = context {
   if _mode.get() {
     pagebreak(weak: true)
@@ -170,7 +170,7 @@
   }
 }
 
-// ── callout — encadré (info / warn / danger / ok) ─────────────────────────────
+// callout — info / warn / danger / ok panel
 #let callout(body, kind: "info", title: none) = {
   let palette = (
     info:   (accent,     accent-bg),
@@ -192,12 +192,12 @@
   )
 }
 
-// ── two-col — deux colonnes (identique dans les deux modes) ───────────────────
+// two-col — two columns, identical in both modes
 #let two-col(l, r, gutter: 1.2em, columns: (1fr, 1fr)) = grid(
   columns: columns, column-gutter: gutter, l, r,
 )
 
-// ── stat / stats-row — tuiles de chiffres-clés (échelle avec le mode) ─────────
+// stat / stats-row — number tiles scaled to the rendering mode
 #let stat(value, label) = block(
   width: 100%, inset: 12pt, radius: 4pt, fill: faint, stroke: 0.5pt + muted,
   {
@@ -213,10 +213,10 @@
   ..items.pos().map(it => stat(it.at(0), it.at(1))),
 )
 
-// ── badge — pastille inline de statut, de verdict ou de marquage ─────────────
-// `#badge("prouvé", kind: "ok")` · kinds : info (défaut), ok, warn, danger, neutral.
-// Pensée pour les documents qui distinguent le fait de l'hypothèse : la pastille
-// se pose DANS le paragraphe, sans en casser le fil.
+// badge — inline status, verdict or marker
+// #badge("proven", kind: "ok"); kinds: info (default), ok, warn, danger, neutral.
+// Use within a paragraph to distinguish established facts from assumptions
+// without breaking the paragraph's flow.
 #let badge(label, kind: "info") = {
   let palette = (
     info:    (accent,     accent-bg),
@@ -233,10 +233,10 @@
   )
 }
 
-// ── dtable — tableau au style maison ─────────────────────────────────────────
-// Filets horizontaux seulement, en-tête teinté, inset qui suit le mode.
-//   #dtable(header: ([Champ], [Rôle]), [renewal], [le discriminant], …)
-// `columns` vaut par défaut le nombre de colonnes de l'en-tête.
+// dtable — table in the shared theme
+// Horizontal rules only, tinted header and mode-dependent inset.
+// #dtable(header: ([Field], [Role]), [renewal], [the discriminator], ...)
+// columns defaults to the number of header cells.
 #let dtable(header: (), columns: auto, ..cells) = context {
   let pres = _mode.get()
   let cols = if columns == auto { header.len() } else { columns }
@@ -256,15 +256,15 @@
   )
 }
 
-// ── diagram — figure légendée pour un schéma déjà chargé ─────────────────────
-// Prend un CONTENU (l'image), jamais un chemin : dans Typst, un chemin relatif se
-// résout depuis le fichier où il est écrit — un `image("assets/…")` passé au thème
-// serait cherché dans btyp/, pas chez l'appelant. Donc :
-//   #diagram(image("assets/diagrams/x.svg", width: 96%), caption: [Légende.])
-// Le style de légende, lui, vient du thème (show figure.caption).
+// diagram — captioned figure for an already loaded image
+// Takes image CONTENT, not a path: Typst resolves a relative path from
+// the file where it is written. Passing a path to the theme would look
+// inside btyp/ rather than in the calling document. Instead use:
+// #diagram(image("assets/diagrams/x.svg", width: 96%), caption: [Caption.])
+// Figure caption styling comes from the theme's show rule.
 #let diagram(img, caption: none) = figure(img, caption: caption)
 
-// ── lead — chapeau : la phrase qui porte le document ─────────────────────────
+// lead — the introductory sentence carrying the document's main point
 #let lead(body) = block(
   width: 100%, inset: (left: 10pt), stroke: (left: 3pt + accent),
   text(size: 1.08em, fill: ink)[#body],

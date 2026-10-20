@@ -1,266 +1,219 @@
 # bgraph
 
-Diagrams as text, where **you** decide the layout.
+**Write a text file. Turn it into a diagram.**
 
-Mermaid and friends auto-place everything and leave you fighting the
-engine. `bgraph` inverts that: every node says where it goes, but says it
-*relative to its neighbours* — so you keep control without hand-editing
-coordinates every time the diagram grows.
+bgraph reads a plain text file ending in `.bd` and generates an SVG image
+or a PDF document. You describe the elements, their connections and their
+appearance. For architecture and process diagrams, you also choose their
+relative positions. For charts, you supply the data.
 
-```bgraph
-graph { background: #0b1120 gap: 70 }
+Use a text editor to change the source, keep a browser or editor preview
+open, and export the finished drawing. You do not need to write a program
+to use the command-line tools.
 
-style node    { fill: #1e293b stroke: #334155 1.5 font: 14 #e2e8f0 }
-style service { fill: #172554 stroke: #3b82f6 1.5 }
-style store extends service { shape: cylinder stroke: #10b981 1.5 }
-
-node client  "Client"
-node gateway "API\nGateway"   .service
-node orders  "Order\nService" .service
-node db      "Postgres"       .store
-node cache   "Redis"          .store
-
-layout {
-  place client at (0, 0)
-  place gateway right-of client gap 90
-  place orders right-of gateway gap 90
-  place db right-of orders gap 90
-  place cache below db gap 55
-}
-
-client  -> gateway "https"
-gateway -> orders
-orders  -> db      "sql"
-orders  -> cache   "read-through" { router: ortho }
-```
-
-```sh
-bgraph init pie > traffic.bd       # a working file for any of the 29 specialised genres
-bgraph examples/free.bd -o /tmp/free.svg # checked-in worked source/SVG gallery
-bgraph diagram.bd -o diagram.svg   # …or .pdf, .png, .json — the extension picks
-bgraph watch diagram.bd            # a browser preview, reloading on save
-bgraph watch docs/diagrams         # …or a whole directory, as a build loop
-bgraph check diagram.bd            # every mistake, with a caret under each
-bgraph explain diagram.bd api      # why that box is where it is
-bgraph diff old.bd new.bd          # what appeared, what left, what moved
-bgraph layout diagram.bd           # freeze the placements into the file
-bgraph fmt --migrate old.bd        # rewrite what a language change removed
-```
+![A worked application diagram](examples/free.svg)
 
 ## Start here
 
-**Documentation utilisateur en français : [guide](docs/guide/index.md).**
-Le site MkDocs ajoute une navigation, une recherche et la galerie des 30 types :
+The **[user guide](docs/guide/index.md)** is the starting point for a first-time
+user:
+
+1. **[Install bgraph](docs/guide/installation.md)** from a supplied package or
+   from a source checkout. Verify that `bgraph --version` works.
+2. **[Create your first diagram](docs/guide/demarrage.md)** with a complete
+   example, line-by-line explanations and expected results.
+3. **[Set up VS Code or Zed](docs/guide/editeurs.md)** for suggestions,
+   diagnostics and a preview shortcut.
+
+The guide, site navigation and worked teaching examples are in English.
+The [gallery](examples/) contains a source and verified SVG for each of the
+30 diagram types.
+
+### Already installed? Start from an example
+
+In a terminal, open a folder where you want to keep your diagram and run:
+
+```sh
+bgraph init free -o architecture.bd
+bgraph check architecture.bd
+bgraph architecture.bd -o architecture.svg
+bgraph watch architecture.bd --open --port 0
+```
+
+This creates a source file, checks it, exports an image and opens a live
+preview on a free local port. Keep the last command running. Edit
+`architecture.bd` in your text editor and save to update the browser.
+Stop the preview with `Ctrl+C` in its terminal.
+
+The `.bd` file is what you edit. The `.svg` file is an output image;
+render again to refresh that export. Closing the browser does not stop
+the preview server.
+
+## A small, complete diagram
+
+Save this as `architecture.bd`:
+
+```bgraph
+node browser "Browser"
+node api "API"
+node db "Database"
+
+layout {
+  place browser at (0, 0)
+  place api right-of browser gap 60
+  place db below api gap 48
+}
+
+browser -> api "HTTPS"
+api -> db "SQL" { router: ortho }
+```
+
+`node` declares a box. `api` is its identifier; `"API"` is its visible
+label. `layout` describes positions. `right-of` and `below` keep the
+drawing related to its neighbors, and `gap` reserves space between them.
+An arrow such as `browser -> api` connects the named boxes.
+
+See [the first tutorial](docs/guide/demarrage.md) to add colors and styles,
+read an error and export a PDF.
+
+## Preview in an editor
+
+- **VS Code:** install the local VSIX, open a `.bd` file and press
+  `Ctrl+Shift+V` (`Cmd+Shift+V` on macOS). The pane updates while you type,
+  including unsaved changes. Its renderer is bundled.
+- **Zed:** install the tools and extension, open the containing folder as a
+  project, and run **task: spawn → bgraph: Preview**. Merge the supplied
+  keymap entry to use `Ctrl+Shift+V`. The preview opens in a browser and
+  updates on save.
+
+The [editor guide](docs/guide/editeurs.md) covers installation, language-server
+paths and troubleshooting. VS Code's direct pane and Markdown renderer
+need self-contained source; use `bgraph watch` for `include` or external
+`from:` data files.
+
+## What can I draw?
+
+The full build includes **29 specialised genres, plus `free`**.
+A genre is a diagram type. List the types present in your build with
+`bgraph init`, then create a complete example with `bgraph init <type>`.
+
+| Need | Examples |
+|---|---|
+| Architecture and networks | `free`, `block`, `network` |
+| Software and data models | `class`, `er`, `state`, `requirements` |
+| Processes and interactions | `bpmn`, `sequence`, `journey`, `kanban` |
+| Charts and comparisons | `pie`, `bar`, `xy`, `radar`, `quadrant`, `treemap` |
+| Flows and intersections | `sankey`, `venn` |
+| Dates and history | `gantt`, `timeline`, `gitgraph` |
+| Hierarchies | `orgchart`, `mindmap`, `treeview` |
+| Electronics and infrastructure | `packet`, `bytefield`, `wave`, `harness`, `rack` |
+
+For example, `type pie` interprets declarations as chart data:
+
+```bgraph
+type pie { title: "Traffic sources" donut: 0.55 }
+
+slice organic "Organic search" 4820
+slice direct "Direct" 2410
+slice referral "Referrals" 1180
+```
+
+See [Choose a diagram type](docs/guide/graphiques.md) and
+the [worked sources and images](examples/).
+
+## Useful next steps
+
+- [Placement](docs/guide/placement.md): relative anchors, rows, columns,
+  alignments and groups.
+- [Styles](docs/guide/styles.md): reusable classes, shapes, colors, margins
+  and `--theme light|dark|print`.
+- [Commands](docs/guide/commandes.md): SVG, PDF, optional PNG, checks,
+  formatting and comparison.
+- [Composition](docs/guide/composition.md): shared style files, reusable
+  components, templates and CSV input.
+- [Integrations](docs/guide/integrations.md): Rust, the browser playground
+  and Typst.
+- [Troubleshooting](docs/guide/depannage.md): installation, diagnostics,
+  previews and older syntax.
+
+For complete syntax and property lookup, use the
+[language manual](docs/language.md),
+[generated reference](docs/reference.md) and
+[Rust API contract](docs/API.md).
+
+## Read the documentation as a local website
+
+From a source checkout, with Bash and Python 3:
 
 ```sh
 ./docs.sh
 ```
 
-Ouvrez <http://127.0.0.1:8000>. Pour produire le site statique dans `site/` :
-`./docs.sh build`.
-Voir [maintenir la documentation](docs/guide/documentation.md) pour Windows
-et l'organisation des pages.
+Open [http://127.0.0.1:8000](http://127.0.0.1:8000). The site adds navigation,
+search and an illustrated gallery. Leave the terminal open and stop it with
+`Ctrl+C`. `./docs.sh build` produces a static site in `site/`.
 
-1. Create a file from a worked archetype:
+See [Maintain this documentation](docs/guide/documentation.md) for manual
+setup, including PowerShell. Building the site does not publish it.
 
-   ```sh
-   bgraph init free > architecture.bd
-   ```
+## Build and test from source
 
-2. Render it, then keep the preview open while you edit:
-
-   ```sh
-   bgraph architecture.bd -o architecture.svg
-   bgraph watch architecture.bd
-   ```
-
-3. Make it yours with a style and a relative placement — the opening example
-   above shows both. Use `bgraph check architecture.bd` whenever a line does
-   not draw as expected.
-
-4. When the picture has data behind it, use `type pie`, `type bar`, `type xy`
-   or one of the other specialised genres. For a calling program, start with
-   the small Rust examples in [`src/lib.rs`](src/lib.rs); for a browser, use
-   the [playground](playground).
-
-The guided tour in [`docs/language.md`](docs/language.md) follows this same
-order: source, placement, style, data, then composition.
-
-## What you get
-
-- **Relative anchors** — `right-of`, `left-of`, `above`, `below`, with
-  `gap` and `align`. Forward references and insertions just work.
-- **A real style cascade** — named styles, `extends`, implicit `node`/`edge`
-  themes, inline overrides. Unknown properties are errors, not silence.
-- **Shapes** — rect, stadium, ellipse, diamond, hexagon, cylinder, with edge
-  endpoints clipped to the true outline.
-- **Edge control** — straight routing, or orthogonal routing that goes **around
-  the boxes in the way** rather than through them, four arrow heads, dash
-  patterns, labels. Where there is no way round, the edge says so instead of
-  pretending.
-- **Self-sizing canvas** — the viewBox follows the content.
-- **A declared grid** — `graph { grid: 4 3 32 48 }` and `at (col 3, row 2)`.
-  Positions, gaps and waypoints use cells in grid mode; the checked-in
-  [`examples/`](examples/) directory contains one `.bd` and one verified SVG
-  for every archetype.
-- **Constraints that never reorder** — `align`, `equal-width`,
-  `equal-height`, `row` and `column`, inside `layout`. They adjust only what
-  you declared; deciding the order stays your job.
-- **Composition** — `include "house.bds"` for a shared palette,
-  `include "core.bd" as core` for a diagram under a namespace, and
-  `component`/`use` for a shape placed many times. No silent shadowing: a name
-  in two files is an error naming both.
-- **Text that belongs to no box** — `note`, and a `legend` derived from the
-  style classes that asked to be in one.
-- **Archetypes** — 29 specialised genres, plus `free`, reinterpret the same statements as
-  chart data, reusing the whole style cascade. `top: 8` folds a long tail;
-  `from: "sales.csv"` reads the rows from a table. `type bpmn` is the widest:
-  tasks, events, gateways and data artefacts, with pools and lanes as groups.
-- **Themes** — `--theme light|dark|print`, laid *underneath* what the file
-  declares, so the one box you coloured on purpose survives.
-- **Sketch mode** — `graph { sketch: on }`, and deterministic: the same file
-  always produces the same file.
-- **Outputs** — SVG, PDF (hand-written, no rasteriser), PNG behind a feature,
-  the solved geometry as JSON, `--page a4` to tile a large diagram across
-  sheets, `--embed-font` to carry the glyphs you used.
-- **Accessible by default** — `description` becomes an SVG `<title>` in every
-  genre, and `role="img"` with a label on the root.
-- **Editor support** — a tree-sitter grammar and a language server, packaged
-  for [Zed](editors/zed) and [VS Code](editors/vscode), and a few lines of
-  configuration away in Neovim, Helix and Emacs — see
-  [`editors/README.md`](editors/README.md). Diagnostics, context-aware
-  completion, hover with resolved geometry, go-to-definition, outline — and a
-  ` ```bgraph ` fence drawn in VS Code's Markdown preview.
-
-## In a browser
-
-The core is six dependencies of pure Rust and the SVG writer is hand-written,
-so the renderer compiles to wasm nearly as it stands:
+Install both commands from the repository root:
 
 ```sh
-./playground/build.sh            # the wasm module, into playground/public/
-cd playground && pnpm install && pnpm dev
+cargo install --locked --path . --bins
 ```
 
-Source on the left with a real editor, SVG on the right, diagnostics under
-both, and the genre menu is the module's own example table rather than a copy
-kept beside it. The wasm boundary is four
-`extern "C"` functions over linear memory — no `wasm-bindgen`, which would be
-a dependency and a build step for four functions whose job is to move bytes.
-
-`include` and `from:` are refused there: both need a path to resolve against
-and a page has no disk, which is why the wasm build exposes `render_source`
-and nothing that touches a filesystem.
-
-For a Rust integration, see the supported embedding boundary in
-[`docs/API.md`](docs/API.md).
-
-## In a Typst document
+For a local build and the test suite:
 
 ```sh
-./typst/build.sh                 # → typst/bgraph.wasm
+cargo build --locked --release
+cargo test --locked
 ```
 
-```typst
-#import "typst/bgraph.typ": bg-diagram, bg-diagram-file
-#bg-diagram-file(path("arch.bd"), width: 70%)
-```
+See [Installation](docs/guide/installation.md) for Rust requirements and
+optional PNG support. The browser playground is in
+[playground/](playground/README.md); the Typst package is in
+[typst/](typst/README.md).
 
-A diagram that does not parse **fails the build**, with the compiler's own
-message — which matches what `check` does and beats shipping a document with a
-hole where a diagram should be. See [`typst/README.md`](typst/README.md),
-including the two-command form that needs no plugin at all.
-
-## Export local sans les sources
-
-Pour préparer un dossier installable sur une autre machine sans distribuer le
-dépôt, lancez :
+The runtime gate compares the CLI, LSP, browser wasm, WASI, live preview,
+Typst and packaged VS Code renderer:
 
 ```sh
-./export.sh
+./tests/runtime/gate.sh --extensions
 ```
 
-Le dossier `export/` contient les binaires Linux, Windows x86_64 et Windows ARM64, le paquet VS Code,
-l'extension Zed et le module Typst. La compilation Windows doit être faite sur
-une machine disposant du linker Windows. Sous Linux, `export.sh` installe et
-utilise automatiquement `cargo-xwin` ; pour fournir vos propres exécutables,
-passez `--windows-bin-dir /chemin/vers/binaires-windows`.
-Sous Windows, l'installation de l'extension Zed se fait avec
-`export/zed/install.ps1`.
+It covers 22 fixtures, all 30 diagram types and four file contexts.
+It requires Node 24, Typst, `zip`/`unzip` and Rust's
+`wasm32-unknown-unknown` and `wasm32-wasip1` targets.
+Separate [VS Code](tests/runtime/vscode-host.sh) and
+[Zed](editors/zed/README.md#isolated-host-verification-linux) checks exercise
+real editor hosts with disposable profiles.
 
-## Other archetypes
+## Prepare an internal binary export
 
-`type`, declared once at the top of a file, picks the genre. `free` — nodes
-and edges — is the default; the others read the same statements as data.
+From the repository, `./export.sh` prepares an `export/` folder with Linux
+x86_64, Windows x86_64 and Windows ARM64 binaries, a VSIX, the Zed extension
+and the Typst module. It does not include the project source.
 
-```bgraph
-type pie { title: "Traffic sources" donut: 0.55 }
+Windows cross-compilation on Linux uses `cargo-xwin`, installed by the
+script when needed. To supply existing Windows binaries instead, use
+`--windows-bin-dir /path/to/windows/binaries`. Read `./export.sh --help`
+before building an export.
 
-node organic "Organic search" { value: 4820 }
-node direct  "Direct"         { value: 2410 }
-node paid    "Paid"           { value: 410 }
-```
+## License
 
-```bgraph
-type packet { title: "TCP header" width: 32 }
+[bgraph Noncommercial License 1.0](LICENSE) is written for this project.
 
-node sport "Source port"      { bits: 0 15 }
-node dport "Destination port" { bits: 16 31 }
-node seq   "Sequence number"  { bits: 32 63 }
-```
+**Noncommercial use is permitted:** personal work, study, research, hobby
+projects, and use inside a charity, school, public research body or government.
 
-Guided tour: [`docs/language.md`](docs/language.md).
-Exhaustive reference (generated from the compiler's own tables):
-[`docs/reference.md`](docs/reference.md).
-Worked examples: `bgraph init <genre>` prints a complete file for any of the
-29 specialised genres, plus `free`, and the reference reproduces every one of them. They live in
-`src/examples.rs`, so the crate needs no directory of sample files to build.
+**Commercial use requires a separate written agreement.** Use by or for a
+company in the course of its work is commercial, whether or not anything is sold.
 
-## Build
+**You may pass on an unchanged build** you received, free of charge and with
+the license, to someone whose use is also noncommercial.
 
-CI builds both binaries and the library without default features on Linux,
-macOS and Windows. These compilation jobs are separate from runtime parity.
-
-Run `./tests/runtime/gate.sh --extensions` to compare diagnostics and SVG bytes
-across the CLI, LSP, browser wasm, WASI, live preview, Typst and the packaged
-VS Code Markdown renderer, and build the Zed shim. This requires Node 24,
-Typst, `zip`/`unzip`, and Rust's `wasm32-unknown-unknown` and `wasm32-wasip1`
-targets; npm installs the VS Code language client when needed. Omit
-`--extensions` to check the library and compiler runtimes only. The gate also
-builds the library without default features and repeats native processes and
-fresh wasm instances to check deterministic output. It covers 17 focused
-fixtures, SVG parity for all 30 archetypes and four native file-context cases.
-
-`./tests/runtime/vscode-host.sh` additionally activates the extension in a real
-VS Code host and compares its diagnostics with the CLI. It requires VS Code
-and Xvfb and uses a temporary profile. The separate
-[`zed-host.py` check](editors/zed/README.md#isolated-host-verification-linux)
-loads the extension component and grammar in real Zed and compares its LSP
-diagnostics with the CLI, also with an isolated profile.
-
-```sh
-cargo build --release        # bgraph and bgraph-lsp
-cargo test
-./editors/zed/install.sh     # editor support
-```
-
-## Licence
-
-[bgraph Noncommercial License 1.0](LICENSE) — two pages, written for this
-project and meant to be read.
-
-**Noncommercial use is permitted**: personal work, study, research, hobby
-projects, and use inside a charity, a school, a public research body or a
-government. Running a shared instance for the people around you is use like
-any other and is covered.
-
-**Commercial use is not**, and needs a separate written agreement. Use by or
-for a company in the course of its own work is commercial, whatever the
-diagram is of and whether or not anything is sold.
-
-**You may pass on a build** you were given — unchanged, free, with the licence,
-to someone whose use is also noncommercial.
-
-**You may not change it, and the source is confidential.** Access to this
-repository is personal to whoever was given it, and carries no right to copy
-the source, publish it, or pass it on.
+**You may not modify it, and the source is confidential.** Repository access
+is personal and grants no right to copy, publish or pass on the source.
+Read [LICENSE](LICENSE) for the full terms.

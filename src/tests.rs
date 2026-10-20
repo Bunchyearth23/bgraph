@@ -2877,6 +2877,169 @@ fn three_sets_say_that_their_areas_are_indicative() {
     assert!(d.iter().any(|x| x.message.contains("indicative")), "{d:?}");
 }
 
+#[test]
+fn venn_fits_three_pairwise_areas_when_the_distances_form_a_triangle() {
+    let l = build(
+        "type venn { radius: 100 }\nset a 420\nset b 260\nset c 180\na -> b 120\na -> c 140\nb -> c 70",
+    );
+    for (a, b, shared) in [(0, 1, 120.0), (0, 2, 140.0), (1, 2, 70.0)] {
+        let (a, b) = (&l.nodes[a].rect, &l.nodes[b].rect);
+        let d = crate::math::hypot(a.cx() - b.cx(), a.cy() - b.cy());
+        let got = crate::charts::lens_area(a.w / 2.0, b.w / 2.0, d);
+        let want = std::f64::consts::PI * 100.0 * 100.0 * shared / 420.0;
+        assert!((got - want).abs() < want * 1e-9, "{got} vs {want}");
+    }
+}
+
+#[test]
+fn venn_pair_totals_are_named_and_kept_out_of_exclusive_regions() {
+    let l = build(
+        "type venn\nset a \"Developers\" 420\nset b \"Operations\" 260\nset c \"Architects\" 180\na -> b 120\na -> c 140\nb -> c 70",
+    );
+    let right = l
+        .nodes
+        .iter()
+        .map(|n| n.rect.right())
+        .fold(0.0_f64, f64::max);
+    for (pair, count) in [("A and B", "120"), ("A and C", "140"), ("B and C", "70")] {
+        let name = l
+            .annotations
+            .iter()
+            .find(|a| a.text == pair)
+            .expect("pair key");
+        let number = l
+            .annotations
+            .iter()
+            .find(|a| a.text == count)
+            .expect("pair total");
+        assert!(name.x > right && number.x > name.x);
+        assert_eq!(name.y, number.y);
+    }
+    assert!(
+        l.annotations
+            .iter()
+            .any(|a| a.text.contains("include the third set"))
+    );
+    assert!(
+        l.annotations
+            .iter()
+            .any(|a| a.text.contains("areas are indicative"))
+    );
+}
+
+#[test]
+fn venn_names_and_counts_do_not_overlap_even_with_long_labels_and_mixed_fonts() {
+    let source = "type venn { title: \"Long labels\" }\nset a \"Developers maintaining the public application programming interface\" 420\nset b \"Operations\" 260 { font: 42 \"Inter\" #111111 }\nset c \"Architects\" 180\na -> b 120\na -> c 140\nb -> c 70";
+    for size in [13.0, 42.0] {
+        let l = build(&source.replace("font: 42", &format!("font: {size}")));
+        assert!(
+            l.annotations
+                .iter()
+                .any(|a| a.text == "Developers maintaining")
+        );
+        assert!(
+            l.annotations
+                .iter()
+                .any(|a| a.text == "Operations" && a.size == size)
+        );
+        for (i, a) in l.annotations.iter().enumerate() {
+            for b in &l.annotations[i + 1..] {
+                let overlap = crate::labels::overlap(
+                    crate::labels::annotation_rect(a),
+                    crate::labels::annotation_rect(b),
+                );
+                assert!(
+                    overlap < 1e-8,
+                    "{} overlaps {} by {overlap}",
+                    a.text,
+                    b.text
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn venn_circle_keys_clear_the_outlines_and_each_other() {
+    for source in [
+        "type venn\nset a 100\nset b 100\na -> b 50",
+        "type venn\nset a 420\nset b 260\nset c 180\na -> b 120\na -> c 140\nb -> c 70",
+        "type venn\nset a 100\nset b 100\nset c 100\na -> b 100\na -> c 100\nb -> c 100",
+    ] {
+        let l = build(source);
+        let right = l
+            .nodes
+            .iter()
+            .map(|n| n.rect.right())
+            .fold(0.0_f64, f64::max);
+        let keys: Vec<_> = l.annotations.iter().filter(|a| a.x < right).collect();
+        assert_eq!(keys.len(), l.nodes.len(), "{source}");
+        for (i, key) in keys.iter().enumerate() {
+            let circle = &l.nodes[i].rect;
+            assert!(crate::math::hypot(key.x - circle.cx(), key.y - circle.cy()) < circle.w / 2.0);
+            for n in &l.nodes {
+                let d = crate::math::hypot(key.x - n.rect.cx(), key.y - n.rect.cy());
+                assert!(
+                    (d - n.rect.w / 2.0).abs() >= key.size,
+                    "{} crosses a circle",
+                    key.text
+                );
+            }
+            for other in &keys[i + 1..] {
+                assert_eq!(
+                    crate::labels::overlap(
+                        crate::labels::annotation_rect(key),
+                        crate::labels::annotation_rect(other)
+                    ),
+                    0.0
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn venn_degenerate_sets_keep_finite_geometry_and_readable_keys() {
+    for source in [
+        "type venn\nset a 100\nset b 100\na -> b 100",
+        "type venn\nset a 100\nset b 25\na -> b 25",
+        "type venn\nset a 100\nset b 0",
+        "type venn\nset a 0\nset b 0\nset c 0",
+        "type venn\nset a 100\nset b 100\nset c 100\na -> b 100\na -> c 100\nb -> c 100",
+        "type venn\nset a 100\nset b 100\nset c 100\na -> b 100\na -> c 50\nb -> c 50",
+        "type venn\nset a 100\nset b 100\nset c 100\na -> b 99\na -> c 99\nb -> c 1",
+    ] {
+        let l = build(source);
+        for n in &l.nodes {
+            assert!(
+                [n.rect.x, n.rect.y, n.rect.w, n.rect.h]
+                    .iter()
+                    .all(|n| n.is_finite())
+            );
+        }
+        for a in &l.annotations {
+            assert!(a.x.is_finite() && a.y.is_finite(), "{}", a.text);
+        }
+        assert!(l.annotations.iter().any(|a| a.text == "Set totals"));
+        assert!(l.annotations.iter().any(|a| a.text == "Shared members"));
+        let expected = crate::render_source(source).unwrap();
+        for _ in 0..3 {
+            assert_eq!(crate::render_source(source).unwrap(), expected);
+        }
+    }
+}
+
+#[test]
+fn venn_omitted_overlaps_are_zero_and_disjoint_sets_stay_disjoint() {
+    let l = build("type venn\nset a 100\nset b 100\nset c 100");
+    for (a, b) in [(0, 1), (0, 2), (1, 2)] {
+        let (a, b) = (&l.nodes[a].rect, &l.nodes[b].rect);
+        let d = crate::math::hypot(a.cx() - b.cx(), a.cy() - b.cy());
+        assert!(crate::charts::lens_area(a.w / 2.0, b.w / 2.0, d) < 1e-8);
+    }
+    assert_eq!(l.annotations.iter().filter(|a| a.text == "0").count(), 3);
+}
+
 // ---------------------------------------------------------------------- W-043
 
 #[test]

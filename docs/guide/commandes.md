@@ -1,10 +1,13 @@
-# Commandes et exports
+# Commands and exports
 
-Les commandes ci-dessous supposent que `architecture.bd` existe.
-L'aide de votre binaire reste accessible avec `bgraph --help` ou
-`bgraph <commande> --help`.
+These examples assume that you created `architecture.bd` in
+[Your first diagram](demarrage.md) and that your terminal is in its folder.
+Quote filenames or paths containing spaces.
 
-## Choisir le format
+Use `bgraph --help` or `bgraph <command> --help` to read the help supplied
+by your installed version.
+
+## Choose an output format
 
 ```sh
 bgraph architecture.bd -o architecture.svg
@@ -12,106 +15,121 @@ bgraph architecture.bd -o architecture.pdf
 bgraph architecture.bd -o architecture.json
 ```
 
-L'extension de sortie choisit le format. Sans `-o`, le fichier de sortie
-est `out.svg`.
+The output filename's extension selects the format. Without `-o`, the
+output is `out.svg` in the terminal's current folder. A render replaces
+an existing output file, so keep source and output filenames distinct.
 
-| Format | Usage |
+| Format | Use |
 |---|---|
-| SVG | Image vectorielle pour navigateur, documentation ou édition graphique |
-| PDF | Document vectoriel pour impression ou partage |
-| PNG | Image raster ; nécessite une compilation avec la feature `png` |
-| JSON | Géométrie résolue, destinée à l'inspection et aux intégrations |
+| SVG | A scalable image for a browser, documentation or graphics editor |
+| PDF | A vector document for printing or sharing |
+| PNG | A raster image; requires a build with the `png` feature |
+| JSON | Solved geometry for inspection and integrations |
 
-Le JSON de géométrie expose des détails d'inspection ; ne supposez pas que
-ses valeurs numériques ou l'ordre des éléments constituent un contrat d'API.
+Geometry JSON exposes inspection details. Numeric values and element order
+are not a stable API contract. This is separate from the stable diagnostic
+JSON returned by `check --json`.
 
-### PNG et résolution
+### PNG and resolution
 
-Après [activation du PNG](installation.md#activer-lexport-png) :
+After [enabling PNG](installation.md#optional-enable-png-output):
 
 ```sh
 bgraph architecture.bd -o architecture.png --scale 2
 ```
 
-`--scale` multiplie les dimensions raster. Il ne sert pas pour les sorties
-vectorielles.
+`--scale` multiplies raster dimensions. Vector exports have no raster
+resolution to choose.
 
-### Polices et impression
+### Fonts and printing
 
 ```sh
-bgraph architecture.bd -o architecture.svg --embed-font /chemin/Police.ttf
+bgraph architecture.bd -o architecture.svg --embed-font /path/to/Font.ttf
 bgraph architecture.bd -o architecture.pdf --page a4
 ```
 
-Le premier exemple embarque une police pour éviter qu'une autre machine
-ne lui substitue une police différente. Le second répartit un grand dessin
-sur des feuilles A4. `--page` accepte aussi `a3`, `letter` ou des dimensions
-en points, comme `600x800`.
+Replace `/path/to/Font.ttf` with a real TrueType font file. Embedding carries
+the selected font so another computer does not substitute its own.
+`--page a4` tiles a large drawing across A4 sheets. Other accepted values
+include `a3`, `letter` and sizes in points such as `600x800`.
 
-## Preview pendant l'édition
+## Preview while editing
 
 ```sh
-bgraph watch architecture.bd
-bgraph watch architecture.bd --port 7879
 bgraph watch architecture.bd --open --port 0
-bgraph watch architecture.svg
 ```
 
-Pour un fichier `.bd`, la preview reconstruit le diagramme à l'enregistrement.
-Pour un SVG, elle affiche l'image existante. Ouvrez l'adresse imprimée par
-la commande. Le viewer propose zoom, déplacement et, pour le source bgraph,
-inspection de la géométrie et du style.
+Leave the terminal running and save the source in your editor to update
+the drawing. Open the printed address if the browser does not open.
+The viewer offers pan, zoom and, for bgraph source, geometry/style inspection.
+Stop it with `Ctrl+C` in that terminal.
 
-`--open` ouvre le navigateur après démarrage du serveur. `--port 0` choisit
-un port libre et affiche l'adresse utilisée. Si le navigateur ne peut pas
-être lancé, la preview reste accessible à cette adresse. `--open` concerne
-les fichiers `.bd` et `.svg`, pas la génération d'un dossier.
-
-## Construire tout un dossier
+You can choose a fixed port or view an existing SVG instead:
 
 ```sh
-bgraph watch schemas --out images
-bgraph watch schemas --out images --once
+bgraph watch architecture.bd --port 7879
+bgraph watch architecture.svg --open --port 0
 ```
 
-En mode dossier, `watch` est une boucle de génération des SVG.
-`--once` construit puis termine, avec un code de sortie non nul si un
-fichier échoue. Cette forme convient à une étape de build.
+Without `--port`, the port is 7878. `--port 0` chooses a free port.
+`--open` opens the browser after the server starts. If opening fails,
+the server stays available at the printed URL. The watcher updates its
+served preview; it does not overwrite an exported image.
 
-## Vérifier et formater
+## Build a whole folder
+
+```sh
+bgraph watch diagrams --out images
+bgraph watch diagrams --out images --once
+```
+
+Create `diagrams` and put your `.bd` files there first. In folder mode,
+`watch` runs an SVG build loop. `--once` builds once and exits with a nonzero
+status if any file fails. `--open` is not available in folder mode.
+
+## Check and format
 
 ```sh
 bgraph check architecture.bd
 bgraph check architecture.bd --ci
 bgraph check architecture.bd --json
-bgraph fmt architecture.bd
 bgraph fmt architecture.bd --check
 ```
 
-`check --ci` produit des lignes `fichier:ligne:colonne: …`.
-`check --json` produit un tableau JSON stable pour l'automatisation.
-Une erreur donne un code de sortie non nul ; les avertissements seuls
-ne font pas échouer `check`.
+`check --ci` prints `file:line:column: severity: message`.
+`check --json` prints a stable JSON array for automation. An error gives
+a nonzero exit status; warnings alone do not make `check` fail.
 
-`fmt` réécrit le fichier. `fmt --check` signale les différences sans modifier
-le source. `fmt --migrate` traite l'ancienne propriété `opacity` ; il ne
-convertit pas les anciens placements en ligne vers le langage `layout`.
+`fmt --check` reports formatting differences without changing the file.
+To rewrite it in canonical format:
 
-## Comprendre et comparer
+```sh
+bgraph fmt architecture.bd
+```
+
+`fmt --migrate` handles the old `opacity` property. It does not convert
+old inline placements into the current `layout` language.
+
+## Explain and compare
 
 ```sh
 bgraph explain architecture.bd api
-bgraph diff avant.bd apres.bd -o changements.svg
 bgraph layout architecture.bd --check
 ```
 
-`explain` décrit un élément et la provenance de son style.
-`diff` représente les ajouts, retraits et déplacements en rapprochant
-les identifiants des deux versions.
-`layout` peut expliciter les placements implicites dans le fichier ;
-sa variante `--check` ne l'écrit pas.
+`explain` describes an element and the source of its styles.
+`layout` makes implicit placements explicit in the source; `--check`
+checks whether that would be necessary without writing the file.
 
-## Générer la référence et le vocabulaire
+Given two saved versions, compare them by matching identifiers:
+
+```sh
+bgraph diff before.bd after.bd -o changes.svg
+```
+
+The image shows additions, removals and movement.
+
+## Generate reference material
 
 ```sh
 bgraph docs -o reference.md
@@ -119,5 +137,5 @@ bgraph schema -o schema.json
 bgraph completions bash > bgraph.bash
 ```
 
-La référence et le schéma sont générés à partir du vocabulaire du compilateur.
-La commande `completions` demande la feature du même nom, activée par défaut.
+The manual and vocabulary schema come from the compiler's tables.
+`completions` requires the feature of the same name, enabled by default.

@@ -738,9 +738,10 @@ tor -> proc02 "" "10 GbE"
 tor -> shelf  "" "10 GbE" { from: bottom to: left }
 "##;
 
-const VENN: &str = r##"// Three sets. With two the lens is *solved* to the number written; with three
-// the overlaps are labelled but arranged, and `check` says so — three circles
-// cannot honour all seven regions at once (W-053).
+const VENN: &str = r##"// Two sets have an exact lens area. Three sets fit the pairwise areas when
+// possible, but remain indicative: the seven regions are not solved.
+// A/B/C identify the sets. The key lists totals and named pairwise overlaps;
+// a pair's total includes members also in the third set. Omitted links mean 0.
 //
 // **On a white surface on purpose**, and one of only two examples that is
 // (`Q-006`). A Venn is read through its overlaps, which are translucent fills

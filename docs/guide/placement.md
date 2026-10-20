@@ -1,15 +1,18 @@
-# Placer les éléments
+# Place and group elements
 
-## Déclarer, puis placer
+Start with [Your first diagram](demarrage.md) if `node` and `layout` are
+new to you. This page explains how to control positions in a larger drawing.
 
-Les déclarations décrivent ce qui existe. Un bloc `layout` décrit les
-positions. Il est accepté dans les types `free`, `class`, `block`, `er`,
-`state`, `harness`, `bpmn`, `network` et `requirements`.
+## Declare elements, then place them
+
+Declarations describe what exists. A `layout` block describes where it goes.
+It is supported by `free`, `class`, `block`, `er`, `state`, `harness`,
+`bpmn`, `network` and `requirements`.
 
 ```bgraph
-node ui "Interface"
+node ui "User interface"
 node api "API"
-node db "Stockage"
+node db "Storage"
 
 layout {
   place ui at (0, 0)
@@ -21,69 +24,32 @@ ui -> api
 api -> db
 ```
 
-`at (x, y)` désigne le coin supérieur gauche de l'élément. Les coordonnées
-augmentent vers la droite et vers le bas. Les distances sont exprimées dans
-les unités du dessin ; le [mode grille](language.md#a-grid) est décrit
-dans le tour complet du langage.
+`at (x, y)` addresses the element's top-left corner. Coordinates increase
+to the right and downward. Distances use drawing units. See
+[the grid](language.md#a-grid) for cell-based coordinates.
 
-| Relation | Effet |
+| Instruction | Effect |
 |---|---|
-| `right-of api` | À droite de `api` |
-| `left-of api` | À gauche |
-| `below api` | En dessous |
-| `above api` | Au-dessus |
-| `gap 40` | Espace entre les bords des éléments |
-| `align top` | Alignement transversal pour un placement horizontal |
-| `align left` | Alignement transversal pour un placement vertical |
+| `right-of api` | Place to the right of `api` |
+| `left-of api` | Place to its left |
+| `below api` | Place below it |
+| `above api` | Place above it |
+| `gap 40` | Leave space between the elements' borders |
+| `align top` | Align top edges during horizontal placement |
+| `align left` | Align left edges during vertical placement |
 
-Sans précision, l'alignement transversal est centré. Un élément sans
-placement suit le flux implicite du fichier (`graph { flow: right gap: 40 }`).
-Déclarez son ancrage quand sa position a un sens particulier.
+Without an explicit alignment, relative placement centers the elements
+across the direction of travel. An element without a placement follows
+the file's implicit flow, for example `graph { flow: right gap: 40 }`.
+Declare a relationship when the element's position matters.
 
-## Éviter le chevauchement des libellés
-
-En BPMN, les événements et les losanges portent leur texte à l'extérieur.
-Le placement cherche une position libre près de la forme, en évitant les
-flux, les autres formes, les libellés et les titres de groupes. Un flux
-vertical sous un losange fait ainsi passer sa légende à côté du trait.
-
-Les placements relatifs réservent aussi l'empreinte de cette légende, en
-plus de `gap` et des marges. Les cadres englobent le texte à sa position
-retenue. Les coordonnées `at` et les alignements explicites continuent à
-désigner les bords visibles des formes.
-
-Les libellés de liens cherchent une place libre près du milieu de leur
-segment, aussi bien le long du trait que de chaque côté. Ils prennent en
-compte les annotations et les titres des groupes dans tous les genres
-qui utilisent le routeur commun.
-
-Pour choisir une position précise :
-
-```bgraph
-gateway decision "Valider ?" exclusive { label-offset: 24 0 }
-```
-
-Pour choisir simplement le côté d'une légende BPMN :
-
-```bgraph
-event recu "Message reçu" start message { label-position: right }
-```
-
-`label-position` accepte `top`, `right`, `bottom` ou `left`, uniquement sur
-les événements et les gateways BPMN. Ce côté reste fixe ; `label-offset`
-peut ajouter un ajustement. Sans ces propriétés, le placement reste automatique.
-
-Un `label-offset` explicite fixe le libellé BPMN ou le texte du lien. Si
-l'espace disponible reste insuffisant, un avertissement signale la collision :
-augmentez le `gap`, ajoutez des marges ou ajustez ce décalage.
-
-## Faire une rangée ou une colonne
+## Make a row or column
 
 ```bgraph
 node api "API"
 node cache "Cache"
-node db "Base"
-node audit "Journal"
+node db "Database"
+node audit "Audit log"
 
 layout {
   place api at (0, 0)
@@ -92,12 +58,12 @@ layout {
 }
 ```
 
-Le premier élément sert d'ancrage. Les suivants reçoivent leur placement
-de la rangée ou de la colonne : ne leur ajoutez pas un second `place`.
+The first element anchors the row or column. The others receive their
+placement from that instruction; do not give them a second `place`.
 
-## Harmoniser les dimensions
+## Match sizes and align edges
 
-Ajoutez les relations dans le même bloc `layout` :
+Add these instructions inside an existing `layout` block:
 
 ```text
 equal-width api cache db
@@ -105,13 +71,14 @@ equal-height api cache db
 align top api cache db
 ```
 
-Les tailles égales préservent la place nécessaire au plus grand libellé.
-`equal-width` et `equal-height` acceptent également des groupes, et peuvent
-mélanger nœuds et groupes. Leur taille doit toujours contenir leurs éléments.
-Pour un alignement, `top`, `bottom` et `center-y` concernent l'axe vertical ;
-`left`, `right` et `center-x` concernent l'axe horizontal.
+Equal sizes preserve the room needed by the largest label.
+`equal-width` and `equal-height` also accept groups, including a mixture
+of nodes and groups. A group must still contain its children.
 
-## Regrouper une partie du schéma
+For alignment, `top`, `bottom` and `center-y` control the vertical axis;
+`left`, `right` and `center-x` control the horizontal axis.
+
+## Group part of a drawing
 
 ```bgraph
 group backend "Backend" {
@@ -124,7 +91,7 @@ group backend "Backend" {
   }
 }
 
-node db "Base"
+node db "Database"
 layout {
   place backend at (0, 0)
   place db right-of backend gap 60
@@ -133,49 +100,78 @@ layout {
 api -> db
 ```
 
-Le groupe s'ajuste à son contenu. Le déplacer déplace son sous-arbre.
-Un bloc `layout` local adresse les membres directs de son groupe.
+A group sizes itself around its contents. Moving it moves its subtree.
+A `layout` block inside a group addresses that group's direct members.
 
-Vous pouvez imposer `width`, `height` ou `size` à un groupe. Par exemple,
-`group pool "Pool" { width: 600 … }` réserve réellement 600 unités. Un
-contenu trop grand provoque une erreur de contraintes.
+You can require a group's `width`, `height` or `size`. For example,
+`group pool "Pool" { width: 600 … }` reserves 600 drawing units.
+If the contents cannot fit, the size requirement produces a constraint error.
 
-En BPMN, un groupe dont les membres directs sont tous des groupes forme une
-pool de lanes. Ces lanes partagent sa largeur intérieure, après déduction
-du `padding` de la pool et de leurs marges. Le parent est dessiné avant ses
-enfants. La couche commune `style node` s'applique aussi aux groupes ;
-utilisez `style group { fill: none }` pour des cadres transparents, et
-`style task { size: 176 74 }` pour dimensionner seulement les tâches.
+In BPMN, a group whose direct members are all groups forms a pool of lanes.
+Those lanes fill its inner width after pool padding and lane margins are
+deducted. The parent is painted before its children. The common
+`style node` layer also applies to groups. Use
+`style group { fill: none }` for transparent frames and
+`style task { size: 176 74 }` to size tasks alone.
 
-## Flux BPMN et ports
+## Leave room for labels
 
-Les flux de séquence sortant d'un événement de bordure s'éloignent d'abord
-de la tâche hôte. Les ports automatiques d'une tâche évitent ses événements
-attachés ; les associations et messages ne décalent pas ses ports de séquence.
-Les avertissements sur les débuts et fins de processus comptent uniquement
-les flux de séquence, y compris `default` et `conditional`.
+In BPMN, events and gateways carry their labels outside their shapes.
+Automatic placement looks for nearby room while avoiding flows, other shapes,
+labels and group titles. For example, a vertical flow below a gateway can
+move its caption beside the line.
 
-Le routeur `ortho` évite les boîtes, les légendes extérieures et les titres de
-groupes, même au-delà de 60 obstacles. Les ports et les points `via` font
-partie de sa recherche. Une route impossible reste visible et s'accompagne
-d'un avertissement ; un `via` impossible ne devient pas une diagonale.
+Relative placements reserve the caption's footprint as well as the gap
+and margins. Frames include the caption at its chosen position. Explicit
+`at` coordinates and alignments still refer to visible shape borders.
 
-Une largeur fixe fait passer les étiquettes de nœuds à la ligne. Si une hauteur
-fixe ou une largeur trop petite empêche encore le texte de tenir, un
-avertissement indique l'élément concerné.
+Edge labels look for room near the middle of a segment, both along it and
+on either side. They also account for annotations and group titles in
+diagram types using the shared router.
 
-## Comprendre un placement inattendu
+Within a `type bpmn` file, these declarations choose a caption position:
+
+```text
+gateway decision "Approve?" exclusive { label-offset: 24 0 }
+event received "Message received" start message { label-position: right }
+```
+
+`label-position` accepts `top`, `right`, `bottom` or `left` on BPMN events
+and gateways only. The chosen side remains fixed; `label-offset` can add
+a further adjustment. Without either property, placement is automatic.
+
+An explicit `label-offset` fixes a BPMN caption or edge label in place.
+If there is still insufficient room, a warning reports the collision.
+Increase the gap, add margins or adjust the offset.
+
+## BPMN flows and ports
+
+Sequence flows leaving a boundary event first move away from its host task.
+Automatic task ports avoid attached boundary events; associations and
+messages do not shift its sequence-flow ports. Start/end warnings count
+sequence flows, including `default` and `conditional` flows.
+
+The `ortho` router avoids boxes, outside captions and group titles,
+including diagrams with more than 60 obstacles. Ports and `via` waypoints
+take part in its search. An impossible route remains visible with a warning;
+an unreachable `via` does not silently turn into a diagonal.
+
+A fixed width wraps node labels. If a fixed height or very small width still
+prevents the text from fitting, a warning identifies the element.
+
+## Understand an unexpected position
 
 ```sh
 bgraph explain architecture.bd api
 ```
 
-La commande explique la géométrie et l'origine du style de l'élément.
-La preview expose aussi ces informations dans son inspecteur.
-Un chevauchement est signalé ; bgraph ne décide pas à votre place dans
-quelle direction déplacer les boîtes.
+This explains the element's geometry and where its style values came from.
+The browser preview's inspector exposes this information too.
 
-!!! note "Les graphiques calculent leur géométrie"
-    Les types comme `pie`, `packet` ou `gantt` refusent les blocs `layout`.
-    Utilisez leurs données et leurs réglages de genre pour agir sur le rendu.
-    Voir [choisir un type](graphiques.md).
+bgraph reports overlaps and contradictory requirements. If a drawing needs
+more space, change the relationships or gaps in the source.
+
+!!! note "Charts calculate their positions"
+    Types such as `pie`, `packet` and `gantt` reject `layout` blocks.
+    Use their data and type settings instead.
+    See [Choose a diagram type](graphiques.md).

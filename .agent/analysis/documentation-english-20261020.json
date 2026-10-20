@@ -1,0 +1,265 @@
+{
+  "readme_and_guide_examples": [
+    {
+      "page": "README.md",
+      "block": 1,
+      "exit": 0
+    },
+    {
+      "page": "README.md",
+      "block": 2,
+      "exit": 0
+    },
+    {
+      "page": "docs/guide/composition.md",
+      "block": 1,
+      "exit": 0
+    },
+    {
+      "page": "docs/guide/demarrage.md",
+      "block": 1,
+      "exit": 0
+    },
+    {
+      "page": "docs/guide/demarrage.md",
+      "block": 2,
+      "exit": 0
+    },
+    {
+      "page": "docs/guide/depannage.md",
+      "block": 1,
+      "exit": 0
+    },
+    {
+      "page": "docs/guide/editeurs.md",
+      "block": 1,
+      "exit": 0
+    },
+    {
+      "page": "docs/guide/graphiques.md",
+      "block": 1,
+      "exit": 0
+    },
+    {
+      "page": "docs/guide/graphiques.md",
+      "block": 2,
+      "exit": 0
+    },
+    {
+      "page": "docs/guide/placement.md",
+      "block": 1,
+      "exit": 0
+    },
+    {
+      "page": "docs/guide/placement.md",
+      "block": 2,
+      "exit": 0
+    },
+    {
+      "page": "docs/guide/placement.md",
+      "block": 3,
+      "exit": 0
+    },
+    {
+      "page": "docs/guide/styles.md",
+      "block": 1,
+      "exit": 0
+    },
+    {
+      "page": "docs/guide/styles.md",
+      "block": 2,
+      "exit": 0
+    },
+    {
+      "page": "docs/guide/styles.md",
+      "block": 3,
+      "exit": 0
+    },
+    {
+      "page": "docs/guide/styles.md",
+      "block": 4,
+      "exit": 0
+    },
+    {
+      "page": "docs/guide/styles.md",
+      "block": 5,
+      "exit": 0
+    }
+  ],
+  "print_manual_examples": [
+    {
+      "block": 0,
+      "exit": 0
+    },
+    {
+      "block": 3,
+      "exit": 0
+    },
+    {
+      "block": 4,
+      "exit": 0
+    },
+    {
+      "block": 5,
+      "exit": 0
+    },
+    {
+      "block": 7,
+      "exit": 0
+    },
+    {
+      "block": 8,
+      "exit": 0
+    },
+    {
+      "block": 9,
+      "exit": 0
+    },
+    {
+      "block": 11,
+      "exit": 0
+    }
+  ],
+  "composition_and_export_checks": [
+    {
+      "args": [
+        "application.bd",
+        "-o",
+        "application.svg"
+      ],
+      "exit": 0
+    },
+    {
+      "args": [
+        "system.bd",
+        "-o",
+        "system.svg"
+      ],
+      "exit": 0
+    },
+    {
+      "args": [
+        "components.bd",
+        "-o",
+        "components.svg"
+      ],
+      "exit": 0
+    },
+    {
+      "args": [
+        "sales.bd",
+        "-o",
+        "sales.svg"
+      ],
+      "exit": 0
+    },
+    {
+      "args": [
+        "traffic.bd",
+        "-o",
+        "traffic.svg",
+        "--set",
+        "year=2026",
+        "--set",
+        "organic=4820",
+        "--set",
+        "direct=2410",
+        "--set",
+        "referral=1180"
+      ],
+      "exit": 0
+    },
+    {
+      "args": [
+        "traffic.bd",
+        "--data",
+        "traffic.json",
+        "-o",
+        "traffic.svg"
+      ],
+      "exit": 0
+    },
+    {
+      "args": [
+        "traffic.bd",
+        "--data",
+        "traffic.json",
+        "--emit"
+      ],
+      "exit": 0
+    },
+    {
+      "scenario": "isolated export README generation",
+      "passed": true
+    }
+  ],
+  "rust_reference_checks": [
+    {
+      "test": "the_reference_manual_is_up_to_date",
+      "exit": 0
+    },
+    {
+      "test": "reference_and_machine_schema_expose_the_same_geometry_contract",
+      "exit": 0
+    },
+    {
+      "test": "every_archetype_shows_a_complete_file",
+      "exit": 0
+    },
+    {
+      "test": "the_generated_reference_lists_the_completions_command",
+      "exit": 0
+    },
+    {
+      "test": "every_diagram_in_the_documentation_still_works",
+      "exit": 0
+    },
+    {
+      "test": "every_public_document_uses_the_same_genre_count",
+      "exit": 0
+    }
+  ],
+  "site": {
+    "html_pages": 18,
+    "local_links_and_assets": 1124,
+    "search_languages": [
+      "en"
+    ],
+    "gallery_sources": 30
+  },
+  "additional_rust_tests_passed": [
+    "the_readme_onboarding_uses_supported_commands_and_examples",
+    "the_editor_guide_points_at_paths_that_exist",
+    "every_editor_the_repository_ships_is_in_the_guide"
+  ],
+  "tutorial_workflow": {
+    "validation": true,
+    "svg_pdf_json_exports": true,
+    "unknown_node_error": true,
+    "watch_actual_browser_url_and_reload": true,
+    "browser_opener": "recording stub"
+  },
+  "browser": {
+    "home": true,
+    "installation": true,
+    "first_diagram": true,
+    "editor_setup": true,
+    "english_search_results": true,
+    "gallery_download_links": 30
+  },
+  "manual": {
+    "pages": 22,
+    "compile_exit": 0,
+    "contact_sheet_reviewed": true,
+    "changed_pages_reviewed": true,
+    "final_cover_reviewed": true,
+    "sha256": "1a6e7ec102befb8208d4396843cdd2a346afadae21db51531cf135416268b29f"
+  },
+  "shared_style_namespace_limit": {
+    "without_root_palette_exit": 1,
+    "with_root_palette_exit": 0,
+    "risk": "X-032",
+    "workaround_documented": true
+  },
+  "index_existing_ids_and_state_date_prefixes_preserved": true
+}

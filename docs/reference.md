@@ -4,12 +4,12 @@
 
 Diagrams as text, where **you** decide the layout.
 
-Mermaid and friends auto-place everything and leave you fighting the engine.
-`bgraph` inverts that: every node says where it goes, but says it *relative to
-its neighbours* — so you keep control without hand-editing coordinates every
-time the diagram grows.
+bgraph reads a plain text `.bd` file and produces a diagram. For declared
+geometry, a `layout` block gives positions and relationships between elements.
+Charts calculate geometry from their data.
 
 - A prose introduction lives in [`../README.md`](../README.md).
+- New users can follow [Your first diagram](guide/demarrage.md).
 - A worked tour of the syntax lives in [`language.md`](language.md).
 - **This file is the exhaustive reference**, generated from the compiler's own
   tables, so it always describes the binary you have.
@@ -63,19 +63,20 @@ the server has bound its port. `--port 0` lets the OS choose a free port; the
 actual address is printed. If the browser cannot be opened, the server stays
 available at that address. `--open` is not supported for directory builds.
 
-## The five statements
+## Declarations and layout
 
 ```
 type <archetype> { … }      // the genre of diagram; optional, defaults to free
 graph { … }                 // diagram-wide settings
 style <name> [extends <name>] { … }
-group <id> ["<label>"] [.class …] [<placement>] { … }
+group <id> ["<label>"] [.class …] { … }
 activate <id> { … }         // type sequence: a bar down an existing lifeline
-<keyword> <id> ["<label>"] <data…> [.class …] [<placement>] { … }
+<keyword> <id> ["<label>"] <data…> [.class …] { … }
 <id> <arrow> <id> ["<label>"] [.class …] { … }
+layout { place <id> <position> }
 ```
 
-The fourth is an **item**, and each archetype has its own word for it —
+An **item** is an element, and each archetype has its own word for it —
 `node` in `free`, `slice` in `pie`, `field` in `packet`. `node` stays a
 universal synonym everywhere, so nothing is ever forced.
 
@@ -99,8 +100,8 @@ with `//` — `#` is reserved for hex colors and cannot also open a comment.
 
 Identifiers may contain letters, digits, `_` and an interior `-`. A trailing
 hyphen is not allowed, which is what lets `a->b` split into three tokens.
-The four statement keywords — `type`, `graph`, `style`, `node` — are reserved
-and cannot name a node.
+Use descriptive identifiers such as `api` or `database`. The parser reports
+names that are invalid in their context.
 
 Labels are quoted. `\n` splits a label into centred lines; `\t` and `\"` also
 work. A node with no label falls back to its identifier. Label text is
@@ -1637,7 +1638,7 @@ j1 -> j2 "sig B"          4 4
 
 ### `type venn`
 
-Overlapping sets. Two or three of them: with two, the lens is solved so its **area** is the number you wrote; with three the overlaps are labelled but arranged rather than solved, because three circles cannot in general honour all seven regions at once. Four is refused rather than drawn wrongly.
+Overlapping sets. Two or three of them: with two, the lens is solved so its **area** is the number you wrote. With three, pairwise areas are fitted when possible, but the seven regions are not solved and the areas remain indicative. A color key identifies each set and its total; a separate key names each pair's shared count, including members of the third set. Omitted links mean zero shared members. Four sets are refused.
 
 Geometry: `archetype-managed`.
 
@@ -1659,15 +1660,16 @@ On a `set` — these are its own, and are not offered elsewhere:
 | Property | Where | Syntax | Meaning |
 |---|---|---|---|
 | `count` | node | `count: <number>` | How many things are in the set. Not `size`, which is on the shared table and means a box's width and height. Usually written positionally — `set rust "Rust" 120`. |
-| `shared` | edge | `shared: <number>` | How many things two sets have in common, written on a link between them — `rust -> embedded 30`. With two sets the lens is solved to that exact area; with three it is labelled but not solved, because three circles cannot in general be arranged to honour all seven regions at once. |
+| `shared` | edge | `shared: <number>` | How many things two sets have in common, written on a link between them — `rust -> embedded 30`. With two sets the lens is solved to that exact area. With three, pairwise areas are fitted when possible; otherwise the arrangement is schematic. The key names each pair and its total, including any members also in the third set. Omitted links mean zero shared members. |
 
 <details>
 <summary>A complete file — <code>bgraph init venn</code></summary>
 
 ```
-// Three sets. With two the lens is *solved* to the number written; with three
-// the overlaps are labelled but arranged, and `check` says so — three circles
-// cannot honour all seven regions at once (W-053).
+// Two sets have an exact lens area. Three sets fit the pairwise areas when
+// possible, but remain indicative: the seven regions are not solved.
+// A/B/C identify the sets. The key lists totals and named pairwise overlaps;
+// a pair's total includes members also in the third set. Omitted links mean 0.
 //
 // **On a white surface on purpose**, and one of only two examples that is
 // (`Q-006`). A Venn is read through its overlaps, which are translucent fills
@@ -2498,6 +2500,14 @@ than accepting the file and failing to draw it.
 `bgraph-lsp` speaks LSP over stdin/stdout with no arguments, so any client can
 use it. A Zed extension is packaged in [`../editors/zed`](../editors/zed)
 together with a tree-sitter grammar.
+
+VS Code is packaged in [`../editors/vscode`](../editors/vscode). Its
+`Ctrl+Shift+V` preview (`Cmd+Shift+V` on macOS) renders the current buffer,
+including unsaved changes, through the bundled WASM renderer. Self-contained
+source is required; use `bgraph watch` for `include` or external `from:` files.
+Zed's native `bgraph: Preview` task saves the file and opens that browser
+watcher. Open the containing folder as a project and add the supplied keymap
+entry for `Ctrl+Shift+V`. See the [editor setup guide](guide/editeurs.md).
 
 It provides diagnostics, go-to-definition from any reference to its
 declaration, a symbol outline, hover (a property's syntax and meaning, a

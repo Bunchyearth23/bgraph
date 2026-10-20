@@ -1,101 +1,46 @@
-# Zed et VS Code
+# Use VS Code or Zed
 
-Le serveur **`bgraph-lsp`** est commun aux éditeurs. Il apporte diagnostics,
-complétion contextuelle, survol, navigation vers les déclarations et plan du
-document. Installez-le avec le CLI et rendez-le accessible dans le `PATH`.
+An editor extension adds syntax colors, suggestions and error highlighting.
+You can still follow the [first tutorial](demarrage.md) with any plain text
+editor and `bgraph watch`.
 
-## Saisir plus vite
+The two extensions share **`bgraph-lsp`**, the language-server command.
+It supplies diagnostics, completion, hover information, navigation and
+document formatting. The extensions and the command-line tools are
+installed separately.
 
-- Dans `layout`, la complétion propose les six instructions de placement,
-  puis les identifiants disponibles dans le groupe courant.
-- Les snippets proposent des choix d'identifiants et des coordonnées
-  numériques, comme `at (0, 0)`. Utilisez `Tab` pour parcourir les champs.
-- Après un placement relatif, complétez l'ancre, `gap` et `align`.
-  Les axes proposés dépendent de la direction du placement.
-- L'aide aux paramètres accompagne les coordonnées, les rangées, les
-  colonnes et les alignements, même pendant une instruction incomplète.
-- La commande de formatage du document de l'éditeur utilise le formateur
-  bgraph. Un source qui ne se parse pas reste inchangé.
+## Choose your preview
 
-Les suggestions restent silencieuses dans les chaînes et les commentaires.
-Après une mise à jour de `bgraph-lsp`, redémarrez le serveur de langage dans
-l'éditeur pour charger le nouvel exécutable et ses capacités.
-
-## Zed
-
-### Depuis le dépôt
-
-À la racine du dépôt :
-
-```sh
-./editors/zed/install.sh
-```
-
-Le script installe le CLI et le serveur, puis prépare la grammaire. Il peut
-créer un commit des fichiers de grammaire régénérés et actualise la révision épinglée
-dans le manifeste de l'extension.
-
-Dans Zed, ouvrez la palette des commandes (`Ctrl+Shift+P` ou `Cmd+Shift+P`),
-lancez **zed: install dev extension** et choisissez le dossier `editors/zed`.
-Ouvrez ensuite un fichier `.bd`.
-
-Pour un dossier d'export reçu séparément, utilisez l'installateur Zed fourni
-avec ce paquet (`install.sh` ou `install.ps1`), puis les instructions qu'il
-affiche.
-
-### Preview et Ctrl+Shift+V
-
-L'extension fournit la tâche **bgraph: Preview** pour le fichier `.bd`
-courant. Ouvrez dans Zed le dossier qui contient ce fichier, puis le `.bd` :
-sur l'hôte vérifié, une fenêtre contenant seulement un fichier isolé ne
-propose pas la tâche de langue. La tâche sauvegarde ce fichier, démarre la
-preview sur un port libre et ouvre le navigateur. Lancez-la avec **task: spawn**,
-puis sélectionnez **bgraph: Preview**. Pour lui associer `Ctrl+Shift+V`, ajoutez l'entrée de
-`editors/zed/keymap.json` à votre keymap Zed (**zed: open keymap**).
-Le raccourci est limité aux éditeurs bgraph.
-
-La tâche fournie utilise la syntaxe des shells Linux/macOS. Pour PowerShell,
-le README de l'extension Zed donne l'argument à adapter dans une tâche de
-projet ; cette variante n'a pas été testée dans un hôte Windows.
-
-La commande équivalente est :
-
-```sh
-bgraph watch architecture.bd --open --port 0
-```
-
-L'adresse choisie est affichée dans le terminal de la tâche. Les sauvegardes
-actualisent le dessin, y compris celles des fichiers inclus ; une inclusion
-non sauvegardée conserve sa version sur disque. Arrêtez la tâche depuis son
-terminal pour fermer le serveur. Relancer une tâche déjà active ne crée pas
-une deuxième instance concurrente.
-
-La preview s'affiche dans le navigateur. L'API d'extension de Zed n'expose
-actuellement pas le volet personnalisé nécessaire à une preview native ;
-l'aperçu Markdown de Zed n'est pas étendu.
-
-### Le serveur est introuvable
-
-Ajoutez son chemin dans les réglages Zed :
-
-```json
-{
-  "lsp": {
-    "bgraph-lsp": {
-      "binary": { "path": "/chemin/vers/bgraph-lsp" }
-    }
-  }
-}
-```
-
-Sous Windows, utilisez le chemin vers `bgraph-lsp.exe`.
-`zed --foreground` permet de consulter les erreurs de chargement.
+| | VS Code | Zed |
+|---|---|---|
+| Where the preview appears | A pane beside the source | Your default browser |
+| When it updates | While you type, including unsaved text | When files are saved |
+| Shortcut | `Ctrl+Shift+V`; `Cmd+Shift+V` on macOS | `Ctrl+Shift+V` after adding the keymap entry |
+| CLI required for preview | No; the renderer is bundled | Yes; an updated `bgraph` on `PATH` |
+| `include` and external `from:` files | Use the browser watcher instead | Supported through the watcher, using saved files |
 
 ## VS Code
 
-### Préparer et installer le VSIX
+### 1. Install the extension
 
-Depuis la racine du dépôt, avec Node/npm, `zip` et la cible Rust wasm :
+If you received a `.vsix` file:
+
+1. Open VS Code's **Extensions** view.
+2. Open its `…` menu and choose **Install from VSIX…**.
+3. Select the supplied `bgraph-<version>.vsix` file.
+4. Reload VS Code if it asks.
+
+If the `code` command is installed, the terminal equivalent is:
+
+```sh
+code --install-extension /path/to/bgraph-1.0.0.vsix --force
+```
+
+Replace the example path with your actual package path. The extension is
+installed locally from that file.
+
+To build a package from the repository, use a Bash terminal at the repository
+root with Node/npm, `zip` and the Rust WebAssembly target available:
 
 ```sh
 rustup target add wasm32-unknown-unknown
@@ -103,53 +48,162 @@ rustup target add wasm32-unknown-unknown
 code --install-extension editors/vscode/bgraph-1.0.0.vsix --force
 ```
 
-Adaptez le nom du VSIX à la version produite par le script. Si vous avez
-reçu un VSIX déjà construit, installez directement ce fichier.
-Le réglage `bgraph.server.path` permet de préciser le chemin du LSP
-lorsqu'il n'est pas sur le `PATH`.
+Use the filename produced by the script if its version differs.
 
-### Preview directe d'un fichier .bd
+### 2. Open a source file and preview it
 
-Dans un éditeur bgraph, pressez **`Ctrl+Shift+V`** (`Cmd+Shift+V` sur macOS),
-ou lancez **bgraph: Open Preview** depuis la palette. Un volet s'ouvre à côté
-du source et s'actualise pendant la saisie, sans enregistrer le fichier.
-Les buffers bgraph sans nom sont aussi acceptés. Rappeler la commande sur
-le même document réutilise son volet ; chaque document garde sa propre preview.
-Les erreurs de syntaxe ou de rendu s'affichent dans le volet.
+Open `architecture.bd` from the tutorial. Its language mode should be
+**bgraph**. If it is plain text, use the language selector in VS Code's
+status bar to choose bgraph.
 
-Le renderer wasm est fourni dans le VSIX, sans CLI à installer pour cette
-preview. Le LSP reste indépendant. Les sources doivent être autonomes :
-`include` et les fichiers `from:` ne sont pas résolus par ce renderer.
-Pour une preview multifichier, utilisez `bgraph watch fichier.bd --open`.
+Keep the source editor focused and press **`Ctrl+Shift+V`**
+(**`Cmd+Shift+V`** on macOS). You can also open the command palette and run
+**bgraph: Open Preview**.
 
-### Dessiner dans une page Markdown
+A pane opens beside the source. Change a label: the image updates without
+saving. An untitled document works once its language is set to bgraph.
+Each document has its own pane; repeating the command reuses that pane.
+Syntax or rendering errors appear in it.
 
-Dans un fichier `.md`, ajoutez un bloc balisé `bgraph` :
+The pane needs neither `bgraph` nor `bgraph-lsp` installed. It renders the
+current text only, so it cannot read `include` files or external `from:`
+data. For those, use:
+
+```sh
+bgraph watch architecture.bd --open --port 0
+```
+
+### 3. Enable suggestions and diagnostics
+
+[Install the command-line tools](installation.md), including `bgraph-lsp`,
+then restart VS Code so it sees the updated `PATH`.
+
+If the server is elsewhere, set its absolute path in VS Code's settings:
+
+```json
+{
+  "bgraph.server.path": "/absolute/path/to/bgraph-lsp"
+}
+```
+
+On Windows, point to `bgraph-lsp.exe` and escape backslashes in JSON, for
+example `"C:\\Tools\\bgraph\\bin\\bgraph-lsp.exe"`.
+
+### Diagrams inside Markdown
+
+Create a Markdown file containing:
 
 ````markdown
 ```bgraph
-node a "Départ"
-node b "Arrivée"
+node a "Start"
+node b "Finish"
 layout { place b right-of a gap 48 }
 a -> b
 ```
 ````
 
-Ouvrez l'aperçu Markdown de VS Code, par exemple avec `Ctrl+Shift+V`.
-L'extension utilise son module wasm embarqué pour dessiner le diagramme.
-Le raccourci conserve son comportement Markdown dans un fichier `.md` ;
-il n'est associé à la commande bgraph que dans un éditeur bgraph.
+Open VS Code's usual Markdown preview. The fenced diagram is rendered by
+the extension's bundled renderer. The shortcut keeps its normal Markdown
+meaning in a `.md` file. Markdown blocks have the same `include` and
+external-data limits as the direct diagram pane.
 
-Les blocs doivent être autonomes : le rendu wasm ne résout pas les
-`include` et les fichiers `from:`. Les diagnostics LSP d'un vrai fichier
-`.bd`, eux, savent résoudre ses inclusions.
+## Zed
 
-## Autres éditeurs
+### 1. Install the tools and extension
 
-`bgraph-lsp` parle LSP sur l'entrée et la sortie standard. Configurez
-votre client LSP pour lancer cette commande sur les fichiers `.bd`.
-La grammaire tree-sitter du dépôt et les requêtes de `editors/zed/languages/bgraph`
-fournissent la coloration pour les clients compatibles.
+For a supplied export, follow the instructions shipped with its `zed`
+folder. The export contains `install.sh` for Linux and `install.ps1` for
+Windows; run the appropriate installer, then select that folder through
+**zed: install dev extension**.
 
-Les configurations détaillées Neovim, Helix et Emacs sont conservées dans
-[le guide des éditeurs du dépôt](https://github.com/Bunchyearth23/bgraph/blob/main/editors/README.md).
+From the source repository, run this in a Bash terminal at its root:
+
+```sh
+./editors/zed/install.sh
+```
+
+This installs `bgraph` and `bgraph-lsp`, prepares the grammar and updates
+the extension's pinned grammar revision. It can create a commit containing
+regenerated grammar files.
+
+In Zed, open the command palette, run **zed: install dev extension**, and
+choose `editors/zed` in the repository.
+
+### 2. Open the folder, then the file
+
+Open the folder containing `architecture.bd` as a Zed project, then open
+the file. A window containing only an isolated file does not expose the
+language task on the verified Zed host.
+
+Open the command palette and run **task: spawn**, then select
+**bgraph: Preview**. The task saves the current file, starts the watcher on
+a free port and opens the browser. Keep the task running; subsequent saves
+update the drawing. Included files use their saved versions on disk.
+
+### 3. Add the preview shortcut
+
+Run **zed: open keymap**. Add the following object to the existing top-level
+array; preserve your other entries and separate objects with commas:
+
+```json
+{
+  "context": "Editor && extension == bd",
+  "bindings": {
+    "ctrl-shift-v": ["task::Spawn", { "task_name": "bgraph: Preview" }]
+  }
+}
+```
+
+The same entry is provided in `editors/zed/keymap.json`. The extension
+supplies the task; this keymap entry supplies its shortcut.
+
+With the `.bd` editor focused, press `Ctrl+Shift+V`. Repeating the task
+replaces the active watcher on the verified host. Stop it with `Ctrl+C`
+in its terminal. If opening the browser fails, use the printed URL.
+
+The supplied task uses Linux/macOS shell syntax, including Fish. For
+PowerShell, the [Zed extension README](https://github.com/Bunchyearth23/bgraph/blob/main/editors/zed/README.md#preview)
+describes the project-task override; that variant has not been verified
+in a Windows host.
+
+Zed uses the browser preview. The extension does not provide a native
+diagram pane or render bgraph blocks inside Zed's Markdown preview.
+
+### If Zed cannot find the language server
+
+Add an absolute path in Zed's settings:
+
+```json
+{
+  "lsp": {
+    "bgraph-lsp": {
+      "binary": { "path": "/absolute/path/to/bgraph-lsp" }
+    }
+  }
+}
+```
+
+Use `bgraph-lsp.exe` on Windows. Restart the language server after changing
+its executable or installing a new version.
+
+## Editing features to try
+
+- Inside `layout`, completion offers placement instructions and identifiers
+  from the current scope.
+- Snippets supply numeric defaults such as `at (0, 0)`. Press `Tab` to move
+  through their fields.
+- After a relative placement, completion offers anchors, `gap` and alignment.
+- Parameter help describes coordinates and placement arguments as you type.
+- The editor's document-formatting command uses bgraph's formatter.
+  A source file that cannot parse is left unchanged.
+
+Suggestions stay quiet inside strings and comments.
+
+## Other editors
+
+`bgraph-lsp` communicates over standard input and output using LSP.
+Configure your editor to launch it for `.bd` files. The repository provides
+the grammar and queries for other tree-sitter clients.
+
+See the [repository editor guide](https://github.com/Bunchyearth23/bgraph/blob/main/editors/README.md)
+for Neovim, Helix and Emacs configurations.

@@ -1,6 +1,11 @@
 # bgraph for Zed
 
-Syntax highlighting (tree-sitter) and a language server for `.bd` files.
+Syntax highlighting, language-server support and a live browser preview for `.bd` files.
+
+New to bgraph? Start with [Your first diagram](../../docs/guide/demarrage.md)
+and the [step-by-step Zed setup](../../docs/guide/editeurs.md#zed). You need
+both the updated CLI and this extension. Open the containing folder as a
+project before opening its `.bd` file, then run **task: spawn → bgraph: Preview**.
 
 ## What it gives you
 

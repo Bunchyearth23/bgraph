@@ -1,75 +1,75 @@
-# Chantiers W-140 à W-150 — tasklist
+# W-140 to W-150 — task list
 
-Ordre : sécuriser les surfaces configurables → terminer les contrats/outils →
-mesurer et durcir → améliorer l'ergonomie et le rendu.
+Historical implementation order: secure configurable surfaces, complete
+contracts and tools, measure and harden, then improve usability and rendering.
 
-## W-140 — matrice de fonctionnalités
+## W-140 — feature matrix
 
-- [x] Ajouter la matrice de builds à la CI.
-- [x] Vérifier localement les variantes minimale, `pie`, `packet`, JSON/CSV/PDF, WASM, PNG et CLI/completions.
-- [x] Ajouter un test qui empêche la réduction accidentelle de cette matrice CI.
+- [x] Add the build matrix to CI.
+- [x] Check minimal, `pie`, `packet`, JSON/CSV/PDF, WASM, PNG and CLI/completions builds locally.
+- [x] Add a test preventing accidental reductions to the CI matrix.
 
-## W-141 — modularisation du LSP
+## W-141 — LSP modularization
 
-- [x] Extraire positions, protocole, diagnostics et contexte lexical.
-- [x] Extraire les méthodes de complétion et les snippets.
-- [x] Extraire navigation, hover, symboles et références.
-- [x] Rapprocher les tests unitaires de leurs modules.
-- [x] Vérifier les interfaces internes et mesurer la réduction de `src/lsp.rs`.
+- [x] Extract positions, protocol, diagnostics and lexical context.
+- [x] Extract completion and snippet methods.
+- [x] Extract navigation, hover, symbols and references.
+- [x] Move unit tests closer to their modules.
+- [x] Check internal interfaces and measure the reduction in `src/lsp.rs`.
 
-## W-142 — layout global
+## W-142 — global layout
 
-- [x] Définir une fonction de coût globale pour labels et routes.
-- [x] Ajouter les diagnostics de conflit résiduel au JSON de layout.
-- [x] Ajouter des cas de contention de labels et de corridors orthogonaux.
-- [x] Vérifier déterminisme et absence de régression sur les goldens.
+- [x] Define a global cost function for labels and routes.
+- [x] Add residual-conflict diagnostics to layout JSON.
+- [x] Add label-contention and orthogonal-corridor cases.
+- [x] Check determinism and golden-output regressions.
 
 ## W-143 — fuzzing
 
-- [x] Créer un corpus d'entrées hostiles versionné.
-- [x] Fuzzer parsing, vérification, layout et rendus SVG/PDF/JSON.
-- [x] Exécuter le corpus dans la CI.
-- [x] Ajouter les régressions trouvées comme tests déterministes.
+- [x] Create a versioned hostile-input corpus.
+- [x] Fuzz parsing, validation, layout and SVG/PDF/JSON rendering.
+- [x] Run the corpus in CI.
+- [x] Turn discovered regressions into deterministic tests.
 
 ## W-144 — benchmarks
 
-- [x] Définir des fixtures : gros graphe, compose, ortho, template et chart.
-- [x] Mesurer parsing, layout et rendu séparément.
-- [x] Conserver les résultats ou seuils de régression dans CI.
+- [x] Define large-graph, composition, orthogonal-routing, template and chart fixtures.
+- [x] Measure parsing, layout and rendering separately.
+- [x] Keep results or regression thresholds in CI.
 
-## W-145 — API publique
+## W-145 — public API
 
-- [x] Répertorier les modules/types publics réellement consommables.
-- [x] Réduire la visibilité des détails internes ou documenter leur absence de stabilité.
-- [x] Vérifier les exemples d'intégration Rust contre cette surface.
+- [x] List public modules and types that consumers can actually use.
+- [x] Reduce internal visibility or document the lack of stability.
+- [x] Verify Rust integration examples against that boundary.
 
-## W-146 — diagnostics JSON
+## W-146 — JSON diagnostics
 
-- [x] Ajouter `bgraph check --json` pour les fichiers simples et composés, y compris les erreurs de composition.
-- [x] Ajouter des tests CLI du schéma et du code de sortie.
-- [x] Documenter le schéma stable dans la référence.
+- [x] Add `bgraph check --json` for simple and composed files, including composition errors.
+- [x] Add CLI tests for the schema and exit status.
+- [x] Document the stable schema in the reference.
 
 ## W-147 — onboarding
 
-- [x] Refaire le README autour du premier diagramme et du preview.
-- [x] Ajouter une progression styles → données → bibliothèque Rust.
-- [x] Vérifier chaque commande et chaque extrait dans la suite.
+- [x] Rewrite the README around a first diagram and preview.
+- [x] Add a progression from styles to data to the Rust library.
+- [x] Verify every command and snippet in the suite.
 
-## W-148 — cohérence documentaire
+## W-148 — documentation consistency
 
-- [x] Choisir la formulation unique : « 29 genres spécialisés + free ».
-- [x] Aligner README, manuel, release notes, playground et textes générés.
-- [x] Ajouter un garde-fou de cohérence des comptes.
+- [x] Choose the canonical count: “29 specialised genres, plus free”.
+- [x] Align README, manual, release notes, playground and generated text.
+- [x] Add a guard against inconsistent counts.
 
-## W-149 — snapshots visuels
+## W-149 — visual snapshots
 
-- [x] Sélectionner des fixtures représentatives des formes, labels et charts.
-- [x] Générer des snapshots PNG reproductibles.
-- [x] Comparer les images avec un seuil explicite en CI.
+- [x] Select representative shape, label and chart fixtures.
+- [x] Generate reproducible PNG snapshots.
+- [x] Compare images with an explicit CI threshold.
 
-## W-150 — schéma du vocabulaire
+## W-150 — vocabulary schema
 
-- [x] Définir le format versionné des métadonnées.
-- [x] Générer le schéma depuis `props.rs`.
-- [x] Exposer `bgraph schema`.
-- [x] Tester que le schéma reste synchronisé avec les tables du compilateur.
+- [x] Define the versioned metadata format.
+- [x] Generate the schema from `props.rs`.
+- [x] Expose `bgraph schema`.
+- [x] Test that the schema stays synchronized with compiler tables.

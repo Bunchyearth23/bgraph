@@ -24,7 +24,7 @@ write wrong.
 One statement form, for every archetype:
 
 ```
-<keyword> <id> ["label"] <positional data…> [.class …] [<placement>] { props }
+<keyword> <id> ["label"] <positional data…> [.class …] { props }
 ```
 
 ```
@@ -42,7 +42,8 @@ signal clk "Clock" "p......"
 signal bus "Data"  "x.=.=x" { data: "head" "body" }
 
 type free
-node a "A" at (0, 0)
+node a "A"
+layout { place a at (0, 0) }
 ```
 
 This keeps `D-008`'s benefit — **one grammar rule, one validator, one
