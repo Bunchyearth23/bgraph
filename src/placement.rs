@@ -408,7 +408,14 @@ impl<'a> PlacementPlan<'a> {
                         .get(anchor.as_str())
                         .copied()
                         .is_none_or(|target| {
-                            target == entity || is_settled(target, &node_settled, &group_settled)
+                            target == entity
+                                || if self.placed_unit(entity).is_some()
+                                    && self.placed_unit(entity) == self.placed_unit(target)
+                                {
+                                    has_coordinates(target, &node_coordinates, &group_coordinates)
+                                } else {
+                                    is_settled(target, &node_settled, &group_settled)
+                                }
                         }),
                     Some(Placement::At { .. } | Placement::Cell { .. }) | None => true,
                 };
@@ -417,8 +424,10 @@ impl<'a> PlacementPlan<'a> {
                 }
 
                 group_coordinates[g] = true;
-                group_settled[g] = true;
-                self.settle_subtree(g, &mut node_settled, &mut group_settled);
+                if self.placed_unit(entity).is_none() {
+                    group_settled[g] = true;
+                    self.settle_subtree(g, &mut node_settled, &mut group_settled);
+                }
                 progress = true;
             }
 

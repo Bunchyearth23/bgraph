@@ -2,7 +2,7 @@
   "name": "bgraph",
   "displayName": "bgraph",
   "description": "Syntax highlighting, live preview and language server for the bgraph diagram DSL",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "bunchyearth23",
   "private": true,
   "license": "LicenseRef-bgraph-noncommercial-1.0",

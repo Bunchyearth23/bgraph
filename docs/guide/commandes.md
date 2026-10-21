@@ -30,6 +30,12 @@ Geometry JSON exposes inspection details. Numeric values and element order
 are not a stable API contract. This is separate from the stable diagnostic
 JSON returned by `check --json`.
 
+Geometry uses the exported canvas coordinates. `canvas.layout_origin.x`
+and `.y` give the translation from solved layout to canvas: subtract them
+from an exported point to recover layout coordinates. For waypoints, prefer
+relative forms such as `via (above api gap 40)` so the route follows its
+anchor. See the [waypoint reference](reference.md#edge-waypoints-via).
+
 ### PNG and resolution
 
 After [enabling PNG](installation.md#optional-enable-png-output):

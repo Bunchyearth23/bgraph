@@ -135,7 +135,7 @@ impl std::fmt::Display for ConstraintConflict {
         }
         write!(
             f,
-            ". Change an `at`, alignment or gap so these required relations agree"
+            ". Change a size, an `at`, alignment or gap so these required relations agree"
         )
     }
 }
@@ -156,6 +156,7 @@ fn conflict_error_with_names(
     variables: &[Variables],
     extra: &[(Variable, String)],
 ) -> anyhow::Error {
+    let registry = crate::style::Registry::build(&diagram.styles).ok();
     let constraints = conflict
         .into_iter()
         .map(|sourced| {
@@ -206,13 +207,49 @@ fn conflict_error_with_names(
                 })
                 .collect::<Vec<_>>()
                 .join(" + ");
-            ConflictConstraint {
-                source: sourced.provenance,
-                equation: format!(
-                    "{expression} {} {}",
-                    sourced.provenance.relation, sourced.provenance.value
-                ),
+            let mut source = sourced.provenance;
+            let mut equation = format!("{expression} {} {}", source.relation, source.value);
+            if matches!(source.origin, ConstraintOrigin::SizeConstraint)
+                && source.node >= diagram.nodes.len()
+                && let Some(registry) = &registry
+            {
+                let group = &diagram.groups[source.node - diagram.nodes.len()];
+                let dimension = |style: &crate::style::Style| match source.axis {
+                    Axis::Width => style.width,
+                    Axis::Height => style.height,
+                    _ => None,
+                };
+                let mut origin = None;
+                for (name, layer) in
+                    registry
+                        .implicit_layers("group")
+                        .chain(group.classes.iter().filter_map(|class| {
+                            registry
+                                .get(class.as_str())
+                                .map(|layer| (class.as_str(), layer))
+                        }))
+                {
+                    if dimension(layer).is_some()
+                        && let Some(decl) = diagram
+                            .styles
+                            .iter()
+                            .find(|decl| decl.name.as_str() == name)
+                    {
+                        origin = Some((format!("`style {name}`"), decl.span));
+                    }
+                }
+                if let Ok(inline) = crate::style::layer_from_props(&group.props)
+                    && dimension(&inline).is_some()
+                {
+                    origin = Some((format!("`{}`'s own block", group.id.as_str()), group.span));
+                }
+                if let Some((name, span)) = origin {
+                    source.related_span = Some(source.span);
+                    source.span = span;
+                    equation.push_str(&format!(" — from {name}"));
+                }
             }
+            ConflictConstraint { source, equation }
         })
         .collect();
     ConstraintConflict { constraints }.into()

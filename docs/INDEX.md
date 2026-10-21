@@ -25,8 +25,21 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**Recorded state: six work items are building (`W-166` to `W-171`);
-none are planned or blocked, and no question or risk is open.**
+**Recorded state: seven work items are building (`W-166` to `W-172`);
+none are planned or blocked. No question is open; `X-005` is reopened.**
+
+1.0.1 preparation on 2026-10-21 (`W-172`): seven corrections from the user
+report, generated reference additions and JSON `canvas.layout_origin` are
+implemented. **760 Rust tests and six JS tests passed**, as did Clippy,
+minimal/WASM/Typst/Zed builds, strict docs and the complete runtime gate.
+Nine original-diagram exports passed; one new architecture label warning
+needs review. The negative sequence frame was already inside the canvas;
+rounded waypoint gaps remain unreproduced, and font title-plate overflow is
+confirmed even with embedding. Resume: review the candidate and these
+remaining points before deciding on release. The user authorized commit/push
+on 2026-10-21; no release or installation was requested.
+Evidence: `.agent/analysis/1.0.1-validation-20261021.md` and
+`docs/release-notes/1.0.1.md`.
 The “all non blocked W done and proven” objective is complete for its seven
 items: `W-153`, `W-156`, `W-157`, `W-158`, `W-159`, `W-160` and `W-164`
 styles. `W-154` and `W-155` had already been closed on user instruction.
@@ -43,7 +56,7 @@ previews ran in real VS Code and Zed hosts. The three BPMN errors are fixed:
 
 The user accepted the documentation and Venn candidate for commit/push on
 2026-10-20. Delivery is recorded by Git; work states remain unchanged.
-Resume: install and validate the updated Venn and preview artifacts
+Earlier follow-up: install and validate the updated Venn and preview artifacts
 (`W-171`, `W-169`/`W-170`); open the folder
 as a project in Zed and merge the keymap entry. User validation of the
 drawings, the original `W-166` screenshot source and additional affected
@@ -109,6 +122,7 @@ have separate rows in **Work landed**; no identifier was renumbered.
 | `W-169` | building | Integrated bgraph preview in VS Code | `Ctrl+Shift+V` opens a WASM pane that updates while typing, including dirty and untitled buffers. Six JS tests, complete/no-LSP VSIX packages and a real VS Code host passed; errors, lifecycle, Markdown and LSP behavior retained. User installation/validation remains; `include`/`from:` need the watcher. `D-054`, `.agent/analysis/editor-previews-20261020.md`. |
 | `W-170` | building | Browser preview shortcut from Zed | Native `bgraph: Preview` task saves the current file, then runs `watch --open --port 0`; a shortcut entry is supplied. Five Rust tests and a real Zed host passed: hostile filenames, URL, reload and one active watcher after repeat. CLI/extension installation, keymap merge and user validation remain; open the folder as a project. `D-054`, `.agent/analysis/zed-preview-20261020.md`. |
 | `W-171` | building | Readable Venn geometry and membership keys | Pairwise distances drive three-circle placement when feasible; two-set areas stay exact. A/B/C and colored keys separate set totals from named pair totals, with wrapping and font-aware spacing. Six new regressions, 751 Rust tests, 40 exports and runtime parity passed; the English guide, generated reference and Venn gallery/golden are updated. User accepted the candidate for commit/push; installation and user runtime validation remain. `.agent/analysis/venn-validation-20261020.md`. |
+| `W-172` | building | Prepare 1.0.1 from the twelve-point user report | Seven corrections, reference coverage and JSON origin implemented; nine new tests, 760 Rust/six JS tests and runtime/build gates passed. Point 3 is a false positive; point 5 needs its original reproduction; point 12 reopens `X-005`. One new label warning in the unchanged architecture source needs review. No release or installation. `.agent/analysis/1.0.1-validation-20261021.md`. |
 
 ### Risks
 
@@ -136,7 +150,7 @@ Open and residual risks; rows name related work and outstanding evidence.
 | `X-006` | mitigated | Edge labels avoid lines, not each other's readability | `W-010` scores candidates; `W-022` made the node and label penalties proportional to the overlapped area and distance a real cost, which stopped labels fleeing three rows from their own edge. Still local: nothing guarantees the best global arrangement — `W-037` adds the escape hatch (`label-offset`) rather than a better solver, because the author can see what the cost function cannot. |
 | `X-017` | narrowed · `W-077` | Raster output is **optional, not absent** — a build without the `png` feature still has none | `W-042` ships PDF because it is vector and needs nothing; a raster format needs glyph rasterisation and path filling, which is a real renderer. `D-027` records that the honest options were a large dependency tree in a crate that has five, or months of work — and that a PDF opens everywhere a PNG does. Anyone who needs a bitmap can rasterise the PDF or the SVG with a tool built for it. **Narrowed on 2026-08-10 by `W-077`:** `resvg` was already in the tree for the window, so a `png` feature costs the default build nothing and gives someone rendering images in CI a first-class output. The dependency-free promise is unchanged, because it was always a promise about what the *default* build costs. |
 | `X-018` | mitigated · `W-127` | An `ortho` edge avoids boxes, not other edges | `W-127` prices a shared run and gives contention its own lanes, so two lines take the same channel only where there is genuinely no other. **Not retired**, and the residue is worth naming: where one channel is the only one — a corridor a box's width — the price buys nothing and the two still double up. Blocking instead of pricing would turn that into a missing edge, which is worse. The order the edges are declared in decides who gets the direct channel, which is the author's to change. |
-| `X-005` | mitigated | Text width cannot be measured, only estimated | **Narrowed by `W-040` and mitigated by `W-095` + `W-100`.** The default SVG still names a font family and therefore retains a cross-family risk, but `--embed-font` now carries the exact measured font and safely subsets it to the glyphs used. Use that option when portable, byte-for-byte text layout is required. `D-026` records why embedding remains opt-in. |
+| `X-005` | open | Estimated advances can leave title plates shorter than rendered text | Reopened on 2026-10-21 by `W-172`. `W-040` improved per-character estimates; `W-095`/`W-100` carry/subset fonts but do not recalculate layout advances. An explicit-family embedded-font PNG still overflows its group title plate. A measurement contract remains needed; the old claim of exact measured text through embedding alone was incorrect. `D-026`; `.agent/analysis/1.0.1-validation-20261021.md`. |
 
 ---
 

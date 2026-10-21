@@ -157,6 +157,10 @@ Use an installed font, or `--embed-font /path/to/Font.ttf` with a real
 TrueType font file. Embedding in an SVG also carries the font to recipients
 who do not have it.
 
+Text widths are estimated before rendering. Embedding a font does not
+recalculate those estimates, so a bold group title or a different typeface
+can still exceed its background plate. This remains a known layout limitation.
+
 ## include works in the CLI but not in an embedded renderer
 
 The browser playground, VS Code pane and Typst plugin render self-contained

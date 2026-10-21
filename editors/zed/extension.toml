@@ -1,7 +1,7 @@
 id = "bgraph"
 name = "bgraph"
 description = "Syntax highlighting, language server and live browser preview for the bgraph diagram DSL"
-version = "1.0.0"
+version = "1.0.1"
 schema_version = 1
 authors = ["Bunchyearth23"]
 repository = "file:///home/bunchy/Desktop/bgraph"

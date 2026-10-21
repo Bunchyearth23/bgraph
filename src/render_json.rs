@@ -26,8 +26,8 @@
 //!
 //! Canvas space, the same numbers the SVG carries — the layout's own
 //! coordinates translated by the padding offset, so a rectangle here is the
-//! rectangle in the file beside it. Emitting the untranslated form would hand
-//! every consumer the same off-by-a-padding bug to discover on their own.
+//! rectangle in the file beside it. `canvas.layout_origin` gives the layout's
+//! `(0, 0)` in canvas space: subtract it to recover solved layout coordinates.
 
 use serde_json::{Value, json};
 
@@ -55,7 +55,7 @@ fn to_value(layout: &Layout) -> Value {
 
     json!({
         "version": VERSION,
-        "canvas": { "width": width, "height": height },
+        "canvas": { "width": width, "height": height, "layout_origin": { "x": dx, "y": dy } },
         "background": layout.opts.background,
         "title": layout.opts.title,
         "description": layout.opts.description,

@@ -435,7 +435,7 @@ meaning without creating a second grammar.
 bgraph diagram.bd -o diagram.svg    # render
 bgraph diagram.bd -o diagram.png    # …with the `png` feature; --scale 2 for twice the size
 bgraph diagram.bd -o diagram.json   # the solved geometry, for another program
-bgraph diagram.bd -o d.svg --embed-font Inter.ttf   # text exact on any machine
+bgraph diagram.bd -o d.svg --embed-font Inter.ttf   # carry a font with the SVG
 bgraph diagram.bd -o big.pdf --page a4  # tile a large diagram across sheets
 bgraph diagram.bd --theme dark      # a named palette under the file's own styles
 bgraph watch diagram.bd             # show it, and reload when it changes
@@ -483,8 +483,9 @@ style <name> [extends <name>] { … }
 group <id> ["<label>"] [.class …] { … }
 activate <id> { … }         // type sequence: a bar down an existing lifeline
 <keyword> <id> ["<label>"] <data…> [.class …] { … }
-<id> <arrow> <id> ["<label>"] [.class …] { … }
+<id> <arrow> <id> ["<label>"] [.class …] [via (<stop>) …] { … }
 layout { place <id> <position> }
+legend [.class …] <position> { … }
 ```
 
 An **item** is an element, and each archetype has its own word for it —
@@ -516,7 +517,8 @@ names that are invalid in their context.
 
 Labels are quoted. `\n` splits a label into centred lines; `\t` and `\"` also
 work. A node with no label falls back to its identifier. Label text is
-XML-escaped on output, so `<`, `&` and quotes are safe.
+XML-escaped on output, so `<`, `&` and quotes are safe. An empty edge label
+`""` is treated as no label: it draws neither text nor a background plate.
 
 ## Groups
 
@@ -547,9 +549,9 @@ layout {
 }
 ```
 
-**A group is sized by its members, never the other way round** — its rectangle
-is their bounding box plus its `padding`. That keeps the rule this language is
-built on: the items say where they go.
+By default, a group's rectangle encloses its members plus its `padding` and
+title. An explicit `width`, `height` or `size` is a required dimension; it must
+leave enough room for that content.
 
 A root `layout` block may place a group, and then it **translates its whole
 subtree** once its members have landed. Members of a placed group only become
@@ -566,6 +568,8 @@ for groups too; `style group { fill: none }` makes frames transparent while
 leaving node fills intact. `width`, `height` and `size` on declared groups are
 required dimensions, with a constraint error when the contents cannot fit.
 `equal-width` and `equal-height` accept both nodes and groups.
+For example, `style node { width: 230 }` also constrains every frame to 230.
+The error names the style layer that supplied the conflicting dimension.
 
 In BPMN, a group containing only other groups defines a pool of lanes. Its
 direct child groups fill the pool's inner width, excluding parent padding and
@@ -576,6 +580,7 @@ their own external margins. No invisible spacer nodes are needed.
 | Form | Meaning |
 |---|---|
 | `at (x, y)` | absolute top-left corner |
+| `at (col 3, row 2)` | a grid cell; the grid is declared in `graph` |
 | `right-of <id>` | to the right of another node |
 | `left-of <id>` | to its left |
 | `below <id>` | underneath it |
@@ -590,6 +595,26 @@ relations are reported as errors.
 A node with no placement flows from the previous one in source order, using
 the graph's `flow` direction and `gap`. The first node lands at `(0, 0)`.
 
+### Rows and columns
+
+Inside a `layout` block, `row a b c gap 32` places `b` right of `a`, then `c`
+right of `b`. `column a b c gap 24` does the same downward. The first node
+keeps its existing placement; the instruction places only the followers.
+Without `gap`, both use the graph's gap. These chains accept nodes, and may
+appear in a group's local `layout` block. Do not also `place` a follower.
+
+```
+node api "API"
+node cache "Cache"
+node db "Database"
+node audit "Audit log"
+layout {
+  place api at (0, 0)
+  row api cache db gap 32
+  column db audit gap 24
+}
+```
+
 Sizes come from the label plus `padding` unless `size`, `width` or `height`
 says otherwise. The canvas is derived from the content — nothing is ever
 clipped, and negative coordinates are fine.
@@ -602,6 +627,88 @@ from the host and automatic task ports avoid its attached events. Message and
 association ports do not displace BPMN sequence-flow ports. No obstacle-count
 threshold disables avoidance. An impossible route retains a visible fallback
 and a diagnostic. BPMN start/end warnings count sequence flows only.
+
+### Edge waypoints: `via`
+
+Write `via` after the optional label, positional data and classes, before the
+inline property block. The property block may also come before `via`.
+Each stop is parenthesised; write several stops in the order to visit them,
+with no separator between them.
+
+```
+node a "Source"
+node b "Destination"
+node wall "Obstacle"
+layout {
+  place a at (0, 0)
+  place b at (400, 0)
+  place wall at (180, 0)
+}
+a -> b "Bypass" via (160, -60) (340, -60) { router: ortho }
+```
+
+| Stop | Meaning |
+|---|---|
+| `(300, 120)` | an absolute point in layout coordinates |
+| `(col 3, row 2)` | a grid cell, using `graph { grid: … }` |
+| `(left-of wall gap 24)` | 24 units left of a node or group, centered on its vertical span |
+| `(above wall gap 24)` | 24 units above it, centered on its horizontal span |
+
+The relative forms also accept `right-of` and `below`; an omitted gap uses
+the graph's gap. `align` does not change a waypoint: a point has no size.
+The grammar calls these forms `rel_point` and `cell`; those are rule names,
+not words to write in a diagram. A relative stop follows the anchor's solved
+bounds when its contents or position change:
+
+```
+node a "Source"
+node b "Destination"
+group services "Services" { node api "API" }
+layout {
+  place a at (0, 0)
+  place services right-of a gap 100
+  place b right-of services gap 100
+}
+a -> b via (above services gap 40) { router: ortho }
+```
+
+Absolute waypoints use the diagram's layout coordinate system, even when
+the edge is declared inside a group. They do not use the exported canvas
+coordinates. Padding, a title and negative content bounds determine the
+translation onto the canvas; do not guess a fixed 16-pixel offset.
+A bounded grid also projects coordinates through its declared cell units.
+Prefer relative stops to keep routes attached to moving elements.
+
+### Geometry JSON coordinates
+
+`bgraph diagram.bd -o diagram.json` exports geometry in canvas coordinates,
+matching the visible SVG. `canvas.layout_origin` gives the layout origin
+in that same space. Subtract its `x` and `y` from an exported point to recover
+its solved layout coordinates; add them to convert the other way.
+Widths and heights are unchanged. This translation includes the space
+reserved around groups and above the drawing for a title. It does not undo
+a group's local origin or a bounded grid's unit conversion.
+
+## Legends
+
+In declared-layout genres, mark styles with `legend: "description"`, then
+place the legend with the same position forms as a node:
+
+```
+style live { fill: #dcfce7 stroke: #166534 legend: "In service" }
+style pending { fill: #fef3c7 stroke: #92400e legend: "Planned" }
+node api "API" .live
+node db "Database" .pending
+layout { place db right-of api gap 40 }
+legend below api gap 32 align left { font-size: 12 }
+```
+
+Entries follow style declaration order and use each style's fill and stroke.
+The anchor may be a node or group. Absolute positions such as
+`legend at (0, 240)` also work. Legend classes precede the position:
+`legend .small below api { font-size: 11 }`.
+A bare `legend` has no position, draws nothing and emits a warning. Chart
+archetypes that create their own keys do not use this statement.
 
 ## Arrows
 
@@ -751,6 +858,9 @@ path.
 - two boxes in a declared-layout diagram that overlap; bgraph names them but
   never chooses a direction in which to move either one
 - a style declared more than once
+- a `font` shorthand containing more than one numeric size; use
+  `font-weight: 600` for a numeric weight
+- a `legend` without a position
 - text whose contrast against what sits behind it is below 3:1
 - `type pie` — a slice with value 0; fewer than three slices, which a bar or
   a single number compares better; more than eight, which exhausts the palette

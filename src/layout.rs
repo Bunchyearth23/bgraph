@@ -265,7 +265,8 @@ fn shape_allowance(shape: Option<Shape>, mut w: f64, mut h: f64) -> (f64, f64) {
             w *= 1.34;
             h += 6.0;
         }
-        Shape::Cylinder => h += 14.0,
+        // The top ellipse takes two cap radii and the bottom takes one.
+        Shape::Cylinder => h = (h / (1.0 - 3.0 * 0.16)).min(h + 3.0 * 14.0),
         // A stadium's ends are semicircles of radius h/2, so the width a line
         // of text can actually use is `w - h`. Nothing was added for it, which
         // is why `type block`'s widest person box had its name running out of
@@ -1266,7 +1267,12 @@ fn solve_with_captions(
             let tall: f64 = rows.iter().map(|(_, scale, _)| font * scale * 1.45).sum();
 
             let ink = s.font_color.clone().unwrap_or_else(|| "#ffffff".into());
-            let mut y = placed.rect.cy() - tall / 2.0;
+            let sink = if s.shape == Some(Shape::Cylinder) {
+                crate::render_svg::cylinder_cap(&placed.rect) / 2.0
+            } else {
+                0.0
+            };
+            let mut y = placed.rect.cy() + sink - tall / 2.0;
             for (text, scale, secondary) in rows {
                 let height = font * scale * 1.45;
                 annotations.push(Annotation {

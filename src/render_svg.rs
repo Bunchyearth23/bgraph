@@ -59,6 +59,12 @@ pub fn render(layout: &Layout) -> String {
     for guide in &layout.guides {
         body.push_str(&guide_line(guide));
     }
+    for group in &layout.groups {
+        body.push_str(&described(
+            &group_frame(group, &layout.opts.background),
+            group.style.description.as_deref(),
+        ));
+    }
     for shape in layout.polylines.iter().filter(|p| !p.over) {
         if let Some(head) = shape.head
             && head != Head::None
@@ -69,12 +75,6 @@ pub fn render(layout: &Layout) -> String {
                 .or_insert((head, colour.to_string()));
         }
         body.push_str(&free_polyline(shape));
-    }
-    for group in &layout.groups {
-        body.push_str(&described(
-            &group_frame(group, &layout.opts.background),
-            group.style.description.as_deref(),
-        ));
     }
 
     for (edge, route) in layout.edges.iter().zip(&routed) {
@@ -198,11 +198,7 @@ pub fn render(layout: &Layout) -> String {
     }
 
     let mut defs = String::new();
-    // The font, when one was handed in. An `@font-face` in `<defs><style>` is
-    // what makes an SVG's text *exact* everywhere rather than approximately
-    // right — it is the practical half of `X-005`, which is that this crate
-    // measures text with an advance table and a viewer may not have the font
-    // that table describes. Carrying the font removes the "may not".
+    // Embedding supplies a portable CSS font face; layout advances remain estimates.
     if let Some((family, bytes)) = &layout.opts.embed_font {
         let _ = write!(
             defs,
@@ -716,7 +712,11 @@ pub fn route_all(layout: &Layout) -> Vec<Routed> {
     // one proves the original choice was globally expensive.
     let mut taken: Vec<Rect> = Vec::new();
     for i in 0..routed.len() {
-        let Some(text) = layout.edges[i].label.clone() else {
+        let Some(text) = layout.edges[i]
+            .label
+            .clone()
+            .filter(|text| !text.is_empty())
+        else {
             continue;
         };
         let rect = place_label(&text, i, &routed, layout, &taken, &layout.edges[i].style);

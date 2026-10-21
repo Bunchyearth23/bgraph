@@ -1,0 +1,93 @@
+checking 34 changed files against 8 learnings and 0 skills
+
+✗ .agent/analysis/1.0.1-validation-20261021.md:1
+  brings back negative frame evidence, which Arnaud's learning ruled out
+  Arnaud · Oct 21: A negative frame x is not evidence of clipping: the
+  reported sequence frame at -175.04 is translated by +211.04 and
+  starts visibly at 36.
+✗ .agent/analysis/1.0.1-validation-20261021.md:1
+  brings back bpmn origin frame, which Arnaud's learning ruled out
+  Arnaud · Oct 20: A REQUIRED equality between a BPMN content origin and
+  the frame's padded corner makes an event at local y=0 followed by a
+  taller centered task insoluble.
+✗ .agent/analysis/1.0.1-validation-20261021.md:10
+  brings back check guide manifest, which Arnaud's learning ruled out
+  Arnaud · Oct 20: The check returned twenty matches in guides,
+  manifests, tests and implementation spans that obey the
+  corresponding learned constraint.
+✗ .agent/analysis/1.0.1-validation-20261021.md:17
+  brings back zed host bare, which Arnaud's learning ruled out
+  Arnaud · Oct 20: On the actual Zed 1.24.3 host, args containing a bare
+  $ZED_FILE split a filename with spaces.
+✗ .agent/analysis/1.0.1-validation-20261021.md:29
+  brings back manual build code, which Arnaud's learning ruled out
+  Arnaud · Oct 20: A successful manual build does not prove printed code
+  examples execute.
+✗ .agent/analysis/1.0.1-validation-20261021.md:31
+  brings back wasm build target, which Arnaud's learning ruled out
+  Arnaud · Oct 20: A full repository runs the incremental wasm build
+  when its target is installed; a standalone export must instead
+  package its supplied module.
+✗ docs/INDEX.md:28
+  brings back runtime gate build, which Arnaud's learning ruled out
+  Arnaud · Oct 20: The runtime gate stages such an export, so requiring
+  a missing repository build script there breaks an otherwise valid
+  package.
+✗ docs/INDEX.md:33
+  sets six to 760, which Arnaud's learning warned about
+  Arnaud · Oct 21: 760 Rust tests, six JS tests, strict docs,
+  minimal/WASM/Typst/Zed builds and the complete runtime/extension
+  gate passed.
+✗ docs/guide/depannage.md:160
+  brings back embedd title plate, which Arnaud's learning ruled out
+  Arnaud · Oct 21: Embedding a matching DejaVuSans family does not fix
+  short title plates.
+✗ docs/reference.md:243
+  brings back content origin local, which Arnaud's learning ruled out
+  Arnaud · Oct 20: A REQUIRED equality between a BPMN content origin and
+  the frame's padded corner makes an event at local y=0 followed by a
+  taller centered task insoluble.
+✗ docs/reference.md:250
+  brings back canva bound include, which Arnaud's learning ruled out
+  Arnaud · Oct 21: Canvas bounds already include it.
+✗ docs/reference.md:269
+  brings back keep key match, which Arnaud's learning ruled out
+  Arnaud · Oct 20: Keep exact pair totals in a named key, with A/B/C
+  matching colored set keys and in-circle letters where they fit.
+✗ docs/release-notes/1.0.1.md:4
+  brings back real miss without, which Arnaud's learning ruled out
+  Arnaud · Oct 20: Packaging tests exercise that real exported directory
+  and the missing-module failure without overwriting an existing VSIX.
+✗ docs/release-notes/1.0.1.md:11
+  brings back negative frame, which Arnaud's learning ruled out
+  Arnaud · Oct 21: A negative frame x is not evidence of clipping: the
+  reported sequence frame at -175.04 is translated by +211.04 and
+  starts visibly at 36.
+✗ docs/release-notes/1.0.1.md:11
+  brings back required origin frame, which Arnaud's learning ruled out
+  Arnaud · Oct 20: A REQUIRED equality between a BPMN content origin and
+  the frame's padded corner makes an event at local y=0 followed by a
+  taller centered task insoluble.
+✗ docs/release-notes/1.0.1.md:15
+  brings back release note explicit, which Arnaud's learning ruled out
+  Arnaud · Oct 20: Historical release notes keep an explicit notice
+  rather than pretending old syntax is current.
+✗ examples/block.svg:1
+  brings back san family title, which Arnaud's learning ruled out
+  Arnaud · Oct 21: Embedding a matching DejaVuSans family does not fix
+  short title plates.
+✗ src/constraint_layout.rs:212
+  brings back matche span constraint, which Arnaud's learning ruled out
+  Arnaud · Oct 20: The check returned twenty matches in guides,
+  manifests, tests and implementation spans that obey the
+  corresponding learned constraint.
+✗ src/docgen.rs:654
+  brings back content origin local, which Arnaud's learning ruled out
+  Arnaud · Oct 20: A REQUIRED equality between a BPMN content origin and
+  the frame's padded corner makes an event at local y=0 followed by a
+  taller centered task insoluble.
+✗ src/docgen.rs:661
+  brings back canva bound include, which Arnaud's learning ruled out
+  Arnaud · Oct 21: Canvas bounds already include it.
+
+· 20 conflicts · fix them, or say why in the commit message or PR description

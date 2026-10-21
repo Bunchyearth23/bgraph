@@ -1,6 +1,6 @@
 [package]
 name = "bgraph"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2024"
 rust-version = "1.88"
 description = "Stylable diagrams from a layout-first DSL — you place the boxes, it draws the SVG."

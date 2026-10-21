@@ -107,12 +107,6 @@ fn render_pages(layout: &Layout, page: Option<Page>) -> Vec<u8> {
         c.line(shift(guide.from, dx, dy), shift(guide.to, dx, dy));
     }
 
-    for shape in layout.polylines.iter().filter(|p| !p.over) {
-        let points: Vec<(f64, f64)> = shape.points.iter().map(|p| shift(*p, dx, dy)).collect();
-        c.path(&points, shape.closed);
-        c.paint(shape.fill.as_deref(), shape.stroke.as_deref(), shape.width);
-    }
-
     for group in &layout.groups {
         let rect = offset(group.rect, dx, dy);
         c.box_of(&rect, Shape::Rect, &group.style);
@@ -154,6 +148,12 @@ fn render_pages(layout: &Layout, page: Option<Page>) -> Vec<u8> {
                 group.style.font_weight.as_deref().unwrap_or("600"),
             );
         }
+    }
+
+    for shape in layout.polylines.iter().filter(|p| !p.over) {
+        let points: Vec<(f64, f64)> = shape.points.iter().map(|p| shift(*p, dx, dy)).collect();
+        c.path(&points, shape.closed);
+        c.paint(shape.fill.as_deref(), shape.stroke.as_deref(), shape.width);
     }
 
     // Slices need arcs, which are the one thing a rectangle cannot fake.

@@ -1,9 +1,9 @@
 # A Typst package manifest, so the module can be *installed* rather than only
 # imported by relative path.
 #
-#   ~/.local/share/typst/packages/local/bgraph/1.0.0/
+#   ~/.local/share/typst/packages/local/bgraph/1.0.1/
 #
-# and then `#import "@local/bgraph:1.0.0": bg-diagram`. The release ships this
+# and then `#import "@local/bgraph:1.0.1": bg-diagram`. The release ships this
 # directory as an archive shaped to unpack straight into that path (`W-139`).
 #
 # `exclude` keeps the build script and the example out of what a document
@@ -12,7 +12,7 @@
 # for a working copy.
 [package]
 name = "bgraph"
-version = "1.0.0"
+version = "1.0.1"
 entrypoint = "bgraph.typ"
 authors = ["Bunchyearth23"]
 license = "LicenseRef-bgraph-noncommercial-1.0"

@@ -1130,13 +1130,22 @@ fn check_nodes<'a>(
     // is — but its anchor is a name like any other, and an unknown one has to
     // be an error here or the note would simply not be drawn and say nothing
     // about why.
-    for note in &diagram.notes {
+    for note in diagram.notes.iter().chain(&diagram.legends) {
         if let Some(Placement::Rel { anchor, .. }) = &note.placement
             && !anchorable.contains(anchor.as_str())
         {
             out.push(Diag::error(
                 anchor.span,
                 format!("unknown node `{}`", anchor.as_str()),
+            ));
+        }
+    }
+
+    for legend in &diagram.legends {
+        if legend.placement.is_none() {
+            out.push(Diag::warn(
+                legend.span,
+                "legend needs a position, for example `legend below a gap 20`; it will not be drawn",
             ));
         }
     }
@@ -3761,6 +3770,12 @@ fn check_props_refined(
                 format!("`{}` needs a value — {}", prop.name, def.syntax),
             ));
             continue;
+        }
+        if prop.name == "font" && prop.values.iter().filter_map(Value::as_num).count() > 1 {
+            out.push(Diag::warn(
+                prop.values_span,
+                "`font` contains more than one size; use `font-weight: 600` for a numeric weight",
+            ));
         }
         if prop.name == "label-position"
             && !prop.values.iter().any(Value::is_hole)

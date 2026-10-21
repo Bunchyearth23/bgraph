@@ -71,7 +71,7 @@ have the same limitations as the diagram preview.
 Both write `bgraph-<version>.vsix` beside this file. Install it with:
 
 ```sh
-code --install-extension bgraph-1.0.0.vsix --force
+code --install-extension bgraph-1.0.1.vsix --force
 ```
 
 A VSIX is a zip with an OPC content-types part and a manifest, so `package.sh`

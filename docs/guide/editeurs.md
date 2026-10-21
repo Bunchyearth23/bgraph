@@ -33,7 +33,7 @@ If you received a `.vsix` file:
 If the `code` command is installed, the terminal equivalent is:
 
 ```sh
-code --install-extension /path/to/bgraph-1.0.0.vsix --force
+code --install-extension /path/to/bgraph-1.0.1.vsix --force
 ```
 
 Replace the example path with your actual package path. The extension is
@@ -45,7 +45,7 @@ root with Node/npm, `zip` and the Rust WebAssembly target available:
 ```sh
 rustup target add wasm32-unknown-unknown
 ./editors/vscode/package.sh
-code --install-extension editors/vscode/bgraph-1.0.0.vsix --force
+code --install-extension editors/vscode/bgraph-1.0.1.vsix --force
 ```
 
 Use the filename produced by the script if its version differs.
