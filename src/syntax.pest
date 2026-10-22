@@ -55,11 +55,10 @@ include_decl = { "include" ~ string ~ ("as" ~ ident)? }
 // and it declares no name, which is what stops anything referring to it.
 note_decl = { "note" ~ string ~ class_ref* ~ placement? ~ block? }
 
-// A key to the colours, in the genres that have no chart to build one from.
-// It lists the style classes that declare a `legend:` text and nothing else —
-// derived from what the file says rather than guessed at, so a legend cannot
-// describe a colour nobody used.
-legend_decl = { "legend" ~ !":" ~ class_ref* ~ placement? ~ block? }
+// Without explicit entries, the key uses classes with a `legend:` label.
+legend_decl = { "legend" ~ !":" ~ class_ref* ~ placement? ~ legend_block? }
+legend_block = { "{" ~ sep ~ ((prop+ | legend_entry) ~ inner_term)* ~ "}" }
+legend_entry = { "entry" ~ string ~ class_ref* ~ block? }
 
 // v2 placement lives apart from declarations. `place` is deliberately a
 // statement rather than a property: geometry names its target and can carry

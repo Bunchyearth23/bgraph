@@ -1,6 +1,7 @@
 {
   "name": "bgraph-playground",
   "private": true,
+  "license": "LicenseRef-bgraph-noncommercial-source-0.1",
   "type": "module",
   "description": "The bgraph renderer, compiled to wasm, in a page.",
   "scripts": {

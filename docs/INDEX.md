@@ -25,13 +25,40 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**Recorded state: seven work items are building (`W-166` to `W-172`);
+**Recorded state: eight work items are building (`W-166` to `W-173`);
 none are planned or blocked. No question is open; `X-005` is open and `X-033` is mitigated.**
 
 The user authorized committing and pushing the complete current worktree on
 2026-10-22, including the audit/editor fixes and tool configuration changes.
 Delivery is recorded by Git; this does not close the parent work items,
 install artifacts or publish a release. Remote CI is the next delivery check.
+
+Local installation on 2026-10-22 (`W-173`): bgraph/bgraph-lsp 1.0.1 rebuilt
+with legends and PNG support in `~/.cargo/bin`; fresh extension packages
+installed in VS Code and the active VSCodium profile. Zed's dev extension
+has a rebuilt component/grammar pinned to local grammar commit `4f45a50`.
+Installed exports/renderers and a real Zed 1.25.2 host accepted legends.
+Running VS Code/VSCodium windows need Reload Window; user validation remains.
+No push/release. Temporary host evidence: `/tmp/bgraph-zed-host-aruij9x3/`.
+
+Licensing decision on 2026-10-22 (`D-056`): apply the user's Non-Commercial
+Source License, version 0.1, in English, with Bunchyearth23 as holder.
+The supplied terms replace the proposed PolyForm licence and the former
+confidential-source terms. The user intends to publish the source; this
+work updates the licence, metadata and README without changing repository
+visibility or publishing artifacts. A separate contribution agreement is
+required by the licence but has not been supplied. Licence/manifest/release
+and documentation tests, the README's SVG/PDF example, local links and
+strict MkDocs passed. Tracked package licence copies are aligned.
+
+Legend documentation refreshed on 2026-10-22 (`W-173`): the English style
+guide, home-page route, language manual and generated reference explain
+`legend { title: ... }`, descriptive entries and placement. Installed
+`bgraph docs` matches `docs/reference.md`. Strict MkDocs, 22 complete
+guide/reference examples, 1,153 local targets and targeted documentation
+tests passed; the local legend page was checked in the browser. The Typst
+plugin and 23-page printable manual were rebuilt; its legend is illustrated
+on page 7. No deployment; work-item states remain unchanged.
 
 Editor usability follow-up on 2026-10-22: VS Code preview now fits both pane
 dimensions, retains zoom/pan across edits and restores automatic fitting on
@@ -83,13 +110,13 @@ previews ran in real VS Code and Zed hosts. The three BPMN errors are fixed:
 
 The user accepted the documentation and Venn candidate for commit/push on
 2026-10-20. Delivery is recorded by Git; work states remain unchanged.
-Earlier follow-up: install and validate the updated Venn and preview artifacts
-(`W-171`, `W-169`/`W-170`); open the folder
-as a project in Zed and merge the keymap entry. User validation of the
+Installation of the updated Venn and preview artifacts (`W-171`,
+`W-169`/`W-170`) completed on 2026-10-22 with the legend build above.
+Open the folder as a project in Zed; the optional keymap merge remains. User validation of the
 drawings, the original `W-166` screenshot source and additional affected
 examples remain outstanding. Follow remote CI for the code changes.
 The updated binary is in `target/release/bgraph` and the VSIX in
-`editors/vscode/`; user installations have not been replaced.
+`editors/vscode/`; user installations were replaced on 2026-10-22 as recorded above.
 Parent work states are unchanged. Evidence:
 `.agent/analysis/editor-previews-20261020.md` and
 `.agent/analysis/parallel-validation-20261020.md`.
@@ -146,10 +173,11 @@ have separate rows in **Work landed**; no identifier was renumbered.
 | `W-166` | building | Outer margins and sequence frames without overlap | CSS margins for the nine declared types and `sequence`; other types reject them. The 2026-10-20 fix also reserves room for large sequence labels and implicit titles. Eleven targeted tests passed, five without default features; sequence SVG unchanged. User validation, the original screenshot source and examples from other affected types remain. `.agent/analysis/w166-validation-20261020.md`; contract: `.agent/analysis/margins-20261016.md`. |
 | `W-167` | building | BPMN captions and edge labels without overlap | Local caption/label avoidance preserves explicit offsets and reports residual collisions. Nine new targeted tests passed; two historical expectations account for wrapping and a real clearance warning without suppressing other diagnostics. No engine replacement was needed. User validation remains, especially for captions still reported. `.agent/analysis/w167-validation-20261020.md`; contract: `.agent/analysis/bpmn-labels-20261016.md`. |
 | `W-168` | building | User BPMN report: ten corrections for 1.0.0 | Fixed BPMN local origins and shared routing; impossible ports are rejected before exhaustive search. Twenty-five unchanged sources and 75 JSON/SVG/check commands passed; 12 warnings across eight cases remain. Large-process release CPU median: 0.736 to 0.0796 s with identical output. Six new tests and the integrated suite passed. User validation and remote CI remain. `.agent/analysis/w168-validation-20261020.md`, `.agent/analysis/w168-observations-20261020.json`. |
-| `W-169` | building | Integrated bgraph preview in VS Code | `Ctrl+Shift+V` opens a WASM pane that updates while typing, including dirty and untitled buffers. Six JS tests, complete/no-LSP VSIX packages and a real VS Code host passed; errors, lifecycle, Markdown and LSP behavior retained. User installation/validation remains; `include`/`from:` need the watcher. `D-054`, `.agent/analysis/editor-previews-20261020.md`. |
-| `W-170` | building | Browser preview shortcut from Zed | Native `bgraph: Preview` task saves the current file, then runs `watch --open --port 0`; a shortcut entry is supplied. Five Rust tests and a real Zed host passed: hostile filenames, URL, reload and one active watcher after repeat. CLI/extension installation, keymap merge and user validation remain; open the folder as a project. `D-054`, `.agent/analysis/zed-preview-20261020.md`. |
-| `W-171` | building | Readable Venn geometry and membership keys | Pairwise distances drive three-circle placement when feasible; two-set areas stay exact. A/B/C and colored keys separate set totals from named pair totals, with wrapping and font-aware spacing. Six new regressions, 751 Rust tests, 40 exports and runtime parity passed; the English guide, generated reference and Venn gallery/golden are updated. User accepted the candidate for commit/push; installation and user runtime validation remain. `.agent/analysis/venn-validation-20261020.md`. |
+| `W-169` | building | Integrated bgraph preview in VS Code | `Ctrl+Shift+V` opens a WASM pane that updates while typing, including dirty and untitled buffers. Six JS tests, complete/no-LSP VSIX packages and a real VS Code host passed; errors, lifecycle, Markdown and LSP behavior retained. Installed in VS Code/VSCodium on 2026-10-22; Reload Window and user validation remain. `include`/`from:` need the watcher. `D-054`, `.agent/analysis/editor-previews-20261020.md`. |
+| `W-170` | building | Browser preview shortcut from Zed | Native `bgraph: Preview` task saves the current file, then runs `watch --open --port 0`; a shortcut entry is supplied. Five Rust tests and a real Zed host passed: hostile filenames, URL, reload and one active watcher after repeat. CLI/extension installed on 2026-10-22; optional keymap merge and user validation remain; open the folder as a project. `D-054`, `.agent/analysis/zed-preview-20261020.md`. |
+| `W-171` | building | Readable Venn geometry and membership keys | Pairwise distances drive three-circle placement when feasible; two-set areas stay exact. A/B/C and colored keys separate set totals from named pair totals, with wrapping and font-aware spacing. Six new regressions, 751 Rust tests, 40 exports and runtime parity passed; the English guide, generated reference and Venn gallery/golden are updated. User accepted the candidate for commit/push; installed on 2026-10-22, user runtime validation remains. `.agent/analysis/venn-validation-20261020.md`. |
 | `W-172` | building | Prepare 1.0.1 from the twelve-point user report | Seven corrections, reference coverage and JSON origin implemented; nine new tests, 760 Rust/six JS tests and runtime/build gates passed. Point 3 is a false positive; point 5 needs its original reproduction; point 12 reopens `X-005`. One new label warning in the unchanged architecture source needs review. No release or installation. `.agent/analysis/1.0.1-validation-20261021.md`. |
+| `W-173` | building | Descriptive legend blocks for every archetype | Explicit `entry` descriptions with class/inline swatches and an optional title; automatic placement below content or absolute placement, with relative anchors on declared layouts. Legacy keys retained. Nine integration tests cover all 30 genres; 813 Rust tests, minimal build and strict Clippy passed. Trail lexical matches were reviewed as unrelated (legend learning). Installed CLI, VS Code/VSCodium and Zed artifacts pass legend checks; running editor reload and user validation remain. `docs/reference.md#legends`, `tests/legends.rs`. |
 
 ### Risks
 
@@ -187,6 +215,7 @@ Open and residual risks; rows name related work and outstanding evidence.
 ### Decisions
 | id | state | date | title | was |
 |---|---|---|---|---|
+| `D-056` | active | 2026-10-22 | **Use the author's Non-Commercial Source License, version 0.1, in preparation for public source availability.** Preserve the supplied terms in English in `LICENSE`, naming Bunchyearth23, as explicitly requested by the user. Study, noncommercial compilation/execution and private/internal noncommercial modifications are permitted; redistribution and commercial use require written authorization, with the stated platform-fork exception. Accepted contributions need a separate agreement. Use `LicenseRef-bgraph-noncommercial-source-0.1`, not PolyForm or an invented standard SPDX identifier. Registry publication remains disabled; changing repository visibility or publishing artifacts requires its own action. | explicit user-supplied licence; replaces proposed PolyForm and historical `D-038`/`D-041` restrictions |
 | `D-055` | active | 2026-10-20 | **All project user documentation is English and starts from a complete beginner workflow.** Installation routes, terminology, copyable examples, expected results, previews, exports and troubleshooting precede the full reference. Existing guide URLs are retained; generated gallery text and documentation launcher help follow the same language. | explicit user request |
 | `D-052` | active | 2026-10-16 | **`margin` reserves outer space around a box or frame**, using CSS top/right/bottom/left order and one-to-four-value forms. Margins add to gaps and container bounds without moving a required `at` or changing explicit alignment. Per-side cascade; finite nonnegative values, no `auto` or CSS collapsing. Explicit support for declared geometry and sequences. | user request, `W-166` |
 | `D-053` | active | 2026-10-16 | **Declared groups have effective dimensions and BPMN lanes fill their pool.** `width`, `height` and `size` are required and may conflict with content; size equalities accept groups. In BPMN, a group containing only groups forms a lane pool: children fill its inner width after padding/margins. Parent painted first. `style node` remains common to nodes and frames; `task`/`group` styles specialize them. | user 1.0.0 report, `W-168` |
@@ -201,7 +230,7 @@ Open and residual risks; rows name related work and outstanding evidence.
 | `D-044` | amended | 2026-08-24 | **V2 is a clean break without V1-to-V2 migration.** Amended by the author on 2026-08-25: while bgraph is in development, V1 inline placement and global constraints are removed; the public parser, Tree-sitter and editors promise no compatibility. `fmt --migrate` handles independent property migrations only. | `Q-010` |
 | `D-043` | active | 2026-08-24 | **DSL V2 separates declarations from scoped layout blocks.** Declarations say what exists; all geometric relations (coordinates, directions, alignments, equal sizes, rows, columns, distributions and guides) use one grammar. Groups may carry their own block. V1 inline placement appears in no migration, documentation, completion or emitted surface. | `Q-009` |
 | `D-042` | active | 2026-08-24 | **The replacement placement core uses Cassowary from the start.** Positions, alignments, dimensions, priorities and stays become simultaneous linear constraints instead of sequential mutations or a temporary exact-equality solver. Required relations remain contracts: contradictions are diagnosed, required coordinates never move silently, and collisions/order choices do not become automatic layout. Canonical tie-breaking and source provenance keep output deterministic. | `Q-008` |
-| `D-041` | active | 2026-08-21 | **No external distribution.** bgraph remains private/internal; no artifacts are published externally and no additional public channel is prepared. `W-151` is dropped. | `Q-007` |
+| `D-041` | superseded by `D-056` | 2026-08-21 | **No external distribution.** bgraph remained private/internal; no artifacts were published externally and no additional public channel was prepared. `W-151` is dropped. The user's 2026-10-22 decision prepares public source availability under a new custom licence; it does not itself publish artifacts. | `Q-007` |
 | `D-034` | active | 2026-08-11 | **A waypoint is a list, it is written like a placement, and it is a passage rather than a preference.** Extends `D-033`, which gave an edge its two ends and left everything between them to the engine. Three parts. (1) **`via` takes several stops**, each parenthesised — that is what lets the list need no separator, since `,` already separates statements, and it is why an absolute point, a grid cell and a place beside a box are all written the same way. (2) **A stop is a `Placement`**, not a point: `(left-of c gap 20)` is the form that survives a neighbour being inserted, and a bare `(300, 120)` is the escape hatch that `D-001` refuses for boxes for exactly the same reason. A grid cell is free, because `at` already reads one. (3) **The passage is not negotiable, and the avoidance survives between the stops**: every leg is routed by `W-105`'s solver, so a line told to pass left of a box still goes around whatever stands in the way of getting there. Joining the stops with straight lines would have traded the guarantee one work item bought for the control another one did, and there is no reason to pay twice. A stop inside a box is **reported, not repaired** — `X-004`'s bargain again | |
 | `D-033` | active | 2026-08-11 | **An edge's *attachment* is declared; its *route* is not.** `D-001` made placement declared and stopped at the boxes — where a line leaves and where it arrives was left to the engine, computed from the two centres. That is the gap the author found: he had said where every box goes and still could not stop two arrow heads landing on the same three pixels. So `from` and `to` join the language as ordinary edge properties, taking `top`, `bottom`, `left`, `right` or `auto`, and the router keeps everything between them. The dotted form `a.bottom` is not available and it is `D-029` that forbids it: a qualified name is one token, so `check.top` lexes as a name in another file's namespace. Two consequences. **Several edges on one side spread along it** rather than converging on its midpoint, in declaration order, with `lane` to reorder them by hand — spreading decides no order, so it does not touch `D-001`. And **`auto` stays the default**, because the engine choosing well is the common case and the point of this is the uncommon one | |
 | `D-032` | superseded by `D-035` | 2026-08-11 | **The licence is proprietary, and that is the answer rather than the absence of one.** Answers `Q-005` by confirming `D-020` after the distribution half was built: the playground (`W-096`), the release binaries and CI action (`W-097`), the Markdown preview (`W-098`) and the Typst plugin (`W-099`) all exist, all work, and **none of them ship**. Recorded as a decision rather than left as a closed question because the four will keep prompting the same question from anyone who finds them, and a repository that answers "we never decided" invites somebody to decide it by accident. Nothing in the repository changes: `LICENSE` grants nothing, `Cargo.toml` keeps `license-file` and `publish = false`, and the test asserting `release.yml` creates no release and runs no `cargo publish` is now load-bearing rather than precautionary. The order `D-014` set holds — **first right for its author, then distributable** — and only the second half is declined | |

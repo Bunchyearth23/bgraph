@@ -213,7 +213,7 @@ fn build(file: Pair<Rule>, input: &str) -> Result<Diagram> {
             Rule::include_decl => diagram.includes.push(parse_include(pair)?),
             Rule::layout_decl => diagram.layouts.push(parse_layout(pair, None)?),
             Rule::note_decl => diagram.notes.push(parse_note(pair)?),
-            Rule::legend_decl => diagram.legends.push(parse_note(pair)?),
+            Rule::legend_decl => diagram.legends.push(parse_legend(pair)?),
             Rule::component_decl => diagram.components.push(parse_component(pair, input)?),
             Rule::use_decl => diagram.uses.push(parse_use(pair)?),
             Rule::style_decl => diagram.styles.push(parse_style(pair)?),
@@ -250,9 +250,6 @@ fn spanned(pair: &Pair<Rule>) -> Spanned<String> {
     }
 }
 
-/// A `note` or a `legend`. They differ in what is drawn, not in how they are
-/// written — both are placed by the ordinary anchors, both take classes, and
-/// neither declares a name.
 fn parse_note(pair: Pair<Rule>) -> Result<crate::ast::NoteDecl> {
     let span = span_of(&pair);
     let mut text = String::new();
@@ -276,6 +273,46 @@ fn parse_note(pair: Pair<Rule>) -> Result<crate::ast::NoteDecl> {
         props,
         span,
     })
+}
+
+fn parse_legend(pair: Pair<Rule>) -> Result<crate::ast::LegendDecl> {
+    let mut legend = crate::ast::LegendDecl {
+        classes: Vec::new(),
+        placement: None,
+        props: Vec::new(),
+        entries: Vec::new(),
+        span: span_of(&pair),
+    };
+    for part in pair.into_inner() {
+        match part.as_rule() {
+            Rule::class_ref => legend.classes.push(class_name(part)),
+            Rule::legend_block => {
+                for item in part.into_inner() {
+                    if item.as_rule() == Rule::prop {
+                        legend.props.extend(parse_prop(item)?);
+                        continue;
+                    }
+                    let mut entry = crate::ast::LegendEntry {
+                        text: String::new(),
+                        classes: Vec::new(),
+                        props: Vec::new(),
+                        span: span_of(&item),
+                    };
+                    for part in item.into_inner() {
+                        match part.as_rule() {
+                            Rule::string => entry.text = unescape(part),
+                            Rule::class_ref => entry.classes.push(class_name(part)),
+                            Rule::block => entry.props = parse_block(part)?,
+                            _ => unreachable!("legend entries hold text, classes and properties"),
+                        }
+                    }
+                    legend.entries.push(entry);
+                }
+            }
+            _ => legend.placement = Some(parse_placement(part)?),
+        }
+    }
+    Ok(legend)
 }
 
 fn parse_layout(pair: Pair<Rule>, scope: Option<Spanned<String>>) -> Result<LayoutDecl> {
@@ -1022,4 +1059,29 @@ fn statements(input: &str) -> Vec<(usize, &str)> {
         out.push((start, &input[start..]));
     }
     out
+}
+
+#[cfg(test)]
+mod legend_tests {
+    use super::parse;
+
+    #[test]
+    fn explicit_legend_preserves_entries_properties_and_spans() {
+        let source = "legend .caption below api {\n title: \"Statuts\" font-size: 12\n entry \"Disponible\" .live\n entry \"Prévu\" { fill: #fef3c7 }\n}";
+        let diagram = parse(source).unwrap();
+        let legend = &diagram.legends[0];
+        assert_eq!(legend.classes[0].value, "caption");
+        assert_eq!(legend.props.len(), 2);
+        assert_eq!(legend.entries.len(), 2);
+        assert_eq!(legend.entries[0].text, "Disponible");
+        let class = &legend.entries[0].classes[0];
+        assert_eq!(&source[class.span.start..class.span.end], "live");
+        let planned = &legend.entries[1];
+        assert_eq!(planned.text, "Prévu");
+        assert_eq!(planned.props[0].name, "fill");
+        assert_eq!(
+            &source[planned.span.start..planned.span.end],
+            "entry \"Prévu\" { fill: #fef3c7 }"
+        );
+    }
 }

@@ -10634,39 +10634,20 @@ fn the_release_ships_everything_and_publishes_only_here() {
     assert!(!release.contains("libwayland-dev"), "{release}");
 }
 
-/// One licence, in one file, and five manifests that name it.
-///
-/// `D-038`: written for this project after the standard texts were tried and
-/// each one gave up something the author wanted. Two properties are worth a
-/// test rather than a reading. The four grants have to still be there — use,
-/// passing on a build, and the two refusals that pay for them — because a
-/// licence loses a clause the way any other text does, in an edit that looked
-/// small. And it must not claim to be somebody else's: it is modelled on the
-/// PolyForm shape and says so, and PolyForm's own terms are that a text
-/// derived from theirs stops using their name.
+/// D-056: preserve the supplied terms, their holder and the package metadata.
 #[test]
 fn every_manifest_names_the_licence_the_repository_carries() {
-    const ID: &str = "LicenseRef-bgraph-noncommercial-1.0";
-
+    const ID: &str = "LicenseRef-bgraph-noncommercial-source-0.1";
+    const TITLE: &str = "Non-Commercial Source License — Version 0.1 (Project)";
     let licence = include_str!("../LICENSE");
+    assert!(licence.starts_with(&format!("# {TITLE}\n")));
 
-    assert!(
-        licence.starts_with("bgraph Noncommercial License 1.0\n\nCopyright 2026"),
-        "LICENSE does not name itself, or carries no copyright line"
-    );
-
-    // The rights holder, in one form, everywhere. `D-039` put a pseudonym in
-    // the notice; a manifest still carrying a different name would undo that
-    // in the one file a package manager reads and a reader never opens.
-    //
-    // Asserted by agreement rather than by naming what must be absent: a test
-    // that spelled out the name being replaced would put it straight back
-    // into the tree it was taken out of.
+    // D-039 keeps the same pseudonym in the licence and package authors.
     let holder = licence
         .lines()
-        .find_map(|l| l.strip_prefix("Copyright 2026 "))
-        .map(|l| l.trim_end_matches('.').to_string())
+        .find_map(|line| line.strip_prefix("Copyright © 2026 "))
         .expect("a copyright line naming a holder");
+    assert_eq!(holder, "Bunchyearth23");
     for (what, text) in [
         ("the crate", include_str!("../Cargo.toml")),
         ("the Typst package", include_str!("../typst/typst.toml")),
@@ -10677,57 +10658,38 @@ fn every_manifest_names_the_licence_the_repository_carries() {
     ] {
         let authors = text
             .lines()
-            .find(|l| l.starts_with("authors = "))
+            .find(|line| line.starts_with("authors = "))
             .unwrap_or_else(|| panic!("{what} names no author"));
         assert!(
-            authors.contains(&holder),
+            authors.contains(holder),
             "{what} says {authors}, and LICENSE says {holder}"
         );
     }
 
-    // What it grants, and what it holds back. Each of these was somebody's
-    // answer to a question, and a heading going missing is that answer being
-    // dropped without anyone deciding to.
     for clause in [
-        "## Copyright Licence",
-        "## Permitted Purposes",
-        "## Running It For Others",
-        "## Passing On A Build",
-        "## The Source Is Confidential",
-        "## No Changes",
-        "## Patent Licence",
-        "## Violations",
-        "## No Liability",
-        "## Definitions",
+        "## 1. Permitted Use",
+        "## 2. Restrictions",
+        "## 3. Contributions",
+        "## 4. Commercial Permissions",
+        "## 5. Termination",
+        "## 6. Disclaimer of Warranty",
+        "View and study the source code.",
+        "Compile and run the software for non-commercial purposes.",
+        "Modify the source code for private or internal non-commercial use.",
+        "Submit contributions to the project's official repository.",
+        "Without prior written authorization from the rights holder, it is prohibited to:",
+        "Redistribute the software, its source code or its binaries, whether modified or unmodified.",
+        "Publish copies, mirrors or alternative versions of the project.",
+        "including GitHub forks, are permitted to the extent provided by that platform's terms.",
+        "They do not confer any general right to redistribute the software outside that platform.",
+        "subject to a separate contribution agreement",
+        "Any commercial use requires prior written authorization from the relevant rights holder.",
     ] {
         assert!(
             licence.contains(clause),
             "`{clause}` is missing from LICENSE"
         );
     }
-    for said in [
-        "Commercial use is not permitted",
-        "unchanged",
-        "personal to",
-        "You may not modify the software",
-    ] {
-        assert!(licence.contains(said), "LICENSE no longer says `{said}`");
-    }
-
-    // Modelled on PolyForm's shape, and saying so — their terms are that a
-    // text derived from theirs stops using their name, so it must not read as
-    // one of theirs anywhere else.
-    assert!(
-        licence.contains("in the shape of the PolyForm licences")
-            && licence.contains("it is not endorsed by them"),
-        "the licence borrows a shape without saying whose, or without disclaiming it"
-    );
-    assert!(
-        !licence.contains("PolyForm Noncommercial License")
-            && !licence.contains("PolyForm Strict License")
-            && !licence.contains("polyformproject.org"),
-        "the licence presents itself as a PolyForm licence"
-    );
 
     for (what, text) in [
         ("the crate", include_str!("../Cargo.toml")),
@@ -10736,32 +10698,87 @@ fn every_manifest_names_the_licence_the_repository_carries() {
             "the Zed extension's crate",
             include_str!("../editors/zed/Cargo.toml"),
         ),
+    ] {
+        assert!(
+            text.lines()
+                .any(|line| line == format!("license = \"{ID}\"")),
+            "{what} does not name `{ID}`"
+        );
+    }
+    for (what, text, field) in [
         (
             "the VS Code extension",
             include_str!("../editors/vscode/package.json"),
+            "/license",
+        ),
+        (
+            "the playground",
+            include_str!("../playground/package.json"),
+            "/license",
+        ),
+        (
+            "the grammar package",
+            include_str!("../tree-sitter-bgraph/package.json"),
+            "/license",
+        ),
+        (
+            "the tree-sitter grammar",
+            include_str!("../tree-sitter-bgraph/tree-sitter.json"),
+            "/metadata/license",
         ),
     ] {
-        assert!(text.contains(ID), "{what} does not name `{ID}`");
+        let manifest: serde_json::Value = serde_json::from_str(text).unwrap();
+        assert_eq!(
+            manifest.pointer(field).and_then(serde_json::Value::as_str),
+            Some(ID),
+            "{what} does not name `{ID}`"
+        );
+    }
+    let vscode: serde_json::Value =
+        serde_json::from_str(include_str!("../editors/vscode/package.json")).unwrap();
+    assert_eq!(vscode["private"], true);
+
+    for (directory, manifest) in [
+        ("bgraph-zed-0.1.0", "Cargo.toml"),
+        ("bgraph-typst-0.1.0", "typst.toml"),
+    ] {
+        let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("stage")
+            .join(directory);
+        assert_eq!(
+            std::fs::read_to_string(directory.join("LICENSE")).unwrap(),
+            licence,
+            "{} carries stale licence terms",
+            directory.display()
+        );
+        let manifest = std::fs::read_to_string(directory.join(manifest)).unwrap();
+        assert!(
+            manifest
+                .lines()
+                .any(|line| line == format!("license = \"{ID}\"")),
+            "{} does not name `{ID}`",
+            directory.display()
+        );
     }
 
-    // It travels with everything the release hands out — a build passed on
-    // without it is a build passed on outside the clause that allows it.
+    // Every official archive carries the terms, including the playground.
     let release = include_str!("../.github/workflows/release.yml");
-    assert_eq!(
-        release.matches("cp LICENSE").count(),
-        3,
-        "an archive ships without the licence"
-    );
+    assert_eq!(release.matches("cp LICENSE").count(), 4);
+    assert!(release.contains("cp LICENSE playground/dist/"));
     assert!(
-        include_str!("../editors/vscode/package.sh").contains("LICENSE"),
+        include_str!("../editors/vscode/package.sh")
+            .contains("cp ../../LICENSE \"$staging/extension/LICENSE\""),
         "the VSIX ships without the licence"
     );
-
-    // crates.io and the marketplaces are still a separate decision.
-    assert!(
-        include_str!("../Cargo.toml").contains("publish = false"),
-        "a licence is not a decision to publish"
-    );
+    for manifest in [
+        include_str!("../Cargo.toml"),
+        include_str!("../editors/zed/Cargo.toml"),
+    ] {
+        assert!(
+            manifest.contains("publish = false"),
+            "a licence is not a decision to publish"
+        );
+    }
 
     let notes = std::fs::read_to_string(
         std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/docs/release-notes"))
@@ -10769,12 +10786,9 @@ fn every_manifest_names_the_licence_the_repository_carries() {
     )
     .expect("release notes");
     assert!(
-        notes.contains("bgraph Noncommercial License 1.0"),
+        notes.contains(TITLE),
         "the notes do not say what licence the artefacts come under"
     );
-    for said in ["separate agreement", "pass on a build", "confidential"] {
-        assert!(notes.contains(said), "the notes never mention `{said}`");
-    }
 }
 
 /// One version, in five files.

@@ -158,4 +158,12 @@ bgraph completions bash > bgraph.bash
 ```
 
 The manual and vocabulary schema come from the compiler's tables.
+The command is `bgraph docs` (plural). Its generated manual includes
+[legend blocks, titles and descriptions](reference.md#legends), alongside
+the property and type reference. Run it again after updating bgraph to
+refresh your saved manual.
+
+For the guide with navigation and search, follow
+[Open the local site](documentation.md#open-the-local-site).
+
 `completions` requires the feature of the same name, enabled by default.

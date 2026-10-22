@@ -61,6 +61,7 @@ To start with a shorter example and understand every line, follow
 |---|---|
 | Put boxes next to each other, align them or make groups | [Placement](placement.md) |
 | Change colors, shapes, fonts and spacing | [Styles and colors](styles.md) |
+| Add a titled legend and describe colors or shapes | [Add a legend](styles.md#add-a-legend) |
 | Pick a chart or a specialized notation | [Diagram types](graphiques.md) |
 | See a complete source and image for every type | [Gallery of all 30 types](galerie.md) |
 | Export images or automate rendering | [Commands and exports](commandes.md) |

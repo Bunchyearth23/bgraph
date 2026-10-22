@@ -537,7 +537,12 @@ fn apply_prop(style: &mut Style, prop: &Prop) -> Result<()> {
         "font-color" | "text-color" => {
             style.font_color = first.and_then(|x| x.as_paint()).map(String::from)
         }
-        "font-weight" => style.font_weight = first.and_then(|x| x.as_text()).map(String::from),
+        "font-weight" => {
+            style.font_weight = first.and_then(|value| match value {
+                Value::Num(weight) => Some(weight.to_string()),
+                other => other.as_text().map(String::from),
+            });
+        }
         // `label-offset: 18` is a horizontal nudge; the vertical one is opt-in.
         "label-offset" | "text-offset" => {
             style.label_offset = Some((

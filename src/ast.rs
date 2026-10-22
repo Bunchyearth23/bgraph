@@ -58,9 +58,9 @@ pub struct Diagram {
     pub layouts: Vec<LayoutDecl>,
     /// Free text placed by the ordinary anchors, belonging to no box.
     pub notes: Vec<NoteDecl>,
-    /// A key to the style classes in use. At most one is meaningful; a second
-    /// is reported rather than drawn twice.
-    pub legends: Vec<NoteDecl>,
+    /// A key populated by explicit entries or style classes in use. At most
+    /// one is meaningful; a second is reported rather than drawn twice.
+    pub legends: Vec<LegendDecl>,
 }
 
 /// `note "Figures are March" below api gap 20`.
@@ -73,6 +73,25 @@ pub struct NoteDecl {
     pub text: String,
     pub classes: Vec<Spanned<String>>,
     pub placement: Option<Placement>,
+    pub props: Vec<Prop>,
+    pub span: Span,
+}
+
+/// A style key, populated explicitly or from classes with a legend label.
+#[derive(Debug)]
+pub struct LegendDecl {
+    pub classes: Vec<Spanned<String>>,
+    pub placement: Option<Placement>,
+    pub props: Vec<Prop>,
+    pub entries: Vec<LegendEntry>,
+    pub span: Span,
+}
+
+/// One labelled swatch in an explicit legend.
+#[derive(Debug)]
+pub struct LegendEntry {
+    pub text: String,
+    pub classes: Vec<Spanned<String>>,
     pub props: Vec<Prop>,
     pub span: Span,
 }

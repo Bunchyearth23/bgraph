@@ -67,6 +67,7 @@ above.
 
 ## Not published
 
-This is not on Typst Universe and nothing here publishes it. `Q-005` — what
-licence this code carries — is unanswered, and publishing is a decision this
-repository leaves to a person.
+This package is not on Typst Universe. It uses the project's
+Non-Commercial Source License, version 0.1; see the repository's `LICENSE`
+or the copy supplied with the package. Publishing to Typst Universe remains
+a separate decision.

@@ -17,6 +17,9 @@
 (graph_declaration
   "graph" @context @name) @item
 
+(legend_declaration
+  "legend" @context @name) @item
+
 ; A component is a declaration like any other, and its placings are what the
 ; reader scrolls looking for.
 (component_declaration

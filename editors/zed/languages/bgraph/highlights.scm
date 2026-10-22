@@ -21,6 +21,7 @@
   "use"
   "note"
   "legend"
+  "entry"
   "layout"
   "place"
   "row"

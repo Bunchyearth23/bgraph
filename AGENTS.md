@@ -203,6 +203,17 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-10-22] **The current licence is the user-supplied Non-Commercial Source
+  License, version 0.1 (`D-056`).** Keep its terms in English in `LICENSE` and the
+  holder Bunchyearth23. It supersedes the confidential-source/no-changes policy
+  below and the briefly proposed PolyForm switch. Metadata uses
+  `LicenseRef-bgraph-noncommercial-source-0.1`. Study and noncommercial private
+  or internal changes are permitted; redistribution and commercial use need
+  written authorization, subject to the stated platform-fork exception.
+  Accepted contributions require a separate agreement; none is supplied yet.
+  The user intends to publish the source. Do not restore confidentiality
+  restrictions or describe this custom licence as PolyForm or open source.
+  Repository visibility and release/registry publication remain separate actions.
 - [2026-08-12] **Every GitHub Release carries auto-generated source archives**
   and there is no way to turn them off. Fine while the repository is private,
   because the release audience is the source audience (`D-040`). If a build

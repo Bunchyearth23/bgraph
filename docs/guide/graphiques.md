@@ -44,7 +44,9 @@ slice referral "Referrals" 1180
 
 The number after each label is its value. The type calculates the geometry,
 so do not add `layout`. Colors come from the default palette unless you
-declare a `fill`.
+declare a `fill`. Pie charts include a key derived from their slices.
+To replace it with descriptive entries and a heading, set `legend: off` in
+the `type pie` block and [add a legend](styles.md#add-a-legend).
 
 For more than eight categories, group the tail of the distribution. See
 `top` in [the pie reference](reference.md#type-pie).
@@ -99,8 +101,13 @@ The type arranges the fields according to the declared row width.
 | Calculated by the type | The other 21 types | Data, written order and type settings |
 
 A type with calculated geometry rejects `layout` blocks and `note`
-declarations. Styles are shared by both families, but a property with no
-effect for the chosen type produces a diagnostic.
+declarations. A `legend` block works in both families: omit its position to
+place it below the drawing, or use `at (x, y)` for an absolute position.
+Relative legend anchors such as `below api` require declared placement.
+See [Add a legend](styles.md#add-a-legend) for a complete example with a title.
+
+Styles are shared by both families, but a property with no effect for the
+chosen type produces a diagnostic.
 
 Each type has its own declaration words, such as `slice`, `field`, `task`
 or `host`. `node` remains a universal synonym. For your first attempt,

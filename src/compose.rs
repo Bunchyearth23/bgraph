@@ -813,7 +813,7 @@ fn pin(d: &mut Diagram, at: Span) {
         props(&mut group.props);
         s(&mut group.span);
     }
-    for note in d.notes.iter_mut().chain(&mut d.legends) {
+    for note in &mut d.notes {
         for class in &mut note.classes {
             sp(class);
         }
@@ -822,6 +822,23 @@ fn pin(d: &mut Diagram, at: Span) {
         }
         props(&mut note.props);
         s(&mut note.span);
+    }
+    for legend in &mut d.legends {
+        for class in &mut legend.classes {
+            sp(class);
+        }
+        if let Some(placement) = &mut legend.placement {
+            pin_placement_value(placement, at);
+        }
+        props(&mut legend.props);
+        s(&mut legend.span);
+        for entry in &mut legend.entries {
+            for class in &mut entry.classes {
+                sp(class);
+            }
+            props(&mut entry.props);
+            s(&mut entry.span);
+        }
     }
     for layout in &mut d.layouts {
         if let Some(scope) = &mut layout.scope {
@@ -978,7 +995,7 @@ fn shift(d: &mut Diagram, delta: usize) {
         props(&mut group.props);
         s(&mut group.span);
     }
-    for note in d.notes.iter_mut().chain(&mut d.legends) {
+    for note in &mut d.notes {
         for class in &mut note.classes {
             sp(class);
         }
@@ -987,6 +1004,23 @@ fn shift(d: &mut Diagram, delta: usize) {
         }
         props(&mut note.props);
         s(&mut note.span);
+    }
+    for legend in &mut d.legends {
+        for class in &mut legend.classes {
+            sp(class);
+        }
+        if let Some(placement) = &mut legend.placement {
+            shift_placement_value(placement, delta);
+        }
+        props(&mut legend.props);
+        s(&mut legend.span);
+        for entry in &mut legend.entries {
+            for class in &mut entry.classes {
+                sp(class);
+            }
+            props(&mut entry.props);
+            s(&mut entry.span);
+        }
     }
     for layout in &mut d.layouts {
         if let Some(scope) = &mut layout.scope {
@@ -1101,11 +1135,26 @@ fn qualify(d: &mut Diagram, prefix: &str) {
             }
         }
     }
-    for note in d.notes.iter_mut().chain(&mut d.legends) {
+    for note in &mut d.notes {
         if let Some(placement) = &mut note.placement {
             rename_placement_anchor(placement, &own, prefix);
         }
         for class in &mut note.classes {
+            if styles.contains(&class.value) {
+                rename(class);
+            }
+        }
+    }
+    for legend in &mut d.legends {
+        if let Some(placement) = &mut legend.placement {
+            rename_placement_anchor(placement, &own, prefix);
+        }
+        for class in legend.classes.iter_mut().chain(
+            legend
+                .entries
+                .iter_mut()
+                .flat_map(|entry| &mut entry.classes),
+        ) {
             if styles.contains(&class.value) {
                 rename(class);
             }
@@ -1152,5 +1201,44 @@ fn qualified(name: &Spanned<String>, prefix: &str) -> Spanned<String> {
     Spanned {
         value: format!("{prefix}.{}", name.value),
         span: name.span,
+    }
+}
+
+#[cfg(test)]
+mod legend_tests {
+    use super::{Span, pin, qualify, shift};
+    use crate::{ast::Placement, parser};
+
+    #[test]
+    fn legend_entries_follow_composition_names_and_source_spans() {
+        let source = "style live { fill: #fff }\nnode api\nlegend .live below api {\n entry \"Ready\" .live .external { stroke: #333 }\n}";
+        let mut diagram = parser::parse(source).unwrap();
+        let original = diagram.legends[0].entries[0].span;
+        let class_span = diagram.legends[0].entries[0].classes[0].span;
+        let prop_span = diagram.legends[0].entries[0].props[0].values_span;
+        qualify(&mut diagram, "service");
+        shift(&mut diagram, 100);
+        let legend = &diagram.legends[0];
+        assert_eq!(legend.classes[0].value, "service.live");
+        let Some(Placement::Rel { anchor, .. }) = &legend.placement else {
+            panic!("legend must keep its relative anchor");
+        };
+        assert_eq!(anchor.value, "service.api");
+        let entry = &legend.entries[0];
+        assert_eq!(entry.classes[0].value, "service.live");
+        assert_eq!(entry.classes[1].value, "external");
+        assert_eq!(entry.span.start, original.start + 100);
+        assert_eq!(entry.span.end, original.end + 100);
+        assert_eq!(entry.classes[0].span.start, class_span.start + 100);
+        assert_eq!(entry.props[0].values_span.start, prop_span.start + 100);
+
+        let use_span = Span { start: 7, end: 17 };
+        pin(&mut diagram, use_span);
+        let entry = &diagram.legends[0].entries[0];
+        assert_eq!(entry.span, use_span);
+        assert_eq!(entry.classes[0].span, use_span);
+        assert_eq!(entry.props[0].span, use_span);
+        assert_eq!(entry.props[0].name_span, use_span);
+        assert_eq!(entry.props[0].values_span, use_span);
     }
 }

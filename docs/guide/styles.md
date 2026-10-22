@@ -58,6 +58,57 @@ Common shapes include `rect`, `stadium`, `ellipse`, `diamond`,
 `hexagon` and `cylinder`. The `ortho` router looks for a right-angle route
 around boxes; `straight` draws a direct connection.
 
+## Add a legend
+
+Write `title: "…"` inside a `legend` block to give the legend a heading.
+Each `entry` describes a color or shape with a label and a small swatch:
+
+```bgraph
+type free
+
+style status { stroke-width: 1.5 radius: 6 }
+style live extends status { fill: #dcfce7 stroke: #166534 }
+style planned extends status { fill: #fef3c7 stroke: #92400e dash: dashed }
+
+node api "API" .live
+node worker "Worker" .planned
+layout { place worker right-of api gap 60 }
+api -> worker
+
+legend {
+  title: "Service status"
+  font-size: 12
+  entry "Available to users" .live
+  entry "Planned for a later release" .planned
+}
+```
+
+The heading here is **Service status**. Entries appear in their written
+order. The same `.live` and `.planned` classes style both the boxes and their
+swatches, including the properties inherited through `extends`. To style a
+swatch directly, an entry can instead use a block such as
+`entry "Available" { fill: #dcfce7 stroke: #166534 }`. Inline properties
+override the entry's classes.
+
+With no position, the legend sits below the drawing. This works in every
+diagram type, including types that have no built-in key. Add
+`at (0, 240)` after `legend` to set an absolute position. In a type with
+[declared placement](graphiques.md#two-ways-to-control-positions), you can also
+write `legend below api gap 32 align left { … }` to anchor it to a node or
+group.
+
+`title` belongs to the legend; it does not change the diagram title. The
+legend's `font`, `font-size`, `font-family`, `font-color` and `font-weight`
+settings control its text. Entry blocks accept `fill`, `stroke`,
+`stroke-width`, `dash`, `radius` and `shape` for the swatches. See
+[Legends in the reference](reference.md#legends).
+
+A chart's built-in key remains independent. Where the type supports
+`legend: off`, put that setting in its `type` block to hide its generated key
+when providing your own legend. Without explicit entries, a `legend` statement
+still builds its rows from styles with `legend: "description"`. Explicit
+entries replace that list; no custom legend appears unless you declare one.
+
 ## Add space around an element
 
 `padding` reserves room **inside** a box. `margin` reserves room **outside**

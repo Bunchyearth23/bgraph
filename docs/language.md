@@ -130,26 +130,47 @@ anchored to something a constraint moved moves with it.
 
 ### A legend
 
-The chart archetypes build a key from their own series. Every other genre had
-no way to declare one:
+A `legend` block describes the colours and shapes in any genre. Each entry
+has its own description and takes a style class, inline properties, or both:
 
 ```bgraph
-style healthy  { fill: #dcfce7 stroke: #16a34a legend: "Healthy" }
-style degraded { fill: #fef3c7 stroke: #d97706 legend: "Degraded" }
-style plain    { radius: 2 }
+style healthy  { fill: #dcfce7 stroke: #16a34a }
+style degraded { fill: #fef3c7 stroke: #d97706 }
 
 node api "API" .healthy
 node jobs "Workers" .degraded
 layout { place jobs below api }
 
-legend right-of api gap 70
+legend {
+  title: "Service status"
+  font-size: 12
+  entry "Healthy — accepting requests" .healthy
+  entry "Degraded — retries required" .degraded
+  entry "Planned" { fill: #e0e7ff stroke: #4338ca }
+}
 ```
 
-It lists the style classes that declare a `legend:` text — nothing else. A
-legend built from every class would list the ones that only round a corner,
-and one built from the colours on the page would have nothing to call them.
-So the file says which classes mean something, and the legend can only ever
-describe a colour the file actually used.
+To give the legend a heading, set `title: "Service status"` **inside the
+legend block**, as in the example. The title is optional and appears above
+the entries. Each quoted string after `entry` is the description of one
+swatch. Use `\n` inside a title or description for a line break.
+
+Entries appear in block order. Separate entries and settings with newlines
+or semicolons. Typography
+settings apply to the whole legend. Swatches support `fill`, `stroke`,
+`stroke-width`, `dash`, `radius` and `shape`.
+
+Without a position, the legend sits below the drawing. An absolute position,
+such as `legend at (0, 240) { … }`, works in every genre. Declared-layout
+genres also support relative placement, such as
+`legend right-of api gap 70 { … }`, anchored to a node or group.
+
+The original style-derived form remains available: write
+`legend: "Healthy"` inside a style, then add a bare `legend` statement.
+When a legend has no explicit entries, it lists those labelled classes in
+declaration order. Explicit entries replace that list. Built-in chart keys
+remain independent; use the archetype's `legend: off` setting, where
+available, to hide them.
 
 The swatch carries the class's stroke as well as its fill, because a status
 colour is usually a pale tint with the meaning in the border.

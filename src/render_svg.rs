@@ -954,7 +954,7 @@ fn segments_cross(p1: (f64, f64), p2: (f64, f64), p3: (f64, f64), p4: (f64, f64)
 
 /// Where a node's label ends up once it has been moved — `None` while it sits
 /// in its shape, which the bounds already cover.
-fn moved_node_label(node: &PlacedNode) -> Option<Rect> {
+pub(crate) fn moved_node_label(node: &PlacedNode) -> Option<Rect> {
     let (dx, dy) = node.style.label_offset?;
     if node.lines.iter().all(|l| l.is_empty()) {
         return None;
@@ -973,7 +973,7 @@ fn moved_node_label(node: &PlacedNode) -> Option<Rect> {
 }
 
 /// The same for a group's title, which hangs off the top-left of its frame.
-fn moved_group_label(group: &PlacedGroup, opts: &GraphOpts) -> Option<Rect> {
+pub(crate) fn moved_group_label(group: &PlacedGroup, opts: &GraphOpts) -> Option<Rect> {
     if group.lines.iter().all(|l| l.is_empty()) {
         return None;
     }

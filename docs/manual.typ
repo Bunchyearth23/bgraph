@@ -27,7 +27,7 @@
   title: "bgraph",
   subtitle: "A diagram language where you decide the layout",
   author: "Bunchyearth23",
-  date: "20 October 2026 · bgraph 1.0.0",
+  date: "22 October 2026 · bgraph 1.0.1",
 )
 #v(1fr)
 #pagebreak(weak: true)
@@ -83,9 +83,6 @@ positions.
   [The categorical palette is validated for colour-vision deficiency. Past
    eight series it tells you to merge the tail rather than repeating a hue.],
 
-  [Emit a raster image],
-  [SVG and PDF are vector and need no rasteriser. Anything that needs a bitmap
-   can rasterise those with a tool built for it.],
 )
 ]
 
@@ -164,6 +161,7 @@ layout { place <id> <position> }
   [item], [A box, a slice, a field — the archetype decides the word.],
   [edge], [A link. `->`, `-->`, `..>`, `<->`, `--`, `..`],
   [`layout`], [Positions and geometric relationships.],
+  [`legend`], [A title and descriptions for styled symbols.],
 )
   ],
   [
@@ -316,6 +314,51 @@ layers deep, and otherwise visible only by rendering the file.
   ],
   columns: (0.85fr, 1fr),
 )
+]
+
+// ══════════════════════════════════════════════════════════════════════════════
+#pagebreak(weak: true)
+#slide(title: "Legends: explain the symbols")[
+
+A legend is its own block. Set `title:` inside it, then write one `entry`
+for each description. Save this complete example as `services.bd`:
+
+#let legend-source = read("diagrams/legend.bd")
+#two-col(
+  [#raw(legend-source, block: true)],
+  [
+#diagram(
+  render(legend-source, width: 100%),
+  caption: [The title belongs to the legend; each entry reuses a node's style.],
+)
+  ],
+  columns: (1.35fr, 1fr),
+)
+
+Run `bgraph services.bd -o services.svg`. The legend appears below the diagram
+without moving the nodes. This automatic placement works with every archetype,
+including those without a built-in key.
+
+*Write the description you need.* Entry text does not have to match a node's
+label. Reuse a named class as above, or style one entry directly:
+`entry "Unavailable" { fill: #fee2e2 stroke: #991b1b }`.
+Separate entries and settings with newlines or semicolons.
+
+*Choose the title and typography.* `title: "Service status"` sets the heading.
+The legend block also accepts `font`, `font-size`, `font-family`, `font-color`
+and `font-weight`. Put `\n` inside a quoted title or description to split it
+across lines.
+
+*Choose a position when necessary.* `legend at (0, 240) { … }` works with
+every archetype. `legend below worker { … }` anchors to a node or group in
+archetypes with declared layout. Managed charts accept automatic or absolute
+placement instead of relative anchors.
+
+*Built-in chart keys stay independent.* Adding this block does not replace a
+pie or another chart's native key. Where the archetype exposes the setting,
+use `legend: off` in its `type` block to hide that key.
+The older form, `style available { legend: "Available now" … }` followed by
+`legend`, still works; explicit entries replace that class-derived list.
 ]
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -1091,10 +1134,6 @@ here.
    moves the label and *pins* it, because the author can see what the cost
    function cannot.],
 
-  [*No raster output*],
-  [No PNG.],
-  [SVG and PDF are vector and need no rasteriser. A bitmap is one command away
-   from either, with a tool built for it.],
 )
 
 #v(0.6em)
@@ -1104,8 +1143,7 @@ here.
 #v(0.4em)
 
 #text(fill: muted, size: 0.92em)[
-None of these is a defect being hidden until it is fixed. Three of them are
-positions; the first is a property of the format itself.
+These limits describe the current layout and rendering behavior.
 ]
 ]
 
@@ -1116,6 +1154,12 @@ positions; the first is a property of the format itself.
 #dtable(
   header: ([Version], [Date], [What changed]),
   columns: (auto, auto, 1fr),
+
+  [*1.4*], [22 October 2026], [Descriptive legend blocks with a title,
+   styled entries and automatic placement for every archetype. The worked
+   example is rendered from the same source printed beside it. Updated the
+   cover to bgraph 1.0.1 and removed obsolete claims that PNG output was
+   unavailable. Revision numbers here refer to this manual.],
 
   [*1.3*], [11 August 2026], [`type bpmn`, the twenty-ninth genre and the
    widest — four words, because four things carry four shapes of data. An

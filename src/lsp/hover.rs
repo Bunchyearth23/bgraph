@@ -116,6 +116,8 @@ pub(super) fn hover(text: &str, index: &LineIndex, offset: usize) -> Value {
     } else if is_key && ctx.block.is_some() {
         let table: Vec<&'static props::PropDef> = match ctx.block {
             Some(Block::Graph) => props::GRAPH_PROPS.iter().collect(),
+            Some(Block::Legend) => props::LEGEND_PROPS.iter().collect(),
+            Some(Block::LegendEntry) => props::LEGEND_ENTRY_PROPS.iter().collect(),
             Some(Block::Type) => props::archetype(archetype)
                 .map_or(&[][..], |def| def.props)
                 .iter()
@@ -135,7 +137,10 @@ pub(super) fn hover(text: &str, index: &LineIndex, offset: usize) -> Value {
         || before.split_whitespace().last() == Some("style")
     {
         describe_style(text, &word)
+    } else if ctx.block == Some(Block::Legend) && word == "entry" {
+        Some("**entry**\n\nAn explicit legend row: `entry \"Available\" .live` or `entry \"Available\" { fill: #dcfce7 }`. The label describes its swatch and declares no node identifier.".to_string())
     } else if text[line_start..span.start].trim().is_empty()
+        && matches!(ctx.block, None | Some(Block::Container))
         && props::archetype(archetype).is_some_and(|def| def.accepts(&word))
         && word != "node"
     {

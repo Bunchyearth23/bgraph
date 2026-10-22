@@ -18,6 +18,7 @@ impl Ctx {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct PropDef {
     pub name: &'static str,
     pub ctx: Ctx,
@@ -594,6 +595,53 @@ pub const PROPS: &[PropDef] = &[
         syntax: "shadow: <on|off>",
         doc: "Soft drop shadow under the shape.",
     },
+];
+
+// Share the canonical spelling and documentation with style properties.
+const fn style_property(name: &str) -> PropDef {
+    let wanted = name.as_bytes();
+    let mut i = 0;
+    while i < PROPS.len() {
+        let found = PROPS[i].name.as_bytes();
+        let mut same = found.len() == wanted.len();
+        let mut j = 0;
+        while same && j < wanted.len() {
+            same = found[j] == wanted[j];
+            j += 1;
+        }
+        if same {
+            return PROPS[i];
+        }
+        i += 1;
+    }
+    panic!("legend property must exist in the style vocabulary")
+}
+
+/// Settings read by an explicit legend block.
+pub const LEGEND_PROPS: &[PropDef] = &[
+    PropDef {
+        name: "title",
+        alias: false,
+        ctx: Ctx::Both,
+        words: &[],
+        syntax: "title: <text>",
+        doc: "Heading displayed above the legend entries.",
+    },
+    style_property("font"),
+    style_property("font-size"),
+    style_property("font-family"),
+    style_property("font-color"),
+    style_property("font-weight"),
+];
+
+/// Appearance of the swatch beside an explicit legend entry.
+pub const LEGEND_ENTRY_PROPS: &[PropDef] = &[
+    style_property("fill"),
+    style_property("stroke"),
+    style_property("stroke-width"),
+    style_property("dash"),
+    style_property("radius"),
+    style_property("shape"),
 ];
 
 pub const GRAPH_PROPS: &[PropDef] = &[
@@ -3081,10 +3129,10 @@ pub const KEYWORDS: &[(&str, &str)] = &[
     ),
     (
         "legend",
-        "A key to the colours: `legend right-of core gap 30`. Lists the style \
-         classes that declare a `legend:` text, so it can only ever describe a \
-         colour the file actually used. The chart archetypes build their own \
-         from their series and need no statement.",
+        "A key with optional title and explicit entries: `legend { entry \
+         \"Available\" .live }`. Without entries, lists styles with a `legend:` \
+         text. Placed below the drawing by default; `at (x, y)` sets a position, \
+         and declared-layout genres also accept relative anchors.",
     ),
     (
         "note",

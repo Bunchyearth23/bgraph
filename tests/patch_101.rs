@@ -107,11 +107,11 @@ fn a_font_shorthand_with_two_sizes_warns_and_names_the_weight_property() {
 }
 
 #[test]
-fn a_legend_without_a_position_warns_and_a_bad_anchor_is_an_error() {
+fn a_legend_without_a_position_is_valid_and_a_bad_anchor_is_an_error() {
     let analysis = analyze_source("node a\nlegend");
     assert!(!analysis.has_errors());
     assert!(
-        analysis.diagnostics.iter().any(|diag| {
+        !analysis.diagnostics.iter().any(|diag| {
             diag.severity == bgraph::check::Severity::Warning
                 && diag.message.contains("legend")
                 && diag.message.contains("position")

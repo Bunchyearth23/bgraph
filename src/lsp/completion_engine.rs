@@ -89,6 +89,8 @@ impl Server {
                 .unwrap_or_default();
             let mut table: Vec<&'static props::PropDef> = match block {
                 Block::Graph => props::GRAPH_PROPS.iter().collect(),
+                Block::Legend => props::LEGEND_PROPS.iter().collect(),
+                Block::LegendEntry => props::LEGEND_ENTRY_PROPS.iter().collect(),
                 Block::Type => props::archetype(archetype)
                     .map_or(&[][..], |a| a.props)
                     .iter()
@@ -154,7 +156,7 @@ impl Server {
                 _ => &[],
             };
 
-            let offered: Vec<Value> = table
+            let mut offered: Vec<Value> = table
                 .iter()
                 .filter(|p| !p.alias)
                 .filter(|p| want.is_none_or(|c| p.ctx.allows(c)))
@@ -170,6 +172,20 @@ impl Server {
                     it
                 })
                 .collect();
+
+            if block == Block::Legend {
+                if trimmed.split_whitespace().count() > 1
+                    || trimmed.ends_with(char::is_whitespace) && !trimmed.is_empty()
+                {
+                    return Vec::new();
+                }
+                offered.insert(0, snippet(
+                    "entry", 14, "entry \"label\" [.class] { … }",
+                    "Describe one swatch in this legend. Classes and inline properties set its appearance.",
+                    "entry \"${1:label}\" { fill: ${2:#dcfce7} }$0",
+                ));
+                return offered;
+            }
 
             // A container holds statements too, so it does not return here —
             // it carries its properties down to the statement level and the
@@ -208,7 +224,7 @@ impl Server {
         }
 
         if is_rel_dir(preceding) {
-            if words.first() != Some(&"note")
+            if !matches!(words.first(), Some(&"note" | &"legend"))
                 || !props::archetype(archetype).is_some_and(|def| def.layout.accepts_layout_block())
             {
                 return Vec::new();
@@ -220,7 +236,7 @@ impl Server {
         }
 
         if preceding == "align" {
-            if words.first() != Some(&"note")
+            if !matches!(words.first(), Some(&"note" | &"legend"))
                 || !props::archetype(archetype).is_some_and(|def| def.layout.accepts_layout_block())
             {
                 return Vec::new();
@@ -302,6 +318,10 @@ impl Server {
                     let insert = match *name {
                         "type" => "type ${1:archetype}$0".to_string(),
                         "graph" => "graph { $0 }".to_string(),
+                        "legend" => {
+                            "legend {\n  entry \"${1:label}\" { fill: ${2:#dcfce7} }\n  $0\n}"
+                                .to_string()
+                        }
                         "layout" => "layout {\n  $0\n}".to_string(),
                         "style" => "style ${1:name} {\n  $0\n}".to_string(),
                         "group" => "group ${1:id} \"${2:label}\" {\n  $0\n}".to_string(),

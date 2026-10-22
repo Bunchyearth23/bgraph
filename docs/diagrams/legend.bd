@@ -1,0 +1,16 @@
+style available { fill: #dcfce7 stroke: #166534 }
+style planned { fill: #fef3c7 stroke: #92400e }
+
+node api "API" .available
+node worker "Worker" .planned
+layout {
+  place api at (0, 0)
+  place worker below api gap 32
+}
+api -> worker
+
+legend {
+  title: "Service status"
+  entry "Available now" .available
+  entry "Planned" .planned
+}

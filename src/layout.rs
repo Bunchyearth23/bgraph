@@ -601,6 +601,10 @@ fn solve_with_captions(
     // pushed, which would have been nineteen chances to disagree (`W-128`).
     if let Some(chart) = chart {
         let mut chart = chart?;
+        if !diagram.legends.is_empty() {
+            let sizes: Vec<_> = chart.nodes.iter().map(|n| (n.rect.w, n.rect.h)).collect();
+            append_legends(diagram, &registry, &mut chart, &sizes)?;
+        }
         place_title(&mut chart);
         return Ok(chart);
     }
@@ -1537,119 +1541,6 @@ fn solve_with_captions(
         }
     }
 
-    // A legend, for the genres that have no chart to build one from. Derived
-    // from the style classes that declare a `legend:` text, in the order they
-    // were declared — so it lists what the file actually says rather than
-    // guessing from the colours on the page.
-    for legend in &diagram.legends {
-        let style = registry.resolve(node_base.clone(), "note", &legend.classes, &legend.props)?;
-        let size = style.font_size.unwrap_or(12.0);
-        let swatch = size;
-        let step = size * 2.0;
-        let gap_to_text = size * 0.7;
-
-        // The swatch takes the class's stroke as well as its fill: a pale
-        // fill is common — a status colour is usually a tint with the meaning
-        // in the border — and a swatch drawn from the fill alone would be a
-        // key nobody can read.
-        let entries: Vec<(String, String, String)> = diagram
-            .styles
-            .iter()
-            .filter_map(|decl| {
-                let resolved = registry.get(decl.name.as_str())?;
-                let text = resolved.legend.clone()?;
-                Some((
-                    text,
-                    resolved.fill.clone().unwrap_or_else(|| "#94a3b8".into()),
-                    resolved.stroke.clone().unwrap_or_else(|| "#94a3b8".into()),
-                ))
-            })
-            .collect();
-        if entries.is_empty() {
-            continue;
-        }
-
-        let widest = entries
-            .iter()
-            .map(|(text, _, _)| advance(text, size))
-            .fold(0.0_f64, f64::max);
-        let w = swatch + gap_to_text + widest;
-        let h = entries.len() as f64 * step;
-
-        let rect = match legend
-            .placement
-            .as_ref()
-            .map(|p| resolve_grid_placement(p, &opts, &sizes))
-        {
-            Some(Placement::At { x, y }) => Rect { x, y, w, h },
-            Some(Placement::Rel {
-                dir,
-                ref anchor,
-                gap,
-                align,
-            }) => {
-                let found = index.get(anchor.as_str()).and_then(|entity| match entity {
-                    Entity::Node(i) => nodes.get(*i).map(|n| n.rect),
-                    Entity::Group(g) => groups.get(*g).map(|f| f.rect),
-                });
-                let Some(anchor_rect) = found else { continue };
-                offset_from(
-                    &anchor_rect,
-                    dir,
-                    grid_distance(&opts, gap.unwrap_or(opts.gap), dir, &sizes),
-                    align,
-                    w,
-                    h,
-                )
-            }
-            Some(Placement::Cell { col, row }) => Rect {
-                x: col,
-                y: row,
-                w,
-                h,
-            },
-            None => continue,
-        };
-
-        for (i, (text, fill, stroke)) in entries.iter().enumerate() {
-            let y = rect.y + i as f64 * step;
-            nodes.push(PlacedNode {
-                id: String::new(),
-                lines: Vec::new(),
-                rect: Rect {
-                    x: rect.x,
-                    y: y + (step - swatch) / 2.0,
-                    w: swatch,
-                    h: swatch,
-                },
-                style: Style {
-                    fill: Some(fill.clone()),
-                    stroke: Some(stroke.clone()),
-                    stroke_width: Some(1.2),
-                    radius: Some(3.0),
-                    ..Style::default()
-                },
-            });
-            annotations.push(Annotation {
-                text: text.clone(),
-                x: rect.x + swatch + gap_to_text,
-                y: y + step / 2.0,
-                anchor: Anchor::Start,
-                size,
-                color: style.font_color.clone().unwrap_or_else(|| {
-                    if dark {
-                        "#e2e8f0".into()
-                    } else {
-                        "#1a1a1a".into()
-                    }
-                }),
-                weight: "500".into(),
-                family: style.font_family.clone().unwrap_or_default(),
-                title: false,
-            });
-        }
-    }
-
     // A BPMN diagram's marks come last, because every one of them is placed
     // against boxes already placed by the common solver, including boundaries.
     #[cfg(feature = "bpmn")]
@@ -1710,9 +1601,6 @@ fn solve_with_captions(
         chart: Chart::Free,
         annotations,
     };
-    // The same funnel the chart genres go through, for the same reason: a
-    // heading can only be placed once the drawing's width is known.
-    place_title(&mut out);
     #[cfg(feature = "bpmn")]
     if process && refinements > 0 && captions.iter().any(Option::is_some) {
         let offsets =
@@ -1726,7 +1614,266 @@ fn solve_with_captions(
             return solve_with_captions(diagram, &offsets, refinements - 1);
         }
     }
+    append_legends(diagram, &registry, &mut out, &sizes)?;
+    place_title(&mut out);
     Ok(out)
+}
+
+fn append_legends(
+    diagram: &Diagram,
+    registry: &Registry,
+    layout: &mut Layout,
+    sizes: &[(f64, f64)],
+) -> Result<()> {
+    for legend in &diagram.legends {
+        let typography: Vec<_> = legend
+            .props
+            .iter()
+            .filter(|p| p.name != "title")
+            .cloned()
+            .collect();
+        let style = registry.resolve(
+            Style {
+                font_color: None,
+                ..Style::node_defaults()
+            },
+            "note",
+            &legend.classes,
+            &typography,
+        )?;
+        let size = style.font_size.unwrap_or(12.0);
+        let swatch = size;
+        let step = size * 2.0;
+        let gap_to_text = size * 0.7;
+        let title = legend
+            .props
+            .iter()
+            .rev()
+            .find(|p| p.name == "title")
+            .and_then(|p| p.values.first())
+            .and_then(Value::as_text);
+        let mut entries = Vec::new();
+        if legend.entries.is_empty() {
+            // Keep the original class-derived legend when no entries are written.
+            for decl in &diagram.styles {
+                if let Some(resolved) = registry.get(decl.name.as_str())
+                    && let Some(text) = &resolved.legend
+                {
+                    entries.push((
+                        text.clone(),
+                        Style {
+                            fill: resolved.fill.clone(),
+                            stroke: resolved.stroke.clone(),
+                            ..Style::default()
+                        },
+                    ));
+                }
+            }
+        } else {
+            for entry in &legend.entries {
+                // Swatches describe the named class, without the implicit node theme.
+                let mut look = Style::default();
+                for class in &entry.classes {
+                    if let Some(layer) = registry.get(class.as_str()) {
+                        look.overlay(layer);
+                    }
+                }
+                look.overlay(&crate::style::layer_from_props(&entry.props)?);
+                entries.push((entry.text.clone(), look));
+            }
+        }
+        if entries.is_empty() && title.is_none() {
+            continue;
+        }
+        let line_count = |text: &str| text.split('\n').count() as f64;
+        let text_width = |text: &str| {
+            text.split('\n')
+                .map(|line| advance(line, size))
+                .fold(0.0_f64, f64::max)
+        };
+        let title_height = title.map_or(0.0, |text| line_count(text) * step);
+        let w = entries
+            .iter()
+            .map(|(text, _)| swatch + gap_to_text + text_width(text))
+            .fold(title.map_or(0.0, text_width), f64::max);
+        let h = title_height
+            + entries
+                .iter()
+                .map(|(text, _)| line_count(text) * step)
+                .sum::<f64>();
+        let rect = match legend
+            .placement
+            .as_ref()
+            .map(|p| resolve_grid_placement(p, &layout.opts, sizes))
+        {
+            Some(Placement::At { x, y }) => Rect { x, y, w, h },
+            Some(Placement::Cell { col, row }) => Rect {
+                x: col,
+                y: row,
+                w,
+                h,
+            },
+            Some(Placement::Rel {
+                dir,
+                ref anchor,
+                gap,
+                align,
+            }) => {
+                let anchor_rect = layout
+                    .nodes
+                    .iter()
+                    .find(|n| n.id == anchor.value)
+                    .map(|n| n.rect)
+                    .or_else(|| {
+                        layout
+                            .groups
+                            .iter()
+                            .find(|g| g.id == anchor.value)
+                            .map(|g| g.rect)
+                    });
+                let Some(anchor_rect) = anchor_rect else {
+                    continue;
+                };
+                offset_from(
+                    &anchor_rect,
+                    dir,
+                    grid_distance(&layout.opts, gap.unwrap_or(layout.opts.gap), dir, sizes),
+                    align,
+                    w,
+                    h,
+                )
+            }
+            None => {
+                let area = legend_content_bounds(layout);
+                Rect {
+                    x: area.x,
+                    y: area.bottom() + layout.opts.gap.max(0.0),
+                    w,
+                    h,
+                }
+            }
+        };
+        let color = style
+            .font_color
+            .clone()
+            .unwrap_or_else(|| crate::charts::Theme::of(&layout.opts).ink);
+        let family = style.font_family.clone().unwrap_or_default();
+        let mut y = rect.y;
+        if let Some(title) = title {
+            for line in title.split('\n') {
+                layout.annotations.push(Annotation {
+                    text: line.into(),
+                    x: rect.x,
+                    y: y + step / 2.0,
+                    anchor: Anchor::Start,
+                    size,
+                    color: color.clone(),
+                    weight: "600".into(),
+                    family: family.clone(),
+                    title: false,
+                });
+                y += step;
+            }
+        }
+        for (text, look) in entries {
+            layout.nodes.push(PlacedNode {
+                id: String::new(),
+                lines: Vec::new(),
+                rect: Rect {
+                    x: rect.x,
+                    y: y + (step - swatch) / 2.0,
+                    w: swatch,
+                    h: swatch,
+                },
+                style: Style {
+                    fill: Some(look.fill.unwrap_or_else(|| "#94a3b8".into())),
+                    stroke: Some(look.stroke.unwrap_or_else(|| "#94a3b8".into())),
+                    stroke_width: Some(look.stroke_width.unwrap_or(1.2)),
+                    radius: Some(look.radius.unwrap_or(3.0)),
+                    shape: look.shape,
+                    dash: look.dash,
+                    ..Style::default()
+                },
+            });
+            for line in text.split('\n') {
+                layout.annotations.push(Annotation {
+                    text: line.into(),
+                    x: rect.x + swatch + gap_to_text,
+                    y: y + step / 2.0,
+                    anchor: Anchor::Start,
+                    size,
+                    color: color.clone(),
+                    weight: style.font_weight.clone().unwrap_or_else(|| "500".into()),
+                    family: family.clone(),
+                    title: false,
+                });
+                y += step;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn legend_content_bounds(layout: &Layout) -> Rect {
+    let outer = |rect: Rect, style: &Style| {
+        let margin = crate::spacing::Margins::of(style);
+        Rect {
+            x: rect.x - margin.left,
+            y: rect.y - margin.top,
+            w: rect.w + margin.left + margin.right,
+            h: rect.h + margin.top + margin.bottom,
+        }
+    };
+    let pie = match &layout.chart {
+        Chart::Pie(pie) => Some(Rect {
+            x: pie.cx - pie.radius,
+            y: pie.cy - pie.radius,
+            w: pie.radius * 2.0,
+            h: pie.radius * 2.0,
+        }),
+        _ => None,
+    };
+    bbox(
+        layout
+            .nodes
+            .iter()
+            .map(|n| outer(n.rect, &n.style))
+            .chain(layout.groups.iter().map(|g| outer(g.rect, &g.style)))
+            .chain(
+                layout
+                    .nodes
+                    .iter()
+                    .filter_map(crate::render_svg::moved_node_label),
+            )
+            .chain(
+                layout
+                    .groups
+                    .iter()
+                    .filter_map(|g| crate::render_svg::moved_group_label(g, &layout.opts)),
+            )
+            .chain(
+                layout
+                    .annotations
+                    .iter()
+                    .map(crate::charts::annotation_bounds),
+            )
+            .chain(layout.guides.iter().map(|g| span(&[g.from, g.to])))
+            .chain(layout.polylines.iter().map(|p| span(&p.points)))
+            .chain(
+                layout
+                    .edges
+                    .iter()
+                    .filter(|e| !e.via.is_empty())
+                    .map(|e| span(&e.via)),
+            )
+            .chain(pie),
+    )
+    .unwrap_or(Rect {
+        x: 0.0,
+        y: 0.0,
+        w: 0.0,
+        h: 0.0,
+    })
 }
 
 fn offset_from(a: &Rect, dir: RelDir, gap: f64, align: Option<Align>, w: f64, h: f64) -> Rect {

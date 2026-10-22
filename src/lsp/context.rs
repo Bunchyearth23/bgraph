@@ -5,6 +5,8 @@ use crate::props;
 pub(super) enum Block {
     Type,
     Graph,
+    Legend,
+    LegendEntry,
     Style(Option<&'static str>),
     Layout,
     Node,
@@ -61,6 +63,14 @@ impl Context {
                     let block = match head.split_whitespace().next() {
                         Some("type") => Block::Type,
                         Some("graph") => Block::Graph,
+                        Some("legend") => Block::Legend,
+                        Some("entry")
+                            if stack
+                                .last()
+                                .is_some_and(|(_, block)| *block == Block::Legend) =>
+                        {
+                            Block::LegendEntry
+                        }
                         Some("layout") => Block::Layout,
                         Some("group" | "activate" | "component") => Block::Container,
                         Some("style") => {

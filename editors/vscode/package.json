@@ -5,7 +5,7 @@
   "version": "1.0.1",
   "publisher": "bunchyearth23",
   "private": true,
-  "license": "LicenseRef-bgraph-noncommercial-1.0",
+  "license": "LicenseRef-bgraph-noncommercial-source-0.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/Bunchyearth23/bgraph"

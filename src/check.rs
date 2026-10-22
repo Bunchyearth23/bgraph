@@ -235,9 +235,14 @@ pub(crate) fn check_component_body(diagram: &Diagram) -> Vec<Diag> {
     if let Some(span) = diagram.graph_span {
         reject(span, "graph");
     }
-    for note in diagram.notes.iter().chain(&diagram.legends) {
-        if !matches!(note.placement, Some(Placement::Rel { .. })) {
-            out.push(Diag::error(note.span, "notes and legends inside a component need a relative placement; anchor it to a component node with `below`, `above`, `left-of` or `right-of`"));
+    for (placement, span) in diagram
+        .notes
+        .iter()
+        .map(|n| (&n.placement, n.span))
+        .chain(diagram.legends.iter().map(|l| (&l.placement, l.span)))
+    {
+        if !matches!(placement, Some(Placement::Rel { .. })) {
+            out.push(Diag::error(span, "notes and legends inside a component need a relative placement; anchor it to a component node with `below`, `above`, `left-of` or `right-of`"));
         }
     }
     out
@@ -256,6 +261,7 @@ pub fn check(diagram: &Diagram) -> Vec<Diag> {
     check_margins(diagram, def, &mut out);
     check_styles(diagram, def, &mut out);
     let nodes = check_nodes(diagram, def, &mut out);
+    check_legends(diagram, def, &mut out);
     check_groups(diagram, def, &nodes, &mut out);
     check_layouts(diagram, &mut out);
     check_grid_bounds(diagram, &mut out);
@@ -1080,8 +1086,26 @@ fn check_dead_styles(diagram: &Diagram, def: &'static props::ArchetypeDef, out: 
     for group in &diagram.groups {
         used.extend(group.classes.iter().map(|c| c.as_str()));
     }
-    for note in diagram.notes.iter().chain(&diagram.legends) {
-        used.extend(note.classes.iter().map(|c| c.as_str()));
+    for classes in diagram
+        .notes
+        .iter()
+        .map(|n| &n.classes)
+        .chain(diagram.legends.iter().map(|l| &l.classes))
+        .chain(
+            diagram
+                .legends
+                .iter()
+                .flat_map(|l| l.entries.iter().map(|e| &e.classes)),
+        )
+    {
+        used.extend(classes.iter().map(|c| c.as_str()));
+    }
+    if diagram.legends.iter().any(|l| l.entries.is_empty()) {
+        for style in &diagram.styles {
+            if style.props.iter().any(|p| p.name == "legend") {
+                used.insert(style.name.as_str());
+            }
+        }
     }
     for style in &diagram.styles {
         if let Some(parent) = &style.extends {
@@ -1144,6 +1168,95 @@ fn check_extends_cycles(diagram: &Diagram, out: &mut Vec<Diag>) {
     }
 }
 
+fn check_legends(diagram: &Diagram, def: &props::ArchetypeDef, out: &mut Vec<Diag>) {
+    if diagram.legends.is_empty() {
+        return;
+    }
+    let known = style_names(diagram);
+    let registry = crate::style::Registry::build(&diagram.styles).ok();
+    for legend in &diagram.legends {
+        check_props(
+            &legend.props,
+            None,
+            props::LEGEND_PROPS,
+            "legend property",
+            out,
+        );
+        for entry in &legend.entries {
+            check_props(
+                &entry.props,
+                None,
+                props::LEGEND_ENTRY_PROPS,
+                "legend entry property",
+                out,
+            );
+        }
+        for class in legend
+            .classes
+            .iter()
+            .chain(legend.entries.iter().flat_map(|e| &e.classes))
+        {
+            if !known.contains(class.as_str()) {
+                out.push(Diag::error(
+                    class.span,
+                    format!("unknown style `.{}`", class.as_str()),
+                ));
+            }
+        }
+        for prop in &legend.props {
+            if prop.values.iter().any(Value::is_hole) {
+                continue;
+            }
+            if prop.name == "title"
+                && (prop.values.len() != 1 || prop.values[0].as_text().is_none())
+            {
+                out.push(Diag::error(
+                    prop.values_span,
+                    "legend title needs one text value",
+                ));
+            }
+            if prop.name == "font-size"
+                && (prop.values.len() != 1
+                    || !prop.values[0]
+                        .as_num()
+                        .is_some_and(|n| n.is_finite() && n > 0.0))
+            {
+                out.push(Diag::error(
+                    prop.values_span,
+                    "legend font-size needs a positive finite number",
+                ));
+            }
+        }
+        if let Some(registry) = &registry {
+            let typography: Vec<_> = legend
+                .props
+                .iter()
+                .filter(|p| p.name != "title")
+                .cloned()
+                .collect();
+            if let Ok(style) = registry.resolve(
+                crate::style::Style::node_defaults(),
+                "note",
+                &legend.classes,
+                &typography,
+            ) && style.font_size.is_some_and(|n| !n.is_finite() || n <= 0.0)
+            {
+                out.push(Diag::error(
+                    legend.span,
+                    "legend font size must be positive and finite",
+                ));
+            }
+        }
+        if !def.layout.accepts_layout_block()
+            && matches!(legend.placement, Some(Placement::Rel { .. }))
+        {
+            out.push(Diag::error(legend.span, format!(
+                "`type {}` manages its own geometry; use `legend {{ ... }}` for automatic placement or `legend at (x, y) {{ ... }}`",
+                def.name)));
+        }
+    }
+}
+
 fn check_nodes<'a>(
     diagram: &'a Diagram,
     def: &'static props::ArchetypeDef,
@@ -1201,22 +1314,18 @@ fn check_nodes<'a>(
     // is — but its anchor is a name like any other, and an unknown one has to
     // be an error here or the note would simply not be drawn and say nothing
     // about why.
-    for note in diagram.notes.iter().chain(&diagram.legends) {
-        if let Some(Placement::Rel { anchor, .. }) = &note.placement
+    for placement in diagram
+        .notes
+        .iter()
+        .map(|n| &n.placement)
+        .chain(diagram.legends.iter().map(|l| &l.placement))
+    {
+        if let Some(Placement::Rel { anchor, .. }) = placement
             && !anchorable.contains(anchor.as_str())
         {
             out.push(Diag::error(
                 anchor.span,
                 format!("unknown node `{}`", anchor.as_str()),
-            ));
-        }
-    }
-
-    for legend in &diagram.legends {
-        if legend.placement.is_none() {
-            out.push(Diag::warn(
-                legend.span,
-                "legend needs a position, for example `legend below a gap 20`; it will not be drawn",
             ));
         }
     }

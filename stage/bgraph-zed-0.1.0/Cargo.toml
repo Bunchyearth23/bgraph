@@ -3,7 +3,7 @@ name = "zed_bgraph"
 version = "0.1.0"
 edition = "2024"
 publish = false
-license = "LicenseRef-bgraph-noncommercial-1.0"
+license = "LicenseRef-bgraph-noncommercial-source-0.1"
 
 [lib]
 path = "src/lib.rs"

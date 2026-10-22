@@ -4,7 +4,7 @@
   "description": "Tree-sitter grammar for the bgraph diagram DSL",
   "main": "bindings/node",
   "keywords": ["parser", "tree-sitter", "bgraph", "diagram"],
-  "license": "MIT",
+  "license": "LicenseRef-bgraph-noncommercial-source-0.1",
   "devDependencies": {
     "tree-sitter-cli": "^0.25.0"
   },

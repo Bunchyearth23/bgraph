@@ -226,6 +226,7 @@ jobs:
           ./playground/build.sh
           pnpm install --frozen-lockfile --dir playground
           pnpm --dir playground build
+          cp LICENSE playground/dist/
           tar czf "out/bgraph-playground-$version.tar.gz" -C playground/dist .
 
       - uses: actions/upload-artifact@v4
@@ -255,19 +256,10 @@ jobs:
           find downloads -type f -exec mv {} release/ \;
           ls -lh release
 
-      # **A release carries the source, and that cannot be turned off.**
-      # GitHub attaches `Source code (zip)` and `Source code (tar.gz)` to every
-      # release, generated from the tag; there is no API and no setting to
-      # suppress them. That is accepted here and only here: a release is as
-      # visible as its repository, this one is private, and everyone who can
-      # open the release page can already clone the source (`D-040`).
-      #
-      # It stops being acceptable the moment a build has to reach somebody who
-      # must not have the source — which the licence contemplates, since it
-      # lets a build be passed on and calls the source confidential. The answer
-      # then is a second repository holding only the artefacts, whose own
-      # source archives contain nothing; not a flag on this step, because there
-      # isn't one.
+      # GitHub adds source archives to every release. They are part of the
+      # rights holder's official distribution when the repository is public.
+      # Source visibility does not grant redistribution rights: LICENSE sets
+      # the conditions, including its exception for platform-native forks.
       #
       # The notes are written and reviewed in the repository, not generated
       # from commit subjects: a release is read by somebody deciding whether

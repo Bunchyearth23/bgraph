@@ -996,3 +996,121 @@ fn placements_follow_the_archetypes_keyword() {
     // A pie ignores placement, so it is not offered — with either word.
     assert!(!labels_at("type pie\nslice a ", "slice a ").contains(&"right-of".to_string()));
 }
+
+#[test]
+fn legend_completion_has_only_legend_settings_and_entries() {
+    for text in ["node entry", "group entry { node child }"] {
+        let diagram = crate::parser::parse(text).unwrap();
+        assert!(crate::check::first_error(&diagram).is_none(), "{text}");
+    }
+    for archetype in ["free", "pie", "sequence", "treeview"] {
+        let text = format!("type {archetype}\nlegend {{\n  ");
+        let labels = labels_at(&text, "  ");
+        let expected = [
+            "entry",
+            "title",
+            "font",
+            "font-size",
+            "font-family",
+            "font-color",
+            "font-weight",
+        ];
+        assert_eq!(labels.len(), expected.len(), "{archetype}: {labels:?}");
+        for name in expected {
+            assert!(
+                labels.iter().any(|label| label == name),
+                "{archetype}: {name}"
+            );
+        }
+
+        let text = format!("type {archetype}\nlegend {{\n  entry \"Available\" {{\n    ");
+        let labels = labels_at(&text, "    ");
+        let expected = ["fill", "stroke", "stroke-width", "dash", "radius", "shape"];
+        assert_eq!(labels.len(), expected.len(), "{archetype}: {labels:?}");
+        for name in expected {
+            assert!(
+                labels.iter().any(|label| label == name),
+                "{archetype}: {name}"
+            );
+        }
+    }
+    assert!(labels_at("legend {\n  entry ", "  entry ").is_empty());
+    assert!(labels_at("legend {\n  entry \"Avai", "  entry \"Avai").is_empty());
+    assert!(!labels_at("", "").iter().any(|label| label == "entry"));
+    let text = "type treeview\nentry leaf \"Leaf\" {\n  ";
+    assert_eq!(Context::at(text, text.len()).block, Some(Block::Node));
+    assert!(labels_at(text, "  ").iter().any(|label| label == "width"));
+    assert!(
+        labels_at("type treeview\n", "")
+            .iter()
+            .any(|label| label == "entry")
+    );
+}
+
+#[test]
+fn legend_snippets_parse_and_entries_reuse_classes() {
+    for archetype in ["free", "pie", "sequence", "treeview"] {
+        let text = format!("type {archetype}\n");
+        let items = server_with(&text).items_for(&text, "", text.len());
+        let insert = items.iter().find(|item| item["label"] == "legend").unwrap()["insertText"]
+            .as_str()
+            .unwrap()
+            .replace("${1:label}", "Available")
+            .replace("${2:#dcfce7}", "#dcfce7")
+            .replace("$0", "");
+        assert!(
+            crate::parser::parse(&format!("{text}{insert}")).is_ok(),
+            "{insert}"
+        );
+    }
+    let text = "style live { fill: #dcfce7 }\nlegend {\n  entry \"Available\" .";
+    assert!(
+        labels_at(text, "  entry \"Available\" .")
+            .iter()
+            .any(|label| label == "live")
+    );
+    let text = "legend {\n  entry \"Available\" { shape: ";
+    assert!(
+        labels_at(text, " shape: ")
+            .iter()
+            .any(|label| label == "rect")
+    );
+}
+
+#[test]
+fn legend_hover_documents_its_title_and_swatch() {
+    for (text, key, expected) in [
+        ("legend { title: \"Status\" }", "title", "Heading displayed"),
+        (
+            "type treeview\nlegend {\n  entry \"Available\" { fill: #dcfce7 }\n}",
+            "entry",
+            "An explicit legend row",
+        ),
+        (
+            "legend { entry \"Available\" { fill: #dcfce7 } }",
+            "fill",
+            "Interior color",
+        ),
+    ] {
+        let at = text.find(key).unwrap() + 1;
+        let value = hover::hover(text, &LineIndex::new(text), at);
+        assert!(
+            value["contents"]["value"]
+                .as_str()
+                .is_some_and(|doc| doc.contains(expected)),
+            "{value:?}"
+        );
+    }
+}
+
+#[test]
+fn legend_anchor_completion_matches_layout_capability() {
+    let text = "node api\nlegend below ";
+    assert!(
+        labels_at(text, "legend below ")
+            .iter()
+            .any(|label| label == "api")
+    );
+    let text = "type pie\nslice api 4\nlegend below ";
+    assert!(labels_at(text, "legend below ").is_empty());
+}

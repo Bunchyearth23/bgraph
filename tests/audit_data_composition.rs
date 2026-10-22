@@ -169,9 +169,16 @@ fn assert_annotations_render(path: &Path, prefix: &str) {
     let diagram = &composed.diagram;
     assert_eq!(diagram.notes.len(), 1);
     assert_eq!(diagram.legends.len(), 1);
-    for (note, target) in [(&diagram.notes[0], "a"), (&diagram.legends[0], "b")] {
-        assert_eq!(note.classes[0].as_str(), format!("{prefix}.highlighted"));
-        let Some(bgraph::ast::Placement::Rel { anchor, .. }) = &note.placement else {
+    for (classes, placement, target) in [
+        (&diagram.notes[0].classes, &diagram.notes[0].placement, "a"),
+        (
+            &diagram.legends[0].classes,
+            &diagram.legends[0].placement,
+            "b",
+        ),
+    ] {
+        assert_eq!(classes[0].as_str(), format!("{prefix}.highlighted"));
+        let Some(bgraph::ast::Placement::Rel { anchor, .. }) = placement else {
             panic!()
         };
         assert_eq!(anchor.as_str(), format!("{prefix}.{target}"));
@@ -196,15 +203,25 @@ fn component_notes_legends_and_waypoints_survive_expansion() {
     let composed = bgraph::compose::load(&path).unwrap();
     let use_offset = source.find("use card").unwrap();
     let diagram = &composed.diagram;
-    for note in diagram.notes.iter().chain(&diagram.legends) {
-        assert_eq!(note.span.start, use_offset);
-        assert_eq!(note.classes[0].span.start, use_offset);
-        for prop in &note.props {
+    for (span, classes, props, placement) in diagram
+        .notes
+        .iter()
+        .map(|n| (n.span, &n.classes, &n.props, &n.placement))
+        .chain(
+            diagram
+                .legends
+                .iter()
+                .map(|l| (l.span, &l.classes, &l.props, &l.placement)),
+        )
+    {
+        assert_eq!(span.start, use_offset);
+        assert_eq!(classes[0].span.start, use_offset);
+        for prop in props {
             assert_eq!(prop.span.start, use_offset);
             assert_eq!(prop.name_span.start, use_offset);
             assert_eq!(prop.values_span.start, use_offset);
         }
-        let Some(bgraph::ast::Placement::Rel { anchor, .. }) = &note.placement else {
+        let Some(bgraph::ast::Placement::Rel { anchor, .. }) = placement else {
             panic!()
         };
         assert_eq!(anchor.span.start, use_offset);
@@ -227,25 +244,35 @@ fn prefixed_includes_keep_annotation_references_and_source_locations() {
     assert_annotations_render(&entry, "module");
     let composed = bgraph::compose::load(&entry).unwrap();
     let d = &composed.diagram;
-    for note in d.notes.iter().chain(&d.legends) {
-        let declaration = if note.text.is_empty() {
-            "legend ."
-        } else {
-            "note \"Caption\""
-        };
+    for (span, classes, props, placement, declaration) in [
+        (
+            d.notes[0].span,
+            &d.notes[0].classes,
+            &d.notes[0].props,
+            &d.notes[0].placement,
+            "note \"Caption\"",
+        ),
+        (
+            d.legends[0].span,
+            &d.legends[0].classes,
+            &d.legends[0].props,
+            &d.legends[0].placement,
+            "legend .",
+        ),
+    ] {
         let offset = ANNOTATED.find(declaration).unwrap();
         assert_eq!(
-            composed.map.locate(note.span.start),
+            composed.map.locate(span.start),
             (
                 child.as_path(),
                 ANNOTATED[..offset].matches('\n').count(),
                 0
             )
         );
-        assert_eq!(composed.map.locate(note.classes[0].span.start).0, child);
-        let span = note.classes[0].span;
+        assert_eq!(composed.map.locate(classes[0].span.start).0, child);
+        let span = classes[0].span;
         assert_eq!(&composed.map.text[span.start..span.end], "highlighted");
-        for prop in &note.props {
+        for prop in props {
             assert_eq!(
                 &composed.map.text[prop.name_span.start..prop.name_span.end],
                 "font-size"
@@ -255,7 +282,7 @@ fn prefixed_includes_keep_annotation_references_and_source_locations() {
                 "14"
             );
         }
-        let Some(bgraph::ast::Placement::Rel { anchor, .. }) = &note.placement else {
+        let Some(bgraph::ast::Placement::Rel { anchor, .. }) = placement else {
             panic!()
         };
         assert_eq!(composed.map.locate(anchor.span.start).0, child);

@@ -1,0 +1,7 @@
+style live { fill: #dcfce7 stroke: #166534 }
+node service "Service" .live
+legend below service gap 20 {
+  title: "Statuts" font-size: 12
+  entry "Disponible" .live
+  entry "Prévu" { fill: #fef3c7 stroke: #92400e }
+}

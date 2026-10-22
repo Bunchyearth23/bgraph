@@ -74,7 +74,7 @@ activate <id> { … }         // type sequence: a bar down an existing lifeline
 <keyword> <id> ["<label>"] <data…> [.class …] { … }
 <id> <arrow> <id> ["<label>"] [.class …] [via (<stop>) …] { … }
 layout { place <id> <position> }
-legend [.class …] <position> { … }
+legend [.class …] [<position>] { … }
 ```
 
 An **item** is an element, and each archetype has its own word for it —
@@ -280,24 +280,66 @@ a group's local origin or a bounded grid's unit conversion.
 
 ## Legends
 
-In declared-layout genres, mark styles with `legend: "description"`, then
-place the legend with the same position forms as a node:
+Add a `legend` block to describe the colours or shapes in any archetype. Each
+`entry` supplies the text and a swatch styled by classes, inline properties,
+or both:
 
+```bgraph
+style live { fill: #dcfce7 stroke: #166534 }
+node api "API" .live
+node db "Database" { fill: #fef3c7 stroke: #92400e }
+layout { place db right-of api gap 40 }
+legend {
+  title: "Status"
+  font-size: 12
+  entry "In service" .live
+  entry "Planned" { fill: #fef3c7 stroke: #92400e }
+}
 ```
+
+### Give the legend a title
+
+Write `title: "Status"` inside the `legend { ... }` block, as above. The
+title appears above its entries. Omit `title` to draw only the entries.
+Each quoted string after `entry` is that row's description; it can explain
+the meaning of a colour or shape in a full sentence.
+
+Entries follow the order in the block. Supported legend settings are `title`,
+`font`, `font-size`, `font-family`, `font-color` and `font-weight`. A swatch
+accepts `fill`, `stroke`, `stroke-width`, `dash`, `radius` and `shape`.
+An entry's classes are resolved before its inline properties, as for a node.
+Separate settings and entries with newlines or semicolons. Use `\n` inside
+a title or description to start a new line.
+
+### Place the legend
+
+Without a position, the legend sits below the drawing. Use
+`legend at (0, 240) { … }` for an absolute position in any archetype.
+Declared-layout genres also accept a node or group as a relative anchor:
+`legend below api gap 32 align left { … }`. Legend classes precede the
+position: `legend .small below api { … }`.
+
+### Reuse descriptions from styles
+
+The existing style-derived form still works. If the block has no explicit
+entries, classes with a `legend: "description"` property provide the rows,
+in style declaration order:
+
+```bgraph
 style live { fill: #dcfce7 stroke: #166534 legend: "In service" }
 style pending { fill: #fef3c7 stroke: #92400e legend: "Planned" }
 node api "API" .live
 node db "Database" .pending
 layout { place db right-of api gap 40 }
-legend below api gap 32 align left { font-size: 12 }
+legend
 ```
 
-Entries follow style declaration order and use each style's fill and stroke.
-The anchor may be a node or group. Absolute positions such as
-`legend at (0, 240)` also work. Legend classes precede the position:
-`legend .small below api { font-size: 11 }`.
-A bare `legend` has no position, draws nothing and emits a warning. Chart
-archetypes that create their own keys do not use this statement.
+Explicit entries replace this style-derived list. A `legend` statement is
+required to draw either form; a legend with neither entries nor title draws
+nothing. Chart archetypes
+keep the keys they already generate from their data. An explicit legend adds
+a separate key; the archetype's `legend: off` setting, where available, hides
+its built-in key.
 
 ## Arrows
 
@@ -2502,7 +2544,6 @@ path.
 - a style declared more than once
 - a `font` shorthand containing more than one numeric size; use
   `font-weight: 600` for a numeric weight
-- a `legend` without a position
 - text whose contrast against what sits behind it is below 3:1
 - `type pie` — a slice with value 0; fewer than three slices, which a bar or
   a single number compares better; more than eight, which exhausts the palette
