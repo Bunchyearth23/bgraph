@@ -6,6 +6,7 @@
 
 const { workspace, window, commands, ViewColumn } = require('vscode');
 const path = require('path');
+const { previewHtml } = require('./preview');
 
 let client;
 const previews = new Map();
@@ -50,8 +51,11 @@ function activate(context) {
       debug: { command, transport: TransportKind.stdio },
     },
     {
-      documentSelector: [{ scheme: 'file', language: 'bgraph' }],
-      synchronize: { fileEvents: workspace.createFileSystemWatcher('**/*.bd') },
+      documentSelector: [
+        { scheme: 'file', language: 'bgraph' },
+        { scheme: 'untitled', language: 'bgraph' },
+      ],
+      synchronize: { fileEvents: workspace.createFileSystemWatcher('**/*.{bd,bds,csv,json}') },
     },
   );
 
@@ -80,6 +84,10 @@ async function showPreview(uri) {
     window.showInformationMessage('bgraph: open a .bd file to preview it.');
     return;
   }
+  if (path.extname(document.fileName).toLowerCase() === '.bds') {
+    window.showInformationMessage('bgraph: this is a shared stylesheet. Open a .bd diagram that includes it to preview the result.');
+    return;
+  }
   const key = document.uri.toString();
   let preview = previews.get(key);
   if (preview) {
@@ -89,14 +97,20 @@ async function showPreview(uri) {
       'bgraph.preview',
       `Preview: ${path.basename(document.fileName)}`,
       { viewColumn: ViewColumn.Beside, preserveFocus: true },
-      { enableScripts: false, localResourceRoots: [] },
+      { enableScripts: true, localResourceRoots: [] },
     );
     preview = { document, panel, timer: undefined };
     previews.set(key, preview);
+    panel.webview.onDidReceiveMessage((message) => {
+      if (message?.type !== 'ready') return;
+      preview.ready = true;
+      if (preview.message) panel.webview.postMessage(preview.message);
+    });
     panel.onDidDispose(() => {
       clearTimeout(preview.timer);
       previews.delete(key);
     });
+    panel.webview.html = previewHtml();
   }
   updatePreview(preview);
 }
@@ -111,18 +125,9 @@ function updatePreview(preview) {
   } catch (error) {
     answer = `error: could not render this diagram. ${error.message}`;
   }
-  const body = answer.startsWith('error:') ?
-    `<pre role="alert">${escapeHtml(answer)}</pre>` : answer;
-  preview.panel.webview.html = `<!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:;">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>bgraph preview</title>
-<style>
-body { margin: 0; padding: 16px; color: var(--vscode-foreground); background: var(--vscode-editor-background); }
-svg { display: block; max-width: 100%; height: auto; margin: auto; }
-pre { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--vscode-errorForeground); }
-</style></head><body><main aria-label="Diagram preview">${body}</main></body></html>`;
+  preview.message = answer.startsWith('error:') ?
+    { type: 'render', error: answer } : { type: 'render', svg: answer };
+  if (preview.ready) preview.panel.webview.postMessage(preview.message);
 }
 
 function disposePreviews() {

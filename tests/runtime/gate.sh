@@ -11,7 +11,7 @@ for tool in cargo rustup node typst; do
   command -v "$tool" >/dev/null || { echo "gate: missing $tool" >&2; exit 1; }
 done
 for target in wasm32-unknown-unknown wasm32-wasip1; do
-  rustup target list --installed | grep -qx "$target" \
+  rustup target list --installed | grep -x "$target" >/dev/null \
     || { echo "gate: rustup target add $target" >&2; exit 1; }
 done
 gate_dir="$(mktemp -d)"

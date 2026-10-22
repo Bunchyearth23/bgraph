@@ -6,7 +6,8 @@ fn declaration_layout_navigation_prefers_controlling_relation_and_groups() {
     let text = "group frame {\n node a\n node b\n layout {\n place b right-of a\n place a at (20, 30)\n }\n}\nlayout { place frame at (100, 100) }\n";
     let index = LineIndex::new(text);
     let declaration = text.find("a\n").unwrap();
-    let result = navigation::definition(text, &index, declaration, "untitled:test");
+    let result =
+        navigation::definition(text, &index, declaration, "untitled:test", &HashMap::new());
     assert_eq!(
         result["range"],
         index.range(ast::Span {
@@ -14,17 +15,23 @@ fn declaration_layout_navigation_prefers_controlling_relation_and_groups() {
             end: text.find("a at").unwrap() + 1
         })
     );
-    let result =
-        navigation::definition(text, &index, text.find("frame {").unwrap(), "untitled:test");
+    let result = navigation::definition(
+        text,
+        &index,
+        text.find("frame {").unwrap(),
+        "untitled:test",
+        &HashMap::new(),
+    );
     assert_eq!(result["range"]["start"]["line"], 8);
     let result = navigation::definition(
         text,
         &index,
         text.find("frame at").unwrap(),
         "untitled:test",
+        &HashMap::new(),
     );
     assert_eq!(result["range"]["start"]["line"], 0);
-    let refs = navigation::references(text, declaration, "untitled:test", true);
+    let refs = navigation::references(text, declaration, "untitled:test", true, &HashMap::new());
     assert_eq!(refs.as_array().unwrap().len(), 3);
 }
 
@@ -43,6 +50,7 @@ fn references_are_dispatched_and_keep_utf16_columns() {
         &LineIndex::new(unicode),
         unicode.find("a at").unwrap(),
         "untitled:unicode",
+        &HashMap::new(),
     );
     assert_eq!(result["range"]["start"], json!({"line":0,"character":20}));
     assert_eq!(
@@ -64,25 +72,21 @@ fn included_definitions_references_and_hover_use_child_locations() {
     let text = "include \"é.bd\" as p\nnode root\nlayout { place root below p.a }\n";
     std::fs::write(&entry, text).unwrap();
     std::fs::write(&child, "node a \"🦀\"\nlayout { place a at (12, 34) }\n").unwrap();
-    let uri = format!("file://{}", entry.display());
+    let uri = file_uri::uri_of(&entry);
     let offset = text.find("p.a").unwrap() + 2;
-    let result = navigation::definition(text, &LineIndex::new(text), offset, &uri);
+    let result = navigation::definition(text, &LineIndex::new(text), offset, &uri, &HashMap::new());
     assert!(result["uri"].as_str().unwrap().ends_with("%C3%A9.bd"));
     assert_eq!(result["range"]["start"], json!({"line":0,"character":5}));
-    let refs = navigation::references(text, offset, &uri, true);
+    let refs = navigation::references(text, offset, &uri, true, &HashMap::new());
     assert_eq!(refs.as_array().unwrap().len(), 3);
     assert_eq!(refs[1]["range"]["start"], json!({"line":1,"character":15}));
-    let hover = hover::file_hover(text, &LineIndex::new(text), offset, &uri);
+    let hover = hover::file_hover(text, &LineIndex::new(text), offset, &uri, &HashMap::new());
     let content = hover["contents"]["value"].as_str().unwrap();
     assert!(content.contains("`p.a`"), "{content}");
     assert!(content.contains("%C3%A9.bd#L1,6"), "{content}");
     assert!(content.contains("at 12, 34"), "{content}");
     assert_eq!(
-        diagnostic_engine::path_of(&format!(
-            "file://{}",
-            child.display().to_string().replace('é', "%C3%A9")
-        ))
-        .unwrap(),
+        diagnostic_engine::path_of(&file_uri::uri_of(&child)).unwrap(),
         child
     );
     assert!(diagnostic_engine::path_of("file:///tmp/%FF.bd").is_none());
@@ -97,6 +101,7 @@ fn hover_exposes_group_bounds_parent_and_unsolved_conflicts() {
         &LineIndex::new(text),
         text.find("inner {").unwrap(),
         "untitled:frame",
+        &HashMap::new(),
     );
     let content = result["contents"]["value"].as_str().unwrap();
     assert!(content.contains("**group** `inner`"));
@@ -108,6 +113,7 @@ fn hover_exposes_group_bounds_parent_and_unsolved_conflicts() {
         &LineIndex::new(text),
         text.find("b c").unwrap(),
         "untitled:conflict",
+        &HashMap::new(),
     );
     let content = result["contents"]["value"].as_str().unwrap();
     assert!(content.contains("**diagnostic:**"), "{content}");
@@ -143,6 +149,7 @@ fn hover_on_node_theme_uses_style_context_before_keyword_documentation() {
             &LineIndex::new(&text),
             text.find("node").unwrap(),
             "untitled:theme",
+            &HashMap::new(),
         );
         let content = result["contents"]["value"].as_str().unwrap();
         assert!(content.contains("**style** `node`"), "{content}");

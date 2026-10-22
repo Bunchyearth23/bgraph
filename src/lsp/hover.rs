@@ -7,29 +7,26 @@ use crate::props;
 use super::{Block, Context, LineIndex, declared_archetype, text_of, word_at};
 
 /// Inspect structural entities before falling back to vocabulary documentation.
-pub(super) fn file_hover(text: &str, index: &LineIndex, offset: usize, uri: &str) -> Value {
+pub(super) fn file_hover(
+    text: &str,
+    index: &LineIndex,
+    offset: usize,
+    uri: &str,
+    sources: &std::collections::HashMap<std::path::PathBuf, String>,
+) -> Value {
     if crate::template::holes_in(text)
         .iter()
         .any(|hole| hole.span.contains(offset))
     {
         return hover(text, index, offset);
     }
-    if let Some(document) = super::navigation::SourceDocument::new(text, uri)
+    if let Some(document) = super::navigation::SourceDocument::new(text, uri, sources)
         && let Some(id) = document.id_at(offset)
     {
-        let file_analysis = super::diagnostic_engine::path_of(uri)
-            .and_then(|path| crate::analyze_file_source(&path, text).ok());
-        let local_analysis;
-        let analysis = if let Some(file) = &file_analysis {
-            &file.analysis
-        } else {
-            local_analysis = crate::analyze_source(text);
-            &local_analysis
-        };
-        if let Some(entity) =
-            crate::explain::inspect::entities(&document.diagram, analysis.layout.as_ref())
-                .into_iter()
-                .find(|entity| entity.id == id)
+        let (layout, diagnostics) = crate::analyze_diagram(&document.diagram);
+        if let Some(entity) = crate::explain::inspect::entities(&document.diagram, layout.as_ref())
+            .into_iter()
+            .find(|entity| entity.id == id)
         {
             let mut out = format!("**{}** `{id}`", entity.kind);
             if let Some(rect) = entity.bounds {
@@ -65,7 +62,7 @@ pub(super) fn file_hover(text: &str, index: &LineIndex, offset: usize, uri: &str
                     document.source(span).trim()
                 ));
             }
-            for diagnostic in &analysis.diagnostics {
+            for diagnostic in diagnostics.iter().chain(&document.diagnostics) {
                 if diagnostic.span.start < entity.span.end
                     && entity.span.start < diagnostic.span.end
                     || crate::explain::inspect::relations(&document.diagram, &id)

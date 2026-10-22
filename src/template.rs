@@ -125,22 +125,99 @@ pub fn lint(source: &str) -> Vec<(crate::ast::Span, String)> {
 /// double a `"` inside itself, which is what a spreadsheet writes.
 #[cfg(feature = "csv")]
 pub fn rows_from_csv(name: &str, source: &str) -> Result<Bindings> {
-    let mut lines = source.lines().filter(|l| !l.trim().is_empty());
-    let Some(header) = lines.next() else {
+    let (fields, records) = csv_records(source)?;
+    let rows = records
+        .into_iter()
+        .map(|cells| {
+            let mut row = Bindings::new();
+            for (field, cell) in fields.iter().zip(cells) {
+                row.insert(
+                    field.clone(),
+                    match cell.parse::<f64>() {
+                        Ok(n) => Value::Number(n),
+                        Err(_) => Value::Text(cell),
+                    },
+                );
+            }
+            row
+        })
+        .collect();
+    Ok(Bindings::new().set(name, Value::Rows(rows)))
+}
+
+/// The same CSV dialect for template bindings and `type { from: … }`.
+#[cfg(feature = "csv")]
+pub(crate) fn csv_records(source: &str) -> Result<(Vec<String>, Vec<Vec<String>>)> {
+    let mut records = Vec::new();
+    let mut row = Vec::new();
+    let mut field = String::new();
+    let mut quoted = false;
+    let mut closed = false;
+    let mut chars = source.chars().peekable();
+    while let Some(c) = chars.next() {
+        if quoted {
+            match c {
+                '"' if chars.peek() == Some(&'"') => {
+                    chars.next();
+                    field.push('"');
+                }
+                '"' => {
+                    quoted = false;
+                    closed = true;
+                }
+                _ => field.push(c),
+            }
+            continue;
+        }
+        match c {
+            '"' if field.trim().is_empty() && !closed => {
+                field.clear();
+                quoted = true;
+            }
+            ',' | '\n' | '\r' => {
+                if c == '\r' && chars.peek() == Some(&'\n') {
+                    chars.next();
+                }
+                if c == ',' || !row.is_empty() || !field.trim().is_empty() || closed {
+                    row.push(field.trim().to_string());
+                }
+                field.clear();
+                closed = false;
+                if c != ',' && !row.is_empty() {
+                    records.push(std::mem::take(&mut row));
+                }
+            }
+            c if c.is_whitespace() => field.push(c),
+            _ if closed || c == '"' => {
+                bail!("invalid CSV quoting in record {}", records.len() + 1);
+            }
+            _ => field.push(c),
+        }
+    }
+    if quoted {
+        bail!("unclosed quoted CSV field in record {}", records.len() + 1);
+    }
+    if !row.is_empty() || !field.trim().is_empty() || closed {
+        row.push(field.trim().to_string());
+        records.push(row);
+    }
+    let mut records = records.into_iter();
+    let Some(fields) = records.next() else {
         bail!("the CSV is empty — the first line names the fields");
     };
-    let fields = split_csv(header);
-    if fields.iter().any(|f| f.is_empty()) {
-        bail!("a column in the header has no name, and a row's fields are named by it");
+    for (i, field) in fields.iter().enumerate() {
+        if field.is_empty() {
+            bail!("a column in the header has no name, and a row's fields are named by it");
+        }
+        if fields[..i].contains(field) {
+            bail!("duplicate CSV column `{field}` — every field needs a unique name");
+        }
     }
-
-    let mut rows = Vec::new();
-    for (n, line) in lines.enumerate() {
-        let cells = split_csv(line);
+    let rows: Vec<_> = records.collect();
+    for (n, cells) in rows.iter().enumerate() {
         if cells.len() != fields.len() {
             bail!(
-                "row {} has {} field{} for {} column{} — a row that does not line up with \
-                 the header has no reading",
+                "row {} has {} field{} for {} column{} — a row that does not line up with the header has no reading",
                 n + 1,
                 cells.len(),
                 if cells.len() == 1 { "" } else { "s" },
@@ -148,50 +225,18 @@ pub fn rows_from_csv(name: &str, source: &str) -> Result<Bindings> {
                 if fields.len() == 1 { "" } else { "s" }
             );
         }
-        let mut row = Bindings::new();
-        for (field, cell) in fields.iter().zip(cells) {
-            row.insert(
-                field.clone(),
-                match cell.parse::<f64>() {
-                    Ok(n) => Value::Number(n),
-                    Err(_) => Value::Text(cell),
-                },
-            );
-        }
-        rows.push(row);
     }
-
-    Ok(Bindings::new().set(name, Value::Rows(rows)))
-}
-
-/// One CSV line into its fields. The common dialect: commas separate, a field
-/// may be wrapped in `"`, and `""` inside one is a literal quote.
-#[cfg(feature = "csv")]
-fn split_csv(line: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    let mut field = String::new();
-    let mut quoted = false;
-    let mut chars = line.trim_end_matches(['\r', '\n']).chars().peekable();
-
-    while let Some(c) = chars.next() {
-        match c {
-            '"' if quoted && chars.peek() == Some(&'"') => {
-                chars.next();
-                field.push('"');
-            }
-            '"' => quoted = !quoted,
-            ',' if !quoted => out.push(std::mem::take(&mut field).trim().to_string()),
-            _ => field.push(c),
-        }
-    }
-    out.push(field.trim().to_string());
-    out
+    Ok((fields, rows))
 }
 
 /// Whether text can stand as a bare name. The same rule the grammar uses:
 /// a leading letter or underscore, then letters, digits, underscores and
 /// interior hyphens — a trailing hyphen would make `a-` swallow an arrow.
 fn is_identifier(text: &str) -> bool {
+    text.split('.').all(is_name_part)
+}
+
+fn is_name_part(text: &str) -> bool {
     let mut chars = text.chars();
     let Some(first) = chars.next() else {
         return false;
@@ -412,38 +457,41 @@ impl Template {
     pub fn parse(source: &str) -> Result<Template> {
         let holes = scan(source);
 
-        // No single probe fits every position: `0` is a number but not an
-        // identifier, `_probe` the reverse. A template is well-formed if
-        // *some* plausible binding parses, so try both before complaining.
-        let mut failure = None;
-        for probe in [Value::Number(0.0), Value::Raw("_probe".into())] {
-            let mut values = Bindings::new();
-            // A dotted hole is a row hole; probing with a single row is enough
-            // to see whether the line it sits on is well-formed.
-            let mut probe_rows: BTreeMap<String, Bindings> = BTreeMap::new();
-            for name in &holes {
-                match name.split_once('.') {
-                    Some((prefix, field)) => {
-                        let row = probe_rows.entry(prefix.to_string()).or_default();
-                        row.insert(field.to_string(), probe.clone());
-                    }
-                    None => values.insert(name.clone(), probe.clone()),
-                }
-            }
-            for (prefix, row) in probe_rows {
-                values.insert(prefix, Value::Rows(vec![row]));
-            }
-            match crate::parser::parse(&fill(source, &values)?) {
-                Ok(_) => {
-                    failure = None;
-                    break;
-                }
-                Err(e) => failure = Some(e),
+        let mut probe_rows = Bindings::new();
+        for hole in &holes {
+            if let Some((prefix, _)) = hole.split_once('.') {
+                probe_rows.insert(prefix, Value::Rows(Vec::new()));
             }
         }
-        if let Some(e) = failure {
-            bail!("the template does not parse once its holes are filled: {e}");
+        for line in without_components(source).lines() {
+            let prefixes = row_prefixes(line, &probe_rows);
+            if prefixes.len() > 1 {
+                bail!(
+                    "this line repeats over {} — a line may repeat over one list",
+                    quoted_list(&prefixes.iter().map(String::as_str).collect::<Vec<_>>())
+                );
+            }
         }
+        // Probe each position, not each binding: identifiers and coordinates
+        // may occur together, and no single dummy value parses as both.
+        let mut probe = String::with_capacity(source.len());
+        let mut at = 0;
+        let mut in_string = false;
+        for hole in holes_in(&without_components(source)) {
+            let before = &source[at..hole.span.start];
+            probe.push_str(before);
+            in_string = string_state(before, in_string);
+            probe.push_str(if !in_string && slot_of(&probe) == Slot::Ident {
+                "_probe"
+            } else {
+                "0"
+            });
+            at = hole.span.end;
+        }
+        probe.push_str(&source[at..]);
+        crate::parser::parse(&probe).map_err(|e| {
+            anyhow::anyhow!("the template does not parse once its holes are filled: {e}")
+        })?;
 
         Ok(Template {
             source: source.to_string(),
@@ -459,6 +507,13 @@ impl Template {
     /// Fills the holes and renders. An unbound hole is an error naming it —
     /// silently rendering a blank would put a wrong figure in a document.
     pub fn render(&self, values: &Bindings) -> Result<String> {
+        crate::render_source(&self.fill_checked(values)?)
+    }
+
+    /// Fill every required hole, refusing missing bindings and row fields.
+    /// Unlike [`Self::fill`], this never leaves unresolved template data for
+    /// the parser to reinterpret as a literal or an omitted chart value.
+    pub fn fill_checked(&self, values: &Bindings) -> Result<String> {
         let missing: Vec<&str> = self
             .holes
             .iter()
@@ -472,12 +527,33 @@ impl Template {
             bail!("nothing bound to {}", quoted_list(&missing));
         }
 
+        for name in &self.holes {
+            if let Some((prefix, field)) = name.split_once('.')
+                && let Some(Value::Rows(rows)) = values.get(prefix)
+            {
+                for (index, row) in rows.iter().enumerate() {
+                    let Some(value) = row.get(field) else {
+                        bail!(
+                            "nothing bound to `{name}` in row {} of `{prefix}`",
+                            index + 1
+                        );
+                    };
+                    if contains_rows(value) {
+                        bail!(
+                            "`{name}` in row {} of `{prefix}` contains nested rows; bind a scalar or a list of scalar values",
+                            index + 1
+                        );
+                    }
+                }
+            }
+        }
+
         // Rows repeat a line; they are not a value. Writing one into a value
         // position is a mistake worth naming rather than quietly dropping.
         let misused: Vec<&str> = self
             .holes
             .iter()
-            .filter(|h| !h.contains('.') && matches!(values.get(h), Some(Value::Rows(_))))
+            .filter(|h| !h.contains('.') && values.get(h).is_some_and(contains_rows))
             .map(String::as_str)
             .collect();
         if !misused.is_empty() {
@@ -489,13 +565,21 @@ impl Template {
             );
         }
 
-        crate::render_source(&fill(&self.source, values)?)
+        fill(&self.source, values)
     }
 
     /// The filled source, without rendering — for inspecting what a binding
     /// produced, and what the CLI's `--emit` prints.
     pub fn fill(&self, values: &Bindings) -> Result<String> {
         fill(&self.source, values)
+    }
+}
+
+fn contains_rows(value: &Value) -> bool {
+    match value {
+        Value::Rows(_) => true,
+        Value::List(items) => items.iter().any(contains_rows),
+        _ => false,
     }
 }
 
@@ -684,7 +768,7 @@ fn fill_line(
                 let _ = write!(out, "{{{{{name}}}}}");
             }
             Some(value) => {
-                let slot = slot_of(before);
+                let slot = slot_of(out);
                 // A name the grammar cannot read is refused here rather than
                 // written and left to fail as a parse error three lines away,
                 // where nothing points back at the binding that caused it.
@@ -756,7 +840,7 @@ fn string_state(text: &str, mut inside: bool) -> bool {
 /// identifier and `slice a {{name}}` must not become two statements. An
 /// **identifier** position is the opposite: quoting there produces a string
 /// where the grammar wants a name, and the file stops parsing. The two cannot
-/// share a rule, which is why `Template::parse` probes with both.
+/// share a rule, which is why `Template::parse` probes each position separately.
 #[derive(Clone, Copy, PartialEq)]
 enum Slot {
     Ident,
@@ -769,24 +853,83 @@ enum Slot {
 /// word before this an item keyword?" would misread `node slice {{v}}`, since
 /// nothing stops an item being *named* `slice`.
 fn slot_of(before: &str) -> Slot {
-    let line = before.rsplit('\n').next().unwrap_or(before);
-    let tokens: Vec<&str> = line.split_whitespace().collect();
-
-    match tokens.as_slice() {
-        // First word of a statement: an edge's tail.
-        [] => Slot::Ident,
-        // Second word: the identifier a statement declares — unless the first
-        // was a property key, which owns the rest of the line.
-        [first] if !first.ends_with(':') && !first.contains('{') => Slot::Ident,
-        // The head of an edge.
-        rest if matches!(
-            rest[rest.len() - 1],
-            "->" | "-->" | "..>" | "<->" | "--" | ".."
-        ) =>
-        {
-            Slot::Ident
+    const ARROWS: [&str; 7] = ["<->", "<-", "-->", "..>", "--", "->", ".."];
+    let mut tokens = Vec::new();
+    let mut rest = before.rsplit('\n').next().unwrap_or(before);
+    let mut parentheses = 0usize;
+    while !rest.is_empty() {
+        rest = rest.trim_start();
+        if rest.is_empty() || rest.starts_with("//") {
+            break;
         }
-        _ => Slot::Value,
+        let c = rest.as_bytes()[0];
+        if c == b'"' {
+            let mut end = 1;
+            let mut escaped = false;
+            for (i, c) in rest[1..].char_indices() {
+                end = i + 1 + c.len_utf8();
+                if c == '"' && !escaped {
+                    break;
+                }
+                escaped = c == '\\' && !escaped;
+            }
+            tokens.push(&rest[..end]);
+            rest = &rest[end..];
+            continue;
+        }
+        if matches!(c, b'{' | b'}' | b';') || (c == b',' && parentheses == 0) {
+            tokens.clear();
+            rest = &rest[1..];
+            continue;
+        }
+        let arrow = ARROWS.into_iter().find(|arrow| rest.starts_with(arrow));
+        let end = if let Some(arrow) = arrow {
+            arrow.len()
+        } else if matches!(c, b'(' | b')' | b',' | b':') {
+            if c == b'(' {
+                parentheses += 1;
+            } else if c == b')' {
+                parentheses = parentheses.saturating_sub(1);
+            }
+            1
+        } else {
+            rest.char_indices()
+                .skip(1)
+                .find(|(i, c)| {
+                    c.is_whitespace()
+                        || "{}();,:\"".contains(*c)
+                        || ARROWS.iter().any(|arrow| rest[*i..].starts_with(arrow))
+                })
+                .map_or(rest.len(), |(i, _)| i)
+        };
+        tokens.push(&rest[..end]);
+        rest = &rest[end..];
+    }
+    let first = tokens.first().copied();
+    let last = tokens.last().copied();
+    let edge = tokens.iter().any(|token| ARROWS.contains(token));
+    if tokens.contains(&":") {
+        return Slot::Value;
+    }
+    if last.is_some_and(|token| ARROWS.contains(&token) || token.ends_with('.'))
+        || (matches!(last, Some("right-of" | "left-of" | "below" | "above"))
+            && (matches!(first, Some("place" | "note" | "legend")) || tokens.contains(&"via")))
+        || (parentheses == 0
+            && (tokens.is_empty()
+                || (tokens.len() == 1 && !matches!(first, Some("note" | "include" | "legend")))
+                || (!edge
+                    && matches!(
+                        first,
+                        Some("row" | "column" | "equal-width" | "equal-height")
+                    )
+                    && !tokens.contains(&"gap"))
+                || (!edge && first == Some("align") && tokens.len() >= 2)
+                || (first == Some("style") && last == Some("extends"))
+                || (matches!(first, Some("use" | "include")) && last == Some("as"))))
+    {
+        Slot::Ident
+    } else {
+        Slot::Value
     }
 }
 

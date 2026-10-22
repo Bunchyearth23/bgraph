@@ -82,6 +82,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Playground draft and keyboard regressions
+        run: npm --prefix playground test
       - uses: typst-community/setup-typst@v5
         with:
           typst-version: 0.15.1

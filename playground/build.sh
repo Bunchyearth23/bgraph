@@ -17,14 +17,17 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$here/.."
 
 target=wasm32-unknown-unknown
+target_dir="${CARGO_TARGET_DIR:-target}"
 # No `cli`, no `csv`, no `pdf`: a page has no argument parser, no disk to read
 # a table from and nowhere to put a PDF. `wasm` is the entry points.
 features=all-archetypes,json,wasm
 
-rustup target list --installed | grep -qx "$target" \
+# Drain the producer: grep -q can trigger SIGPIPE, which pipefail treats as failure.
+rustup target list --installed | grep -x "$target" >/dev/null \
   || { echo "build.sh: rustup target add $target" >&2; exit 1; }
 
-cargo build --lib --release --target "$target" --no-default-features --features "$features"
+cargo build --lib --release --target "$target" --target-dir "$target_dir" \
+  --no-default-features --features "$features"
 mkdir -p playground/public
-cp "target/$target/release/bgraph.wasm" playground/public/bgraph.wasm
+cp "$target_dir/$target/release/bgraph.wasm" playground/public/bgraph.wasm
 printf 'playground/public/bgraph.wasm — %s\n' "$(du -h playground/public/bgraph.wasm | cut -f1)"

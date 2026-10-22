@@ -175,6 +175,9 @@ pub mod init;
 pub mod lsp;
 #[allow(missing_docs)]
 #[doc(hidden)]
+pub mod output;
+#[allow(missing_docs)]
+#[doc(hidden)]
 pub mod watch;
 
 // The suite covers every archetype, so a reduced build cannot run it. Saying
@@ -358,7 +361,13 @@ pub fn analyze_file_source_with_theme(
     source: &str,
     theme: Option<&str>,
 ) -> Result<FileAnalysis> {
-    let mut composed = compose::compose(path, Some(source))?;
+    analyze_composed(compose::compose(path, Some(source))?, theme)
+}
+
+pub(crate) fn analyze_composed(
+    mut composed: compose::Composed,
+    theme: Option<&str>,
+) -> Result<FileAnalysis> {
     if let Some(theme) = theme {
         themes::apply(&mut composed.diagram, theme)?;
     }
@@ -435,5 +444,5 @@ pub fn render_file(path: &std::path::Path) -> Result<String> {
 #[cfg(feature = "pdf")]
 pub fn render_source_pdf(source: &str) -> Result<Vec<u8>> {
     let layout = analyze_source(source).into_layout()?;
-    Ok(render_pdf::render(&layout))
+    render_pdf::render(&layout)
 }

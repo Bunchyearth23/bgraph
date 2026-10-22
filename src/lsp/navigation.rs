@@ -6,8 +6,14 @@ use crate::{ast::Span, props};
 use super::{LineIndex, declaration_span, declared_archetype, is_ident_char, item_words, word_at};
 
 /// Resolve an identifier to the declaration relevant to the cursor context.
-pub(super) fn definition(text: &str, index: &LineIndex, offset: usize, uri: &str) -> Value {
-    if let Some(document) = SourceDocument::new(text, uri)
+pub(super) fn definition(
+    text: &str,
+    index: &LineIndex,
+    offset: usize,
+    uri: &str,
+    sources: &std::collections::HashMap<std::path::PathBuf, String>,
+) -> Value {
+    if let Some(document) = SourceDocument::new(text, uri, sources)
         && let Some(entity) = document.entity_at(offset)
     {
         let target = if document.contains(entity.declaration, offset) {
@@ -69,20 +75,26 @@ struct EntityReferences {
 pub(super) struct SourceDocument {
     pub diagram: ast::Diagram,
     pub map: Option<crate::compose::SourceMap>,
+    pub diagnostics: Vec<crate::check::Diag>,
     text: String,
     uri: String,
     path: Option<std::path::PathBuf>,
 }
 
 impl SourceDocument {
-    pub fn new(text: &str, uri: &str) -> Option<Self> {
+    pub fn new(
+        text: &str,
+        uri: &str,
+        sources: &std::collections::HashMap<std::path::PathBuf, String>,
+    ) -> Option<Self> {
         let path = super::diagnostic_engine::path_of(uri);
         if let Some(path) = path.as_ref()
-            && let Ok(composed) = crate::compose::compose(path, Some(text))
+            && let Ok(composed) = crate::compose::compose_with_sources(path, Some(text), sources)
         {
             return Some(Self {
                 diagram: composed.diagram,
                 map: Some(composed.map),
+                diagnostics: composed.diagnostics,
                 text: text.into(),
                 uri: uri.into(),
                 path: Some(
@@ -95,6 +107,7 @@ impl SourceDocument {
         Some(Self {
             diagram: crate::parser::parse(text).ok()?,
             map: None,
+            diagnostics: Vec::new(),
             text: text.into(),
             uri: uri.into(),
             path,
@@ -125,18 +138,7 @@ impl SourceDocument {
                 start: span.start.saturating_sub(base),
                 end: span.end.saturating_sub(base),
             };
-            let uri: String = path
-                .to_string_lossy()
-                .bytes()
-                .map(|byte| {
-                    if byte.is_ascii_alphanumeric() || b"/-._~:".contains(&byte) {
-                        (byte as char).to_string()
-                    } else {
-                        format!("%{byte:02X}")
-                    }
-                })
-                .collect();
-            return json!({ "uri": format!("file://{uri}"), "range": LineIndex::new(map.source_of(span.start)).range(local) });
+            return json!({ "uri": super::file_uri::uri_of(path), "range": LineIndex::new(map.source_of(span.start)).range(local) });
         }
         json!({ "uri": self.uri, "range": LineIndex::new(&self.text).range(span) })
     }
@@ -198,8 +200,14 @@ impl SourceDocument {
     }
 }
 
-pub(super) fn references(text: &str, offset: usize, uri: &str, include_declaration: bool) -> Value {
-    let Some(document) = SourceDocument::new(text, uri) else {
+pub(super) fn references(
+    text: &str,
+    offset: usize,
+    uri: &str,
+    include_declaration: bool,
+    sources: &std::collections::HashMap<std::path::PathBuf, String>,
+) -> Value {
+    let Some(document) = SourceDocument::new(text, uri, sources) else {
         return json!([]);
     };
     let Some(entity) = document.entity_at(offset) else {

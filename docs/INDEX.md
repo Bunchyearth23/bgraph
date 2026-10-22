@@ -26,7 +26,34 @@ purpose — an identifier is earned by being cited.
 ## Open — the answer to "what is left"
 
 **Recorded state: seven work items are building (`W-166` to `W-172`);
-none are planned or blocked. No question is open; `X-005` is reopened.**
+none are planned or blocked. No question is open; `X-005` is open and `X-033` is mitigated.**
+
+The user authorized committing and pushing the complete current worktree on
+2026-10-22, including the audit/editor fixes and tool configuration changes.
+Delivery is recorded by Git; this does not close the parent work items,
+install artifacts or publish a release. Remote CI is the next delivery check.
+
+Editor usability follow-up on 2026-10-22: VS Code preview now fits both pane
+dimensions, retains zoom/pan across edits and restores automatic fitting on
+request. The LSP uses open included buffers consistently for diagnostics,
+definitions, references and hover. Both plugins recognize `.bds`; VS Code
+also sends untitled buffers to the server. **798 Rust tests and 12 extension
+JS tests passed**, with strict Clippy, minimal build, formatting, strict docs
+and a complete VSIX. Actual Linux VS Code and Zed hosts passed, including
+preview geometry/resizing and Zed's task/shortcut. User installations are
+unchanged; Windows/macOS and screen readers remain unverified. Parent work
+states are unchanged. Evidence: `.agent/analysis/editor-usability-20261022.md`.
+
+Full-project audit and authorized parallel remediation on 2026-10-22: 19 of
+20 findings corrected locally; embedded-font title decoration improved while
+`X-005` remains open for global text measurement. Standard/PNG suites pass
+**796/805 tests** (one manual performance test ignored), along with minimal
+build/tests, strict Clippy, formatting, 11 JS tests, strict docs and the
+complete runtime gate. At that validation checkpoint there was no commit,
+installation or publication. The later editor follow-up above establishes
+Linux host validation; native Windows/macOS and accessibility checks remain.
+Evidence: `.agent/analysis/audit-remediation-20261022.md` and the
+[editable audit with correction follow-up](https://chatgpt.com/space/page_24e4faa833608191bed9b99f4e1399ca).
 
 1.0.1 preparation on 2026-10-21 (`W-172`): seven corrections from the user
 report, generated reference additions and JSON `canvas.layout_origin` are
@@ -130,6 +157,7 @@ Open and residual risks; rows name related work and outstanding evidence.
 
 | id | state | title | notes |
 |---|---|---|---|
+| `X-033` | mitigated | CLI and delivery paths can destroy inputs or report success for incorrect outputs | The 2026-10-22 fixes stage exports, protect sources/dependencies, preserve output permissions, route templates through the common writers and reject incomplete rows. Boundary regressions and full standard/PNG/runtime gates pass. Native Windows remains to verify; bundle interruption can leave a recoverable backup. `.agent/analysis/audit-remediation-20261022.md`; [editable audit](https://chatgpt.com/space/page_24e4faa833608191bed9b99f4e1399ca). |
 | `X-032` | mitigated | A prefixed diagram can lose class references from a nested shared-style include | Observed while replaying the beginner guide: including application.bd under a prefix reports unknown .service unless its shared house.bds is also included at the root. Both the limitation and the verified workaround are documented; qualification of nested style references remains a follow-up. `.agent/analysis/documentation-english-20261020.md`. |
 | `X-019` | retired | A late pass can invalidate an already solved position | W-153 delivered one simultaneous solver for nodes, frames and BPMN attachments, without a production threshold/fallback. Dependencies/cycles above 512 entities, local origins and permutations checked; 20,000 nodes pass the performance guard. `.agent/analysis/w153-completion.md`. |
 | `X-020` | mitigated | Interfaces can disagree about placement semantics | Shared analysis and diagnostics across surfaces; multifile error recovery uses source maps and LSP relatedInformation. Runtime parity and real VS Code/Zed hosts checked, with explicit Unicode contracts. W-155/W-160; `.agent/analysis/parallel-work-validation.md`. |
@@ -150,7 +178,7 @@ Open and residual risks; rows name related work and outstanding evidence.
 | `X-006` | mitigated | Edge labels avoid lines, not each other's readability | `W-010` scores candidates; `W-022` made the node and label penalties proportional to the overlapped area and distance a real cost, which stopped labels fleeing three rows from their own edge. Still local: nothing guarantees the best global arrangement — `W-037` adds the escape hatch (`label-offset`) rather than a better solver, because the author can see what the cost function cannot. |
 | `X-017` | narrowed · `W-077` | Raster output is **optional, not absent** — a build without the `png` feature still has none | `W-042` ships PDF because it is vector and needs nothing; a raster format needs glyph rasterisation and path filling, which is a real renderer. `D-027` records that the honest options were a large dependency tree in a crate that has five, or months of work — and that a PDF opens everywhere a PNG does. Anyone who needs a bitmap can rasterise the PDF or the SVG with a tool built for it. **Narrowed on 2026-08-10 by `W-077`:** `resvg` was already in the tree for the window, so a `png` feature costs the default build nothing and gives someone rendering images in CI a first-class output. The dependency-free promise is unchanged, because it was always a promise about what the *default* build costs. |
 | `X-018` | mitigated · `W-127` | An `ortho` edge avoids boxes, not other edges | `W-127` prices a shared run and gives contention its own lanes, so two lines take the same channel only where there is genuinely no other. **Not retired**, and the residue is worth naming: where one channel is the only one — a corridor a box's width — the price buys nothing and the two still double up. Blocking instead of pricing would turn that into a missing edge, which is worse. The order the edges are declared in decides who gets the direct channel, which is the author's to change. |
-| `X-005` | open | Estimated advances can leave title plates shorter than rendered text | Reopened on 2026-10-21 by `W-172`. `W-040` improved per-character estimates; `W-095`/`W-100` carry/subset fonts but do not recalculate layout advances. An explicit-family embedded-font PNG still overflows its group title plate. A measurement contract remains needed; the old claim of exact measured text through embedding alone was incorrect. `D-026`; `.agent/analysis/1.0.1-validation-20261021.md`. |
+| `X-005` | open | Estimated advances can leave text outside its intended bounds | Reopened by `W-172`; the 2026-10-22 fix measures embedded explicit-family group-title plates and title canvas bounds, with three regression tests and no movement of solved nodes/frames. Global sizing/wrapping, shaping, kerning and installed-font metrics remain estimated. Font embedding alone is not exact layout. Contract: `docs/API.md#font-metrics`; `.agent/analysis/audit-remediation-20261022.md`. |
 
 ---
 

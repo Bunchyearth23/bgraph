@@ -17,7 +17,9 @@ bgraph architecture.bd -o architecture.json
 
 The output filename's extension selects the format. Without `-o`, the
 output is `out.svg` in the terminal's current folder. A render replaces
-an existing output file, so keep source and output filenames distinct.
+an existing output file only after producing the complete result. The renderer
+refuses to replace its source, includes or data files; choose a distinct output
+filename. A failed render leaves an existing export unchanged.
 
 | Format | Use |
 |---|---|
@@ -57,7 +59,17 @@ bgraph architecture.bd -o architecture.pdf --page a4
 Replace `/path/to/Font.ttf` with a real TrueType font file. Embedding carries
 the selected font so another computer does not substitute its own.
 `--page a4` tiles a large drawing across A4 sheets. Other accepted values
-include `a3`, `letter` and sizes in points such as `600x800`.
+include `a3`, `letter` and sizes in points such as `600x800`. Dimensions must
+be finite and larger than the 24-point overlap; exports above 10,000 sheets
+are refused.
+
+Without embedding, PDF text is limited to the standard font encoding.
+Characters outside it produce an error naming the character. Use
+`--embed-font` with a TrueType font containing every required character.
+Missing glyphs are rejected instead of being silently replaced by `?`.
+For SVG, select the embedded file's stem in the diagram's `font:` property
+(for example `font: "DejaVuSans"` for `DejaVuSans.ttf`). Embedding alone does
+not resize nodes or perform complex-script text shaping.
 
 ## Preview while editing
 
@@ -92,6 +104,8 @@ bgraph watch diagrams --out images --once
 Create `diagrams` and put your `.bd` files there first. In folder mode,
 `watch` runs an SVG build loop. `--once` builds once and exits with a nonzero
 status if any file fails. `--open` is not available in folder mode.
+Includes and external chart data trigger rebuilds too. Identical SVG output
+is not rewritten, so unchanged diagrams keep their modification times.
 
 ## Check and format
 

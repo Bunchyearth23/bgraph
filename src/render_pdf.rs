@@ -6,10 +6,8 @@
 //! That is the same size of job as the SVG writer and the watch server, and it
 //! keeps the dependency list at five.
 //!
-//! One thing falls out of it that is better than SVG can manage: a PDF viewer
-//! is required by the specification to have Helvetica, and the advance table
-//! `W-040` added *is* Helvetica's. Text width here is not an estimate — it is
-//! exact, and `X-005` does not apply to this output at all.
+//! Text uses the base Helvetica encoding or an explicitly embedded TrueType
+//! font. Unsupported characters are rejected rather than replaced silently.
 
 use std::collections::BTreeMap;
 use std::fmt::Write;
@@ -42,7 +40,7 @@ impl Page {
 
     /// A named size, or `WIDTHxHEIGHT` in points.
     pub fn parse(text: &str) -> Option<Page> {
-        match text.to_ascii_lowercase().as_str() {
+        let page = match text.to_ascii_lowercase().as_str() {
             "a4" => Some(Page::A4),
             "a3" => Some(Page {
                 width: 841.89,
@@ -62,12 +60,23 @@ impl Page {
                     ..Page::A4
                 })
             }
-        }
+        }?;
+        page.is_valid().then_some(page)
+    }
+
+    pub(crate) fn is_valid(self) -> bool {
+        self.width.is_finite()
+            && self.height.is_finite()
+            && self.overlap.is_finite()
+            && self.overlap >= 0.0
+            && self.width > self.overlap
+            && self.height > self.overlap
     }
 }
 
-pub fn render(layout: &Layout) -> Vec<u8> {
-    render_pages(layout, None)
+pub fn render(layout: &Layout) -> anyhow::Result<Vec<u8>> {
+    crate::check::pdf_export(layout, None)?;
+    Ok(render_pages(layout, None))
 }
 
 /// The same diagram across as many sheets as it takes.
@@ -79,8 +88,20 @@ pub fn render(layout: &Layout) -> Vec<u8> {
 ///
 /// Only the PDF gets this. An SVG has no pages, and pretending otherwise would
 /// be inventing a concept the format does not have.
-pub fn render_paged(layout: &Layout, page: Page) -> Vec<u8> {
-    render_pages(layout, Some(page))
+pub fn render_paged(layout: &Layout, page: Page) -> anyhow::Result<Vec<u8>> {
+    crate::check::pdf_export(layout, Some(page))?;
+    Ok(render_pages(layout, Some(page)))
+}
+
+pub(crate) fn page_grid(width: f64, height: f64, page: Page) -> (f64, f64) {
+    (
+        ((width - page.overlap) / (page.width - page.overlap))
+            .ceil()
+            .max(1.0),
+        ((height - page.overlap) / (page.height - page.overlap))
+            .ceil()
+            .max(1.0),
+    )
 }
 
 fn render_pages(layout: &Layout, page: Option<Page>) -> Vec<u8> {
@@ -125,7 +146,13 @@ fn render_pages(layout: &Layout, page: Option<Page>) -> Vec<u8> {
                 let plate = Rect {
                     x: at.0 - 3.0,
                     y: at.1 - size * 0.72,
-                    w: crate::layout::text_width(std::slice::from_ref(&text), size) + 6.0,
+                    w: c.font
+                        .as_mut()
+                        .map(|font| font.encode(&text, size).1)
+                        .unwrap_or_else(|| {
+                            crate::layout::text_width(std::slice::from_ref(&text), size)
+                        })
+                        + 6.0,
                     h: size * 1.4,
                 };
                 c.path(
@@ -863,8 +890,8 @@ impl Content {
         if text.is_empty() {
             return;
         }
-        // Helvetica is one of the fourteen a viewer must have, so the advance
-        // table `W-040` added is exact here rather than an estimate.
+        // Embedded text uses its own metrics; the base-font table remains an
+        // estimate for bold and non-ASCII text.
         let bold = weight == "bold" || weight.parse::<u32>().is_ok_and(|w| w >= 600);
         let font = if bold { "/F2" } else { "/F1" };
         let (encoded, width) = if let Some(font) = &mut self.font {
@@ -892,6 +919,43 @@ impl Content {
 
 /// PDF strings are parenthesised, so the delimiters and the escape character
 /// have to be escaped. Base-14 fonts use Windows-1252, never UTF-8.
+pub(crate) fn win_ansi(c: char) -> Option<u8> {
+    if (c as u32) < 0x100 && !c.is_control() {
+        return Some(c as u8);
+    }
+    Some(match c {
+        '€' => 0x80,
+        '‚' => 0x82,
+        'ƒ' => 0x83,
+        '„' => 0x84,
+        '…' => 0x85,
+        '†' => 0x86,
+        '‡' => 0x87,
+        'ˆ' => 0x88,
+        '‰' => 0x89,
+        'Š' => 0x8a,
+        '‹' => 0x8b,
+        'Œ' => 0x8c,
+        'Ž' => 0x8e,
+        '‘' => 0x91,
+        '’' => 0x92,
+        '“' => 0x93,
+        '”' => 0x94,
+        '•' => 0x95,
+        '–' => 0x96,
+        '—' => 0x97,
+        '˜' => 0x98,
+        '™' => 0x99,
+        'š' => 0x9a,
+        '›' => 0x9b,
+        'œ' => 0x9c,
+        'ž' => 0x9e,
+        'Ÿ' => 0x9f,
+        '\u{202f}' => 0xa0,
+        _ => return None,
+    })
+}
+
 fn escape(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for c in text.chars() {
@@ -901,46 +965,27 @@ fn escape(text: &str) -> String {
                 out.push(c);
             }
             c if c.is_ascii() && !c.is_control() => out.push(c),
-            c if (c as u32) < 0x100 && !c.is_control() => {
-                let _ = write!(out, "\\{:03o}", c as u32);
-            }
-            _ => {
-                let byte = match c {
-                    '€' => 0x80,
-                    '‚' => 0x82,
-                    'ƒ' => 0x83,
-                    '„' => 0x84,
-                    '…' => 0x85,
-                    '†' => 0x86,
-                    '‡' => 0x87,
-                    'ˆ' => 0x88,
-                    '‰' => 0x89,
-                    'Š' => 0x8a,
-                    '‹' => 0x8b,
-                    'Œ' => 0x8c,
-                    'Ž' => 0x8e,
-                    '‘' => 0x91,
-                    '’' => 0x92,
-                    '“' => 0x93,
-                    '”' => 0x94,
-                    '•' => 0x95,
-                    '–' => 0x96,
-                    '—' => 0x97,
-                    '˜' => 0x98,
-                    '™' => 0x99,
-                    'š' => 0x9a,
-                    '›' => 0x9b,
-                    'œ' => 0x9c,
-                    'ž' => 0x9e,
-                    'Ÿ' => 0x9f,
-                    '\u{202f}' => 0xa0,
-                    _ => b'?',
-                };
-                let _ = write!(out, "\\{byte:03o}");
+            c => {
+                let _ = write!(out, "\\{:03o}", win_ansi(c).unwrap_or(b'?'));
             }
         }
     }
     out
+}
+
+pub(crate) fn missing_glyph(layout: &Layout) -> Option<char> {
+    let embedded = layout
+        .opts
+        .embed_font
+        .as_ref()
+        .and_then(|(_, bytes)| EmbeddedFont::new(bytes));
+    layout.text_runs().flat_map(str::chars).find(|&ch| {
+        if let Some(font) = &embedded {
+            crate::subset::glyph_of(&font.bytes, font.cmap, ch).unwrap_or(0) == 0
+        } else {
+            win_ansi(ch).is_none()
+        }
+    })
 }
 
 /// The file around the content stream: the object table, the page tree, the
@@ -970,10 +1015,10 @@ fn assemble(
     let boxes: Vec<(f64, f64, f64, f64)> = match page {
         None => vec![(0.0, 0.0, width, height)],
         Some(p) => {
-            let step_x = (p.width - p.overlap).max(1.0);
-            let step_y = (p.height - p.overlap).max(1.0);
-            let cols = ((width / step_x).ceil() as usize).max(1);
-            let rows = ((height / step_y).ceil() as usize).max(1);
+            let step_x = p.width - p.overlap;
+            let step_y = p.height - p.overlap;
+            let (cols, rows) = page_grid(width, height, p);
+            let (cols, rows) = (cols as usize, rows as usize);
             let mut out = Vec::with_capacity(cols * rows);
             // Row by row from the top, because that is the order a reader
             // lays the sheets out — the PDF's own y axis runs the other way,

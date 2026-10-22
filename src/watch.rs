@@ -6,7 +6,7 @@
 
 use std::fs;
 use std::hash::{Hash, Hasher};
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 
@@ -84,9 +84,15 @@ fn open_browser(url: String) {
 }
 
 fn handle(mut stream: TcpStream, input: &Path, data: Option<&Path>) -> Result<()> {
-    let mut reader = BufReader::new(stream.try_clone()?);
+    stream.set_read_timeout(Some(std::time::Duration::from_secs(1)))?;
+    stream.set_write_timeout(Some(std::time::Duration::from_secs(1)))?;
+    let mut reader = BufReader::new(stream.try_clone()?.take(8193));
     let mut request = String::new();
     reader.read_line(&mut request)?;
+    anyhow::ensure!(
+        request.len() <= 8192 && request.ends_with('\n'),
+        "invalid HTTP request line"
+    );
 
     let path = request.split_whitespace().nth(1).unwrap_or("/");
 
@@ -155,9 +161,15 @@ fn version(input: &Path, data: Option<&Path>) -> String {
     // The composed text includes child files; editing a layout in an include
     // must invalidate its source highlights as well as the drawing.
     if !is_svg(input)
-        && let Ok(composed) = crate::compose::compose(input, None)
+        && let Ok(source) = preview_source(input, data)
+        && let Ok(composed) = crate::compose::compose(input, Some(&source))
     {
         composed.map.text.hash(&mut hash);
+        for dependency in composed.map.dependencies() {
+            dependency.hash(&mut hash);
+            dependency.exists().hash(&mut hash);
+            fs::read(dependency).unwrap_or_default().hash(&mut hash);
+        }
         for diagnostic in composed.diagnostics {
             diagnostic.message.hash(&mut hash);
             diagnostic.span.start.hash(&mut hash);
@@ -421,6 +433,10 @@ fn preview_diagnostics(input: &Path, data: Option<&Path>) -> Result<Vec<crate::c
 }
 
 fn preview_analysis(input: &Path, data: Option<&Path>) -> Result<crate::FileAnalysis> {
+    crate::analyze_file_source(input, &preview_source(input, data)?)
+}
+
+fn preview_source(input: &Path, data: Option<&Path>) -> Result<String> {
     let source =
         fs::read_to_string(input).with_context(|| format!("cannot read {}", input.display()))?;
     #[cfg(feature = "json")]
@@ -429,13 +445,13 @@ fn preview_analysis(input: &Path, data: Option<&Path>) -> Result<crate::FileAnal
             fs::read_to_string(path).with_context(|| format!("cannot read {}", path.display()))?;
         let values = crate::template::Bindings::from_json(&raw)
             .with_context(|| format!("in {}", path.display()))?;
-        crate::template::Template::parse(&source)?.fill(&values)?
+        crate::template::Template::parse(&source)?.fill_checked(&values)?
     } else {
         source
     };
     #[cfg(not(feature = "json"))]
     let _ = data;
-    crate::analyze_file_source(input, &source)
+    Ok(source)
 }
 
 fn preview_inspection(input: &Path, data: Option<&Path>) -> Result<serde_json::Value> {
@@ -532,8 +548,8 @@ fn html_escape(s: &str) -> String {
 /// costs nothing on an idle machine, short enough that a save feels answered.
 const POLL: std::time::Duration = std::time::Duration::from_millis(250);
 
-/// Render every `.bd` in `dir` whose picture is missing or older, then keep
-/// doing it as they change.
+/// Render every `.bd` in `dir`, then rebuild when a source or dependency changes.
+/// Identical pictures are left untouched.
 ///
 /// This is the half of `watch` that is a *build*, not a view: regenerating a
 /// directory of diagrams after editing one of them is the thing this project
@@ -550,6 +566,7 @@ pub fn build_dir(dir: &Path, out: Option<&Path>, once: bool) -> Result<()> {
         anyhow::bail!("{} is not a directory", dir.display());
     }
     fs::create_dir_all(out).with_context(|| format!("cannot create {}", out.display()))?;
+    let mut versions = std::collections::HashMap::new();
 
     loop {
         let mut built = 0;
@@ -562,16 +579,26 @@ pub fn build_dir(dir: &Path, out: Option<&Path>, once: bool) -> Result<()> {
                     .file_name()
                     .expect("a source has a file name"),
             );
-            if !outdated(&source, &target) {
+            let current = version(&source, None);
+            if versions.get(&source) == Some(&current) && target.exists() {
                 continue;
             }
 
-            match render_source(&source, None) {
+            let rendered = preview_analysis(&source, None).and_then(|analysis| {
+                for dependency in analysis.map.dependencies() {
+                    crate::output::protect_input(&target, dependency)?;
+                }
+                Ok(crate::render_svg::render(&analysis.into_layout()?))
+            });
+            match rendered {
                 Ok(svg) => {
-                    fs::write(&target, svg)
-                        .with_context(|| format!("cannot write {}", target.display()))?;
-                    println!("{} → {}", source.display(), target.display());
-                    built += 1;
+                    if fs::read_to_string(&target).ok().as_deref() != Some(&svg) {
+                        crate::output::write(&target, svg)
+                            .with_context(|| format!("cannot write {}", target.display()))?;
+                        println!("{} → {}", source.display(), target.display());
+                        built += 1;
+                    }
+                    versions.insert(source, current);
                 }
                 // One broken file must not stop the others: mid-edit, that is
                 // the normal state of the file being worked on, and taking the
@@ -610,19 +637,6 @@ pub fn sources(dir: &Path) -> Result<Vec<PathBuf>> {
         .collect();
     found.sort();
     Ok(found)
-}
-
-/// Whether the picture needs making again. A missing target counts, and so
-/// does one whose mtime cannot be read — doing the work is cheap and being
-/// wrong the other way leaves a stale picture committed.
-fn outdated(source: &Path, target: &Path) -> bool {
-    let Ok(made) = fs::metadata(target).and_then(|m| m.modified()) else {
-        return true;
-    };
-    match fs::metadata(source).and_then(|m| m.modified()) {
-        Ok(edited) => edited > made,
-        Err(_) => true,
-    }
 }
 
 fn plural(n: usize) -> &'static str {
@@ -876,6 +890,83 @@ mod tests {
         let error = &inspection["diagnostics"][0];
         assert_eq!(error["entities"], serde_json::json!(["child"]));
         assert_eq!(error["source"]["column"], 25);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    #[cfg(all(feature = "csv", feature = "pie"))]
+    fn external_data_changes_and_deletion_invalidate_the_preview() {
+        let dir = scratch("csv-version");
+        let path = dir.join("a.bd");
+        let data = dir.join("data.csv");
+        fs::write(&path, "type pie { from: \"data.csv\" }\n").unwrap();
+        fs::write(&data, "name,value\nA,5\nB,10\n").unwrap();
+        let before = version(&path, None);
+        fs::write(&data, "name,value\nA,10\nB,5\n").unwrap();
+        let changed = version(&path, None);
+        assert_ne!(before, changed);
+        fs::remove_file(data).unwrap();
+        assert_ne!(changed, version(&path, None));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn directory_builds_recheck_includes_without_rewriting_unchanged_images() {
+        let dir = scratch("directory-dependencies");
+        let output = dir.join("images");
+        let source = dir.join("a.bd");
+        let style = dir.join("shared.bds");
+        fs::write(&source, "include \"shared.bds\"\nnode a\n").unwrap();
+        fs::write(&style, "style node { fill: #ff0000 }\n").unwrap();
+        build_dir(&dir, Some(&output), true).unwrap();
+        let target = output.join("a.svg");
+        let stamp = fs::metadata(&target).unwrap().modified().unwrap();
+        build_dir(&dir, Some(&output), true).unwrap();
+        assert_eq!(stamp, fs::metadata(&target).unwrap().modified().unwrap());
+        fs::write(&style, "style node { fill: #0000ff }\n").unwrap();
+        build_dir(&dir, Some(&output), true).unwrap();
+        assert!(fs::read_to_string(&target).unwrap().contains("#0000ff"));
+        fs::remove_file(style).unwrap();
+        assert!(build_dir(&dir, Some(&output), true).is_err());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn idle_connection_cannot_hold_the_next_request_indefinitely() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let worker = std::thread::spawn(move || {
+            for _ in 0..2 {
+                let (stream, _) = listener.accept().unwrap();
+                let _ = handle(stream, Path::new("absent.bd"), None);
+            }
+        });
+        let idle = TcpStream::connect(address).unwrap();
+        let mut active = TcpStream::connect(address).unwrap();
+        active
+            .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+            .unwrap();
+        active.write_all(b"GET /version HTTP/1.1\r\n\r\n").unwrap();
+        let mut response = String::new();
+        active.read_to_string(&mut response).unwrap();
+        assert!(response.starts_with("HTTP/1.1 200"));
+        drop(idle);
+        worker.join().unwrap();
+    }
+
+    #[test]
+    #[cfg(feature = "json")]
+    fn bound_include_paths_are_watched_after_template_expansion() {
+        let dir = scratch("bound-dependencies");
+        let input = dir.join("main.bd");
+        let data = dir.join("data.json");
+        let child = dir.join("child.bds");
+        fs::write(&input, "include \"{{partial}}\"\nnode a\n").unwrap();
+        fs::write(&data, r#"{"partial":"child.bds"}"#).unwrap();
+        fs::write(&child, "style node { fill: #ff0000 }\n").unwrap();
+        let before = version(&input, Some(&data));
+        fs::write(&child, "style node { fill: #0000ff }\n").unwrap();
+        assert_ne!(before, version(&input, Some(&data)));
         fs::remove_dir_all(dir).unwrap();
     }
 }

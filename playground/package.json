@@ -6,6 +6,7 @@
   "scripts": {
     "wasm": "./build.sh",
     "dev": "vite",
+    "test": "node --test test/*.test.mjs",
     "build": "vite build",
     "preview": "vite preview"
   },

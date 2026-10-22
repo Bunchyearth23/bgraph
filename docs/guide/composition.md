@@ -80,7 +80,10 @@ web.app -> jobs.app "triggers"
 
 Render it with `bgraph components.bd -o components.svg`.
 Each instance is a frame you can place. Parameters are substituted by the
-template engine with escaping appropriate to their context.
+template engine with escaping appropriate to their context. Notes and legends
+inside a component must use a relative anchor to one of its elements, so they
+follow each instance. Nested `component`, `use`, `include`, `type` and `graph`
+statements are rejected inside component bodies.
 
 ## Fill a template
 
@@ -115,7 +118,11 @@ bgraph watch traffic.bd --data traffic.json --open --port 0
 ```
 
 `--emit` prints the filled source. `watch --data` reloads changed data as
-well as the diagram. A missing value produces an error naming the hole.
+well as the diagram and the files selected by the filled template. A missing
+value produces an error naming the hole; a missing field in a repeated row
+also identifies the row. `--emit` deliberately allows partial substitution.
+Filled templates support the same SVG, PDF, PNG and JSON outputs, themes
+and fonts as ordinary source files.
 
 ## Load chart data from CSV
 
@@ -143,7 +150,9 @@ bgraph sales.bd -o sales.svg
 Required columns depend on the type; look up its section in the
 [reference](reference.md). To repeat a template line for each record,
 see `--rows` in `bgraph --help` and
-[the repetition syntax](reference.md#repetition).
+[the repetition syntax](reference.md#repetition). Both CSV entry points accept
+quoted commas, escaped quotes and quoted multiline cells. Duplicate or empty
+column names and rows with the wrong number of cells produce an error.
 
 !!! note "Embedded rendering and files"
     `include` and `from:` require a disk path. Use the CLI or Rust's

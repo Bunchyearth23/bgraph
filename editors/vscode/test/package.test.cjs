@@ -19,6 +19,8 @@ test('exported extension packages its supplied WASM and refuses a missing render
     const result = spawnSync('bash', ['package.sh', '--no-server'], { cwd: extension, encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr);
     const archive = path.join(extension, `${manifest.name}-${manifest.version}.vsix`);
+    assert.deepEqual(execFileSync('unzip', ['-p', archive, 'extension/src/preview.js']),
+      fs.readFileSync(path.join(extension, 'src', 'preview.js')));
     const supplied = fs.readFileSync(path.join(extension, 'bgraph.wasm'));
     assert.deepEqual(execFileSync('unzip', ['-p', archive, 'extension/bgraph.wasm'],
       { maxBuffer: supplied.length + 1024 }), supplied);

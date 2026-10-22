@@ -31,7 +31,8 @@
         "command": "bgraph.showPreview",
         "title": "Open Preview",
         "category": "bgraph",
-        "enablement": "resourceLangId == bgraph"
+        "icon": "$(open-preview)",
+        "enablement": "resourceLangId == bgraph && resourceExtname != .bds"
       }
     ],
     "keybindings": [
@@ -39,14 +40,14 @@
         "command": "bgraph.showPreview",
         "key": "ctrl+shift+v",
         "mac": "cmd+shift+v",
-        "when": "editorLangId == bgraph && editorTextFocus"
+        "when": "editorLangId == bgraph && editorTextFocus && resourceExtname != .bds"
       }
     ],
     "menus": {
       "editor/title": [
         {
           "command": "bgraph.showPreview",
-          "when": "resourceLangId == bgraph",
+          "when": "resourceLangId == bgraph && resourceExtname != .bds",
           "group": "navigation"
         }
       ]
@@ -64,7 +65,8 @@
           "bgraph"
         ],
         "extensions": [
-          ".bd"
+          ".bd",
+          ".bds"
         ],
         "configuration": "./language-configuration.json"
       }

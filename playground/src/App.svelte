@@ -31,6 +31,10 @@ api -> db  "reads"
   let diagnostics = $state([])
   let dark = $state(false)
   let editor = $state(null)
+  let initialized = $state(false)
+  let draftStatus = $state('')
+  let storageAvailable = true
+  const DRAFT_KEY = 'bgraph.playground.draft'
   let timer
 
   // The source travels in the fragment, not the query: a fragment is never
@@ -51,12 +55,12 @@ api -> db  "reads"
     navigator.clipboard?.writeText(location.href)
   }
 
-  function download() {
-    const blob = new Blob([svg], { type: 'image/svg+xml' })
+  function download(source = false) {
+    const blob = new Blob([source ? text : svg], { type: source ? 'text/plain;charset=utf-8' : 'image/svg+xml' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${genre || 'diagram'}.svg`
+    a.download = `${genre || 'diagram'}.${source ? 'bd' : 'svg'}`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -65,6 +69,7 @@ api -> db  "reads"
     const found = genres.find((g) => g.name === name)
     if (!found) return
     genre = name
+    text = found.source
     editor?.replace(found.source)
   }
 
@@ -83,8 +88,23 @@ api -> db  "reads"
     diagnostics = wasm.check(text)
   }
 
-  onMount(async () => {
+  async function initialize() {
     dark = matchMedia('(prefers-color-scheme: dark)').matches
+    const shared = fromLink()
+    let saved = null
+    try {
+      saved = localStorage.getItem(DRAFT_KEY)
+    } catch {
+      storageAvailable = false
+      draftStatus = 'Autosave unavailable — download your source to keep it'
+    }
+    const initial = shared ?? saved
+    if (initial !== null) {
+      text = initial
+      editor?.replace(initial)
+    }
+    initialized = true
+    const beforeLoad = text
     try {
       await wasm.load()
       genres = wasm.examples()
@@ -95,11 +115,8 @@ api -> db  "reads"
       return
     }
 
-    const shared = fromLink()
-    if (shared) {
-      editor?.replace(shared)
-      text = shared
-    } else {
+    // Loading must never replace work typed while the renderer was arriving.
+    if (initial === null && text === beforeLoad) {
       genre = 'free'
       const start = genres.find((g) => g.name === 'free')?.source
       if (start) {
@@ -107,6 +124,26 @@ api -> db  "reads"
         text = start
       }
     }
+  }
+
+  onMount(() => {
+    initialize()
+    return () => clearTimeout(timer)
+  })
+
+  function saveDraft() {
+    if (!initialized || !storageAvailable) return
+    try {
+      localStorage.setItem(DRAFT_KEY, text)
+      draftStatus = 'Draft saved on this device'
+    } catch {
+      draftStatus = 'Autosave unavailable — download your source to keep it'
+    }
+  }
+
+  $effect(() => {
+    const _ = text
+    if (initialized) saveDraft()
   })
 
   // Debounced, because rendering is fast but not free and a keystroke is not a
@@ -139,15 +176,17 @@ api -> db  "reads"
   <div class="spacer"></div>
 
   {#if status === 'ready'}
-    <select bind:value={genre} onchange={(e) => pick(e.currentTarget.value)}>
+    <select aria-label="Diagram example" bind:value={genre} onchange={(e) => pick(e.currentTarget.value)}>
+      <option value="" disabled>Choose an example</option>
       {#each genres as g (g.name)}
         <option value={g.name}>{g.name}</option>
       {/each}
     </select>
     <button onclick={share} title="Copy a link that carries the source">Share</button>
-    <button onclick={download} disabled={!svg}>SVG</button>
+    <button onclick={() => download()} disabled={!svg} aria-label="Download SVG image">SVG</button>
   {/if}
-  <button class="theme" onclick={() => (dark = !dark)} title="Light or dark">
+  <button onclick={() => download(true)} title="Download editable source">Download .bd</button>
+  <button class="theme" onclick={() => (dark = !dark)} aria-label={dark ? 'Use light theme' : 'Use dark theme'} title="Light or dark">
     {dark ? '☾' : '☀'}
   </button>
 </header>
@@ -179,6 +218,7 @@ then reload. `pnpm dev` serves public/ at the site root.
 </main>
 
 <footer class:bad={errors > 0} class:warn={errors === 0 && warnings > 0}>
+  <span class="draft" role="status">{draftStatus}</span>
   {#if status !== 'ready'}
     <span class="ok">…</span>
   {:else if diagnostics.length === 0}
@@ -247,6 +287,7 @@ then reload. `pnpm dev` serves public/ at the site root.
   footer.bad { box-shadow: inset 3px 0 0 var(--bad); }
   footer.warn { box-shadow: inset 3px 0 0 var(--warn); }
   .ok { color: var(--muted); }
+  .draft { display: block; color: var(--muted); }
   footer ul { margin: 0; padding: 0; list-style: none; }
   footer li { display: flex; gap: 10px; }
   li.error { color: var(--bad); }

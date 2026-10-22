@@ -11,7 +11,7 @@
 
 set -euo pipefail
 
-repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+repo="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 output="$repo/export"
 windows_bin_dir="${BGRAPH_WINDOWS_BIN_DIR:-}"
 
@@ -32,6 +32,9 @@ MSVC targets with clang/lld plus the Windows SDK. To avoid that
 installation, pass a directory containing one subdirectory per target (for
 example DIR/x86_64-pc-windows-msvc and DIR/aarch64-pc-windows-msvc) with
 --windows-bin-dir (or BGRAPH_WINDOWS_BIN_DIR).
+
+An existing output must be a recognized bgraph export. It is replaced only
+after every build succeeds; other directories and symbolic links are refused.
 USAGE
 }
 
@@ -62,13 +65,89 @@ while (($#)); do
   esac
 done
 
+if [[ -n "$windows_bin_dir" ]]; then
+  windows_bin_dir="$(realpath -m -- "$windows_bin_dir")"
+fi
+cd "$repo"
+
+# Resolve aliases before checking ancestors, so "export/.." cannot erase the repo.
+[[ ! -L "$(realpath -ms -- "$output")" ]] \
+  || { echo "export.sh: output must not be a symbolic link" >&2; exit 2; }
+output="$(realpath -m -- "$output")"
+case "$repo/" in
+  "$output/"*) echo "export.sh: output must not contain the repository" >&2; exit 2 ;;
+esac
+[[ "$output" != / && "$output" != "$(realpath -m -- "$HOME")" ]] \
+  || { echo "export.sh: refusing unsafe output directory: $output" >&2; exit 2; }
+
+recognized_export() {
+  [[ -d "$1" && ! -L "$1" ]] || return 1
+  if [[ -f "$1/.bgraph-export" && ! -L "$1/.bgraph-export" ]] \
+    && [[ "$(cat "$1/.bgraph-export")" == 'bgraph source-free export v1' ]]; then
+    return 0
+  fi
+  # Older exports have no marker: accept only their complete, known layout.
+  local entry
+  for entry in "$1"/* "$1"/.[!.]* "$1"/..?*; do
+    [[ -e "$entry" || -L "$entry" ]] || continue
+    [[ ! -L "$entry" ]] || return 1
+    case "${entry##*/}" in
+      linux-x86_64|windows-x86_64|windows-aarch64|vscode|zed|typst|README.md) ;;
+      *) return 1 ;;
+    esac
+  done
+  for entry in linux-x86_64/bin/bgraph linux-x86_64/bin/bgraph-lsp \
+    windows-x86_64/bin/bgraph.exe windows-x86_64/bin/bgraph-lsp.exe \
+    windows-aarch64/bin/bgraph.exe windows-aarch64/bin/bgraph-lsp.exe \
+    zed/extension.wasm zed/extension.toml typst/bgraph.wasm typst/typst.toml; do
+    [[ -f "$1/$entry" ]] || return 1
+  done
+  for entry in "$1/vscode"/bgraph-*.vsix; do
+    [[ -f "$entry" && ! -L "$entry" ]] && return 0
+  done
+  return 1
+}
+
+check_output() {
+  if [[ -e "$1" || -L "$1" ]] && ! recognized_export "$1"; then
+    echo "export.sh: refusing to replace an unrecognized directory: $1" >&2
+    exit 2
+  fi
+}
+check_output "$output"
+
 command -v cargo >/dev/null || { echo "export.sh: cargo is required" >&2; exit 1; }
 command -v rustup >/dev/null || { echo "export.sh: rustup is required" >&2; exit 1; }
 
 version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' "$repo/Cargo.toml" | head -1)"
 [[ -n "$version" ]] || { echo "export.sh: cannot read Cargo.toml version" >&2; exit 1; }
 
-rm -rf "$output"
+destination="$output"
+mkdir -p -- "$(dirname "$destination")"
+output="$(mktemp -d "$(dirname "$destination")/.bgraph-export.XXXXXXXX")"
+backup=""
+cleanup() {
+  local status=$?
+  if [[ -n "$backup" && -d "$backup/previous" ]]; then
+    if [[ ! -e "$destination" && ! -L "$destination" ]] \
+      && mv -T -- "$backup/previous" "$destination"; then
+      rmdir -- "$backup"
+    else
+      echo "export.sh: previous export preserved at $backup/previous" >&2
+    fi
+  elif [[ -n "$backup" && -d "$backup" ]]; then
+    rmdir -- "$backup"
+  fi
+  [[ -z "$output" ]] || rm -rf -- "$output"
+  exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+
+target_dir="${CARGO_TARGET_DIR:-$repo/target}"
+zed_target_dir="${CARGO_TARGET_DIR:-$repo/editors/zed/target}"
 mkdir -p "$output/linux-x86_64/bin" "$output/windows-x86_64/bin" \
   "$output/windows-aarch64/bin" "$output/vscode" \
   "$output/zed/grammar-repo/src" "$output/typst"
@@ -76,12 +155,12 @@ mkdir -p "$output/linux-x86_64/bin" "$output/windows-x86_64/bin" \
 build_target() {
   local target="$1"
   echo "==> building bgraph for $target"
-  cargo build --release --target "$target"
+  cargo build --release --target "$target" --target-dir "$target_dir"
 }
 
 build_target x86_64-unknown-linux-gnu
 for binary in bgraph bgraph-lsp; do
-  cp "$repo/target/x86_64-unknown-linux-gnu/release/$binary" \
+  cp "$target_dir/x86_64-unknown-linux-gnu/release/$binary" \
     "$output/linux-x86_64/bin/$binary"
 done
 
@@ -106,12 +185,13 @@ for target_spec in "${windows_targets[@]}"; do
   fi
 
   if [[ -z "$windows_source" ]]; then
-    rustup target list --installed | grep -qx "$windows_target" \
+    # Drain the producer: grep -q can trigger SIGPIPE, which pipefail treats as failure.
+    rustup target list --installed | grep -x "$windows_target" >/dev/null \
       || { echo "==> installing Rust target $windows_target"; rustup target add "$windows_target"; }
 
     if [[ "$host" == "$windows_target" ]]; then
       echo "==> building bgraph for $windows_target with the native MSVC toolchain"
-      cargo build --release --target "$windows_target"
+      cargo build --release --target "$windows_target" --target-dir "$target_dir"
     else
       if ! command -v cargo-xwin >/dev/null 2>&1; then
         if [[ "${BGRAPH_SKIP_XWIN_INSTALL:-0}" == 1 ]]; then
@@ -124,9 +204,9 @@ for target_spec in "${windows_targets[@]}"; do
         cargo install --locked cargo-xwin
       fi
       echo "==> building bgraph for $windows_target with cargo-xwin"
-      cargo xwin build --release --target "$windows_target"
+      cargo xwin build --release --target "$windows_target" --target-dir "$target_dir"
     fi
-    windows_source="$repo/target/$windows_target/release"
+    windows_source="$target_dir/$windows_target/release"
   fi
 
   for binary in bgraph bgraph-lsp; do
@@ -146,13 +226,13 @@ cp "$repo/LICENSE" "$repo/README.md" "$repo/docs/reference.md" \
   "$output/windows-aarch64/"
 
 echo "==> building the Typst module"
-rustup target list --installed | grep -qx wasm32-unknown-unknown \
+rustup target list --installed | grep -x wasm32-unknown-unknown >/dev/null \
   || { echo "export.sh: install wasm32-unknown-unknown with rustup" >&2; exit 1; }
 cargo build --lib --release --target wasm32-unknown-unknown \
-  --no-default-features --features all-archetypes,json,typst
+  --target-dir "$target_dir" --no-default-features --features all-archetypes,json,typst
 cp "$repo/typst/typst.toml" "$repo/typst/bgraph.typ" "$repo/typst/README.md" \
   "$output/typst/"
-cp "$repo/target/wasm32-unknown-unknown/release/bgraph.wasm" "$output/typst/"
+cp "$target_dir/wasm32-unknown-unknown/release/bgraph.wasm" "$output/typst/"
 cp "$repo/LICENSE" "$output/typst/"
 
 echo "==> packaging the VS Code extension"
@@ -164,10 +244,11 @@ cp "$repo/LICENSE" "$output/vscode/"
 
 echo "==> building the Zed extension"
 zed_target="wasm32-wasip2"
-rustup target list --installed | grep -qx "$zed_target" \
+rustup target list --installed | grep -x "$zed_target" >/dev/null \
   || { echo "export.sh: install $zed_target with rustup" >&2; exit 1; }
-cargo build --manifest-path "$repo/editors/zed/Cargo.toml" --release --target "$zed_target"
-cp "$repo/editors/zed/target/$zed_target/release/zed_bgraph.wasm" \
+cargo build --manifest-path "$repo/editors/zed/Cargo.toml" --release --target "$zed_target" \
+  --target-dir "$zed_target_dir"
+cp "$zed_target_dir/$zed_target/release/zed_bgraph.wasm" \
   "$output/zed/extension.wasm"
 
 command -v tree-sitter >/dev/null || {
@@ -290,6 +371,17 @@ The VS Code pane cannot read include or external from: files; use the browser
 watcher for diagrams composed from several files. Read LICENSE for usage terms.
 EOF
 
+printf '%s\n' 'bgraph source-free export v1' > "$output/.bgraph-export"
+check_output "$destination"
+if [[ -e "$destination" ]]; then
+  backup="$(mktemp -d "$(dirname "$destination")/.bgraph-export-backup.XXXXXXXX")"
+  mv -T -- "$destination" "$backup/previous"
+fi
+mv -T -- "$output" "$destination"
+output=""
+[[ -z "$backup" ]] || rm -rf -- "$backup"
+backup=""
+
 echo
-echo "Export ready: $output"
-find "$output" -type f -not -path '*/.git/*' -printf '  %P\n' | sort
+echo "Export ready: $destination"
+find "$destination" -type f -not -path '*/.git/*' -printf '  %P\n' | sort

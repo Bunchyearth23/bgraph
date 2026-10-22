@@ -1,6 +1,7 @@
 # bgraph for VS Code
 
-Syntax highlighting, live diagram preview and the `bgraph` language server for `.bd` files.
+Syntax highlighting and the `bgraph` language server for `.bd` diagrams and
+`.bds` shared stylesheets, with live preview for diagrams.
 
 ## Start using the extension
 
@@ -19,6 +20,7 @@ The preview renderer is bundled. For completion and diagnostics, install
 |---|---|
 | `syntaxes/bgraph.tmLanguage.json` | Highlighting. A TextMate grammar, not tree-sitter — VS Code reads these natively, so nothing has to be compiled or pinned. |
 | `src/extension.js` | Launches `bgraph-lsp`, opens diagram previews and renders Markdown fences. |
+| `src/preview.js` | Fits the diagram to the pane and handles zoom, pan and retained view state. |
 | `language-configuration.json` | Comments, brackets, indentation. |
 | `bgraph.wasm` | The renderer for both previews. Built by `package.sh`; not committed. |
 
@@ -35,11 +37,25 @@ unsaved changes. An untitled buffer works too once its language is set to
 `bgraph`. Opening the command again reuses that document's preview; different
 documents have their own panels. Syntax and rendering errors appear in the panel.
 
+The diagram fits both the width and height of the pane, and recenters when
+you resize it. Use **Fit** to see everything, **100%** for natural size, or
+**+ / −** to zoom. Drag to move; the wheel zooms around the pointer. With the
+preview focused, arrow keys move, `+` / `-` zoom, `0` selects natural size and
+`F` / `Home` fits. A manual zoom and position survive edits, errors and panel
+switches; **Fit** returns to automatic adjustment. Small diagrams are not
+stretched to fill the pane.
+
 The renderer is bundled, so preview needs neither `bgraph` nor `bgraph-lsp` on
 `PATH`. It renders the current buffer only: `include` and `from:` require file
 access and are rejected by this WASM renderer. Use `bgraph watch file.bd` for
 diagrams composed from several files. The LSP still resolves those files for
 diagnostics and navigation.
+
+Diagnostics, definitions, references and hover use the current text of open
+included files, including unsaved changes. Closing a child file returns to
+its saved version. Untitled bgraph buffers get language-server support too.
+Shared `.bds` stylesheets are recognized automatically; preview the `.bd`
+diagram that includes one to see its effect.
 
 The shortcut is limited to `bgraph` editors, preserving the Markdown preview's
 shortcut in Markdown files.

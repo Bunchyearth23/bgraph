@@ -747,7 +747,7 @@ pub fn gitgraph(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Resu
         });
         if let Some(tag) = &style.tag {
             annotations.push(Annotation {
-                text: format!("⌾ {tag}"),
+                text: format!("tag: {tag}"),
                 x,
                 y: y + DOT + 6.0,
                 anchor: Anchor::Middle,

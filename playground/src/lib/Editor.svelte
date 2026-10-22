@@ -107,6 +107,7 @@
           marks,
           gutter({ class: 'cm-dots', markers: (v) => v.state.field(marks) }),
           EditorView.lineWrapping,
+          EditorView.contentAttributes.of({ 'aria-label': 'Diagram source' }),
           skin.of(look(dark)),
           EditorView.updateListener.of((update) => {
             if (update.docChanged) text = update.state.doc.toString()

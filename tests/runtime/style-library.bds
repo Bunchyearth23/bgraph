@@ -1,0 +1,4 @@
+style node {
+  fill: #f0f4ff
+  stroke: #345678
+}

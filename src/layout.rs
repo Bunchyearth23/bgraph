@@ -119,6 +119,31 @@ pub struct Layout {
     pub annotations: Vec<Annotation>,
 }
 
+impl Layout {
+    /// Text emitted by the writers, excluding line separators.
+    pub fn text_runs(&self) -> impl Iterator<Item = &str> {
+        self.nodes
+            .iter()
+            .flat_map(|node| node.lines.iter().map(String::as_str))
+            .chain(
+                self.groups
+                    .iter()
+                    .flat_map(|group| group.lines.iter().map(String::as_str)),
+            )
+            .chain(
+                self.annotations
+                    .iter()
+                    .map(|annotation| annotation.text.as_str()),
+            )
+            .chain(
+                self.edges
+                    .iter()
+                    .filter_map(|edge| edge.label.as_deref())
+                    .flat_map(|label| label.split('\n')),
+            )
+    }
+}
+
 /// What the statements in the file were interpreted as.
 pub enum Chart {
     /// Nodes and edges. `nodes` carries the geometry.

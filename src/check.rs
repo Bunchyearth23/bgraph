@@ -11,6 +11,45 @@ use crate::props::{self, Ctx};
 
 mod overlaps;
 
+/// Validate the output-specific constraints before any PDF bytes are emitted.
+#[cfg(feature = "pdf")]
+pub fn pdf_export(
+    layout: &crate::layout::Layout,
+    page: Option<crate::render_pdf::Page>,
+) -> anyhow::Result<()> {
+    use anyhow::{bail, ensure};
+    let (_, _, width, height) = crate::render_svg::canvas(layout);
+    ensure!(
+        width.is_finite() && height.is_finite() && width > 0.0 && height > 0.0,
+        "PDF canvas dimensions must be finite and positive"
+    );
+    if let Some(page) = page {
+        ensure!(
+            page.is_valid(),
+            "PDF page dimensions must be finite and larger than the nonnegative overlap"
+        );
+        let (columns, rows) = crate::render_pdf::page_grid(width, height, page);
+        // shortcut: cap output at 10000 sheets; add streaming if larger print jobs become useful.
+        ensure!(
+            columns * rows <= 10_000.0,
+            "PDF export would exceed 10000 pages; choose a larger page size"
+        );
+    }
+    if let Some((_, bytes)) = &layout.opts.embed_font {
+        ensure!(
+            crate::render_pdf::supports_embedded_font(bytes),
+            "PDF embedding requires a valid TrueType font with glyf outlines (.ttf)"
+        );
+    }
+    if let Some(ch) = crate::render_pdf::missing_glyph(layout) {
+        bail!(
+            "PDF font cannot represent `{ch}` (U+{:04X}); use --embed-font with a TrueType font containing this character",
+            ch as u32
+        );
+    }
+    Ok(())
+}
+
 /// Whether a diagnostic stops the render.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Severity {
@@ -170,6 +209,38 @@ pub(crate) fn frame_geometry(
         }
     }
     diagnostics
+}
+
+/// Declarations that cannot be transferred into a component instance.
+pub(crate) fn check_component_body(diagram: &Diagram) -> Vec<Diag> {
+    let mut out = Vec::new();
+    let mut reject = |span, statement| {
+        out.push(Diag::error(
+            span,
+            format!("`{statement}` is not supported inside a component; declare it outside the component"),
+        ));
+    };
+    for component in &diagram.components {
+        reject(component.span, "component");
+    }
+    for placing in &diagram.uses {
+        reject(placing.span, "use");
+    }
+    for include in &diagram.includes {
+        reject(include.span, "include");
+    }
+    if let Some(archetype) = &diagram.archetype {
+        reject(archetype.span, "type");
+    }
+    if let Some(span) = diagram.graph_span {
+        reject(span, "graph");
+    }
+    for note in diagram.notes.iter().chain(&diagram.legends) {
+        if !matches!(note.placement, Some(Placement::Rel { .. })) {
+            out.push(Diag::error(note.span, "notes and legends inside a component need a relative placement; anchor it to a component node with `below`, `above`, `left-of` or `right-of`"));
+        }
+    }
+    out
 }
 
 /// Every problem in a diagram, not just the first.

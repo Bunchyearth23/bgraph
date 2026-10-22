@@ -40,9 +40,15 @@ pub struct SourceMap {
     /// Each file's starting offset, in the order they were laid down.
     files: Vec<(usize, PathBuf)>,
     includes: Vec<(usize, usize, Span)>,
+    dependencies: Vec<PathBuf>,
 }
 
 impl SourceMap {
+    /// Files read or attempted, including missing includes and external data.
+    pub fn dependencies(&self) -> &[PathBuf] {
+        &self.dependencies
+    }
+
     /// Find the entry-file include leading to a diagnostic's owning file.
     pub(crate) fn include_span(&self, entry: &Path, offset: usize) -> Option<Span> {
         let root = self.files.iter().rev().find(|(_, path)| path == entry)?.0;
@@ -121,9 +127,8 @@ pub fn load(path: &Path) -> Result<Composed> {
 ///
 /// For an editor: the buffer is what the reader is looking at, and the file on
 /// disk is a version of it from before the last keystroke. Composing from disk
-/// would report diagnostics against text nobody can see. The *included* files
-/// are still read from disk, which is correct — those are not being edited in
-/// this buffer.
+/// would report diagnostics against text nobody can see. Included files are
+/// read from disk; the language server supplies its open buffers separately.
 pub fn load_text(path: &Path, source: &str) -> Result<Composed> {
     strict(compose(path, Some(source))?)
 }
@@ -169,7 +174,16 @@ fn strict(composed: Composed) -> Result<Composed> {
 }
 
 pub(crate) fn compose(path: &Path, entry: Option<&str>) -> Result<Composed> {
+    compose_with_sources(path, entry, &HashMap::new())
+}
+
+pub(crate) fn compose_with_sources(
+    path: &Path,
+    entry: Option<&str>,
+    sources: &HashMap<PathBuf, String>,
+) -> Result<Composed> {
     let mut state = State {
+        sources,
         diagram: Diagram::default(),
         text: String::new(),
         files: Vec::new(),
@@ -179,6 +193,7 @@ pub(crate) fn compose(path: &Path, entry: Option<&str>) -> Result<Composed> {
         chain: Vec::new(),
         diagnostics: Vec::new(),
         includes: Vec::new(),
+        dependencies: Vec::new(),
     };
     state.absorb(path, None, entry)?;
 
@@ -188,12 +203,14 @@ pub(crate) fn compose(path: &Path, entry: Option<&str>) -> Result<Composed> {
             text: state.text,
             files: state.files,
             includes: state.includes,
+            dependencies: state.dependencies,
         },
         diagnostics: state.diagnostics,
     })
 }
 
-struct State {
+struct State<'a> {
+    sources: &'a HashMap<PathBuf, String>,
     diagram: Diagram,
     text: String,
     files: Vec<(usize, PathBuf)>,
@@ -201,14 +218,28 @@ struct State {
     chain: Vec<PathBuf>,
     diagnostics: Vec<crate::check::Diag>,
     includes: Vec<(usize, usize, Span)>,
+    dependencies: Vec<PathBuf>,
 }
 
-impl State {
+impl State<'_> {
+    fn dependency(&mut self, path: &Path) {
+        let path = path
+            .canonicalize()
+            .or_else(|_| std::path::absolute(path))
+            .unwrap_or_else(|_| path.to_path_buf());
+        if !self.dependencies.contains(&path) {
+            self.dependencies.push(path);
+        }
+    }
+
     fn absorb(&mut self, path: &Path, prefix: Option<&str>, entry: Option<&str>) -> Result<()> {
+        self.dependency(path);
         let path = path
             .canonicalize()
             .or_else(|error| {
-                if entry.is_some() {
+                if entry.is_some()
+                    || std::path::absolute(path).is_ok_and(|path| self.sources.contains_key(&path))
+                {
                     std::path::absolute(path)
                 } else {
                     Err(error)
@@ -223,7 +254,7 @@ impl State {
             bail!("`include` runs in a circle: {}", chain.join(" → "));
         }
 
-        let source = match entry {
+        let source = match entry.or_else(|| self.sources.get(&path).map(String::as_str)) {
             Some(text) => text.to_string(),
             None => std::fs::read_to_string(&path)
                 .with_context(|| format!("cannot read {}", path.display()))?,
@@ -289,9 +320,6 @@ impl State {
                 (None, Some(inner)) => Some(inner.as_str().to_string()),
                 (None, None) => None,
             };
-            // Only the entry file's text is supplied; everything it pulls in
-            // comes from disk, which is right — those are not being edited in
-            // the buffer this was called for.
             match self.absorb(&target, nested.as_deref(), None) {
                 Ok(()) => {
                     let child_base = self
@@ -323,6 +351,9 @@ impl State {
         self.text.push('\n');
 
         local.extend(expand(&mut diagram));
+        if let Some(data) = data_path(&diagram, &path) {
+            self.dependency(&data);
+        }
         if let Err(error) = read_data(&mut diagram, &path) {
             local.push(crate::check::Diag {
                 severity: crate::check::Severity::Error,
@@ -422,6 +453,14 @@ impl State {
     }
 }
 
+fn data_path(diagram: &Diagram, from: &Path) -> Option<PathBuf> {
+    let prop = diagram.archetype_props.iter().find(|p| p.name == "from")?;
+    let crate::ast::Value::Str(file) = prop.values.first()? else {
+        return None;
+    };
+    Some(from.parent().unwrap_or_else(|| Path::new(".")).join(file))
+}
+
 /// `type pie { from: "sales.csv" }` — read the items from a table.
 ///
 /// The short path for the plain case. The template engine already reads CSV
@@ -436,7 +475,7 @@ impl State {
 /// moved. The diagnostic names the file, which is the least this owes.
 #[cfg(feature = "csv")]
 fn read_data(diagram: &mut Diagram, from: &Path) -> Result<()> {
-    use crate::ast::{NodeDecl, Span, Spanned, Value};
+    use crate::ast::{NodeDecl, Spanned, Value};
 
     let Some(prop) = diagram
         .archetype_props
@@ -451,20 +490,20 @@ fn read_data(diagram: &mut Diagram, from: &Path) -> Result<()> {
     };
 
     let def = crate::check::archetype_of(diagram);
-    let target = from.parent().unwrap_or_else(|| Path::new(".")).join(&file);
+    let target = data_path(diagram, from).expect("the from property is a string");
     let raw = std::fs::read_to_string(&target)
         .with_context(|| format!("`from: \"{file}\"` in {}", from.display()))?;
 
-    let mut lines = raw.lines().filter(|l| !l.trim().is_empty());
-    let header: Vec<String> = lines
-        .next()
-        .map(|l| l.split(',').map(|c| c.trim().to_lowercase()).collect())
-        .unwrap_or_default();
-    if header.is_empty() {
-        bail!(
-            "{} is empty — the first line names the columns",
-            target.display()
-        );
+    let (header, records) = crate::template::csv_records(&raw)
+        .with_context(|| format!("reading {}", target.display()))?;
+    let header: Vec<_> = header
+        .into_iter()
+        .map(|field| field.to_lowercase())
+        .collect();
+    for (i, field) in header.iter().enumerate() {
+        if header[..i].contains(field) {
+            bail!("{} has duplicate CSV column `{field}`", target.display());
+        }
     }
 
     let column = |want: &str| header.iter().position(|c| c == want);
@@ -496,17 +535,13 @@ fn read_data(diagram: &mut Diagram, from: &Path) -> Result<()> {
         wanted.push(at);
     }
 
-    for (n, line) in lines.enumerate() {
-        let cells: Vec<&str> = line.split(',').map(|c| c.trim()).collect();
-        let Some(label) = cells.get(name_at) else {
-            bail!("{}: row {} is short of the header", target.display(), n + 1);
-        };
+    for (n, cells) in records.into_iter().enumerate() {
+        let label = &cells[name_at];
         let positional: Vec<Value> = wanted
             .iter()
-            .filter_map(|at| cells.get(*at))
-            .map(|cell| match cell.parse::<f64>() {
+            .map(|at| match cells[*at].parse::<f64>() {
                 Ok(n) => Value::Num(n),
-                Err(_) => Value::Word(cell.to_string()),
+                Err(_) => Value::Word(cells[*at].clone()),
             })
             .collect();
 
@@ -532,7 +567,6 @@ fn read_data(diagram: &mut Diagram, from: &Path) -> Result<()> {
         });
     }
 
-    let _ = Span::default();
     Ok(())
 }
 
@@ -631,7 +665,7 @@ fn expand_one(
     }
 
     let filled = crate::template::Template::parse(&component.body)
-        .and_then(|t| t.fill(&values))
+        .and_then(|t| t.fill_checked(&values))
         .with_context(|| ComponentError {
             span: placing.span,
             message: format!(
@@ -650,6 +684,23 @@ fn expand_one(
             e.message
         ),
     })?;
+
+    let unsupported = crate::check::check_component_body(&instance);
+    if !unsupported.is_empty() {
+        return Err(ComponentError {
+            span: placing.span,
+            message: format!(
+                "component `{}`: {}",
+                component.name.as_str(),
+                unsupported
+                    .iter()
+                    .map(|diag| diag.message.as_str())
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            ),
+        }
+        .into());
+    }
 
     // Every span in the instance points at the `use`. The instance has no
     // text of its own in any file, and a span into the component's body
@@ -683,6 +734,8 @@ fn expand_one(
     diagram.nodes.extend(instance.nodes);
     diagram.styles.extend(instance.styles);
     diagram.layouts.extend(instance.layouts);
+    diagram.notes.extend(instance.notes);
+    diagram.legends.extend(instance.legends);
 
     diagram.groups.push(crate::ast::GroupDecl {
         activates: false,
@@ -744,6 +797,9 @@ fn pin(d: &mut Diagram, at: Span) {
             sp(c);
         }
         props(&mut edge.props);
+        for placement in &mut edge.via {
+            pin_placement_value(placement, at);
+        }
         s(&mut edge.span);
     }
     for group in &mut d.groups {
@@ -756,6 +812,16 @@ fn pin(d: &mut Diagram, at: Span) {
         }
         props(&mut group.props);
         s(&mut group.span);
+    }
+    for note in d.notes.iter_mut().chain(&mut d.legends) {
+        for class in &mut note.classes {
+            sp(class);
+        }
+        if let Some(placement) = &mut note.placement {
+            pin_placement_value(placement, at);
+        }
+        props(&mut note.props);
+        s(&mut note.span);
     }
     for layout in &mut d.layouts {
         if let Some(scope) = &mut layout.scope {
@@ -896,6 +962,9 @@ fn shift(d: &mut Diagram, delta: usize) {
             sp(c);
         }
         props(&mut edge.props);
+        for placement in &mut edge.via {
+            shift_placement_value(placement, delta);
+        }
         s(&mut edge.span);
     }
     for group in &mut d.groups {
@@ -908,6 +977,16 @@ fn shift(d: &mut Diagram, delta: usize) {
         }
         props(&mut group.props);
         s(&mut group.span);
+    }
+    for note in d.notes.iter_mut().chain(&mut d.legends) {
+        for class in &mut note.classes {
+            sp(class);
+        }
+        if let Some(placement) = &mut note.placement {
+            shift_placement_value(placement, delta);
+        }
+        props(&mut note.props);
+        s(&mut note.span);
     }
     for layout in &mut d.layouts {
         if let Some(scope) = &mut layout.scope {
@@ -1022,11 +1101,24 @@ fn qualify(d: &mut Diagram, prefix: &str) {
             }
         }
     }
+    for note in d.notes.iter_mut().chain(&mut d.legends) {
+        if let Some(placement) = &mut note.placement {
+            rename_placement_anchor(placement, &own, prefix);
+        }
+        for class in &mut note.classes {
+            if styles.contains(&class.value) {
+                rename(class);
+            }
+        }
+    }
     for edge in &mut d.edges {
         for end in [&mut edge.from, &mut edge.to] {
             if own.contains(&end.value) {
                 *end = qualified(end, prefix);
             }
+        }
+        for placement in &mut edge.via {
+            rename_placement_anchor(placement, &own, prefix);
         }
         for class in &mut edge.classes {
             if styles.contains(&class.value) {

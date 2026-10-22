@@ -38,6 +38,46 @@ pub fn keep_glyphs_for(font: &[u8], text: &str) -> Vec<u8> {
     }
 }
 
+/// Unshaped horizontal advances from the embedded face, in drawing units.
+/// Missing tables or glyphs leave the caller's existing estimate in place.
+pub(crate) fn text_advance(font: &[u8], text: &str, size: f64) -> Option<f64> {
+    if !size.is_finite()
+        || size <= 0.0
+        || !matches!(be32(font, 0)?, 0x0001_0000 | 0x7472_7565 | 0x4f54_544f)
+    {
+        return None;
+    }
+    let table = |tag: &[u8; 4]| {
+        for i in 0..usize::from(be16(font, 4)?) {
+            let at = 12 + i * 16;
+            if font.get(at..at + 4)? == tag {
+                let start = be32(font, at + 8)? as usize;
+                let length = be32(font, at + 12)? as usize;
+                return font.get(start..start.checked_add(length)?);
+            }
+        }
+        None
+    };
+    let units = f64::from(be16(table(b"head")?, 18)?);
+    let metrics = usize::from(be16(table(b"hhea")?, 34)?);
+    let glyphs = usize::from(be16(table(b"maxp")?, 4)?);
+    if units == 0.0 || metrics == 0 || metrics > glyphs {
+        return None;
+    }
+    let advances = table(b"hmtx")?;
+    advances.get(..metrics * 4)?;
+    let cmap = table(b"cmap")?;
+    let mut width = 0.0;
+    for ch in text.chars() {
+        let glyph = usize::from(glyph_of(cmap, 0, ch)?);
+        if glyph == 0 || glyph >= glyphs {
+            return None;
+        }
+        width += f64::from(be16(advances, glyph.min(metrics - 1) * 4)?);
+    }
+    Some(width * size / units)
+}
+
 /// A table's offset and length in the file.
 struct Table {
     tag: [u8; 4],

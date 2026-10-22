@@ -257,14 +257,19 @@ fn write_layout(inputs: &[PathBuf], check: bool) -> Result<i32> {
 /// Matched by identifier, which the language already gives every box — so
 /// this is a set difference on the solved geometry rather than an image
 /// comparison, and it stays vector and deterministic.
-fn diff_files(before: &std::path::Path, after: &std::path::Path, output: &PathBuf) -> Result<i32> {
-    let old = bgraph::analyzed_layout(&bgraph::compose::load(before)?.diagram)
+fn diff_files(before: &Path, after: &Path, output: &Path) -> Result<i32> {
+    let old = bgraph::compose::load(before)?;
+    let new = bgraph::compose::load(after)?;
+    for dependency in old.map.dependencies().iter().chain(new.map.dependencies()) {
+        bgraph::output::protect_input(output, dependency)?;
+    }
+    let old = bgraph::analyzed_layout(&old.diagram)
         .with_context(|| format!("in {}", before.display()))?;
-    let new = bgraph::analyzed_layout(&bgraph::compose::load(after)?.diagram)
-        .with_context(|| format!("in {}", after.display()))?;
+    let new =
+        bgraph::analyzed_layout(&new.diagram).with_context(|| format!("in {}", after.display()))?;
 
     let picture = bgraph::diff::compare(&old, &new);
-    fs::write(output, render_svg::render(&picture))
+    bgraph::output::write(output, render_svg::render(&picture))
         .with_context(|| format!("cannot write {}", output.display()))?;
     println!(
         "{} → {} → {}",
@@ -477,6 +482,14 @@ fn run() -> Result<i32> {
         bail!("no input file (try `bgraph diagram.bd -o diagram.svg`)");
     };
 
+    bgraph::output::protect_input(&cli.output, &input)?;
+    for path in [&cli.data, &cli.embed_font].into_iter().flatten() {
+        bgraph::output::protect_input(&cli.output, path)?;
+    }
+    if let Some((_, path)) = cli.rows.as_deref().and_then(|rows| rows.split_once('=')) {
+        bgraph::output::protect_input(&cli.output, Path::new(path))?;
+    }
+
     let source =
         fs::read_to_string(&input).with_context(|| format!("cannot read {}", input.display()))?;
 
@@ -488,7 +501,7 @@ fn run() -> Result<i32> {
             return Err(error);
         }
     };
-    if !template.holes().is_empty()
+    let source = if !template.holes().is_empty()
         || !cli.set.is_empty()
         || cli.data.is_some()
         || cli.rows.is_some()
@@ -559,44 +572,23 @@ fn run() -> Result<i32> {
             return Ok(0);
         }
 
-        let svg = template.render(&values)?;
-        fs::write(&cli.output, svg)
-            .with_context(|| format!("cannot write {}", cli.output.display()))?;
-        println!(
-            "{} holes filled → {}",
-            template.holes().len(),
-            cli.output.display()
-        );
-        return Ok(0);
-    }
+        template.fill_checked(&values)?
+    } else {
+        source
+    };
 
-    let mut layout = bgraph::analyze_file_source_with_theme(&input, &source, cli.theme.as_deref())?
-        .into_layout()?;
+    let analysis = bgraph::analyze_file_source_with_theme(&input, &source, cli.theme.as_deref())?;
+    for dependency in analysis.map.dependencies() {
+        bgraph::output::protect_input(&cli.output, dependency)?;
+    }
+    let mut layout = analysis.into_layout()?;
     if let Some(path) = &cli.embed_font {
         let whole = fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
         // Only the glyphs the diagram draws. The text is gathered from the
         // solved layout rather than from the source, so a label the renderer
         // never draws costs nothing and one it invents — a percentage, an
         // axis tick — is not left out.
-        let mut drawn = String::new();
-        for node in &layout.nodes {
-            for line in &node.lines {
-                drawn.push_str(line);
-            }
-        }
-        for group in &layout.groups {
-            for line in &group.lines {
-                drawn.push_str(line);
-            }
-        }
-        for annotation in &layout.annotations {
-            drawn.push_str(&annotation.text);
-        }
-        for edge in &layout.edges {
-            if let Some(label) = &edge.label {
-                drawn.push_str(label);
-            }
-        }
+        let drawn: String = layout.text_runs().collect();
         let bytes = bgraph::subset::keep_glyphs_for(&whole, &drawn);
         // Named after the file, because that is what the diagram's own
         // `font:` will be asking for — a family invented here would be one
@@ -616,25 +608,27 @@ fn run() -> Result<i32> {
         .map(|e| e.to_string_lossy().to_lowercase())
         .unwrap_or_default();
 
+    if cli.page.is_some() && extension != "pdf" {
+        bail!("`--page` is for a PDF; choose a .pdf output");
+    }
+    if cli.scale != 1.0 && extension != "png" {
+        bail!("`--scale` is for a PNG; vector outputs have no resolution to choose");
+    }
+
     match extension.as_str() {
         "pdf" => {
             #[cfg(feature = "pdf")]
             {
-                if let Some((_, bytes)) = &layout.opts.embed_font
-                    && !bgraph::render_pdf::supports_embedded_font(bytes)
-                {
-                    bail!("PDF embedding requires a valid TrueType font with glyf outlines (.ttf)");
-                }
                 let bytes = match &cli.page {
                     Some(size) => {
                         let page = bgraph::render_pdf::Page::parse(size).with_context(|| {
                             format!("unknown page size `{size}` (try a4, a3, letter, or 595x842)")
                         })?;
-                        bgraph::render_pdf::render_paged(&layout, page)
+                        bgraph::render_pdf::render_paged(&layout, page)?
                     }
-                    None => bgraph::render_pdf::render(&layout),
+                    None => bgraph::render_pdf::render(&layout)?,
                 };
-                fs::write(&cli.output, bytes)
+                bgraph::output::write(&cli.output, bytes)
                     .with_context(|| format!("cannot write {}", cli.output.display()))?;
             }
             #[cfg(not(feature = "pdf"))]
@@ -643,27 +637,21 @@ fn run() -> Result<i32> {
         "json" => {
             // Pretty by default: a person running this at a terminal is
             // reading it, and a program does not care either way.
-            fs::write(&cli.output, bgraph::render_json::render_pretty(&layout))
+            bgraph::output::write(&cli.output, bgraph::render_json::render_pretty(&layout))
                 .with_context(|| format!("cannot write {}", cli.output.display()))?;
         }
         "png" => {
             #[cfg(feature = "png")]
             {
                 let bytes = bgraph::render_png::render(&layout, cli.scale)?;
-                fs::write(&cli.output, bytes)
+                bgraph::output::write(&cli.output, bytes)
                     .with_context(|| format!("cannot write {}", cli.output.display()))?;
             }
             #[cfg(not(feature = "png"))]
             bail!("this build has no rasteriser — rebuild with the `png` feature");
         }
         _ => {
-            if cli.page.is_some() {
-                bail!("`--page` is for a PDF; an SVG has no pages");
-            }
-            if cli.scale != 1.0 {
-                bail!("`--scale` is for a raster; an SVG and a PDF have no resolution to choose");
-            }
-            fs::write(&cli.output, render_svg::render(&layout))
+            bgraph::output::write(&cli.output, render_svg::render(&layout))
                 .with_context(|| format!("cannot write {}", cli.output.display()))?;
         }
     }

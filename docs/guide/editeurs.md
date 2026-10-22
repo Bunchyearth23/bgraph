@@ -65,6 +65,12 @@ saving. An untitled document works once its language is set to bgraph.
 Each document has its own pane; repeating the command reuses that pane.
 Syntax or rendering errors appear in it.
 
+The picture fits the pane's width **and** height. **Fit** restores that view;
+**100%** shows natural size. Zoom with **+ / −** or the wheel, and drag to
+move. Your manual zoom and position stay in place while you edit. With the
+preview focused, use arrow keys to move, `F` or `Home` to fit, and `0` for
+natural size. The editor title bar also has an **Open Preview** icon.
+
 The pane needs neither `bgraph` nor `bgraph-lsp` installed. It renders the
 current text only, so it cannot read `include` files or external `from:`
 data. For those, use:
@@ -88,6 +94,12 @@ If the server is elsewhere, set its absolute path in VS Code's settings:
 
 On Windows, point to `bgraph-lsp.exe` and escape backslashes in JSON, for
 example `"C:\\Tools\\bgraph\\bin\\bgraph-lsp.exe"`.
+
+The server also works in untitled buffers set to bgraph. Both editors
+recognize `.bds` shared stylesheets. For included files that are open in the
+editor, diagnostics, navigation and hover use unsaved changes; closing the
+file returns to its saved version. To preview a stylesheet's effect, open
+the `.bd` diagram that uses it.
 
 ### Diagrams inside Markdown
 

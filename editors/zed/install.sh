@@ -52,10 +52,12 @@ if [ -z "$(git rev-parse --verify HEAD 2>/dev/null || true)" ]; then
   exit 1
 fi
 
-if ! git diff --quiet -- tree-sitter-bgraph; then
+if ! git diff HEAD --quiet -- tree-sitter-bgraph \
+  || [[ -n "$(git ls-files --others --exclude-standard -- tree-sitter-bgraph)" ]]; then
   echo "==> committing the regenerated parser"
   git add tree-sitter-bgraph
-  git commit -m "tree-sitter-bgraph: regenerate parser" --quiet
+  # Only grammar changes belong here; leave the user's other staged work staged.
+  git commit --only -m "tree-sitter-bgraph: regenerate parser" --quiet -- tree-sitter-bgraph
 fi
 
 rev="$(git rev-parse HEAD)"

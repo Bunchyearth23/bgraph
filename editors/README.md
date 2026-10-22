@@ -54,7 +54,7 @@ Packaged. Build the extension and install it:
 ```sh
 cd editors/vscode
 ./package.sh                    # or ./package.sh --no-server for highlighting and preview
-code --install-extension bgraph-1.0.0.vsix --force
+code --install-extension "bgraph-$(node -p 'require("./package.json").version').vsix" --force
 ```
 
 ### Preview a .bd file

@@ -1,13 +1,40 @@
 <script>
+  import { tick } from 'svelte'
   let { svg = '', error = '' } = $props()
 
   let zoom = $state(1)
   let pan = $state({ x: 0, y: 0 })
   let dragging = $state(null)
+  let stage = $state(null)
+  let sheet = $state(null)
+  let fitted = false
 
   function fit() {
-    zoom = 1
+    if (!stage || !sheet?.offsetWidth || !sheet.offsetHeight) return
+    zoom = Math.max(0.01, Math.min(1, (stage.clientWidth - 32) / sheet.offsetWidth, (stage.clientHeight - 64) / sheet.offsetHeight))
     pan = { x: 0, y: 0 }
+  }
+
+  $effect(() => {
+    if (svg && !fitted) {
+      fitted = true
+      tick().then(fit)
+    }
+  })
+
+  function keydown(event) {
+    const step = event.shiftKey ? 100 : 40
+    switch (event.key) {
+      case 'ArrowLeft': pan = { ...pan, x: pan.x - step }; break
+      case 'ArrowRight': pan = { ...pan, x: pan.x + step }; break
+      case 'ArrowUp': pan = { ...pan, y: pan.y - step }; break
+      case 'ArrowDown': pan = { ...pan, y: pan.y + step }; break
+      case '+': case '=': zoom = Math.min(8, zoom * 1.25); break
+      case '-': zoom = Math.max(0.01, zoom / 1.25); break
+      case 'Home': case '0': fit(); break
+      default: return
+    }
+    event.preventDefault()
   }
 
   function wheel(event) {
@@ -16,7 +43,7 @@
     // scroll past is worse than one you have to hold a key to zoom.
     event.preventDefault()
     const next = zoom * (event.deltaY < 0 ? 1.1 : 1 / 1.1)
-    zoom = Math.min(8, Math.max(0.1, next))
+    zoom = Math.min(8, Math.max(0.01, next))
   }
 
   function down(event) {
@@ -37,18 +64,24 @@
 
 <div class="viewer">
   <div class="tools">
-    <button onclick={() => (zoom = Math.min(8, zoom * 1.25))} title="Zoom in">+</button>
-    <button onclick={() => (zoom = Math.max(0.1, zoom / 1.25))} title="Zoom out">−</button>
-    <button onclick={fit} title="Reset">{Math.round(zoom * 100)}%</button>
+    <button onclick={() => (zoom = Math.min(8, zoom * 1.25))} aria-label="Zoom in" title="Zoom in">+</button>
+    <button onclick={() => (zoom = Math.max(0.01, zoom / 1.25))} aria-label="Zoom out" title="Zoom out">−</button>
+    <button onclick={fit} aria-label="Fit diagram to preview" title="Fit diagram (Home)">Fit · {Math.round(zoom * 100)}%</button>
   </div>
 
   {#if error}
     <pre class="error">{error}</pre>
   {:else}
-    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <!-- The application role is scoped to this keyboard-operated diagram. -->
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
     <div
       class="stage"
+      bind:this={stage}
+      role="application"
+      tabindex="0"
+      aria-label="Diagram preview. Arrow keys move, plus and minus zoom, Home fits the diagram."
       class:grabbing={dragging}
+      onkeydown={keydown}
       onwheel={wheel}
       onpointerdown={down}
       onpointermove={move}
@@ -57,6 +90,7 @@
     >
       <div
         class="sheet"
+        bind:this={sheet}
         style="transform: translate({pan.x}px, {pan.y}px) scale({zoom})"
       >
         <!-- The renderer's own output, and the only thing here that is not
@@ -99,19 +133,22 @@
   .stage {
     height: 100%;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     place-items: center;
     cursor: grab;
     overflow: hidden;
     touch-action: none;
   }
   .stage.grabbing { cursor: grabbing; }
+  .stage:focus-visible { outline: 2px solid var(--ink); outline-offset: -3px; }
 
   .sheet {
+    width: max-content;
     transform-origin: center;
     line-height: 0;
   }
   .sheet :global(svg) {
-    max-width: min(100%, 1400px);
+    max-width: none;
     height: auto;
     user-select: none;
   }

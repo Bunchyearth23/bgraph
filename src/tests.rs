@@ -2385,10 +2385,7 @@ fn a_pdf_draws_the_edges_the_svg_draws() {
 
 #[cfg(feature = "pdf")]
 #[test]
-fn pdf_text_is_measured_exactly_rather_than_estimated() {
-    // The one place `X-005` does not apply: a PDF viewer must have Helvetica,
-    // and the advance table `W-040` added is Helvetica's — so the centring
-    // here is right rather than close.
+fn pdf_text_uses_a_standard_font_and_text_operators() {
     let pdf = crate::render_source_pdf("type pie\nslice a \"Organic\" 10").expect("renders");
     let text = String::from_utf8_lossy(&pdf).to_string();
     assert!(text.contains("/Helvetica"), "the base-14 font is named");
@@ -2397,11 +2394,18 @@ fn pdf_text_is_measured_exactly_rather_than_estimated() {
 
 #[cfg(feature = "pdf")]
 #[test]
-fn every_example_also_renders_as_a_pdf() {
+fn every_example_also_renders_as_a_pdf_with_a_unicode_font() {
     // The sweep, again: an archetype whose geometry the PDF writer cannot
     // express would otherwise only be found by opening a file.
     for (genre, source) in crate::examples::EXAMPLES {
-        let pdf = crate::render_source_pdf(source).unwrap_or_else(|e| panic!("{genre}: {e:#}"));
+        let mut layout = crate::analyze_source(source).into_layout().unwrap();
+        layout.opts.embed_font = Some((
+            "DejaVuSans".into(),
+            include_bytes!("../tests/fixtures/fonts/DejaVuSans.ttf")
+                .to_vec()
+                .into(),
+        ));
+        let pdf = crate::render_pdf::render(&layout).unwrap_or_else(|e| panic!("{genre}: {e:#}"));
         assert!(pdf.starts_with(b"%PDF"), "{genre}");
     }
 }
@@ -6994,7 +6998,7 @@ fn versioned_hostile_inputs_cover_every_renderer() {
         };
         let svg = crate::render_svg::render(&layout);
         assert!(svg.starts_with("<svg"), "{name}: invalid SVG root");
-        let pdf = crate::render_pdf::render(&layout);
+        let pdf = crate::render_pdf::render(&layout).expect("representable corpus text");
         assert!(pdf.starts_with(b"%PDF-"), "{name}: invalid PDF header");
         let json = crate::render_json::render(&layout);
         serde_json::from_str::<serde_json::Value>(&json)
@@ -9819,7 +9823,7 @@ fn a_diagram_that_fits_is_still_one_page() {
     // The default must not change: a diagram smaller than a sheet has always
     // been one page sized to itself, and that is still the right answer.
     let l = build("node a \"A\"");
-    let pdf = String::from_utf8_lossy(&crate::render_pdf::render(&l)).into_owned();
+    let pdf = String::from_utf8_lossy(&crate::render_pdf::render(&l).unwrap()).into_owned();
     assert_eq!(
         pdf.matches("/Type /Page\n").count() + pdf.matches("/Type /Page ").count(),
         1
@@ -9835,10 +9839,9 @@ fn a_wide_diagram_is_tiled_across_sheets() {
         source.push_str(&format!("node n{i} \"Stage {i}\"\n"));
     }
     let l = build(&source);
-    let pdf = String::from_utf8_lossy(&crate::render_pdf::render_paged(
-        &l,
-        crate::render_pdf::Page::A4,
-    ))
+    let pdf = String::from_utf8_lossy(
+        &crate::render_pdf::render_paged(&l, crate::render_pdf::Page::A4).unwrap(),
+    )
     .into_owned();
 
     assert!(
@@ -9880,10 +9883,9 @@ fn sheets_overlap_so_a_seam_is_readable() {
         source.push_str(&format!("node n{i} \"Stage {i}\"\n"));
     }
     let l = build(&source);
-    let pdf = String::from_utf8_lossy(&crate::render_pdf::render_paged(
-        &l,
-        crate::render_pdf::Page::A4,
-    ))
+    let pdf = String::from_utf8_lossy(
+        &crate::render_pdf::render_paged(&l, crate::render_pdf::Page::A4).unwrap(),
+    )
     .into_owned();
 
     let lefts: Vec<f64> = pdf

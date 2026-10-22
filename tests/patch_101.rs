@@ -70,7 +70,7 @@ fn sequence_frames_paint_below_messages_and_fit_the_canvas() {
     assert!(svg.find("fill-opacity=\"0.5\"").unwrap() < svg.find("<polyline").unwrap());
     #[cfg(feature = "pdf")]
     {
-        let bytes = bgraph::render_pdf::render(&layout);
+        let bytes = bgraph::render_pdf::render(&layout).unwrap();
         let pdf = String::from_utf8_lossy(&bytes);
         assert!(pdf.find("0 1 0 rg").unwrap() < pdf.find("1 0 0 RG").unwrap());
     }

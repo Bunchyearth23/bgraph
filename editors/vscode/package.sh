@@ -55,7 +55,7 @@ fi
 # without it the fence quietly falls back to a code block.
 if [[ -f ../../playground/build.sh && -f ../../Cargo.toml ]] \
   && command -v rustup >/dev/null \
-  && rustup target list --installed | grep -qx wasm32-unknown-unknown; then
+  && rustup target list --installed | grep -x wasm32-unknown-unknown >/dev/null; then
   echo "package.sh: building the preview renderer…"
   (cd ../.. && ./playground/build.sh >/dev/null)
   cp ../../playground/public/bgraph.wasm bgraph.wasm

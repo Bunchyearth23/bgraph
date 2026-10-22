@@ -9,7 +9,7 @@ use crate::layout::{
     Anchor, Annotation, Chart, Guide, Layout, Pie, PlacedGroup, PlacedNode, Polyline, Rect,
     text_width,
 };
-use crate::style::{Head, Router, Shape, Style};
+use crate::style::{GraphOpts, Head, Router, Shape, Style};
 
 /// An edge after routing, with its label already placed.
 /// An edge, once it knows where it runs and where its label sits.
@@ -61,7 +61,7 @@ pub fn render(layout: &Layout) -> String {
     }
     for group in &layout.groups {
         body.push_str(&described(
-            &group_frame(group, &layout.opts.background),
+            &group_frame(group, &layout.opts),
             group.style.description.as_deref(),
         ));
     }
@@ -973,18 +973,41 @@ fn moved_node_label(node: &PlacedNode) -> Option<Rect> {
 }
 
 /// The same for a group's title, which hangs off the top-left of its frame.
-fn moved_group_label(group: &PlacedGroup) -> Option<Rect> {
-    let (dx, dy) = group.style.label_offset?;
+fn moved_group_label(group: &PlacedGroup, opts: &GraphOpts) -> Option<Rect> {
     if group.lines.iter().all(|l| l.is_empty()) {
         return None;
     }
     let size = group.style.font_size.unwrap_or(12.0);
+    let measured = embedded_width(
+        opts,
+        group.style.font_family.as_deref().unwrap_or("sans-serif"),
+        &group.lines.join(" "),
+        size,
+    );
+    let (dx, dy) = group.style.label_offset.or(measured.map(|_| (0.0, 0.0)))?;
+    if let Some(width) = measured {
+        return Some(Rect {
+            x: group.rect.x + 9.0 + dx,
+            y: group.rect.y + size * (1.3 - 0.72) + dy,
+            w: width + 6.0,
+            h: size * 1.4,
+        });
+    }
     Some(Rect {
         x: group.rect.x + 10.0 + dx,
         y: group.rect.y + size / 2.0 + dy,
         w: text_width(&[group.lines.join(" ")], size),
         h: size,
     })
+}
+
+fn embedded_width(opts: &GraphOpts, family: &str, text: &str, size: f64) -> Option<f64> {
+    let (embedded, bytes) = opts.embed_font.as_ref()?;
+    let primary = family.split(',').next()?.trim().trim_matches(['\'', '"']);
+    if !primary.eq_ignore_ascii_case(embedded) {
+        return None;
+    }
+    crate::subset::text_advance(bytes, text, size)
 }
 
 fn bounds(layout: &Layout, routed: &[Routed]) -> (f64, f64, f64, f64) {
@@ -1028,11 +1051,34 @@ fn bounds(layout: &Layout, routed: &[Routed]) -> (f64, f64, f64, f64) {
             });
         }
     }
-    boxes.extend(layout.annotations.iter().map(annotation_bounds));
+    boxes.extend(layout.annotations.iter().map(|annotation| {
+        let mut rect = annotation_bounds(annotation);
+        if annotation.title
+            && let Some(width) = embedded_width(
+                &layout.opts,
+                &annotation.family,
+                &annotation.text,
+                annotation.size,
+            )
+        {
+            rect.x = match annotation.anchor {
+                Anchor::Start => annotation.x,
+                Anchor::Middle => annotation.x - width / 2.0,
+                Anchor::End => annotation.x - width,
+            };
+            rect.w = width;
+        }
+        rect
+    }));
     boxes.extend(routed.iter().filter_map(|r| r.label.as_ref().map(|l| l.1)));
     // A label the author moved can leave the shape it belongs to entirely.
     boxes.extend(layout.nodes.iter().filter_map(moved_node_label));
-    boxes.extend(layout.groups.iter().filter_map(moved_group_label));
+    boxes.extend(
+        layout
+            .groups
+            .iter()
+            .filter_map(|group| moved_group_label(group, &layout.opts)),
+    );
 
     // Edge geometry can leave the nodes' box entirely — a self-loop does.
     for route in routed {
@@ -1119,7 +1165,7 @@ fn free_polyline(p: &Polyline) -> String {
 }
 
 /// A frame and its name, set into the top-left of the border.
-fn group_frame(group: &PlacedGroup, background: &Option<String>) -> String {
+fn group_frame(group: &PlacedGroup, opts: &GraphOpts) -> String {
     let s = &group.style;
     let r = &group.rect;
 
@@ -1148,8 +1194,14 @@ fn group_frame(group: &PlacedGroup, background: &Option<String>) -> String {
         // A plate of the background, as edge labels get. A frame's title can
         // sit over a lifeline or a gridline it has no way to avoid, and this
         // is what already makes every other label readable when it does.
-        if let Some(fill) = background.as_deref().filter(|b| *b != "none") {
-            let w = text_width(std::slice::from_ref(&text), size);
+        if let Some(fill) = opts.background.as_deref().filter(|b| *b != "none") {
+            let w = embedded_width(
+                opts,
+                s.font_family.as_deref().unwrap_or("sans-serif"),
+                &text,
+                size,
+            )
+            .unwrap_or_else(|| text_width(std::slice::from_ref(&text), size));
             let _ = write!(
                 out,
                 r#"<rect x="{}" y="{}" width="{}" height="{}" fill="{}" />"#,

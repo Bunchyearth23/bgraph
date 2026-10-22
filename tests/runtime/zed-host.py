@@ -25,9 +25,13 @@ import tomllib
 import urllib.request
 
 ROOT = Path(__file__).resolve().parents[2]
-FIXTURES = ("declared", "overlap", "conflict", "unicode-error", "frame-nested", "size-chain-conflict")
+FIXTURES = ("declared", "overlap", "conflict", "unicode-error", "frame-nested", "size-chain-conflict", "style-library")
 ERROR_FIXTURES = ("conflict", "unicode-error", "size-chain-conflict")
 PREVIEW_FILE = os.environ.get("BGRAPH_ZED_PREVIEW_FILE", "preview ' $(touch INJECTED) `touch INJECTED` $file.bd")
+
+
+def fixture_file(name):
+    return f"{name}.{'bds' if name == 'style-library' else 'bd'}"
 
 
 def preview_check(base, host):
@@ -158,7 +162,7 @@ def normalize(diagnostics):
 def inside(evidence, zed):
     base = Path(evidence)
     preview = json.loads((base / "inputs.json").read_text()).get("preview", False)
-    files = [] if preview else [base / "project" / f"{name}.bd" for name in FIXTURES]
+    files = [] if preview else [base / "project" / fixture_file(name) for name in FIXTURES]
     file_by_uri = {file.as_uri(): file for file in files}
     opened_files = [base / "project", base / "project" / PREVIEW_FILE] if preview else files
     with open(base / "host.stdout", "wb") as stdout, open(base / "host.stderr", "wb") as stderr:
@@ -175,7 +179,7 @@ def inside(evidence, zed):
                      "column": d.get("column", d.get("col")), "message": d["message"]}
                     for d in json.loads(checked.stdout)
                 ])
-                if name in ("declared", "frame-nested"):
+                if name in ("declared", "frame-nested", "style-library"):
                     assert not expected[file.as_uri()], "valid fixture has unexpected diagnostics"
                 else:
                     severity = "error" if name in ERROR_FIXTURES else "warning"
@@ -276,7 +280,7 @@ def run(args):
     (extension / "grammars").mkdir()
     shutil.copyfile(args.grammar, extension / "grammars/bgraph.wasm")
     for name in FIXTURES:
-        shutil.copyfile(ROOT / "tests/runtime" / f"{name}.bd", base / "project" / f"{name}.bd")
+        shutil.copyfile(ROOT / "tests/runtime" / fixture_file(name), base / "project" / fixture_file(name))
     for name, source in (("bgraph", args.cli), ("bgraph-lsp-real", args.server)):
         shutil.copy2(source, base / "bin" / name)
     wrapper = base / "bin/bgraph-lsp"

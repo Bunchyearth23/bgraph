@@ -36,4 +36,4 @@ env -u VSCODE_IPC_HOOK_CLI -u VSCODE_PID -u ELECTRON_RUN_AS_NODE \
 [[ -f "$BGRAPH_RUNTIME_RESULT" ]] \
   || { echo "VS Code exited without running the extension-host assertions" >&2; exit 1; }
 cat "$BGRAPH_RUNTIME_RESULT"
-grep -qx 'VS Code host: 7 fixtures passed; 2 inspection scenarios passed; preview passed' "$BGRAPH_RUNTIME_RESULT"
+grep -qx 'VS Code host: 8 fixtures passed; 2 inspection scenarios passed; untitled diagnostics passed; preview geometry passed' "$BGRAPH_RUNTIME_RESULT"

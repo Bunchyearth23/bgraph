@@ -24,6 +24,7 @@ mod completion_engine;
 mod context;
 #[path = "lsp/diagnostics.rs"]
 mod diagnostic_engine;
+mod file_uri;
 mod hover;
 mod navigation;
 mod protocol;
@@ -33,7 +34,10 @@ use context::{
     is_rel_dir, item_words, text_of, word_at,
 };
 #[allow(unused_imports)]
-pub(crate) use diagnostic_engine::{diagnostics, diagnostics_for, path_of};
+pub(crate) use diagnostic_engine::diagnostics;
+#[cfg(test)]
+pub(crate) use diagnostic_engine::diagnostics_for;
+pub(crate) use file_uri::path_of;
 
 // ------------------------------------------------------------ server
 
@@ -137,7 +141,7 @@ impl Server {
                 self.docs.remove(&uri_of(params));
                 Response::Nothing
             }
-            "textDocument/didSave" => Response::Nothing,
+            "textDocument/didSave" | "workspace/didChangeWatchedFiles" => Response::Nothing,
 
             "textDocument/completion" => Response::Result(self.completion(params)),
             "textDocument/formatting" => {
@@ -181,30 +185,47 @@ impl Server {
                 | "textDocument/didChange"
                 | "textDocument/didSave"
                 | "textDocument/didClose"
+                | "workspace/didChangeWatchedFiles"
         ) {
             return Vec::new();
         }
 
-        let uri = uri_of(params);
+        let mut notes = Vec::new();
         if method == "textDocument/didClose" {
-            return vec![json!({
+            notes.push(json!({
                 "jsonrpc": "2.0",
                 "method": "textDocument/publishDiagnostics",
-                "params": { "uri": uri, "diagnostics": [] }
-            })];
+                "params": { "uri": uri_of(params), "diagnostics": [] }
+            }));
         }
-        let Some(text) = self.docs.get(&uri) else {
-            return Vec::new();
-        };
+        let sources = self.sources();
+        // A changed dependency can fix an error in any open parent, including
+        // a formerly missing include that has no successful dependency map yet.
+        let mut docs: Vec<_> = self.docs.iter().collect();
+        docs.sort_by_key(|(uri, _)| *uri);
+        notes.extend(docs.into_iter().map(|(uri, text)| json!({
+                "jsonrpc": "2.0",
+                "method": "textDocument/publishDiagnostics",
+                "params": {
+                    "uri": uri,
+                    "diagnostics": diagnostic_engine::diagnostics_with_sources(text, path_of(uri).as_deref(), &sources),
+                }
+            })));
+        notes
+    }
 
-        vec![json!({
-            "jsonrpc": "2.0",
-            "method": "textDocument/publishDiagnostics",
-            "params": {
-                "uri": uri,
-                "diagnostics": diagnostics_for(text, path_of(&uri).as_deref()),
-            }
-        })]
+    fn sources(&self) -> HashMap<std::path::PathBuf, String> {
+        self.docs
+            .iter()
+            .filter_map(|(uri, text)| {
+                let path = path_of(uri)?;
+                let path = path
+                    .canonicalize()
+                    .or_else(|_| std::path::absolute(path))
+                    .ok()?;
+                Some((path, text.clone()))
+            })
+            .collect()
     }
 
     fn doc(&self, params: &Value) -> Option<(&String, LineIndex, usize)> {
@@ -265,7 +286,7 @@ impl Server {
         let Some((text, index, offset)) = self.doc(params) else {
             return Value::Null;
         };
-        hover::file_hover(text, &index, offset, &uri_of(params))
+        hover::file_hover(text, &index, offset, &uri_of(params), &self.sources())
     }
 
     // -------------------------------------------------------- navigation
@@ -275,7 +296,7 @@ impl Server {
             return Value::Null;
         };
         let uri = params["textDocument"]["uri"].as_str().unwrap_or("");
-        navigation::definition(text, &index, offset, uri)
+        navigation::definition(text, &index, offset, uri, &self.sources())
     }
 
     fn references(&self, params: &Value) -> Value {
@@ -289,6 +310,7 @@ impl Server {
             params["context"]["includeDeclaration"]
                 .as_bool()
                 .unwrap_or(false),
+            &self.sources(),
         )
     }
 
@@ -332,6 +354,9 @@ fn colour_presentation(params: &Value) -> Value {
 #[cfg(test)]
 #[path = "lsp/tests.rs"]
 mod tests;
+
+#[cfg(test)]
+mod refresh_tests;
 
 #[cfg(test)]
 mod block_vocabulary_tests {

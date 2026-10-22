@@ -1,36 +1,25 @@
 use serde_json::{Value, json};
 
-use super::positions::LineIndex;
+pub(crate) use super::file_uri::path_of;
+use super::{file_uri, positions::LineIndex};
 use crate::check::{self, Severity};
 
-/// A `file://` URI as a path, when it is one.
-pub(crate) fn path_of(uri: &str) -> Option<std::path::PathBuf> {
-    let rest = uri.strip_prefix("file://")?;
-    let mut out = Vec::with_capacity(rest.len());
-    let mut chars = rest.chars();
-    while let Some(c) = chars.next() {
-        if c != '%' {
-            let mut encoded = [0; 4];
-            out.extend_from_slice(c.encode_utf8(&mut encoded).as_bytes());
-            continue;
-        }
-        let hex: String = chars.by_ref().take(2).collect();
-        match u8::from_str_radix(&hex, 16) {
-            Ok(byte) => out.push(byte),
-            Err(_) => {
-                out.push(b'%');
-                out.extend_from_slice(hex.as_bytes());
-            }
-        }
-    }
-    String::from_utf8(out).ok().map(std::path::PathBuf::from)
+#[cfg(test)]
+pub(crate) fn diagnostics_for(text: &str, path: Option<&std::path::Path>) -> Vec<Value> {
+    diagnostics_with_sources(text, path, &std::collections::HashMap::new())
 }
 
-pub(crate) fn diagnostics_for(text: &str, path: Option<&std::path::Path>) -> Vec<Value> {
+pub(super) fn diagnostics_with_sources(
+    text: &str,
+    path: Option<&std::path::Path>,
+    sources: &std::collections::HashMap<std::path::PathBuf, String>,
+) -> Vec<Value> {
     let Some(path) = path else {
         return diagnostics(text);
     };
-    let Ok(composed) = crate::analyze_file_source(path, text) else {
+    let Ok(composed) = crate::compose::compose_with_sources(path, Some(text), sources)
+        .and_then(|composed| crate::analyze_composed(composed, None))
+    else {
         return diagnostics(text);
     };
     let entry = path
@@ -50,17 +39,6 @@ pub(crate) fn diagnostics_for(text: &str, path: Option<&std::path::Path>) -> Vec
             (index.range(local), diag.message, None)
         } else if let Some(include) = composed.map.include_span(&entry, diag.span.start) {
             let child = LineIndex::new(composed.map.source_of(diag.span.start));
-            let uri: String = owner
-                .to_string_lossy()
-                .bytes()
-                .map(|byte| {
-                    if byte.is_ascii_alphanumeric() || b"/-._~:".contains(&byte) {
-                        (byte as char).to_string()
-                    } else {
-                        format!("%{byte:02X}")
-                    }
-                })
-                .collect();
             let message = format!(
                 "{}:{}:{}: {}",
                 owner.display(),
@@ -69,7 +47,7 @@ pub(crate) fn diagnostics_for(text: &str, path: Option<&std::path::Path>) -> Vec
                 diag.message
             );
             let related = json!([{
-                "location": { "uri": format!("file://{uri}"), "range": child.range(local) },
+                "location": { "uri": file_uri::uri_of(owner), "range": child.range(local) },
                 "message": diag.message,
             }]);
             (index.range(include), message, Some(related))

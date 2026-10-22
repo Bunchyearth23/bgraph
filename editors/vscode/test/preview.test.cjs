@@ -3,8 +3,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { test } = require('node:test');
 const vm = require('node:vm');
+const { createRequire } = require('node:module');
 
 const entry = path.join(__dirname, '..', 'src', 'extension.js');
+const extensionRequire = createRequire(entry);
 
 function event() {
   const listeners = new Set();
@@ -26,9 +28,15 @@ function extension({ missingRenderer = false } = {}) {
     showWarningMessage: text => notices.push(text),
     showInformationMessage: text => notices.push(text),
     createWebviewPanel(viewType, title, column, options) {
-      const disposed = event();
+      const disposed = event(), received = event();
       const panel = {
-        viewType, title, column, options, webview: { html: '' }, revealed: 0,
+        viewType, title, column, options, revealed: 0,
+        webview: {
+          html: '', messages: [],
+          onDidReceiveMessage: received.subscribe,
+          postMessage(message) { this.messages.push(message); return Promise.resolve(true); },
+        },
+        ready() { received.fire({ type: 'ready' }); },
         onDidDispose: disposed.subscribe,
         reveal() { this.revealed++; },
         dispose() {
@@ -66,7 +74,7 @@ function extension({ missingRenderer = false } = {}) {
       if (id === 'fs' && missingRenderer) return {
         readFileSync() { throw new Error('No bundled renderer'); },
       };
-      return require(id);
+      return extensionRequire(id);
     },
     setTimeout(fn, delay) {
       assert.equal(delay, 150);
@@ -90,7 +98,10 @@ function extension({ missingRenderer = false } = {}) {
       window.activeTextEditor = { document };
       return document;
     },
-    preview: uri => commands.get('bgraph.showPreview')(uri),
+    async preview(uri, ready = true) {
+      await commands.get('bgraph.showPreview')(uri);
+      if (ready) panels.at(-1)?.ready();
+    },
     flush() {
       for (const callback of [...timers.values()]) callback();
       assert.equal(timers.size, 0);
@@ -107,14 +118,16 @@ test('preview uses unsaved buffer text without the language client, with a scope
   const document = harness.document('file:///tmp/diagram.bd', 'node a "Unsaved buffer"\n');
   await harness.preview();
   const panel = harness.panels[0];
-  assert.match(panel.webview.html, /<svg\b/);
-  assert.match(panel.webview.html, /Unsaved buffer/);
+  assert.match(panel.webview.messages.at(-1).svg, /<svg\b/);
+  assert.match(panel.webview.messages.at(-1).svg, /Unsaved buffer/);
   assert.equal(panel.title, 'Preview: diagram.bd');
   assert.equal(panel.viewType, 'bgraph.preview');
-  assert.equal(panel.options.enableScripts, false);
+  assert.equal(panel.options.enableScripts, true);
   assert.equal(panel.options.localResourceRoots.length, 0);
   assert.match(panel.webview.html, /default-src 'none'/);
-  assert.doesNotMatch(panel.webview.html, /<script\b/);
+  const nonce = panel.webview.html.match(/<script nonce="([a-f0-9]+)">/)[1];
+  assert.ok(panel.webview.html.includes(`script-src 'nonce-${nonce}'`));
+  assert.equal((panel.webview.html.match(/<script\b/g) || []).length, 1);
   await harness.preview(document.uri);
   assert.equal(harness.panels.length, 1);
   assert.equal(panel.revealed, 1);
@@ -122,7 +135,8 @@ test('preview uses unsaved buffer text without the language client, with a scope
   const shortcut = manifest.contributes.keybindings.find(key => key.command === 'bgraph.showPreview');
   assert.equal(shortcut.key, 'ctrl+shift+v');
   assert.equal(shortcut.mac, 'cmd+shift+v');
-  assert.equal(shortcut.when, 'editorLangId == bgraph && editorTextFocus');
+  assert.equal(shortcut.when, 'editorLangId == bgraph && editorTextFocus && resourceExtname != .bds');
+  assert.equal(manifest.contributes.commands[0].icon, '$(open-preview)');
   harness.dispose();
 });
 
@@ -133,16 +147,18 @@ test('edits debounce per document, stay bound to its panel and clean up on close
   const second = harness.document('untitled:Untitled-1', 'node a "Second"\n');
   await harness.preview();
   first.text = 'node a "Intermediate"\n';
+  const html = harness.panels[0].webview.html;
   harness.changed.fire({ document: first });
   first.text = 'node a "Final buffer"\nnode b "Added while typing"\n';
   harness.changed.fire({ document: first });
   assert.equal(harness.timers.size, 1);
-  assert.doesNotMatch(harness.panels[0].webview.html, /Final buffer/);
+  assert.doesNotMatch(harness.panels[0].webview.messages.at(-1).svg, /Final buffer/);
   harness.flush();
-  assert.match(harness.panels[0].webview.html, /Final buffer/);
-  assert.match(harness.panels[0].webview.html, /Added while typing/);
-  assert.match(harness.panels[1].webview.html, /Second/);
-  assert.doesNotMatch(harness.panels[1].webview.html, /Final buffer/);
+  assert.equal(harness.panels[0].webview.html, html, 'edits preserve the webview and its camera');
+  assert.match(harness.panels[0].webview.messages.at(-1).svg, /Final buffer/);
+  assert.match(harness.panels[0].webview.messages.at(-1).svg, /Added while typing/);
+  assert.match(harness.panels[1].webview.messages.at(-1).svg, /Second/);
+  assert.doesNotMatch(harness.panels[1].webview.messages.at(-1).svg, /Final buffer/);
   harness.changed.fire({ document: first });
   harness.panels[0].dispose();
   assert.equal(harness.timers.size, 0);
@@ -161,24 +177,24 @@ test('syntax errors and hostile labels are escaped, and valid edits recover', as
   const document = harness.document('file:///tmp/hostile.bd', 'node a "<script>alert(1)</script> & text"\n');
   await harness.preview();
   const panel = harness.panels[0];
-  assert.match(panel.webview.html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
-  assert.doesNotMatch(panel.webview.html, /<script\b/);
+  assert.match(panel.webview.messages.at(-1).svg, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  assert.doesNotMatch(panel.webview.messages.at(-1).svg, /<script\b/);
   document.text = 'node a @\n';
   harness.changed.fire({ document });
   harness.flush();
-  assert.match(panel.webview.html, /<pre role="alert">error:/);
-  assert.doesNotMatch(panel.webview.html, /<svg\b|<script\b/);
+  assert.match(panel.webview.messages.at(-1).error, /^error:/);
+  assert.equal(panel.webview.messages.at(-1).svg, undefined);
   document.getText = () => { throw new Error('<script>alert(1)</script>'); };
   harness.changed.fire({ document });
   harness.flush();
-  assert.match(panel.webview.html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
-  assert.doesNotMatch(panel.webview.html, /<script\b/);
+  assert.match(panel.webview.messages.at(-1).error, /<script>alert\(1\)<\/script>/);
+  assert.doesNotMatch(panel.webview.html, /alert\(1\)/);
   document.text = 'node a "Recovered"\n';
   document.getText = () => document.text;
   harness.changed.fire({ document });
   harness.flush();
-  assert.match(panel.webview.html, /<svg\b/);
-  assert.match(panel.webview.html, /Recovered/);
+  assert.match(panel.webview.messages.at(-1).svg, /<svg\b/);
+  assert.match(panel.webview.messages.at(-1).svg, /Recovered/);
   harness.dispose();
 });
 
@@ -192,8 +208,8 @@ test('Markdown still renders, and WASM file access limits are reported', async (
   assert.match(fence('bgraph', 'node a { bogus: 1 }'), /bgraph-error/);
   harness.document('file:///tmp/include.bd', 'include "child.bd"\n');
   await harness.preview();
-  assert.match(harness.panels[0].webview.html, /<pre role="alert">error:/);
-  assert.doesNotMatch(harness.panels[0].webview.html, /<svg\b/);
+  assert.match(harness.panels[0].webview.messages.at(-1).error, /^error:/);
+  assert.equal(harness.panels[0].webview.messages.at(-1).svg, undefined);
   harness.dispose();
 });
 
@@ -201,12 +217,38 @@ test('missing WASM gives a useful panel error and preserves Markdown fallback', 
   const harness = extension({ missingRenderer: true });
   harness.document('file:///tmp/missing.bd', 'node a\n');
   await harness.preview();
-  assert.match(harness.panels[0].webview.html, /renderer is missing or could not load/);
+  assert.match(harness.panels[0].webview.messages.at(-1).error, /renderer is missing or could not load/);
   const md = { renderer: { rules: { fence: () => 'fallback' } } };
   harness.api.extendMarkdownIt(md);
   assert.equal(md.renderer.rules.fence([{ info: 'bgraph', content: 'node a' }], 0), 'fallback');
   harness.window.activeTextEditor = undefined;
   await harness.preview();
   assert.match(harness.notices.at(-1), /open a \.bd file/);
+  harness.dispose();
+});
+
+test('a newly ready or restored webview receives the most recent edit', async () => {
+  const harness = extension();
+  const document = harness.document('untitled:Untitled-1', 'node a "First"\n');
+  await harness.preview(undefined, false);
+  const panel = harness.panels[0];
+  assert.equal(panel.webview.messages.length, 0);
+  document.text = 'node a "Latest"\n';
+  harness.changed.fire({ document });
+  harness.flush();
+  panel.ready();
+  assert.match(panel.webview.messages.at(-1).svg, /Latest/);
+  panel.ready();
+  assert.match(panel.webview.messages.at(-1).svg, /Latest/);
+  harness.dispose();
+});
+
+test('stylesheets use the language plugin without offering a diagram preview', async () => {
+  const harness = extension();
+  harness.document('file:///tmp/common.bds', 'style node { fill: #fff }\n');
+  await harness.preview();
+  assert.equal(harness.panels.length, 0);
+  assert.match(harness.notices.at(-1), /shared stylesheet/);
+  assert.ok(require('../package.json').contributes.languages[0].extensions.includes('.bds'));
   harness.dispose();
 });
