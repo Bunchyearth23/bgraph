@@ -43,13 +43,16 @@ No push/release. Temporary host evidence: `/tmp/bgraph-zed-host-aruij9x3/`.
 
 Licensing decision on 2026-10-22 (`D-056`): apply the user's Non-Commercial
 Source License, version 0.1, in English, with Bunchyearth23 as holder.
-The supplied terms replace the proposed PolyForm licence and the former
-confidential-source terms. The user intends to publish the source; this
-work updates the licence, metadata and README without changing repository
-visibility or publishing artifacts. A separate contribution agreement is
-required by the licence but has not been supplied. Licence/manifest/release
-and documentation tests, the README's SVG/PDF example, local links and
-strict MkDocs passed. Tracked package licence copies are aligned.
+It replaces the proposed PolyForm licence and former confidential-source
+terms. Licence/manifest/release and documentation tests, the README's SVG/PDF
+example, local links and strict MkDocs passed. Tracked package licence copies
+are aligned; repository visibility and publication are unchanged.
+
+The English `CONTRIBUTOR_AGREEMENT.md` is now linked from the README
+(`D-056`): ownership retained, commercial/relicensing rights and explicit
+acceptance of identified revisions. Its eight sections and 27 local links
+across the agreement and README were checked. This is a draft for legal
+review; no contributor acceptance or publication has been recorded.
 
 Legend documentation refreshed on 2026-10-22 (`W-173`): the English style
 guide, home-page route, language manual and generated reference explain
@@ -215,7 +218,7 @@ Open and residual risks; rows name related work and outstanding evidence.
 ### Decisions
 | id | state | date | title | was |
 |---|---|---|---|---|
-| `D-056` | active | 2026-10-22 | **Use the author's Non-Commercial Source License, version 0.1, in preparation for public source availability.** Preserve the supplied terms in English in `LICENSE`, naming Bunchyearth23, as explicitly requested by the user. Study, noncommercial compilation/execution and private/internal noncommercial modifications are permitted; redistribution and commercial use require written authorization, with the stated platform-fork exception. Accepted contributions need a separate agreement. Use `LicenseRef-bgraph-noncommercial-source-0.1`, not PolyForm or an invented standard SPDX identifier. Registry publication remains disabled; changing repository visibility or publishing artifacts requires its own action. | explicit user-supplied licence; replaces proposed PolyForm and historical `D-038`/`D-041` restrictions |
+| `D-056` | active | 2026-10-22 | **Use the author's Non-Commercial Source License, version 0.1, in preparation for public source availability.** Preserve the supplied terms in English in `LICENSE`, naming Bunchyearth23, as explicitly requested by the user. Study, noncommercial compilation/execution and private/internal noncommercial modifications are permitted; redistribution and commercial use require written authorization, with the stated platform-fork exception. `CONTRIBUTOR_AGREEMENT.md` supplies the separate contribution terms, subject to explicit acceptance and legal review. Use `LicenseRef-bgraph-noncommercial-source-0.1`, not PolyForm or an invented standard SPDX identifier. Registry publication remains disabled; changing repository visibility or publishing artifacts requires its own action. | explicit user-supplied licence; replaces proposed PolyForm and historical `D-038`/`D-041` restrictions |
 | `D-055` | active | 2026-10-20 | **All project user documentation is English and starts from a complete beginner workflow.** Installation routes, terminology, copyable examples, expected results, previews, exports and troubleshooting precede the full reference. Existing guide URLs are retained; generated gallery text and documentation launcher help follow the same language. | explicit user request |
 | `D-052` | active | 2026-10-16 | **`margin` reserves outer space around a box or frame**, using CSS top/right/bottom/left order and one-to-four-value forms. Margins add to gaps and container bounds without moving a required `at` or changing explicit alignment. Per-side cascade; finite nonnegative values, no `auto` or CSS collapsing. Explicit support for declared geometry and sequences. | user request, `W-166` |
 | `D-053` | active | 2026-10-16 | **Declared groups have effective dimensions and BPMN lanes fill their pool.** `width`, `height` and `size` are required and may conflict with content; size equalities accept groups. In BPMN, a group containing only groups forms a lane pool: children fill its inner width after padding/margins. Parent painted first. `style node` remains common to nodes and frames; `task`/`group` styles specialize them. | user 1.0.0 report, `W-168` |

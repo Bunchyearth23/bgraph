@@ -203,6 +203,14 @@ disagree.
 _Append via `/start learn <type>: <lesson>`. NEVER delete this section on update._
 
 ### Critical Warnings
+- [2026-10-22] **The English contribution agreement is now
+  `CONTRIBUTOR_AGREEMENT.md`, linked from the README (`D-056`).** This supersedes
+  the earlier note that no separate agreement was supplied. It retains the
+  contributor's ownership and grants commercial/distribution/sublicensing
+  rights to the maintainer for identified contributions. Acceptance must be
+  explicit, tied to the agreement and contribution revisions, and recorded
+  before incorporation; do not treat a pull request or commit sign-off as
+  acceptance. No agreement has been executed by this documentation change.
 - [2026-10-22] **The current licence is the user-supplied Non-Commercial Source
   License, version 0.1 (`D-056`).** Keep its terms in English in `LICENSE` and the
   holder Bunchyearth23. It supersedes the confidential-source/no-changes policy

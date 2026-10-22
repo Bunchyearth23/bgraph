@@ -150,9 +150,13 @@ WebAssembly and packaged integrations. When reporting a problem, include the
 bgraph version, a minimal `.bd` source, the command or editor used, and the
 expected and actual result.
 
-Accepted contributions require a separate agreement granting the maintainer
-the necessary rights, including commercial use. Consult [LICENSE](LICENSE)
-before submitting a contribution or distributing a modified build.
+Before a contribution can be incorporated, read and explicitly accept the
+[Contributor License Agreement](CONTRIBUTOR_AGREEMENT.md) for the submitted
+revisions. You retain ownership while granting the maintainer rights to use,
+modify, distribute and sublicense the contribution, including commercially.
+The agreement explains how to record acceptance and any employer or
+third-party permissions. Consult [LICENSE](LICENSE) for the project's usage
+and redistribution terms.
 
 ## License
 
