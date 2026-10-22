@@ -72,12 +72,36 @@ module.exports = grammar({
         optional(field('body', $.block)),
       ),
 
-    // A key to the colours, for the genres with no chart to build one from.
+    // Without entries, the key uses classes with a `legend:` label.
     legend_declaration: ($) =>
       seq(
         'legend',
         repeat(field('class', $.class_reference)),
         optional(field('placement', $._placement)),
+        optional(field('body', $.legend_block)),
+      ),
+
+    legend_block: ($) =>
+      seq(
+        '{',
+        repeat($._newline),
+        optional(
+          seq(
+            $._legend_item,
+            repeat(seq(repeat1($._newline), $._legend_item)),
+            repeat($._newline),
+          ),
+        ),
+        '}',
+      ),
+
+    _legend_item: ($) => choice(repeat1($.property), $.legend_entry),
+
+    legend_entry: ($) =>
+      seq(
+        'entry',
+        field('text', $.string),
+        repeat(field('class', $.class_reference)),
         optional(field('body', $.block)),
       ),
 

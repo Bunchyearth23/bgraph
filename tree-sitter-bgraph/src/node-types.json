@@ -648,6 +648,25 @@
     }
   },
   {
+    "type": "legend_block",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "legend_entry",
+          "named": true
+        },
+        {
+          "type": "property",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "legend_declaration",
     "named": true,
     "fields": {
@@ -656,7 +675,7 @@
         "required": false,
         "types": [
           {
-            "type": "block",
+            "type": "legend_block",
             "named": true
           }
         ]
@@ -681,6 +700,42 @@
           },
           {
             "type": "relative_position",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "legend_entry",
+    "named": true,
+    "fields": {
+      "body": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "block",
+            "named": true
+          }
+        ]
+      },
+      "class": {
+        "multiple": true,
+        "required": false,
+        "types": [
+          {
+            "type": "class_reference",
+            "named": true
+          }
+        ]
+      },
+      "text": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string",
             "named": true
           }
         ]
@@ -1153,6 +1208,10 @@
   {
     "type": "duration",
     "named": true
+  },
+  {
+    "type": "entry",
+    "named": false
   },
   {
     "type": "equal-height",

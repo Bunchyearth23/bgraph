@@ -526,3 +526,52 @@ layout {
         member: (identifier)
         (gap_clause
           amount: (number))))))
+
+================================================================================
+Explicit legend entries and properties
+================================================================================
+
+legend .caption below api gap 20 {
+  title: "Statuts" font-size: 12
+  entry "Disponible" .live
+  entry "Prévu" { fill: #fef3c7 stroke: #92400e }
+}
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (legend_declaration
+    class: (class_reference (identifier))
+    placement: (relative_position
+      direction: (direction)
+      anchor: (identifier)
+      (gap_clause amount: (number)))
+    body: (legend_block
+      (property name: (property_name) value: (string))
+      (property name: (property_name) value: (number))
+      (legend_entry
+        text: (string)
+        class: (class_reference (identifier)))
+      (legend_entry
+        text: (string)
+        body: (block
+          (property name: (property_name) value: (color))
+          (property name: (property_name) value: (color)))))))
+
+================================================================================
+Legacy legend with placement and properties
+================================================================================
+
+legend at (40, 60) { font-size: 12 color: #222 }
+legend
+
+--------------------------------------------------------------------------------
+
+(source_file
+  (legend_declaration
+    placement: (absolute_position
+      point: (point x: (number) y: (number)))
+    body: (legend_block
+      (property name: (property_name) value: (number))
+      (property name: (property_name) value: (color))))
+  (legend_declaration))
