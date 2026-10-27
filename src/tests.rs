@@ -3011,7 +3011,8 @@ fn venn_degenerate_sets_keep_finite_geometry_and_readable_keys() {
         "type venn\nset a 0\nset b 0\nset c 0",
         "type venn\nset a 100\nset b 100\nset c 100\na -> b 100\na -> c 100\nb -> c 100",
         "type venn\nset a 100\nset b 100\nset c 100\na -> b 100\na -> c 50\nb -> c 50",
-        "type venn\nset a 100\nset b 100\nset c 100\na -> b 99\na -> c 99\nb -> c 1",
+        // `a -> b 99`, `a -> c 99` and a count of 100 force `b -> c` to be at
+        // least 98; `b -> c 1` cannot be drawn and is now refused by `check`.
     ] {
         let l = build(source);
         for n in &l.nodes {
@@ -3042,6 +3043,18 @@ fn venn_omitted_overlaps_are_zero_and_disjoint_sets_stay_disjoint() {
         assert!(crate::charts::lens_area(a.w / 2.0, b.w / 2.0, d) < 1e-8);
     }
     assert_eq!(l.annotations.iter().filter(|a| a.text == "0").count(), 3);
+}
+
+#[test]
+fn a_venn_refuses_pair_totals_that_cannot_all_be_true() {
+    // `a -> b 0` says A and B share nobody, while `a -> c 180` and
+    // `b -> c 180` say C is in both of them — so C's whole 180 people are in
+    // both, which means A and B share at least 180. The picture that follows
+    // would show a lens beside a key saying "0 in common".
+    let e = err(
+        "type venn\nset a \"A\" 420\nset b \"B\" 260\nset c \"C\" 180\na -> b 0\na -> c 180\nb -> c 180",
+    );
+    assert!(e.contains("they must share at least 180"), "{e}");
 }
 
 // ---------------------------------------------------------------------- W-043

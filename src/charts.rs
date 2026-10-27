@@ -1331,28 +1331,71 @@ pub fn venn(diagram: &Diagram, opts: GraphOpts, registry: &Registry) -> Result<L
     for (i, r) in radii.iter().enumerate() {
         let (cx, cy) = place(i);
         let size = font + 3.0;
-        let mut best = None;
+        let mut best: Option<(f64, f64)> = None;
+        // The room a candidate point has: inside its own circle, clear of
+        // every other outline, and clear of the letters already placed.
+        let room_at = |x: f64, y: f64, exclusive: bool| {
+            let mut room = r - crate::math::hypot(x - cx, y - cy);
+            for (j, other) in radii.iter().enumerate().filter(|(j, _)| *j != i) {
+                let (ox, oy) = place(j);
+                let gap = crate::math::hypot(x - ox, y - oy) - other;
+                room = room.min(if exclusive { gap } else { gap.abs() });
+            }
+            for (mx, my) in &marked {
+                room = room.min(crate::math::hypot(x - mx, y - my) - size);
+            }
+            room
+        };
         for exclusive in [true, false] {
             let mut clearance = size;
+            let mut seed: Option<(f64, f64, f64)> = None;
             for row in -16..=16 {
                 for col in -16..=16 {
                     let (x, y) = (
                         cx + r * f64::from(col) / 16.0,
                         cy + r * f64::from(row) / 16.0,
                     );
-                    let mut room = r - crate::math::hypot(x - cx, y - cy);
-                    for (j, other) in radii.iter().enumerate().filter(|(j, _)| *j != i) {
-                        let (ox, oy) = place(j);
-                        let gap = crate::math::hypot(x - ox, y - oy) - other;
-                        room = room.min(if exclusive { gap } else { gap.abs() });
-                    }
-                    for (mx, my) in &marked {
-                        room = room.min(crate::math::hypot(x - mx, y - my) - size);
-                    }
+                    let room = room_at(x, y, exclusive);
                     if room > clearance {
                         clearance = room;
                         best = Some((x, y));
                     }
+                    if seed.as_ref().is_none_or(|(sr, _, _)| room > *sr) {
+                        seed = Some((room, x, y));
+                    }
+                }
+            }
+            // The coarse grid can step over a narrow exclusive crescent: the
+            // letter lands in an overlap instead of in its own set. Refine
+            // around the best sample before giving the region up.
+            if let Some((_, sx, sy)) = seed {
+                let mut step = 2.0 * r / 16.0;
+                let (mut bx, mut by) = (sx, sy);
+                for _ in 0..3 {
+                    let mut local: Option<(f64, f64, f64)> = None;
+                    for row in -4..=4 {
+                        for col in -4..=4 {
+                            let (x, y) = (
+                                bx + step * f64::from(col) / 8.0,
+                                by + step * f64::from(row) / 8.0,
+                            );
+                            let room = room_at(x, y, exclusive);
+                            if local.as_ref().is_none_or(|(lr, _, _)| room > *lr) {
+                                local = Some((room, x, y));
+                            }
+                        }
+                    }
+                    if let Some((room, x, y)) = local
+                        && room > clearance
+                    {
+                        clearance = room;
+                        bx = x;
+                        by = y;
+                    }
+                    step /= 4.0;
+                }
+                if clearance > size {
+                    best = Some((bx, by));
                 }
             }
             if best.is_some() {

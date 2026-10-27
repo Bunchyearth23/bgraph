@@ -112,8 +112,21 @@ unavailable when opening a file alone without its folder. The task runs
 port, and the task terminal displays the preview URL. An older CLI needs
 updating before it understands `--open`.
 
-To use `Ctrl+Shift+V`, open **zed: open keymap** and merge the entry from
-[`keymap.json`](keymap.json) into your existing array:
+### Add the `Ctrl+Shift+V` shortcut (optional)
+
+The shortcut is optional: **task: spawn → bgraph: Preview** does the same
+thing without it. Zed extensions cannot install keybindings, so the entry is
+supplied for you to merge into your own keymap.
+
+1. Open the keymap **file**: command palette → **zed: open keymap file**.
+   (The action named *zed: open keymap* opens the keymap *editor*; the one
+   you want opens the JSON file.) The file is
+   `~/.config/zed/keymap.json` on macOS and Linux, and
+   `~\AppData\Roaming\Zed\keymap.json` on Windows.
+2. The file holds one JSON **array**. If it does not exist yet, create it with
+   the contents of step 3. If it exists, keep everything already in it.
+3. Add this object as one element of that array — between the `[` and the `]`,
+   after the last existing object, separated from it by a comma:
 
 ```json
 {
@@ -124,15 +137,43 @@ To use `Ctrl+Shift+V`, open **zed: open keymap** and merge the entry from
 }
 ```
 
-The extension supplies the task; Zed leaves the shortcut configuration to
-you. This binding only applies to bgraph editors. The task saves the current
-file before launching; included files use their last saved version.
+   A keymap with nothing else in it is exactly this:
 
-Keep the browser open while editing, and save to reload. The task reuses its
-terminal and prevents concurrent runs. On the verified Zed host, pressing the
-shortcut again replaces the previous watcher and opens the new preview. Stop
-it with `Ctrl+C` in its terminal when finished. If the browser cannot open,
-the terminal keeps the URL available to open manually.
+```json
+[
+  {
+    "context": "Editor && extension == bd",
+    "bindings": {
+      "ctrl-shift-v": ["task::Spawn", { "task_name": "bgraph: Preview" }]
+    }
+  }
+]
+```
+
+   The entry is also shipped as [`keymap.json`](keymap.json), so you can copy
+   it from there instead of typing it.
+4. Save the file. Zed reads the keymap immediately — no restart is needed.
+
+To undo the merge, delete the object again and save.
+
+### What the shortcut does
+
+With a `.bd` file focused, `Ctrl+Shift+V` spawns the same **bgraph: Preview**
+task: the buffer is saved first, then `bgraph watch <file> --open --port 0`
+runs in a task terminal, a free loopback port is chosen, and your default
+browser opens on `http://127.0.0.1:<port>`. Keep the browser open while
+editing and save to reload the drawing. The task reuses its terminal and
+prevents concurrent runs; on the verified Zed host, pressing the shortcut
+again replaces the previous watcher and opens the new preview. `Ctrl+C` in
+the task terminal stops it. If the browser cannot open, the terminal keeps the
+URL available to open manually. Included files use their last saved version.
+
+The binding is scoped to `.bd` editors, so `Ctrl+Shift+V` keeps its usual
+meaning everywhere else — in a Markdown file it still opens Zed's own
+Markdown preview. On macOS the key is *control*+shift+V; to use another key,
+change the `"ctrl-shift-v"` string. If Zed reports a keymap error, the file is
+not valid JSON — the usual cause is a missing or extra comma between two
+objects.
 
 The bundled task uses the shell syntax shared by Linux/macOS shells (also
 Fish). It passes the filename through an environment variable before expanding

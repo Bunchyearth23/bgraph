@@ -117,17 +117,66 @@ async function showPreview(uri) {
 
 function updatePreview(preview) {
   clearTimeout(preview.timer);
+  let source = '';
   let answer;
   try {
+    source = preview.document.getText();
     const draw = loadRenderer();
-    answer = draw ? draw(preview.document.getText()) :
+    answer = draw ? draw(source) :
       'error: the preview renderer is missing or could not load. Rebuild the extension with package.sh.';
   } catch (error) {
     answer = `error: could not render this diagram. ${error.message}`;
   }
+  const name = preview.document.fileName || 'diagram.bd';
+  // The compiler's own wording for a diagram that reads another file names a
+  // Rust function — `bgraph::render_file` — which nobody in an editor can
+  // call. The same condition is stated here in terms the reader can act on.
+  // The wording is pinned by a test, so a change in `src/lib.rs` fails loudly
+  // rather than quietly restoring the unusable message.
+  if (/needs a file to resolve it against/.test(answer)) {
+    answer = compositionError(source, name, untitled(preview.document));
+  }
   preview.message = answer.startsWith('error:') ?
     { type: 'render', error: answer } : { type: 'render', svg: answer };
+  // A pie that reads its slices from a CSV is refused by nothing and drawn
+  // wrongly: the renderer ignores the file and draws what the buffer happens
+  // to declare. The picture is kept — it is not wrong about the rest of the
+  // diagram — and the caveat is shown with it.
+  const notice = answer.startsWith('error:') ? null :
+    externalDataNotice(source, name, untitled(preview.document));
+  if (notice) preview.message.notice = notice;
   if (preview.ready) preview.panel.webview.postMessage(preview.message);
+}
+
+// A buffer that has never been saved has no file to watch.
+function untitled(document) {
+  return document.uri?.scheme === 'untitled';
+}
+
+// The first `include` in the source, and the file it names.
+const INCLUDE_STATEMENT = /^[ \t]*include[ \t]+"([^"]*)"/m;
+
+// `type pie { from: "sales.csv" }` — the archetype block that reads its
+// slices from a table. The value has to be a quoted file name: `from:` on an
+// edge names a side (`from: right`) and must not be mistaken for this.
+const EXTERNAL_DATA = /^[ \t]*type[ \t]+[A-Za-z_][A-Za-z0-9_-]*\s*\{[^}]*\bfrom[ \t]*:[ \t]*"[^"]*"/m;
+
+function compositionError(source, name, isUntitled) {
+  const include = INCLUDE_STATEMENT.exec(source);
+  const which = include ? `\`${include[1]}\`` : 'another file';
+  return `error: this diagram includes ${which}, and the preview renders the current buffer only.\n` +
+    (isUntitled ?
+      'Save it as a file, then run `bgraph watch <file>` to see the composed diagram.' :
+      `Save it, then run \`bgraph watch ${name}\` to see the composed diagram.`);
+}
+
+function externalDataNotice(source, name, isUntitled) {
+  if (!EXTERNAL_DATA.test(source)) return null;
+  return 'This diagram reads its data from another file, which the preview cannot open. ' +
+    'The picture shows only what this buffer declares. ' +
+    (isUntitled ?
+      'Save it as a file, then run `bgraph watch <file>` to see the data.' :
+      `Save it, then run \`bgraph watch ${name}\` to see the data.`);
 }
 
 function disposePreviews() {

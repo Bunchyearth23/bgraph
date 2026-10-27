@@ -12,6 +12,11 @@ authors = ["Bunchyearth23"]
 license = "LicenseRef-bgraph-noncommercial-source-0.1"
 
 publish = false
+# The working notes of the sessions that built this are not part of the
+# source: nothing in the crate reads `.agent/`, and a tarball that carries
+# 135 internal reports is a tarball that carries somebody's notes by
+# accident.
+exclude = [".agent/**"]
 
 [lib]
 name = "bgraph"

@@ -2770,6 +2770,47 @@ fn check_venn(diagram: &Diagram, out: &mut Vec<Diag>) {
             }
         }
     }
+    // The pair totals have to agree with each other. If a third set is in two
+    // of them, those two cannot be disjoint — and a key that says "0 in
+    // common" beside a picture that shows an overlap is a picture that lies.
+    let mut shared: HashMap<(&str, &str), f64> = HashMap::new();
+    for edge in &diagram.edges {
+        let props = edge.effective_props(def.edge_slots);
+        let Some(n) = props
+            .iter()
+            .find(|p| p.name == "shared")
+            .and_then(|p| p.values.first())
+            .and_then(|v| v.as_num())
+        else {
+            continue;
+        };
+        let (a, b) = (edge.from.as_str(), edge.to.as_str());
+        let key = if a <= b { (a, b) } else { (b, a) };
+        shared.insert(key, n.max(0.0));
+    }
+    for ((a, b), ab) in &shared {
+        for (c, c_size) in &sizes {
+            if *c == *a || *c == *b {
+                continue;
+            }
+            let ac = shared.get(&(*a, *c)).copied().unwrap_or(0.0);
+            let bc = shared.get(&(*b, *c)).copied().unwrap_or(0.0);
+            let least = ac + bc - *c_size;
+            if *ab < least {
+                out.push(Diag::error(
+                    where_,
+                    format!(
+                        "`{}` and `{}` share {}, but `{}` is in both — they must share at least {}",
+                        a,
+                        b,
+                        crate::charts::trim_number(*ab),
+                        c,
+                        crate::charts::trim_number(least)
+                    ),
+                ));
+            }
+        }
+    }
 }
 
 /// A topology draws boxes and lines like `free`, so what is worth reporting is

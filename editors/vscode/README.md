@@ -51,6 +51,11 @@ access and are rejected by this WASM renderer. Use `bgraph watch file.bd` for
 diagrams composed from several files. The LSP still resolves those files for
 diagnostics and navigation.
 
+When a diagram reads another file, the pane says so instead of leaving you to
+work it out: an `include` is refused with a message naming `bgraph watch`, and
+a pie that reads its slices from a CSV keeps its picture with a note beside it
+saying that the table was not read.
+
 Diagnostics, definitions, references and hover use the current text of open
 included files, including unsaved changes. Closing a child file returns to
 its saved version. Untitled bgraph buffers get language-server support too.

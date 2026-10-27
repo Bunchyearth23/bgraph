@@ -38,44 +38,107 @@ pub fn keep_glyphs_for(font: &[u8], text: &str) -> Vec<u8> {
     }
 }
 
-/// Unshaped horizontal advances from the embedded face, in drawing units.
-/// Missing tables or glyphs leave the caller's existing estimate in place.
-pub(crate) fn text_advance(font: &[u8], text: &str, size: f64) -> Option<f64> {
-    if !size.is_finite()
-        || size <= 0.0
-        || !matches!(be32(font, 0)?, 0x0001_0000 | 0x7472_7565 | 0x4f54_544f)
-    {
-        return None;
-    }
-    let table = |tag: &[u8; 4]| {
-        for i in 0..usize::from(be16(font, 4)?) {
-            let at = 12 + i * 16;
-            if font.get(at..at + 4)? == tag {
-                let start = be32(font, at + 8)? as usize;
-                let length = be32(font, at + 12)? as usize;
-                return font.get(start..start.checked_add(length)?);
-            }
-        }
-        None
-    };
-    let units = f64::from(be16(table(b"head")?, 18)?);
-    let metrics = usize::from(be16(table(b"hhea")?, 34)?);
-    let glyphs = usize::from(be16(table(b"maxp")?, 4)?);
-    if units == 0.0 || metrics == 0 || metrics > glyphs {
-        return None;
-    }
-    let advances = table(b"hmtx")?;
-    advances.get(..metrics * 4)?;
-    let cmap = table(b"cmap")?;
-    let mut width = 0.0;
-    for ch in text.chars() {
-        let glyph = usize::from(glyph_of(cmap, 0, ch)?);
-        if glyph == 0 || glyph >= glyphs {
+/// The face a diagram embeds, parsed once.
+///
+/// Its advances are the face's own, so a diagram that embeds its font can be
+/// measured in that font rather than in the estimate. This is the only way a
+/// measurement can be exact: an SVG names a family and the renderer decides
+/// what it resolves to (`D-026`), but an *embedded* face is the one the
+/// reader will certainly use.
+pub(crate) struct Face<'a> {
+    bytes: &'a [u8],
+    /// The units the outlines are drawn in.
+    units: f64,
+    /// How many advances `hmtx` holds; the glyphs past it share the last.
+    metrics: usize,
+    /// How many glyphs the face has.
+    glyphs: usize,
+    /// Where `hmtx` and `cmap` live.
+    hmtx: usize,
+    cmap: usize,
+}
+
+impl<'a> Face<'a> {
+    /// The face in `bytes`, if it is one this can measure.
+    pub(crate) fn parse(bytes: &'a [u8]) -> Option<Face<'a>> {
+        if !matches!(be32(bytes, 0)?, 0x0001_0000 | 0x7472_7565 | 0x4f54_544f) {
             return None;
         }
-        width += f64::from(be16(advances, glyph.min(metrics - 1) * 4)?);
+        let table = |tag: &[u8; 4]| -> Option<(usize, usize)> {
+            for i in 0..usize::from(be16(bytes, 4)?) {
+                let at = 12 + i * 16;
+                if bytes.get(at..at + 4)? == tag {
+                    let start = be32(bytes, at + 8)? as usize;
+                    let length = be32(bytes, at + 12)? as usize;
+                    return Some((start, length));
+                }
+            }
+            None
+        };
+        let (head, _) = table(b"head")?;
+        let (hhea, _) = table(b"hhea")?;
+        let (maxp, _) = table(b"maxp")?;
+        let (hmtx, _) = table(b"hmtx")?;
+        let (cmap, _) = table(b"cmap")?;
+        let units = f64::from(be16(bytes, head + 18)?);
+        let metrics = usize::from(be16(bytes, hhea + 34)?);
+        let glyphs = usize::from(be16(bytes, maxp + 4)?);
+        if units == 0.0 || metrics == 0 || metrics > glyphs {
+            return None;
+        }
+        bytes.get(hmtx..hmtx.checked_add(metrics * 4)?)?;
+        Some(Face {
+            bytes,
+            units,
+            metrics,
+            glyphs,
+            hmtx,
+            cmap,
+        })
     }
-    Some(width * size / units)
+
+    /// The advance of one character, in ems, if the face has a glyph for it.
+    fn advance_em(&self, ch: char) -> Option<f64> {
+        let glyph = usize::from(glyph_of(self.bytes, self.cmap, ch)?);
+        // Glyph 0 is `.notdef`: the face has nothing to say about the
+        // character, and its width is not what the reader will draw.
+        if glyph == 0 || glyph >= self.glyphs {
+            return None;
+        }
+        let at = self.hmtx + glyph.min(self.metrics - 1) * 4;
+        Some(f64::from(be16(self.bytes, at)?) / self.units)
+    }
+
+    /// The width of `text` drawn in this face.
+    ///
+    /// A character the face has no glyph for is measured with the project's
+    /// own estimate — the reader will draw it from whatever font it falls
+    /// back to, which nobody here can know, and that estimate is what the
+    /// caller would have used for the whole string anyway. One missing
+    /// character no longer throws away the measurement of all the others.
+    pub(crate) fn width(&self, text: &str, size: f64) -> f64 {
+        let mut width = 0.0;
+        let mut buf = [0u8; 4];
+        for ch in text.chars() {
+            width += match self.advance_em(ch) {
+                Some(em) => em * size,
+                None => crate::layout::advance(ch.encode_utf8(&mut buf), size),
+            };
+        }
+        width
+    }
+}
+
+/// Unshaped horizontal advances from the embedded face, in drawing units.
+///
+/// A face this cannot read leaves the caller's existing estimate in place;
+/// a character the face has no glyph for is measured with that estimate, and
+/// the rest of the string is measured with the face's own advances.
+pub(crate) fn text_advance(font: &[u8], text: &str, size: f64) -> Option<f64> {
+    if !size.is_finite() || size <= 0.0 {
+        return None;
+    }
+    Some(Face::parse(font)?.width(text, size))
 }
 
 /// A table's offset and length in the file.
@@ -374,4 +437,71 @@ fn be16(bytes: &[u8], at: usize) -> Option<u16> {
 
 fn be32(bytes: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_be_bytes(bytes.get(at..at + 4)?.try_into().ok()?))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Face, keep_glyphs_for, text_advance};
+
+    /// The project's own fixture face: a real TrueType font with a real
+    /// `head`, `hhea`, `maxp`, `hmtx` and `cmap`.
+    const DEJAVU: &[u8] = include_bytes!("../tests/fixtures/fonts/DejaVuSans.ttf");
+
+    #[test]
+    fn the_face_measures_with_its_own_advances() {
+        // DejaVu Sans is 11.2% wider than the Helvetica table the project
+        // estimates with: 'Auth gateway' at 14px is 97.15px in the face and
+        // 84.83px in the estimate. An embedded face is the one the reader
+        // will use, so this is the number that belongs in a plate.
+        let measured = text_advance(DEJAVU, "Auth gateway", 14.0).expect("measured");
+        assert!((measured - 97.15).abs() < 0.01, "measured {measured}");
+        let estimate = crate::layout::advance("Auth gateway", 14.0);
+        assert!((estimate - 84.83).abs() < 0.01, "estimated {estimate}");
+        assert!(measured > estimate, "the face is wider than the estimate");
+    }
+
+    #[test]
+    fn a_character_the_face_lacks_does_not_void_the_measurement_of_the_rest() {
+        // DejaVu Sans has no CJK ideograph. One missing character used to
+        // throw the whole measurement away, and the caller fell back to the
+        // estimate for every character in the string.
+        let width = text_advance(DEJAVU, "Deploy 日本", 12.0).expect("the face measures the rest");
+        // The Latin part is the face's own: 3.8193 em. The two ideographs are
+        // the estimate, because the face has no glyph for them.
+        let latin = text_advance(DEJAVU, "Deploy ", 12.0).expect("measured");
+        let fallback = crate::layout::advance("日本", 12.0);
+        assert!(
+            (width - (latin + fallback)).abs() < 1e-9,
+            "{width} against {}",
+            latin + fallback
+        );
+        assert!((width - 59.272).abs() < 0.01, "measured {width}");
+        // An ideograph is full-width in the reader's fallback font, so a
+        // measurement that is wider than the estimate for the whole string is
+        // the one closer to the truth.
+        let whole = crate::layout::advance("Deploy 日本", 12.0);
+        assert!(
+            width > whole,
+            "the face is wider than the estimate for the same string: {width} against {whole}"
+        );
+    }
+
+    #[test]
+    fn a_face_this_cannot_read_measures_nothing() {
+        assert!(text_advance(b"not a font at all", "abc", 12.0).is_none());
+        assert!(text_advance(DEJAVU, "abc", 0.0).is_none());
+        assert!(text_advance(DEJAVU, "abc", f64::NAN).is_none());
+        assert!(Face::parse(b"").is_none());
+    }
+
+    #[test]
+    fn a_subset_face_measures_the_same_as_the_face_it_came_from() {
+        // The subsetter empties outlines and keeps every id, so the metrics
+        // must survive it untouched — a subset that measured differently
+        // would make the embedded diagram a different size from the original.
+        let subset = keep_glyphs_for(DEJAVU, "Auth gateway");
+        let before = text_advance(DEJAVU, "Auth gateway", 14.0).expect("measured");
+        let after = text_advance(&subset, "Auth gateway", 14.0).expect("measured");
+        assert!((before - after).abs() < 1e-9, "{before} against {after}");
+    }
 }

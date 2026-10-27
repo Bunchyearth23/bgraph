@@ -14,7 +14,7 @@ function preview(saved) {
       setAttribute(name, value) { this.attributes[name] = value; },
     };
   }
-  const elements = Object.fromEntries(['viewport', 'diagram', 'error', 'scale'].map(id => [id, element()]));
+  const elements = Object.fromEntries(['viewport', 'diagram', 'error', 'notice', 'scale'].map(id => [id, element()]));
   const buttons = ['fit', 'actual-size', 'zoom-out', 'zoom-in'].map(action => {
     const button = element(); button.dataset.action = action; return button;
   });
@@ -36,6 +36,7 @@ function preview(saved) {
     get state() { return state; },
     render(width, height) { dimensions = { width, height }; window.fire('message', { data: { type: 'render', svg: '<svg/>' } }); },
     showError(text) { window.fire('message', { data: { type: 'render', error: text } }); },
+    showNotice(text) { window.fire('message', { data: { type: 'render', svg: '<svg/>', notice: text } }); },
     resize(width, height) { elements.viewport.clientWidth = width; elements.viewport.clientHeight = height; resize(); },
     click(action) { buttons.find(button => button.dataset.action === action).fire('click'); },
   };
@@ -108,4 +109,16 @@ test('errors are text, disable controls, and recover without changing the camera
   assert.ok(p.buttons.every(button => !button.disabled));
   p.render(0, 200);
   assert.equal(p.viewport.hidden, true);
+});
+
+test('a caveat about the picture is shown beside it, and cleared with it', () => {
+  const p = preview();
+  p.render(400, 200);
+  p.showNotice('this diagram reads another file');
+  assert.equal(p.notice.hidden, false);
+  assert.equal(p.notice.textContent, 'this diagram reads another file');
+  assert.equal(p.viewport.hidden, false, 'the picture stays: the caveat is not an error');
+  p.render(400, 200);
+  assert.equal(p.notice.hidden, true);
+  assert.equal(p.notice.textContent, '');
 });

@@ -19,10 +19,11 @@ function event() {
   };
 }
 
-function extension({ missingRenderer = false } = {}) {
+function extension({ missingRenderer = false, withClient = false } = {}) {
   const changed = event(), closed = event();
   const commands = new Map(), documents = new Map(), panels = [], timers = new Map();
   const notices = [];
+  const clients = [];
   let timerId = 0;
   const window = {
     showWarningMessage: text => notices.push(text),
@@ -63,6 +64,7 @@ function extension({ missingRenderer = false } = {}) {
       onDidChangeTextDocument: changed.subscribe,
       onDidCloseTextDocument: closed.subscribe,
       openTextDocument: async uri => documents.get(uri.toString()),
+      createFileSystemWatcher: () => ({ dispose() {} }),
     },
   };
   const module = { exports: {} };
@@ -70,7 +72,21 @@ function extension({ missingRenderer = false } = {}) {
     module, __dirname: path.dirname(entry),
     require(id) {
       if (id === 'vscode') return vscode;
-      if (id === 'vscode-languageclient/node') throw new Error('No language client');
+      if (id === 'vscode-languageclient/node') {
+        // The real module is not needed to know what the extension asks of it:
+        // the constructor's arguments are the whole contract.
+        if (!withClient) throw new Error('No language client');
+        return {
+          TransportKind: { stdio: 0 },
+          LanguageClient: class {
+            constructor(id, name, serverOptions, clientOptions) {
+              clients.push({ id, name, serverOptions, clientOptions });
+            }
+            start() { return Promise.resolve(); }
+            stop() { return Promise.resolve(); }
+          },
+        };
+      }
       if (id === 'fs' && missingRenderer) return {
         readFileSync() { throw new Error('No bundled renderer'); },
       };
@@ -87,11 +103,12 @@ function extension({ missingRenderer = false } = {}) {
   const context = { subscriptions: [] };
   module.exports.activate(context);
   return {
-    panels, timers, notices, changed, closed, window,
+    panels, timers, notices, clients, changed, closed, window,
     api: module.exports,
     document(uri, text, languageId = 'bgraph') {
       const document = {
-        uri: { toString: () => uri }, fileName: uri.split('/').pop(),
+        uri: { toString: () => uri, scheme: uri.slice(0, uri.indexOf(':')) },
+        fileName: uri.split('/').pop(),
         languageId, text, getText() { return this.text; },
       };
       documents.set(uri, document);
@@ -241,6 +258,76 @@ test('a newly ready or restored webview receives the most recent edit', async ()
   panel.ready();
   assert.match(panel.webview.messages.at(-1).svg, /Latest/);
   harness.dispose();
+});
+
+test('a diagram that reads other files says so, and names the command that works', async () => {
+  const harness = extension();
+
+  // `include` is refused by the renderer, and the refusal names a Rust
+  // function. The panel must say what the reader can actually do.
+  harness.document('file:///tmp/composed.bd', 'include "child.bd"\nnode a "Child"\n');
+  await harness.preview();
+  const refused = harness.panels[0].webview.messages.at(-1);
+  assert.match(refused.error, /^error:/);
+  assert.match(refused.error, /`child\.bd`/);
+  assert.match(refused.error, /bgraph watch composed\.bd/);
+  assert.doesNotMatch(refused.error, /render_file/);
+  assert.equal(refused.notice, undefined);
+
+  // A pie that reads a CSV is refused by nothing: the renderer ignores the
+  // file and draws what the buffer declares. The picture stays, with the
+  // caveat beside it.
+  harness.document('file:///tmp/sales.bd', 'type pie { from: "sales.csv" }\nslice a "A" 1\n');
+  await harness.preview();
+  const data = harness.panels[1].webview.messages.at(-1);
+  assert.match(data.svg, /<svg\b/);
+  assert.equal(data.error, undefined);
+  assert.match(data.notice, /bgraph watch sales\.bd/);
+
+  // A buffer that was never saved has no file to watch, so the command names
+  // a placeholder rather than a name that does not exist.
+  harness.document('untitled:Untitled-1', 'include "child.bd"\n');
+  await harness.preview();
+  const unsaved = harness.panels[2].webview.messages.at(-1);
+  assert.match(unsaved.error, /Save it as a file, then run `bgraph watch <file>`/);
+  assert.doesNotMatch(unsaved.error, /Untitled-1/);
+
+  harness.dispose();
+});
+
+test('the caveat is not raised for a diagram that reads no file', async () => {
+  const harness = extension();
+  // `from:` on an edge names a side, and a label may say anything.
+  harness.document('file:///tmp/plain.bd', 'node a "A"\nnode b "B"\na -> b { from: right }\n');
+  await harness.preview();
+  assert.equal(harness.panels[0].webview.messages.at(-1).notice, undefined);
+  assert.match(harness.panels[0].webview.messages.at(-1).svg, /<svg\b/);
+
+  harness.document('file:///tmp/prose.bd', 'node a "include child.bd"\n');
+  await harness.preview();
+  assert.equal(harness.panels[1].webview.messages.at(-1).notice, undefined);
+  harness.dispose();
+});
+
+test('the language client is given the untitled scheme, so an unsaved buffer is diagnosed too', () => {
+  const harness = extension({ withClient: true });
+  assert.equal(harness.clients.length, 1);
+  const selector = harness.clients[0].clientOptions.documentSelector;
+  assert.ok(selector.some(entry => entry.scheme === 'file' && entry.language === 'bgraph'));
+  assert.ok(selector.some(entry => entry.scheme === 'untitled' && entry.language === 'bgraph'),
+    'an untitled buffer must reach the server: it is a document like any other');
+  harness.dispose();
+});
+
+test('a build without the language client still previews and says what it lost', () => {
+  const harness = extension();
+  assert.equal(harness.clients.length, 0);
+  assert.match(harness.notices.at(-1), /no language client/);
+  harness.document('file:///tmp/still.bd', 'node a "Still"\n');
+  return harness.preview().then(() => {
+    assert.match(harness.panels[0].webview.messages.at(-1).svg, /Still/);
+    harness.dispose();
+  });
 });
 
 test('stylesheets use the language plugin without offering a diagram preview', async () => {

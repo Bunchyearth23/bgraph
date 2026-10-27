@@ -84,3 +84,95 @@ pub(crate) fn entities(diagram: &Diagram) -> anyhow::Result<Vec<Margins>> {
     }
     Ok(out)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::Value;
+
+    fn nums(values: &[f64]) -> Vec<Value> {
+        values.iter().map(|n| Value::Num(*n)).collect()
+    }
+
+    #[test]
+    fn the_shorthand_follows_the_css_side_order() {
+        for (values, expected) in [
+            (vec![5.0], [5.0, 5.0, 5.0, 5.0]),
+            (vec![5.0, 7.0], [5.0, 7.0, 5.0, 7.0]),
+            (vec![5.0, 7.0, 11.0], [5.0, 7.0, 11.0, 7.0]),
+            (vec![5.0, 7.0, 11.0, 13.0], [5.0, 7.0, 11.0, 13.0]),
+        ] {
+            let margin = Margins::parse(&nums(&values)).expect("a valid margin");
+            assert_eq!(
+                [margin.top, margin.right, margin.bottom, margin.left],
+                expected,
+                "{values:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_margin_that_is_not_finite_and_nonnegative_is_refused() {
+        for values in [
+            vec![],
+            nums(&[1.0, 2.0, 3.0, 4.0, 5.0]),
+            nums(&[-1.0]),
+            nums(&[f64::NAN]),
+            nums(&[f64::INFINITY]),
+            vec![Value::Str("auto".into())],
+        ] {
+            assert!(
+                Margins::parse(&values).is_none(),
+                "{values:?} must not parse as a margin"
+            );
+        }
+    }
+
+    #[test]
+    fn adjacent_margins_add_on_the_sides_that_face_each_other() {
+        let anchor = Margins {
+            top: 1.0,
+            right: 2.0,
+            bottom: 3.0,
+            left: 4.0,
+        };
+        let other = Margins {
+            top: 5.0,
+            right: 6.0,
+            bottom: 7.0,
+            left: 8.0,
+        };
+        assert_eq!(other.gap_to(anchor, RelDir::RightOf), 2.0 + 8.0);
+        assert_eq!(other.gap_to(anchor, RelDir::LeftOf), 4.0 + 6.0);
+        assert_eq!(other.gap_to(anchor, RelDir::Below), 3.0 + 5.0);
+        assert_eq!(other.gap_to(anchor, RelDir::Above), 1.0 + 7.0);
+    }
+
+    /// The contract says a managed genre must not *offer* `margin` either, and
+    /// the completion table and the validator read the same predicate — so a
+    /// genre that rejects the property and suggests it would be one change
+    /// away from a file that looks valid and is not.
+    ///
+    /// The rule is written out here rather than called, so that moving
+    /// `supported` off the contract fails this test instead of passing it.
+    #[test]
+    fn margin_is_offered_only_where_it_is_supported() {
+        for def in crate::props::ARCHETYPES {
+            let expected = def.layout.accepts_layout_block() || def.name == "sequence";
+            let offered = crate::props::item_table(def)
+                .iter()
+                .any(|prop| is_margin(prop.name));
+            assert_eq!(
+                offered, expected,
+                "`margin` completion disagrees with the contract for `{}`",
+                def.name
+            );
+            assert_eq!(
+                supported(def),
+                expected,
+                "`margin` support disagrees with the contract for `{}`",
+                def.name
+            );
+        }
+    }
+}

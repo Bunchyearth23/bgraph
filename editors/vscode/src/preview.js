@@ -23,6 +23,7 @@ button[aria-pressed="true"] { background: var(--vscode-toolbar-activeBackground,
 #diagram { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
 #diagram svg { display: block; width: 100%; height: 100%; max-width: none; user-select: none; }
 #error { margin: 0; padding: 16px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--vscode-errorForeground); }
+#notice { margin: 0; padding: 8px 12px; border-bottom: 1px solid var(--vscode-panel-border, #7775); color: var(--vscode-descriptionForeground); background: var(--vscode-textCodeBlock-background, #8881); white-space: pre-wrap; overflow-wrap: anywhere; }
 #hint { margin: 0; padding: 5px 8px; color: var(--vscode-descriptionForeground); font-size: .85em; }
 [hidden] { display: none !important; }
 </style></head><body>
@@ -34,6 +35,7 @@ button[aria-pressed="true"] { background: var(--vscode-toolbar-activeBackground,
 <button data-action="zoom-in" aria-label="Zoom in" title="Zoom in (+)">+</button>
 </div>
 <main id="viewport" tabindex="0" role="region" aria-label="Diagram preview" aria-describedby="hint"><div id="diagram"></div></main>
+<p id="notice" role="status" hidden></p>
 <pre id="error" role="alert" hidden></pre>
 <p id="hint">Drag or arrow keys to move · scroll to zoom · F to fit</p>
 <script nonce="${nonce}">(${previewMain.toString()})();</script>
@@ -46,6 +48,7 @@ function previewMain() {
   const viewport = document.getElementById('viewport');
   const diagram = document.getElementById('diagram');
   const error = document.getElementById('error');
+  const notice = document.getElementById('notice');
   const scale = document.getElementById('scale');
   const buttons = [...document.querySelectorAll('button[data-action]')];
   const saved = vscode.getState();
@@ -137,6 +140,10 @@ function previewMain() {
     stopDrag();
     error.hidden = !data.error;
     error.textContent = data.error || '';
+    // A caveat about the picture, kept beside it: the diagram is right about
+    // everything the buffer declares and silent about the file it cannot read.
+    notice.hidden = !data.notice;
+    notice.textContent = data.notice || '';
     viewport.hidden = Boolean(data.error);
     if (!data.error) {
       diagram.innerHTML = data.svg;
