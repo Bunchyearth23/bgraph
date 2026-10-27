@@ -27,8 +27,20 @@ purpose — an identifier is earned by being cited.
 
 **Recorded state: no work item is building, planned or blocked. `W-166` to
 `W-173` landed on 2026-10-27 — the user ruled that the recorded proof closes
-each one — joining `W-174`, landed the same day. No question is open; `X-005`
-is narrowed, `X-033` and `X-034` are mitigated.**
+each one — joining `W-174`, landed the same day. **`1.0.1` is released.**
+No question is open; `X-005` is narrowed, `X-033` and `X-034` are mitigated.**
+
+**`1.0.1` released on 2026-10-27.** The user authorized the release; tag
+`v1.0.1` on `18d7684`, run
+[`40541108984`](https://github.com/Bunchyearth23/bgraph/actions/runs/40541108984)
+green in 5m52s (test gate with zero skipped guards, then binaries,
+extensions and wasm). The
+[release](https://github.com/Bunchyearth23/bgraph/releases/tag/v1.0.1)
+carries the seven artefacts — three binaries, VS Code and Zed extensions,
+the Typst package and the playground — with `docs/release-notes/1.0.1.md` as
+its notes. One channel, per `D-035`: no registry was touched. `W-172`'s
+point 5 (rounded waypoint gaps) was never reproduced and rides no release;
+it still awaits the user's original source.
 
 **`W-166` to `W-173` landed on 2026-10-27.** Each had a proof on file: the
 nine parallel validation passes of 2026-10-27 re-ran the recorded evidence
@@ -36,8 +48,7 @@ nine parallel validation passes of 2026-10-27 re-ran the recorded evidence
 recorded Zed host) and the five defects they found were fixed in `4cec6cc`,
 with the trapped-label fix in `c33e7df`. What no proof could contain is
 carried in the landed rows rather than forgotten: `W-166`'s motivating
-screenshot is unrecoverable, `W-170`'s real-host evidence is a recording, and
-`W-172`'s release decision and point 5 remain the user's.
+screenshot is unrecoverable, and `W-170`'s real-host evidence is a recording.
 
 **Nine parallel validation passes on 2026-10-27.** One agent per work item
 re-ran the recorded evidence and classified what was left. Five defects were
@@ -317,7 +328,7 @@ not copies.
 | `W-169` | 2026-10-27 | Integrated bgraph preview in VS Code: `Ctrl+Shift+V` opens a WASM pane that updates while typing, dirty and untitled buffers included. The 2026-10-27 pass caught a silent wrong pie — `from:` was ignored on the in-memory path — now fixed in the extension and the playground with a notice and tests. 17 JS tests, both VSIX packages, the real VS Code host and the library suite pass; the untitled-buffer LSP path is test-proven. `include`/`from:` need `bgraph watch` — said in the UI, not just the docs. `.agent/analysis/w169-validation-20261027.md` | `4cec6cc` |
 | `W-170` | 2026-10-27 | Browser preview shortcut from Zed: the native `bgraph: Preview` task saves the file and runs `watch --open --port 0`; the keymap procedure names `zed: open keymap file` with per-platform paths. 18 watcher + 5 preview + 9 delivery-safety tests and both wasm builds. **Carried:** the real-host evidence is a 2026-10-20 recording, not replayable on a machine without Zed, and the optional keymap merge is the user's. `.agent/analysis/w170-validation-20261027.md` | `4cec6cc` |
 | `W-171` | 2026-10-27 | Readable Venn geometry and membership keys: pairwise distances drive three-circle placement when feasible, two-set areas stay exact, and the keys separate set totals from named pair totals. The 2026-10-27 pass found and fixed two defects — the set letter search now finds the exclusive crescent, and `check` refuses pair totals that cannot all be true (`D-059`). Venn tests, 40 exports and the gallery sweep clean; the regenerated picture was inspected. `.agent/analysis/w171-validation-20261027.md` | `8696d4c` |
-| `W-172` | 2026-10-27 | Prepare 1.0.1 from the twelve-point user report: seven corrections, reference coverage and JSON `canvas.layout_origin` implemented, the "new" label warning shown pre-existing and true, point 3 re-derived correct, release notes corrected. **Carried:** the release decision is the user's, and point 5 (rounded waypoint gaps) is unreproduced without the user's original source. `.agent/analysis/w172-validation-20261027.md` | `79d2d80` |
+| `W-172` | 2026-10-27 | Prepare 1.0.1 from the twelve-point user report: seven corrections, reference coverage and JSON `canvas.layout_origin` implemented, the "new" label warning shown pre-existing and true, point 3 re-derived correct, release notes corrected. **Released the same day** — tag `v1.0.1`, run `40541108984` green, seven artefacts on the GitHub Release, no registry touched (`D-035`). Point 5 (rounded waypoint gaps) was never reproduced and still awaits the user's original source. `.agent/analysis/w172-validation-20261027.md` | `79d2d80` |
 | `W-173` | 2026-10-27 | Descriptive legend blocks for every archetype: explicit `entry` descriptions with swatches and an optional title; automatic, absolute and relative placement measured on all 30 archetypes — 0 overlaps, WCAG AAA ink contrast, the six charts with their own key keep it. `tests/legends.rs` grew 9 → 16; installed exports and a real Zed host accepted legends. `.agent/analysis/w173-validation-20261027.md` | `4f45a50` |
 | `W-174` | 2026-10-27 | The README onboarding guard re-pinned to the rewritten README (`D-057`): it pins the commands the README shows and parses the README's own `bgraph` block, so the guard cannot drift from the file it guards. The `3567c31` rewrite had left `main` red — runs `39776360015` and `39781674796` failed on that one test. Shipped as `0e2222f`; run `40523148598` passed all sixteen jobs and `40523751927` was green after. The guard was proven to fail when a pinned command is removed. | `0e2222f` |
 | `W-160` | 2026-10-16 | Runtime gate and remote CI verified: 16 passing jobs, 714 tests, 22 fixtures/30 types/four contexts, five native runners and performance; PNG font fixes and aliases preserved. `.agent/analysis/w160-completion.md`; CI `38898281988`. | `8630085` |
