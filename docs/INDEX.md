@@ -28,17 +28,17 @@ purpose — an identifier is earned by being cited.
 **Recorded state: nine work items are building (`W-166` to `W-174`); none are
 planned or blocked. No question is open; `X-005` is open and `X-033` is mitigated.**
 
-**Remote CI is red on `main` (`W-174`), fixed locally but not yet delivered.**
-Runs `39776360015` (`3567c31`) and `39781674796` (`49ac2ed`, HEAD) both fail in
-`check`; `39764410364` (`b32c82f`) passed. One test fails —
+**Remote CI was red on `main` (`W-174`) and is green again.** Runs `39776360015`
+(`3567c31`) and `39781674796` (`49ac2ed`) both failed in `check`; `39764410364`
+(`b32c82f`) passed. One test failed —
 `tests::the_readme_onboarding_uses_supported_commands_and_examples`, reproduced
 locally: the `3567c31` README rewrite dropped the three strings it pinned
 (`bgraph init free`, `--theme light|dark|print`, `type pie`). The user chose to
 re-pin the guard to the rewritten README (`D-057`): the test now pins the
 commands the README actually shows and parses the README's own `bgraph` block
-instead of copied snippets. 715 library tests, the full suite, Clippy and
-formatting pass locally; the guard was proven to fail when a pinned command is
-removed. Commit, push and a green run remain.
+instead of copied snippets. The fix shipped as `0e2222f` on 2026-10-27 and run
+`40523148598` passed all sixteen jobs, including `check` and the five native
+runners. The guard was proven to fail when a pinned command is removed.
 
 The user authorized committing and pushing the complete current worktree on
 2026-10-22, including the audit/editor fixes and tool configuration changes.
@@ -193,7 +193,7 @@ have separate rows in **Work landed**; no identifier was renumbered.
 | `W-171` | building | Readable Venn geometry and membership keys | Pairwise distances drive three-circle placement when feasible; two-set areas stay exact. A/B/C and colored keys separate set totals from named pair totals, with wrapping and font-aware spacing. Six new regressions, 751 Rust tests, 40 exports and runtime parity passed; the English guide, generated reference and Venn gallery/golden are updated. User accepted the candidate for commit/push; installed on 2026-10-22, user runtime validation remains. `.agent/analysis/venn-validation-20261020.md`. |
 | `W-172` | building | Prepare 1.0.1 from the twelve-point user report | Seven corrections, reference coverage and JSON origin implemented; nine new tests, 760 Rust/six JS tests and runtime/build gates passed. Point 3 is a false positive; point 5 needs its original reproduction; point 12 reopens `X-005`. One new label warning in the unchanged architecture source needs review. No release or installation. `.agent/analysis/1.0.1-validation-20261021.md`. |
 | `W-173` | building | Descriptive legend blocks for every archetype | Explicit `entry` descriptions with class/inline swatches and an optional title; automatic placement below content or absolute placement, with relative anchors on declared layouts. Legacy keys retained. Nine integration tests cover all 30 genres; 813 Rust tests, minimal build and strict Clippy passed. Trail lexical matches were reviewed as unrelated (legend learning). Installed CLI, VS Code/VSCodium and Zed artifacts pass legend checks; running editor reload and user validation remain. `docs/reference.md#legends`, `tests/legends.rs`. |
-| `W-174` | building | Remote CI is red on `main` after the README rewrite | `3567c31` rewrote the README as a release landing page and dropped the three strings `tests::the_readme_onboarding_uses_supported_commands_and_examples` pinned; runs `39776360015` and `39781674796` fail, `39764410364` passed, and the failure reproduces locally. The user chose to re-pin the guard (`D-057`): the test now pins the commands the README shows and parses the README's own `bgraph` block. 715 library tests, the full suite, Clippy and formatting pass locally; the guard fails when a pinned command is removed. Commit, push and a green run remain. `src/tests.rs:10896`. |
+| `W-174` | building | Remote CI is red on `main` after the README rewrite | `3567c31` rewrote the README as a release landing page and dropped the three strings `tests::the_readme_onboarding_uses_supported_commands_and_examples` pinned; runs `39776360015` and `39781674796` failed, `39764410364` passed, and the failure reproduced locally. The user chose to re-pin the guard (`D-057`): the test now pins the commands the README shows and parses the README's own `bgraph` block. Shipped as `0e2222f` on 2026-10-27; run `40523148598` passed all sixteen jobs, `check` included. The guard fails when a pinned command is removed. The parent state awaits the user's word. `src/tests.rs:10896`. |
 
 ### Risks
 
