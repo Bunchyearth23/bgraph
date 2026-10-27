@@ -817,6 +817,68 @@ fn place_label(
         }
     }
 
+    // A label is never left over a node (`X-034`). The midpoint can sit on a
+    // short elbow jog pressed against a box — spread edges land one there —
+    // where every nearby candidate clips the box or crosses a frame, and the
+    // least-bad answer is still an overpainted label. The room is usually
+    // elsewhere on the same route, so before settling, walk the edge's other
+    // segments and take the cheapest candidate that clears every box. The
+    // search stays on the route itself: a label that cannot escape *there* is
+    // reported by the check, not teleported off its line.
+    if layout
+        .nodes
+        .iter()
+        .any(|node| overlap_fraction(&best.1, &node.rect) > 1e-9)
+    {
+        let mut escaped: Option<((bool, bool, f64), Rect)> = None;
+        for pair in routed[index].points.windows(2) {
+            let (a, b) = (pair[0], pair[1]);
+            let (sx, sy) = (b.0 - a.0, b.1 - a.1);
+            let slen = (sx * sx + sy * sy).sqrt();
+            if slen < 1e-6 {
+                continue;
+            }
+            let (spx, spy) = (-sy / slen, sx / slen);
+            let mid = ((a.0 + b.0) / 2.0, (a.1 + b.1) / 2.0);
+            for (along, k) in [0.0, 0.2, -0.2, 0.35, -0.35].into_iter().flat_map(|along| {
+                [0.0, 1.0, -1.0, 2.0, -2.0, 3.0, -3.0]
+                    .into_iter()
+                    .map(move |k| (along, k))
+            }) {
+                let cx = mid.0 + sx * along + spx * step * k;
+                let cy = mid.1 + sy * along + spy * step * k;
+                let rect = Rect {
+                    x: cx - w / 2.0,
+                    y: cy - h / 2.0,
+                    w,
+                    h,
+                };
+                if layout
+                    .nodes
+                    .iter()
+                    .any(|node| overlap_fraction(&rect, &node.rect) > 1e-9)
+                {
+                    continue;
+                }
+                let collision = label_cost(&rect, index, routed, layout, taken);
+                let distance = (crate::math::square(cx - anchor.0)
+                    + crate::math::square(cy - anchor.1))
+                .sqrt()
+                    / step
+                    * 0.4;
+                // A candidate on the wire itself reads as belonging to the
+                // edge; one beside a far segment does not, however near.
+                let cost = (collision > 1e-9, k != 0.0, collision + distance);
+                if escaped.is_none_or(|(prev, _)| cost < prev) {
+                    escaped = Some((cost, rect));
+                }
+            }
+        }
+        if let Some((_, rect)) = escaped {
+            return rect;
+        }
+    }
+
     best.1
 }
 

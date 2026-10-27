@@ -6307,6 +6307,57 @@ layout {
 }
 
 #[test]
+fn an_edge_label_trapped_on_an_elbow_walks_along_its_own_route() {
+    // `X-034`. Two links spread off `tor`'s right side (`D-033`), so the route
+    // to `proc01` elbows right against the server's box — and the midpoint of
+    // the middle *segment*, the avoider's anchor, is that short jog. Every
+    // candidate near it clips the box or crosses the frame, and keeping the
+    // least-bad one left the label overpainted. The room is on the long run
+    // of the same wire.
+    let source = r#"
+        type network
+        graph { padding: 30 gap: 70 }
+
+        style host  { font: 12 #e2e8f0 margin: 10 }
+        style edge  { font: 10 #94a3b8 head: none }
+
+        host tor "Top-of-rack" switch
+
+        group core "Core segment" {
+            host proc01 "rk1-app01" server
+            host proc02 "rk1-app02" server
+            host shelf  "Storage shelf" storage
+        }
+
+        tor -> proc01 "" "10 GbE"
+        tor -> proc02 "" "10 GbE"
+        tor -> shelf  "" "10 GbE" { from: bottom to: left }
+
+layout {
+  place tor at (0, 0)
+  place proc01 right-of tor gap 190
+  place proc02 below proc01 gap 40
+  place shelf below proc02 gap 40
+}"#;
+    let messages = after(source);
+    assert!(
+        !messages.iter().any(|m| m.contains("is drawn over")),
+        "the label found room on its own route: {messages:?}"
+    );
+
+    // And it escaped onto its own wire, not off to some free patch the reader
+    // cannot connect to the edge.
+    let l = build(source);
+    let route = &render_svg::route_all(&l)[0];
+    let (_, rect) = route.label.as_ref().expect("the edge is labelled");
+    let on_wire = route
+        .points
+        .windows(2)
+        .any(|pair| render_svg::segment_hits(pair[0], pair[1], rect));
+    assert!(on_wire, "the label left its own route: {rect:?}");
+}
+
+#[test]
 fn a_moved_node_label_takes_the_canvas_with_it() {
     let source = |extra: &str| {
         format!(

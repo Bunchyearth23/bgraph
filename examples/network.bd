@@ -37,10 +37,10 @@ layout {
 
 net -> fw  "uplink" "1 GbE"
 fw  -> tor "trunk"  "10 GbE"
-// The link to the first server has its label moved along the line: the
-// switch's margin leaves the three labels little room, and the one that
-// belongs to this line would otherwise sit on the server it names.
-tor -> proc01 "" "10 GbE" { label-offset: -40 0 }
+// Three links share the switch's right side, so the first one's line elbows
+// against the server and its label has no room beside the elbow; the engine
+// walks it back along the line itself (X-034).
+tor -> proc01 "" "10 GbE"
 tor -> proc02 "" "10 GbE"
 // Told which side to leave by (`D-033`). Three links off one switch share its
 // right-hand side; sending the longest one out of the bottom keeps its label

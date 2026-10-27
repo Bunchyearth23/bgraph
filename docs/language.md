@@ -961,9 +961,11 @@ diamonds and ellipses on their edge, not on an invisible bounding box.
 ### Moving a label
 
 An edge label lands on the middle of its line and slides sideways when that
-would put it on top of a node, another line or a label already placed. The
-solver is good, not clairvoyant — on a busy diagram it eventually runs out of
-room. `label-offset` is the escape hatch:
+would put it on top of a node, another line or a label already placed; when
+the middle is hemmed in by a box, it walks further along the line to a
+clearer stretch rather than sit overpainted. The solver is good, not
+clairvoyant — on a busy diagram it eventually runs out of room.
+`label-offset` is the escape hatch:
 
 ```bgraph
 node worker "Worker"
