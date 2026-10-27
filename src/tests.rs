@@ -10895,29 +10895,49 @@ fn the_embedding_api_boundary_is_documented_and_exercised() {
 #[test]
 fn the_readme_onboarding_uses_supported_commands_and_examples() {
     let readme = include_str!("../README.md");
+    // The commands the README tells a reader to type. They are pinned here
+    // because a quick start that names a command the CLI does not have is a
+    // quick start that fails in someone else's terminal.
     for command in [
-        "bgraph init free",
-        "bgraph architecture.bd -o architecture.svg",
-        "bgraph watch architecture.bd",
+        "cargo install --locked --path . --bins",
+        "bgraph --version",
         "bgraph check architecture.bd",
-        "--theme light|dark|print",
-        "type pie",
+        "bgraph architecture.bd -o architecture.svg",
+        "bgraph architecture.bd -o architecture.pdf",
+        "bgraph watch architecture.bd --open --port 0",
+        "bgraph init pie -o chart.bd",
     ] {
         assert!(
             readme.contains(command),
             "onboarding command `{command}` is missing"
         );
     }
-    for source in [
-        "node browser \"Browser\"",
-        "node api \"API\"",
-        "browser -> api",
-    ] {
-        assert!(
-            parse_diagram(source).is_ok(),
-            "README example no longer parses: {source}"
-        );
+    // The README's own diagram, parsed from the file rather than copied out
+    // of it: a quick start that no longer compiles is the failure this
+    // guard exists for, and copying the example would let the two drift.
+    let blocks = fenced_bgraph_blocks(readme);
+    assert!(
+        !blocks.is_empty(),
+        "the README shows no `bgraph` example, so nothing teaches the language"
+    );
+    for source in &blocks {
+        parse_diagram(source)
+            .unwrap_or_else(|e| panic!("README example no longer parses: {e}\n---\n{source}\n---"));
     }
+}
+
+/// Every ` ```bgraph ` block in a document, in order.
+fn fenced_bgraph_blocks(document: &str) -> Vec<String> {
+    const FENCE: &str = "```bgraph\n";
+    let mut blocks = Vec::new();
+    let mut rest = document;
+    while let Some(start) = rest.find(FENCE) {
+        let after = &rest[start + FENCE.len()..];
+        let end = after.find("```").expect("a fenced example block is closed");
+        blocks.push(after[..end].to_string());
+        rest = &after[end + "```".len()..];
+    }
+    blocks
 }
 
 #[test]

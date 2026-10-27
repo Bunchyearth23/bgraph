@@ -25,13 +25,25 @@ purpose — an identifier is earned by being cited.
 
 ## Open — the answer to "what is left"
 
-**Recorded state: eight work items are building (`W-166` to `W-173`);
-none are planned or blocked. No question is open; `X-005` is open and `X-033` is mitigated.**
+**Recorded state: nine work items are building (`W-166` to `W-174`); none are
+planned or blocked. No question is open; `X-005` is open and `X-033` is mitigated.**
+
+**Remote CI is red on `main` (`W-174`), fixed locally but not yet delivered.**
+Runs `39776360015` (`3567c31`) and `39781674796` (`49ac2ed`, HEAD) both fail in
+`check`; `39764410364` (`b32c82f`) passed. One test fails —
+`tests::the_readme_onboarding_uses_supported_commands_and_examples`, reproduced
+locally: the `3567c31` README rewrite dropped the three strings it pinned
+(`bgraph init free`, `--theme light|dark|print`, `type pie`). The user chose to
+re-pin the guard to the rewritten README (`D-057`): the test now pins the
+commands the README actually shows and parses the README's own `bgraph` block
+instead of copied snippets. 715 library tests, the full suite, Clippy and
+formatting pass locally; the guard was proven to fail when a pinned command is
+removed. Commit, push and a green run remain.
 
 The user authorized committing and pushing the complete current worktree on
 2026-10-22, including the audit/editor fixes and tool configuration changes.
 Delivery is recorded by Git; this does not close the parent work items,
-install artifacts or publish a release. Remote CI is the next delivery check.
+install artifacts or publish a release.
 
 Local installation on 2026-10-22 (`W-173`): bgraph/bgraph-lsp 1.0.1 rebuilt
 with legends and PNG support in `~/.cargo/bin`; fresh extension packages
@@ -181,6 +193,7 @@ have separate rows in **Work landed**; no identifier was renumbered.
 | `W-171` | building | Readable Venn geometry and membership keys | Pairwise distances drive three-circle placement when feasible; two-set areas stay exact. A/B/C and colored keys separate set totals from named pair totals, with wrapping and font-aware spacing. Six new regressions, 751 Rust tests, 40 exports and runtime parity passed; the English guide, generated reference and Venn gallery/golden are updated. User accepted the candidate for commit/push; installed on 2026-10-22, user runtime validation remains. `.agent/analysis/venn-validation-20261020.md`. |
 | `W-172` | building | Prepare 1.0.1 from the twelve-point user report | Seven corrections, reference coverage and JSON origin implemented; nine new tests, 760 Rust/six JS tests and runtime/build gates passed. Point 3 is a false positive; point 5 needs its original reproduction; point 12 reopens `X-005`. One new label warning in the unchanged architecture source needs review. No release or installation. `.agent/analysis/1.0.1-validation-20261021.md`. |
 | `W-173` | building | Descriptive legend blocks for every archetype | Explicit `entry` descriptions with class/inline swatches and an optional title; automatic placement below content or absolute placement, with relative anchors on declared layouts. Legacy keys retained. Nine integration tests cover all 30 genres; 813 Rust tests, minimal build and strict Clippy passed. Trail lexical matches were reviewed as unrelated (legend learning). Installed CLI, VS Code/VSCodium and Zed artifacts pass legend checks; running editor reload and user validation remain. `docs/reference.md#legends`, `tests/legends.rs`. |
+| `W-174` | building | Remote CI is red on `main` after the README rewrite | `3567c31` rewrote the README as a release landing page and dropped the three strings `tests::the_readme_onboarding_uses_supported_commands_and_examples` pinned; runs `39776360015` and `39781674796` fail, `39764410364` passed, and the failure reproduces locally. The user chose to re-pin the guard (`D-057`): the test now pins the commands the README shows and parses the README's own `bgraph` block. 715 library tests, the full suite, Clippy and formatting pass locally; the guard fails when a pinned command is removed. Commit, push and a green run remain. `src/tests.rs:10896`. |
 
 ### Risks
 
@@ -218,6 +231,7 @@ Open and residual risks; rows name related work and outstanding evidence.
 ### Decisions
 | id | state | date | title | was |
 |---|---|---|---|---|
+| `D-057` | active | 2026-10-27 | **The README is the release landing page, and the onboarding guard follows it.** The `3567c31` rewrite is deliberate, so `the_readme_onboarding_uses_supported_commands_and_examples` is re-pinned to the commands the README actually shows (`cargo install --locked --path . --bins`, `bgraph --version`, the check/export/preview trio, `bgraph init pie -o chart.bd`) and parses the README's own `bgraph` block instead of copied snippets, so the guard cannot drift from the file it guards. `D-055` still governs the guides, which keep the beginner route. | the guard pinned `bgraph init free`, `--theme light|dark|print` and `type pie`, all three removed by the rewrite |
 | `D-056` | active | 2026-10-22 | **Use the author's Non-Commercial Source License, version 0.1, in preparation for public source availability.** Preserve the supplied terms in English in `LICENSE`, naming Bunchyearth23, as explicitly requested by the user. Study, noncommercial compilation/execution and private/internal noncommercial modifications are permitted; redistribution and commercial use require written authorization, with the stated platform-fork exception. `CONTRIBUTOR_AGREEMENT.md` supplies the separate contribution terms, subject to explicit acceptance and legal review. Use `LicenseRef-bgraph-noncommercial-source-0.1`, not PolyForm or an invented standard SPDX identifier. Registry publication remains disabled; changing repository visibility or publishing artifacts requires its own action. | explicit user-supplied licence; replaces proposed PolyForm and historical `D-038`/`D-041` restrictions |
 | `D-055` | active | 2026-10-20 | **All project user documentation is English and starts from a complete beginner workflow.** Installation routes, terminology, copyable examples, expected results, previews, exports and troubleshooting precede the full reference. Existing guide URLs are retained; generated gallery text and documentation launcher help follow the same language. | explicit user request |
 | `D-052` | active | 2026-10-16 | **`margin` reserves outer space around a box or frame**, using CSS top/right/bottom/left order and one-to-four-value forms. Margins add to gaps and container bounds without moving a required `at` or changing explicit alignment. Per-side cascade; finite nonnegative values, no `auto` or CSS collapsing. Explicit support for declared geometry and sequences. | user request, `W-166` |
