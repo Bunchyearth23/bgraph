@@ -14,7 +14,7 @@
 type er { title: "Ordering schema" }
 graph { background: #0b1120 padding: 32 gap: 56 }
 
-style entity { fill: #1e293b stroke: #38bdf8 1.4 font: 13 #e2e8f0 radius: 6 padding: 14 }
+style entity { fill: #1e293b stroke: #38bdf8 1.4 font: 13 #e2e8f0 radius: 6 padding: 14 margin: 10 }
 style edge   { stroke: #64748b 1.4 font: 11 #94a3b8 head: none }
 
 entity customer "Customer" {

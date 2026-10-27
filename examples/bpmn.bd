@@ -26,7 +26,7 @@
 type bpmn { title: "Expense claim" }
 graph { background: #ffffff padding: 36 gap: 40 }
 
-style node  { font: 13 #111827 stroke: #334155 1.2 fill: #ffffff }
+style node  { font: 13 #111827 stroke: #334155 1.2 fill: #ffffff margin: 10 }
 style edge  { stroke: #475569 1.3 font: 11 #475569 }
 style store { fill: #f1f5f9 }
 

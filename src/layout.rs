@@ -2574,7 +2574,22 @@ mod frame_solver_tests {
                 .find(|(genre, _)| *genre == name)
                 .unwrap()
                 .1;
-            let diagram = crate::parser::parse(source).unwrap();
+            let mut diagram = crate::parser::parse(source).unwrap();
+            // The two engines do not speak the same margin language. The
+            // transitional path predates `D-052`: it inflates a frame around a
+            // node, while the solver adds a margin to the *gap* between two
+            // boxes. So the cross-check runs on the language both speak — and
+            // the margin rule is proven by its own tests, not by asking two
+            // engines that disagree to agree.
+            for style in &mut diagram.styles {
+                style.props.retain(|p| !crate::spacing::is_margin(&p.name));
+            }
+            for node in &mut diagram.nodes {
+                node.props.retain(|p| !crate::spacing::is_margin(&p.name));
+            }
+            for group in &mut diagram.groups {
+                group.props.retain(|p| !crate::spacing::is_margin(&p.name));
+            }
             let actual = solve(&diagram).unwrap();
             let plan = PlacementPlan::new(&diagram);
             let sizes: Vec<_> = actual

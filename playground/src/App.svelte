@@ -28,6 +28,7 @@ api -> db  "reads"
   let text = $state(FALLBACK)
   let svg = $state('')
   let error = $state('')
+  let notice = $state('')
   let diagnostics = $state([])
   let dark = $state(false)
   let editor = $state(null)
@@ -79,13 +80,39 @@ api -> db  "reads"
     // One channel, so there is no second call to forget: an error announces
     // itself in the text rather than in a status nobody checks.
     if (answer.startsWith('error:')) {
-      error = answer
+      error = readable(answer, text)
       svg = ''
+      notice = ''
     } else {
       error = ''
       svg = answer
+      notice = caveat(text)
     }
     diagnostics = wasm.check(text)
+  }
+
+  // The playground renders in memory, so a diagram that reads another file is
+  // drawn from what the document declares alone. That picture is right about
+  // everything it has and silent about the file it cannot open — so the
+  // caveat is shown beside it, rather than the picture being hidden.
+  //
+  // `include` is a different case: the renderer refuses it outright, and its
+  // message names a Rust function. The wording here names the command.
+  const INCLUDE = /^[ \t]*include[ \t]+"([^"]*)"/m
+  const EXTERNAL_DATA = /^[ \t]*type[ \t]+[A-Za-z_][A-Za-z0-9_-]*\s*\{[^}]*\bfrom[ \t]*:[ \t]*"[^"]*"/m
+
+  function caveat(text) {
+    if (!EXTERNAL_DATA.test(text)) return ''
+    return 'This diagram reads its data from another file, which the playground cannot open. ' +
+      'The picture shows only what this document declares — use the `bgraph` command line to see the data.'
+  }
+
+  function readable(error, text) {
+    if (!/needs a file to resolve it against/.test(error)) return error
+    const include = INCLUDE.exec(text)
+    const which = include ? `\`${include[1]}\`` : 'another file'
+    return `error: this diagram includes ${which}, and the playground renders the document in memory only.\n` +
+      'Save it as a file, then run `bgraph watch <file>` to see the composed diagram.'
   }
 
   async function initialize() {
@@ -199,7 +226,7 @@ api -> db  "reads"
   <Editor bind:this={editor} bind:text {diagnostics} {dark} />
 
   {#if status === 'ready'}
-    <Viewer {svg} {error} />
+    <Viewer {svg} {error} {notice} />
   {:else}
     <aside class="pending">
       {#if status === 'broken'}

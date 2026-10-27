@@ -36,6 +36,12 @@ four warnings. `bgraph_render` answers with the SVG or a string beginning
 `error:`, one channel so there is no second call to forget; `bgraph_check`
 answers with every diagnostic, positions and all.
 
+**A diagram that reads another file is drawn from what the page has.** The
+module renders in memory, so `include` is refused — with a message naming
+`bgraph watch` rather than a Rust function — and a chart that reads its data
+from a table keeps its picture with a note beside it saying the table was not
+read. Hiding the picture would be a worse lie than the caveat.
+
 There used to be a `--inline` build that folded the module into a single
 1.5 MB HTML file, openable by double-clicking. It went when this became an
 application (`W-135`): `pnpm dev` is one command and gives a real editor.

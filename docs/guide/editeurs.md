@@ -17,7 +17,7 @@ installed separately.
 | When it updates | While you type, including unsaved text | When files are saved |
 | Shortcut | `Ctrl+Shift+V`; `Cmd+Shift+V` on macOS | `Ctrl+Shift+V` after adding the keymap entry |
 | CLI required for preview | No; the renderer is bundled | Yes; an updated `bgraph` on `PATH` |
-| `include` and external `from:` files | Use the browser watcher instead | Supported through the watcher, using saved files |
+| `include` and external `from:` files | The pane says so; use the browser watcher instead | Supported through the watcher, using saved files |
 
 ## VS Code
 
@@ -73,7 +73,10 @@ natural size. The editor title bar also has an **Open Preview** icon.
 
 The pane needs neither `bgraph` nor `bgraph-lsp` installed. It renders the
 current text only, so it cannot read `include` files or external `from:`
-data. For those, use:
+data. When such a diagram is open, the pane says so: an `include` is refused
+with a message naming `bgraph watch`, and a pie that reads its slices from a
+table keeps its picture with a note beside it saying that the table was not
+read. For those, use:
 
 ```sh
 bgraph watch architecture.bd --open --port 0
@@ -154,8 +157,12 @@ update the drawing. Included files use their saved versions on disk.
 
 ### 3. Add the preview shortcut
 
-Run **zed: open keymap**. Add the following object to the existing top-level
-array; preserve your other entries and separate objects with commas:
+Run **zed: open keymap file** — the action named *zed: open keymap* opens the
+keymap editor, not the JSON file (`~/.config/zed/keymap.json` on macOS and
+Linux, `~\AppData\Roaming\Zed\keymap.json` on Windows). If the file does not
+exist yet, create it with the array below. Add the following object to the
+existing top-level array; preserve your other entries and separate objects
+with commas:
 
 ```json
 {

@@ -15,7 +15,7 @@
 type harness { title: "Sensor loom — J1 to J2" }
 graph { background: #0b1120 padding: 32 gap: 160 }
 
-style connector { fill: #1e293b stroke: #38bdf8 1.4 font: 12 #e2e8f0 radius: 5 padding: 12 }
+style connector { fill: #1e293b stroke: #38bdf8 1.4 font: 12 #e2e8f0 radius: 5 padding: 12 margin: 10 }
 style edge      { stroke: #64748b 1.3 font: 10 #94a3b8 head: none }
 style power     { stroke: #f43f5e 1.6 font: 10 #fda4af head: none }
 style ground    { stroke: #64748b 1.6 font: 10 #94a3b8 head: none dash: dashed }

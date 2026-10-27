@@ -9,6 +9,7 @@
 
 type block { title: "Internet banking — containers" }
 graph { background: #f8fafc padding: 36 gap: 72 }
+style block { margin: 10 }
 
 block customer "Personal Banking Customer" person {
   description: "A customer of the bank, with personal accounts."

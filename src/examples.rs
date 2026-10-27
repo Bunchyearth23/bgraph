@@ -57,7 +57,7 @@ const GROUPS: &str = r##"// A group is a frame sized by what it holds. Give it a
 
 graph { background: #0f172a padding: 32 gap: 44 }
 
-style node  { fill: #1e293b stroke: #334155 1.5 font: 13 #e2e8f0 radius: 8 }
+style node  { fill: #1e293b stroke: #334155 1.5 font: 13 #e2e8f0 radius: 8 margin: 10 }
 style group { stroke: #38bdf8 1.2 font: 12 #38bdf8 fill: #38bdf80c radius: 12 }
 style edge  { stroke: #64748b 1.5 font: 11 #94a3b8 }
 style store extends node { shape: cylinder stroke: #10b981 1.5 }
@@ -311,9 +311,9 @@ const SEQUENCE: &str = r##"type sequence {
   numbered: on
 }
 graph { background: #0b1120 padding: 30 }
-style participant { fill: #1e293b stroke: #334155 1.5 font: 13 #e2e8f0 radius: 8 }
+style participant { fill: #1e293b stroke: #334155 1.5 font: 13 #e2e8f0 radius: 8 margin-bottom: 12 }
 style edge  { stroke: #7dd3fc 1.5 font: 11 #cbd5e1 }
-style group { stroke: #f59e0b 1.2 font: 11 #f59e0b fill: #f59e0b10 }
+style group { stroke: #f59e0b 1.2 font: 11 #f59e0b fill: #f59e0b10 margin: 16 8 }
 
 participant browser "Browser"
 participant api     "API"
@@ -385,6 +385,7 @@ event e24 "Edition 2024"    2025-02-20
 
 const BLOCK: &str = r##"type block { title: "Internet banking — containers" }
 graph { background: #f8fafc padding: 36 gap: 72 }
+style block { margin: 10 }
 
 block customer "Personal Banking Customer" person {
   description: "A customer of the bank, with personal accounts."
@@ -435,7 +436,7 @@ api -> mainframe "Makes API calls to" { tech: "XML/HTTPS" }
 const ER: &str = r##"type er { title: "Ordering schema" }
 graph { background: #0b1120 padding: 32 gap: 56 }
 
-style entity { fill: #1e293b stroke: #38bdf8 1.4 font: 13 #e2e8f0 radius: 6 padding: 14 }
+style entity { fill: #1e293b stroke: #38bdf8 1.4 font: 13 #e2e8f0 radius: 6 padding: 14 margin: 10 }
 style edge   { stroke: #64748b 1.4 font: 11 #94a3b8 head: none }
 
 entity customer "Customer" {
@@ -480,7 +481,7 @@ const REQUIREMENTS: &str = r##"// `requirements` is a class box with a relation 
 type requirements { title: "Braking system" }
 graph { background: #0b1120 padding: 32 gap: 64 }
 
-style requirement { fill: #1e293b stroke: #38bdf8 1.4 font: 13 #e2e8f0 radius: 6 padding: 14 }
+style requirement { fill: #1e293b stroke: #38bdf8 1.4 font: 13 #e2e8f0 radius: 6 padding: 14 margin: 10 }
 style edge        { stroke: #64748b 1.4 font: 11 #94a3b8 head: open dash: dashed }
 
 requirement stop "Stopping distance" {
@@ -528,7 +529,7 @@ adas  -> pedal trace
 const CLASS: &str = r##"type class { title: "Ordering domain" }
 graph { background: #0b1120 padding: 32 gap: 56 }
 
-style class { fill: #1e293b stroke: #38bdf8 1.4 font: 13 #e2e8f0 radius: 6 padding: 14 }
+style class { fill: #1e293b stroke: #38bdf8 1.4 font: 13 #e2e8f0 radius: 6 padding: 14 margin: 10 }
 style edge  { stroke: #64748b 1.4 font: 11 #94a3b8 }
 
 class user "User" {
@@ -705,7 +706,7 @@ const NETWORK: &str = r##"// Topology: hosts, links and the segments that hold t
 type network { title: "One site — edge to core" }
 graph { background: #0b1120 padding: 30 gap: 70 }
 
-style host  { fill: #1e293b stroke: #334155 1.2 font: 12 #e2e8f0 radius: 5 }
+style host  { fill: #1e293b stroke: #334155 1.2 font: 12 #e2e8f0 radius: 5 margin: 10 }
 style edge  { stroke: #64748b 1.3 font: 10 #94a3b8 head: none }
 style group { stroke: #334155 1 fill: #0f172a80 radius: 8 dash: dashed font: 11 #94a3b8 }
 
@@ -730,7 +731,10 @@ layout {
 
 net -> fw  "uplink" "1 GbE"
 fw  -> tor "trunk"  "10 GbE"
-tor -> proc01 "" "10 GbE"
+// The link to the first server has its label moved along the line: the
+// switch's margin leaves the three labels little room, and the one that
+// belongs to this line would otherwise sit on the server it names.
+tor -> proc01 "" "10 GbE" { label-offset: -40 0 }
 tor -> proc02 "" "10 GbE"
 // Told which side to leave by (`D-033`). Three links off one switch share its
 // right-hand side; sending the longest one out of the bottom keeps its label
@@ -771,7 +775,7 @@ const HARNESS: &str = r##"// A connector's pins are its member lines; a wire is 
 type harness { title: "Sensor loom — J1 to J2" }
 graph { background: #0b1120 padding: 32 gap: 160 }
 
-style connector { fill: #1e293b stroke: #38bdf8 1.4 font: 12 #e2e8f0 radius: 5 padding: 12 }
+style connector { fill: #1e293b stroke: #38bdf8 1.4 font: 12 #e2e8f0 radius: 5 padding: 12 margin: 10 }
 style edge      { stroke: #64748b 1.3 font: 10 #94a3b8 head: none }
 style power     { stroke: #f43f5e 1.6 font: 10 #fda4af head: none }
 style ground    { stroke: #64748b 1.6 font: 10 #94a3b8 head: none dash: dashed }
@@ -921,7 +925,7 @@ const STATE: &str = r##"// The gaps are wide where the transition carries a long
 type state { title: "Order lifecycle" }
 graph { background: #0b1120 padding: 32 gap: 54 }
 
-style state { fill: #1e293b stroke: #38bdf8 1.5 font: 13 #e2e8f0 padding: 16 }
+style state { fill: #1e293b stroke: #38bdf8 1.5 font: 13 #e2e8f0 padding: 16 margin: 10 }
 style edge  { stroke: #64748b 1.5 font: 11 #94a3b8 }
 style group { stroke: #f59e0b 1.2 font: 11 #f59e0b fill: #f59e0b0c }
 
@@ -971,7 +975,7 @@ const BPMN: &str = r##"// A business process. Four words, because four things ha
 type bpmn { title: "Expense claim" }
 graph { background: #ffffff padding: 36 gap: 40 }
 
-style node  { font: 13 #111827 stroke: #334155 1.2 fill: #ffffff }
+style node  { font: 13 #111827 stroke: #334155 1.2 fill: #ffffff margin: 10 }
 style edge  { stroke: #475569 1.3 font: 11 #475569 }
 style store { fill: #f1f5f9 }
 

@@ -1,6 +1,6 @@
 <script>
   import { tick } from 'svelte'
-  let { svg = '', error = '' } = $props()
+  let { svg = '', error = '', notice = '' } = $props()
 
   let zoom = $state(1)
   let pan = $state({ x: 0, y: 0 })
@@ -72,6 +72,12 @@
   {#if error}
     <pre class="error">{error}</pre>
   {:else}
+    <!-- A caveat about the picture, kept beside it: the diagram is right
+         about everything the document declares and silent about the file it
+         cannot read. -->
+    {#if notice}
+      <p class="notice" role="status">{notice}</p>
+    {/if}
     <!-- The application role is scoped to this keyboard-operated diagram. -->
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
     <div
@@ -161,5 +167,20 @@
     color: var(--bad);
     font: 13px/1.6 ui-monospace, monospace;
     white-space: pre-wrap;
+  }
+
+  .notice {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    right: 170px;
+    z-index: 2;
+    margin: 0;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--muted);
+    font: 12px/1.5 system-ui, sans-serif;
   }
 </style>

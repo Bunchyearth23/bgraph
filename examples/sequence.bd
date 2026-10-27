@@ -12,9 +12,9 @@ type sequence {
   numbered: on
 }
 graph { background: #0b1120 padding: 30 }
-style participant { fill: #1e293b stroke: #334155 1.5 font: 13 #e2e8f0 radius: 8 }
+style participant { fill: #1e293b stroke: #334155 1.5 font: 13 #e2e8f0 radius: 8 margin-bottom: 12 }
 style edge  { stroke: #7dd3fc 1.5 font: 11 #cbd5e1 }
-style group { stroke: #f59e0b 1.2 font: 11 #f59e0b fill: #f59e0b10 }
+style group { stroke: #f59e0b 1.2 font: 11 #f59e0b fill: #f59e0b10 margin: 16 8 }
 
 participant browser "Browser"
 participant api     "API"
