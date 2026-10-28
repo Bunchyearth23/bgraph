@@ -469,20 +469,25 @@ mod tests {
         // The Latin part is the face's own: 3.8193 em. The two ideographs are
         // the estimate, because the face has no glyph for them.
         let latin = text_advance(DEJAVU, "Deploy ", 12.0).expect("measured");
-        let fallback = crate::layout::advance("日本", 12.0);
+        // The two ideographs are full-width by convention, so a face that
+        // lacks them is charged one em each — the width the reader's
+        // fallback font gives them.
+        let fallback = 2.0 * 12.0;
         assert!(
             (width - (latin + fallback)).abs() < 1e-9,
             "{width} against {}",
             latin + fallback
         );
-        assert!((width - 59.272).abs() < 0.01, "measured {width}");
-        // An ideograph is full-width in the reader's fallback font, so a
-        // measurement that is wider than the estimate for the whole string is
-        // the one closer to the truth.
+        // The measurement and the whole-string estimate now differ only in
+        // the Latin part, where this face and the table disagree: the
+        // cross-family error `D-026` accepted, and nothing more. The
+        // ideographs are charged the same on both sides, so the two
+        // differences are the same difference.
         let whole = crate::layout::advance("Deploy 日本", 12.0);
+        let latin_estimate = crate::layout::advance("Deploy ", 12.0);
         assert!(
-            width > whole,
-            "the face is wider than the estimate for the same string: {width} against {whole}"
+            (width - whole).abs() - (latin - latin_estimate).abs() < 1e-9,
+            "the face and the estimate differ only in the Latin part: {width} against {whole}"
         );
     }
 

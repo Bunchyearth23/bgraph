@@ -253,12 +253,54 @@ pub fn advance(text: &str, font_size: f64) -> f64 {
         .chars()
         .map(|c| match c as u32 {
             code @ 0x20..=0x7e => ADVANCE[(code - 0x20) as usize] as f64 / 1000.0,
-            // Anything outside printable ASCII keeps the old flat guess: a
-            // table for one typeface has nothing to say about CJK or emoji.
-            _ => 0.56,
+            // Anything outside printable ASCII is charged what a convention
+            // fixes, and the flat guess for the rest.
+            _ => wide_advance(c),
         })
         .sum();
     em * font_size
+}
+
+/// What a character outside printable ASCII is charged.
+///
+/// The flat guess of 0.56 was less than half of what a full-width character
+/// costs: at 32px, `日本語のラベル` was given 125.44px and the reader drew it
+/// in 224px — 70.56px past the box it was in.
+///
+/// What replaces it is not a better guess at a font: it is the width a
+/// convention fixes. An ideograph occupies one em square by the design of
+/// the script, in every face that has one, and the em dash is one em wide
+/// because that is what the name says. A face the reader does not have is
+/// not a reason to measure a character differently, and the cross-family
+/// error `D-026` accepted is untouched by this.
+///
+/// What keeps the flat guess is everything no convention fixes. An emoji is
+/// not one em: a joined sequence is one glyph whatever the characters in it
+/// are, and the colour-emoji faces advance their own way. A bullet is a
+/// third of an em in Helvetica. A factor for these would be a fudge wearing
+/// the clothes of a measurement.
+fn wide_advance(ch: char) -> f64 {
+    match ch as u32 {
+        // Full-width forms: ideographs, kana, Hangul, full-width punctuation.
+        0x1100..=0x115f
+        | 0x2e80..=0x303e
+        | 0x3041..=0x33ff
+        | 0x3400..=0x4dbf
+        | 0x4e00..=0x9fff
+        | 0xa000..=0xa4cf
+        | 0xac00..=0xd7a3
+        | 0xf900..=0xfaff
+        | 0xfe10..=0xfe19
+        | 0xfe30..=0xfe6f
+        | 0xff00..=0xff60
+        | 0xffe0..=0xffe6
+        | 0x20000..=0x3fffd => 1.0,
+        // The em dash and the horizontal bar are one em wide in Helvetica, in
+        // Noto Sans and in DejaVu Sans alike.
+        0x2014 | 0x2015 => 1.0,
+        // Everything else keeps the flat guess.
+        _ => 0.56,
+    }
 }
 
 /// The widest of a set of lines. Character *count* used to stand in for width

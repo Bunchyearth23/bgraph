@@ -2536,11 +2536,25 @@ fn a_box_is_sized_for_its_widest_line_not_its_longest() {
 }
 
 #[test]
-fn text_outside_printable_ascii_keeps_the_flat_estimate() {
-    // A table for one Latin typeface has nothing to say about CJK or emoji,
-    // and pretending otherwise would be a worse guess than admitting it.
+fn text_outside_printable_ascii_is_charged_what_a_convention_fixes() {
+    // An ideograph is one em square by the design of the script, so the
+    // table is not consulted and the guess is not consulted either: the
+    // width is known. At 32px the old flat guess gave `日本語のラベル`
+    // 125.44px and the reader drew it in 224px.
     let cjk = crate::layout::advance("日本語", 10.0);
-    assert!((cjk - 3.0 * 0.56 * 10.0).abs() < 0.01, "{cjk}");
+    assert!((cjk - 3.0 * 10.0).abs() < 0.01, "{cjk}");
+
+    // The em dash is one em wide because that is what the name says.
+    let dash = crate::layout::advance(" — ", 10.0);
+    assert!((dash - (2.0 * 0.278 + 1.0) * 10.0).abs() < 0.01, "{dash}");
+
+    // What no convention fixes keeps the flat guess, and the reason is
+    // stated rather than assumed: a joined emoji sequence is one glyph
+    // whatever its characters are, and a bullet is a third of an em.
+    let emoji = crate::layout::advance("🙂", 10.0);
+    assert!((emoji - 0.56 * 10.0).abs() < 0.01, "{emoji}");
+    let bullet = crate::layout::advance("•", 10.0);
+    assert!((bullet - 0.56 * 10.0).abs() < 0.01, "{bullet}");
 }
 
 // ---------------------------------------------------------------------- W-049
