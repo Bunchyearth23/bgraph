@@ -302,6 +302,57 @@ fn prefixed_includes_keep_annotation_references_and_source_locations() {
 }
 
 #[test]
+fn a_prefixed_file_follows_a_style_that_came_from_its_own_include() {
+    // The style is declared in a file the prefixed file includes, so the
+    // compiler sees it as `backend.service`. The class the prefixed file
+    // writes says `.service`, and it has to follow the style across the
+    // prefix — otherwise the reference names nothing that exists.
+    let files = Files::new();
+    files.write(
+        "house.bds",
+        "style service { fill: #dbeafe stroke: #2563eb 1.5 radius: 8 }\n",
+    );
+    files.write(
+        "application.bd",
+        "include \"house.bds\"\n\nnode api \"API\" .service\nnode jobs \"Background jobs\" .service\n",
+    );
+    let path = files.write(
+        "system.bd",
+        "include \"application.bd\" as backend\n\nnode ui \"User interface\"\n",
+    );
+
+    let analysis = bgraph::analyze_file(&path).unwrap();
+    let errors: Vec<_> = analysis
+        .analysis
+        .diagnostics
+        .iter()
+        .filter(|d| d.severity == bgraph::check::Severity::Error)
+        .collect();
+    assert!(errors.is_empty(), "{errors:?}");
+
+    // The class was qualified, and the style it names is the one that paints.
+    let composed = bgraph::compose::load(&path).unwrap();
+    let api = composed
+        .diagram
+        .nodes
+        .iter()
+        .find(|node| node.id.value == "backend.api")
+        .expect("the prefixed node");
+    assert_eq!(
+        api.classes
+            .iter()
+            .map(|c| c.value.as_str())
+            .collect::<Vec<_>>(),
+        ["backend.service"]
+    );
+    let svg = bgraph::render_file(&path).unwrap();
+    assert!(
+        svg.contains("#dbeafe"),
+        "the style from the nested include does not paint"
+    );
+}
+
+#[test]
 fn unsupported_component_declarations_fail_at_the_use_instead_of_disappearing() {
     for body in [
         "component inner { node a }\nuse inner as nested",

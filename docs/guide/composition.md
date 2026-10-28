@@ -40,7 +40,6 @@ A `.bds` file contains styles only; a `.bd` file can contain a full diagram.
 To include the previous diagram from `system.bd`:
 
 ```text
-include "house.bds"
 include "application.bd" as backend
 
 node ui "User interface"
@@ -50,9 +49,12 @@ ui -> backend.api
 
 Render with `bgraph system.bd -o system.svg`.
 `backend.api` refers to `api` in the included file. Node references receive
-the same prefix, which avoids identifier collisions between diagrams.
-Keep `house.bds` included at the top level too: this makes the shared
-`.service` class available when the application is included under a prefix.
+the same prefix, which avoids identifier collisions between diagrams. A class
+does too: `application.bd` writes `.service`, and the style it names comes
+from the `house.bds` that `application.bd` includes, so the compiler looks
+for `backend.service` and finds it. Including `house.bds` at the top level as
+well is no longer needed — and it would leave the top-level copy of the
+style unused.
 
 ## Reuse a component
 

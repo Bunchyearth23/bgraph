@@ -232,7 +232,18 @@ impl State<'_> {
         }
     }
 
-    fn absorb(&mut self, path: &Path, prefix: Option<&str>, entry: Option<&str>) -> Result<()> {
+    /// Absorb a file, and report the styles **it** declared under the names
+    /// they now carry.
+    ///
+    /// The map is what lets an including file follow a class reference into
+    /// a file it included: the style is already qualified by the time the
+    /// parent looks, so the parent has to be told which name means what.
+    fn absorb(
+        &mut self,
+        path: &Path,
+        prefix: Option<&str>,
+        entry: Option<&str>,
+    ) -> Result<HashMap<String, String>> {
         self.dependency(path);
         let path = path
             .canonicalize()
@@ -307,6 +318,10 @@ impl State<'_> {
         let includes = std::mem::take(&mut diagram.includes);
         self.chain.push(path.clone());
         let mut child_links = Vec::new();
+        // The styles the included files brought in, under the names they now
+        // carry. A class in this file that names one of them has to follow it
+        // across the prefix, or it looks for a style that is not there.
+        let mut inherited: HashMap<String, String> = HashMap::new();
         for include in &includes {
             let target = path
                 .parent()
@@ -321,7 +336,8 @@ impl State<'_> {
                 (None, None) => None,
             };
             match self.absorb(&target, nested.as_deref(), None) {
-                Ok(()) => {
+                Ok(brought) => {
+                    inherited.extend(brought);
                     let child_base = self
                         .files
                         .last()
@@ -372,11 +388,28 @@ impl State<'_> {
             self.diagnostics.push(diagnostic);
         }
         shift(&mut diagram, base);
+        // The styles this file declares, and the names they will carry once
+        // the prefix is applied. A file that declares nothing contributes
+        // nothing, and its classes can only be following a style that came
+        // in through one of its own includes.
+        let declared_here: Vec<String> = diagram
+            .styles
+            .iter()
+            .map(|style| style.name.value.clone())
+            .collect();
         if let Some(prefix) = prefix {
-            qualify(&mut diagram, prefix);
+            qualify(&mut diagram, prefix, &inherited);
+        }
+        let mut contributed = HashMap::new();
+        for name in declared_here {
+            let final_name = match prefix {
+                Some(prefix) => format!("{prefix}.{name}"),
+                None => name.clone(),
+            };
+            contributed.insert(name, final_name);
         }
         self.merge(diagram, &path);
-        Ok(())
+        Ok(contributed)
     }
 
     fn merge(&mut self, other: Diagram, from: &Path) {
@@ -707,7 +740,9 @@ fn expand_one(
     // would send a reader to a line that describes every instance rather
     // than the one that is wrong.
     pin(&mut instance, placing.span);
-    qualify(&mut instance, placing.prefix.as_str());
+    // A component body is a text, not a file: it cannot include anything, so
+    // there is no nested style for a class to follow.
+    qualify(&mut instance, placing.prefix.as_str(), &HashMap::new());
 
     // The instance is wrapped in a frame named after it. That is what
     // makes an instance *placeable*: a group is already anchorable,
@@ -1069,7 +1104,7 @@ fn shift_placement_value(placement: &mut crate::ast::Placement, delta: usize) {
 /// A reference the file did *not* declare is left alone: it is either a
 /// forward reference into the file that included this one, or a name from a
 /// third file, and renaming it would break both.
-fn qualify(d: &mut Diagram, prefix: &str) {
+fn qualify(d: &mut Diagram, prefix: &str, inherited: &HashMap<String, String>) {
     let own: std::collections::HashSet<String> = d
         .nodes
         .iter()
@@ -1081,12 +1116,24 @@ fn qualify(d: &mut Diagram, prefix: &str) {
 
     let rename = |x: &mut Spanned<String>| *x = qualified(x, prefix);
 
+    // A class follows the style it names. The file may declare that style
+    // itself, or the style may have come in through one of the file's own
+    // includes — in which case it already carries the prefix, and the class
+    // has to follow it to the name it now answers to. Without this, a file
+    // included under a prefix keeps writing `.service` for a style the
+    // compiler can only see as `backend.service`.
+    let follow = |class: &mut Spanned<String>| {
+        if styles.contains(&class.value) {
+            *class = qualified(class, prefix);
+        } else if let Some(final_name) = inherited.get(&class.value) {
+            class.value = final_name.clone();
+        }
+    };
+
     for node in &mut d.nodes {
         rename(&mut node.id);
         for class in &mut node.classes {
-            if styles.contains(&class.value) {
-                rename(class);
-            }
+            follow(class);
         }
     }
     for group in &mut d.groups {
@@ -1097,9 +1144,7 @@ fn qualify(d: &mut Diagram, prefix: &str) {
             }
         }
         for class in &mut group.classes {
-            if styles.contains(&class.value) {
-                rename(class);
-            }
+            follow(class);
         }
     }
     for layout in &mut d.layouts {
@@ -1140,9 +1185,7 @@ fn qualify(d: &mut Diagram, prefix: &str) {
             rename_placement_anchor(placement, &own, prefix);
         }
         for class in &mut note.classes {
-            if styles.contains(&class.value) {
-                rename(class);
-            }
+            follow(class);
         }
     }
     for legend in &mut d.legends {
@@ -1155,9 +1198,7 @@ fn qualify(d: &mut Diagram, prefix: &str) {
                 .iter_mut()
                 .flat_map(|entry| &mut entry.classes),
         ) {
-            if styles.contains(&class.value) {
-                rename(class);
-            }
+            follow(class);
         }
     }
     for edge in &mut d.edges {
@@ -1170,17 +1211,13 @@ fn qualify(d: &mut Diagram, prefix: &str) {
             rename_placement_anchor(placement, &own, prefix);
         }
         for class in &mut edge.classes {
-            if styles.contains(&class.value) {
-                rename(class);
-            }
+            follow(class);
         }
     }
     for style in &mut d.styles {
         rename(&mut style.name);
-        if let Some(parent) = &mut style.extends
-            && styles.contains(&parent.value)
-        {
-            rename(parent);
+        if let Some(parent) = &mut style.extends {
+            follow(parent);
         }
     }
 }
@@ -1206,7 +1243,7 @@ fn qualified(name: &Spanned<String>, prefix: &str) -> Spanned<String> {
 
 #[cfg(test)]
 mod legend_tests {
-    use super::{Span, pin, qualify, shift};
+    use super::{HashMap, Span, pin, qualify, shift};
     use crate::{ast::Placement, parser};
 
     #[test]
@@ -1216,7 +1253,7 @@ mod legend_tests {
         let original = diagram.legends[0].entries[0].span;
         let class_span = diagram.legends[0].entries[0].classes[0].span;
         let prop_span = diagram.legends[0].entries[0].props[0].values_span;
-        qualify(&mut diagram, "service");
+        qualify(&mut diagram, "service", &HashMap::new());
         shift(&mut diagram, 100);
         let legend = &diagram.legends[0];
         assert_eq!(legend.classes[0].value, "service.live");

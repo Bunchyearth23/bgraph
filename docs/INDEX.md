@@ -28,7 +28,9 @@ purpose — an identifier is earned by being cited.
 **Recorded state: no work item is building, planned or blocked. `W-166` to
 `W-173` landed on 2026-10-27 — the user ruled that the recorded proof closes
 each one — joining `W-174`, landed the same day. **`1.0.1` is released.**
-No question is open; `X-005` is narrowed, `X-033` and `X-034` are mitigated.**
+No question is open; `X-005` is narrowed, `X-033` and `X-034` are mitigated, and
+`X-032` is retired — a prefixed file now follows a style that came from one of
+its own includes, which was the last named follow-up.**
 
 **`1.0.1` released on 2026-10-27.** The user authorized the release; tag
 `v1.0.1` on `18d7684`, run
@@ -231,7 +233,6 @@ Open and residual risks; rows name related work and outstanding evidence.
 | id | state | title | notes |
 |---|---|---|---|
 | `X-033` | mitigated | CLI and delivery paths can destroy inputs or report success for incorrect outputs | The 2026-10-22 fixes stage exports, protect sources/dependencies, preserve output permissions, route templates through the common writers and reject incomplete rows. Boundary regressions and full standard/PNG/runtime gates pass. Native Windows remains to verify; bundle interruption can leave a recoverable backup. `.agent/analysis/audit-remediation-20261022.md`; [editable audit](https://chatgpt.com/space/page_24e4faa833608191bed9b99f4e1399ca). |
-| `X-032` | mitigated | A prefixed diagram can lose class references from a nested shared-style include | Observed while replaying the beginner guide: including application.bd under a prefix reports unknown .service unless its shared house.bds is also included at the root. Both the limitation and the verified workaround are documented; qualification of nested style references remains a follow-up. `.agent/analysis/documentation-english-20261020.md`. |
 | `X-019` | retired | A late pass can invalidate an already solved position | W-153 delivered one simultaneous solver for nodes, frames and BPMN attachments, without a production threshold/fallback. Dependencies/cycles above 512 entities, local origins and permutations checked; 20,000 nodes pass the performance guard. `.agent/analysis/w153-completion.md`. |
 | `X-020` | mitigated | Interfaces can disagree about placement semantics | Shared analysis and diagnostics across surfaces; multifile error recovery uses source maps and LSP relatedInformation. Runtime parity and real VS Code/Zed hosts checked, with explicit Unicode contracts. W-155/W-160; `.agent/analysis/parallel-work-validation.md`. |
 | `X-021` | mitigated | Extending placement without a unified DSL multiplies competing paths | V1 removed from both grammars and the AST; the hidden test converter was removed and fixtures migrated to V2. Keep one `layout` grammar in future extensions. W-154; `.agent/analysis/parallel-work-validation.md`. |
@@ -529,6 +530,7 @@ Nothing is marked `landed` without a commit to point at.
 
 | id | date | title | how |
 |---|---|---|---|
+| `X-032` | 2026-10-28 | A prefixed diagram lost class references from a nested shared-style include | The style a nested include brings is already qualified by the time the parent looks at it, so the parent's own class reference had to follow it across the prefix. `compose::qualify` now takes the styles the included files brought and follows a class into them: a file included as `backend` writes `.service` and the compiler looks for `backend.service`, which is where the style is. The documented workaround — including the shared file at the root as well — is gone from the guide, because it would now leave the top-level copy of the style unused. `tests/audit_data_composition.rs`; `docs/guide/composition.md`. |
 | `X-001` | 2026-07-31 | The Zed extension had never been exercised inside Zed | The Archmagos installed it and reported live completion and rendering behaviour, which drove `D-011` and the `font-color` fix |
 | `X-007` | 2026-07-31 | `W-029` was going to move some syntax errors to semantic ones | It did, exactly once: `alpha beta` is now an item with an unknown keyword. The message names the archetype's word, and `tests/grammar/accept/bare-words-parse-as-items.bd` pins the new category |
 | `X-015` | 2026-07-31 | Prose documentation could not be checked, so it rotted | `language.md` still called a slice a `node` five archetypes after the word changed. Snippets in a ```` ```bgraph ```` fence are now parsed and checked by the suite, and every archetype's section of the reference carries an `include_str!`d example the suite renders |
